@@ -1,0 +1,24 @@
+# Development Dockerfile for SolidJS client with hot reloading
+FROM node:22-alpine
+
+# Install necessary packages
+RUN apk add --no-cache git
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files first for better dependency caching
+COPY package*.json ./
+
+# Install all dependencies (dev + prod) for development
+RUN npm ci && npm cache clean --force
+
+# Copy the rest of the application (source code changes frequently)
+COPY . .
+
+# Expose the port Vite runs on
+EXPOSE 3020
+
+# For development, always ensure latest dependencies are installed
+# This handles cases where package.json changed after image build
+CMD ["sh", "-c", "npm install && npm run dev"]

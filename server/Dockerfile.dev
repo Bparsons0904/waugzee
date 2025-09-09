@@ -1,0 +1,48 @@
+FROM golang:1.25.1-alpine AS base
+
+# Install necessary packages in a single layer
+RUN apk add --no-cache git make gcc musl-dev curl && \
+    go install github.com/air-verse/air@latest
+
+# Set working directory
+WORKDIR /app
+
+# Create cache directories with proper permissions upfront
+RUN mkdir -p /.cache/go-build /go/pkg/mod tmp && \
+    chmod -R 777 /.cache /go/pkg && \
+    chmod 755 tmp
+
+# Copy go mod files first for better dependency caching
+COPY go.mod go.sum ./
+
+# Download and verify dependencies in one step
+RUN go mod download && go mod verify
+
+# Development stage
+FROM base AS development
+
+# Copy Air config first (rarely changes)
+COPY .air.toml .air.toml
+
+# Copy source code (changes frequently, so comes last)
+COPY . .
+
+# Set up final permissions in one layer
+RUN chmod -R 755 /app
+
+# Set environment variables for Go build cache
+ENV GOCACHE=/.cache/go-build
+ENV GOMODCACHE=/go/pkg/mod
+
+# Add air to PATH explicitly
+ENV PATH="/root/go/bin:${PATH}"
+
+# Expose the port your app runs on
+EXPOSE 8288
+
+# Health check for better container monitoring
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8288/api/health || exit 1
+
+# Run Air for hot reloading
+CMD ["air", "-c", ".air.toml"]
