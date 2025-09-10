@@ -23,7 +23,7 @@ const OidcCallback: Component = () => {
         throw new Error("State parameter not received");
       }
 
-      await handleOIDCCallback(code, state, redirectUri);
+      await handleOIDCCallback(Array.isArray(code) ? code[0] : code, Array.isArray(state) ? state[0] : state, redirectUri);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Authentication failed";
       setError(errorMessage);

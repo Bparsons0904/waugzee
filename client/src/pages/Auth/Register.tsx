@@ -10,7 +10,7 @@ import { validators } from "../../utils/validation";
 import { RegisterRequest } from "../../types/User";
 
 const Register: Component = () => {
-  const { register } = useAuth();
+  const auth = useAuth(); // Note: register function not yet implemented in new AuthContext
 
 
   const RegisterFormContent: Component = () => {
@@ -96,7 +96,8 @@ const Register: Component = () => {
     // Create registration payload without confirmPassword
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { confirmPassword, ...registrationData } = formData;
-    register(registrationData as RegisterRequest);
+    // TODO: Implement register function in AuthContext
+        console.log('Register functionality not yet implemented:', registrationData);
   };
 
   return (

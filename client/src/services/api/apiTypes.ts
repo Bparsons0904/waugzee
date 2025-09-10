@@ -31,6 +31,7 @@ export interface RequestConfig {
   params?: Record<string, unknown>;
   headers?: Record<string, string>;
   timeout?: number;
+  signal?: AbortSignal;
 }
 
 // HTTP method types

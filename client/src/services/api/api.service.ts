@@ -1,6 +1,11 @@
 import { env } from "@services/env.service";
 import axios, { AxiosError, AxiosResponse } from "axios";
-import { ApiResponse, ApiClientError, NetworkError, RequestConfig } from "./apiTypes";
+import {
+  ApiResponse,
+  ApiClientError,
+  NetworkError,
+  RequestConfig,
+} from "./apiTypes";
 
 export const apiClient = axios.create({
   baseURL: env.apiUrl + "/api",
@@ -10,52 +15,39 @@ export const apiClient = axios.create({
     "Content-Type": "application/json",
     "X-Client-Type": "solid",
   },
-  withCredentials: true,
 });
 
+// Token management for secure authentication
 let currentToken: string | null = null;
 
-export const initializeTokenInterceptor = (
-  setToken: (token: string) => void,
-) => {
-  // Clear existing interceptors
-  apiClient.interceptors.request.clear();
-  apiClient.interceptors.response.clear();
+// Request interceptor to add Authorization header
+apiClient.interceptors.request.use(
+  (config) => {
+    if (currentToken) {
+      config.headers.Authorization = `Bearer ${currentToken}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
 
-  // Request interceptor to add Authorization header
-  apiClient.interceptors.request.use(
-    (config) => {
-      if (currentToken) {
-        config.headers.Authorization = `Bearer ${currentToken}`;
-      }
-      return config;
-    },
-    (error) => Promise.reject(error)
-  );
+// Response interceptor for error handling
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => Promise.reject(handleApiError(error)),
+);
 
-  // Response interceptor to handle token updates
-  apiClient.interceptors.response.use(
-    (response) => {
-      const token = response.headers["x-auth-token"];
-      if (token) {
-        currentToken = token;
-        setToken(token);
-      }
-      return response;
-    },
-    (error) => {
-      // Clear token on auth errors
-      if (error.response?.status === 401) {
-        currentToken = null;
-      }
-      return Promise.reject(handleApiError(error));
-    },
-  );
+// Token management functions
+export const setApiToken = (token: string | null) => {
+  currentToken = token;
+};
 
-  // Return function to set current token
-  return (token: string | null) => {
-    currentToken = token;
-  };
+export const getApiToken = (): string | null => {
+  return currentToken;
+};
+
+export const clearApiToken = () => {
+  currentToken = null;
 };
 
 // Enhanced error handling function
@@ -64,28 +56,31 @@ const handleApiError = (error: AxiosError): ApiClientError | NetworkError => {
     // Server responded with error status
     const response = error.response as AxiosResponse<ApiResponse>;
     const apiError = response.data?.error;
-    
+
     return new ApiClientError(
-      apiError?.message || error.message || 'An error occurred',
+      apiError?.message || error.message || "An error occurred",
       error.response.status,
       apiError?.code,
-      apiError?.details
+      apiError?.details,
     );
   } else if (error.request) {
     // Request was made but no response received
-    return new NetworkError('Network error: No response received', error);
+    return new NetworkError("Network error: No response received", error);
   } else {
     // Something else happened
-    return new NetworkError(error.message || 'An unexpected error occurred', error);
+    return new NetworkError(
+      error.message || "An unexpected error occurred",
+      error,
+    );
   }
 };
 
 // Generic API request function
 export const apiRequest = async <T>(
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   url: string,
   data?: unknown,
-  config?: RequestConfig
+  config?: RequestConfig,
 ): Promise<T> => {
   try {
     const response = await apiClient.request({
@@ -94,16 +89,6 @@ export const apiRequest = async <T>(
       data,
       ...config,
     });
-
-    // Handle API-level errors in response
-    if (response.data.error) {
-      throw new ApiClientError(
-        response.data.error.message || 'API Error',
-        response.status,
-        response.data.error.code,
-        response.data.error.details
-      );
-    }
 
     return response.data;
   } catch (error) {
@@ -119,36 +104,36 @@ export const getApi = async <T>(
   url: string,
   params?: Record<string, unknown>,
 ): Promise<T> => {
-  return apiRequest<T>('GET', url, undefined, { params });
+  return apiRequest<T>("GET", url, undefined, { params });
 };
 
 export const postApi = async <T, U = unknown>(
-  url: string, 
+  url: string,
   data: U,
-  config?: RequestConfig
+  config?: RequestConfig,
 ): Promise<T> => {
-  return apiRequest<T>('POST', url, data, config);
+  return apiRequest<T>("POST", url, data, config);
 };
 
 export const putApi = async <T, U = unknown>(
-  url: string, 
+  url: string,
   data: U,
-  config?: RequestConfig
+  config?: RequestConfig,
 ): Promise<T> => {
-  return apiRequest<T>('PUT', url, data, config);
+  return apiRequest<T>("PUT", url, data, config);
 };
 
 export const patchApi = async <T, U = unknown>(
-  url: string, 
+  url: string,
   data: U,
-  config?: RequestConfig
+  config?: RequestConfig,
 ): Promise<T> => {
-  return apiRequest<T>('PATCH', url, data, config);
+  return apiRequest<T>("PATCH", url, data, config);
 };
 
 export const deleteApi = async <T>(
   url: string,
-  config?: RequestConfig
+  config?: RequestConfig,
 ): Promise<T> => {
-  return apiRequest<T>('DELETE', url, undefined, config);
+  return apiRequest<T>("DELETE", url, undefined, config);
 };

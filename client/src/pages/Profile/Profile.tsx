@@ -12,7 +12,7 @@ const Profile: Component = () => {
         <h2>User Information</h2>
         <div style={{ margin: "1rem 0" }}>
           <p>
-            <strong>Username:</strong> {user?.login || "Not available"}
+            <strong>Username:</strong> {user?.displayName || "Not available"}
           </p>
           <p>
             <strong>Name:</strong> {user?.firstName || ""}{" "}
@@ -22,9 +22,9 @@ const Profile: Component = () => {
             <strong>User ID:</strong> {user?.id || "Not available"}
           </p>
           <p>
-            <strong>Member Since:</strong>{" "}
-            {user?.createdAt
-              ? new Date(user.createdAt).toLocaleDateString()
+            <strong>Last Login:</strong>{" "}
+            {user?.lastLoginAt
+              ? new Date(user.lastLoginAt).toLocaleDateString()
               : "Not available"}
           </p>
         </div>
