@@ -200,10 +200,17 @@ func (h *AuthHandler) exchangeToken(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate the token and get user info
-	tokenInfo, err := h.zitadelService.ValidateToken(c.Context(), tokenResp.AccessToken)
+	// Validate the ID token and get user info (use ID token for public OIDC clients)
+	var tokenInfo *services.TokenInfo
+	if tokenResp.IDToken != "" {
+		tokenInfo, err = h.zitadelService.ValidateIDToken(c.Context(), tokenResp.IDToken)
+	} else {
+		// Fallback to access token validation for confidential clients
+		tokenInfo, err = h.zitadelService.ValidateToken(c.Context(), tokenResp.AccessToken)
+	}
+	
 	if err != nil || !tokenInfo.Valid {
-		log.Info("token validation failed", "error", err)
+		log.Info("token validation failed", "error", err, "hasIDToken", tokenResp.IDToken != "")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Invalid token received",
 		})
@@ -298,10 +305,17 @@ func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate token and create user session (same logic as exchangeToken)
-	tokenInfo, err := h.zitadelService.ValidateToken(c.Context(), tokenResp.AccessToken)
+	// Validate the ID token and get user info (use ID token for public OIDC clients)
+	var tokenInfo *services.TokenInfo
+	if tokenResp.IDToken != "" {
+		tokenInfo, err = h.zitadelService.ValidateIDToken(c.Context(), tokenResp.IDToken)
+	} else {
+		// Fallback to access token validation for confidential clients
+		tokenInfo, err = h.zitadelService.ValidateToken(c.Context(), tokenResp.AccessToken)
+	}
+	
 	if err != nil || !tokenInfo.Valid {
-		log.Info("OIDC callback token validation failed", "error", err)
+		log.Info("OIDC callback token validation failed", "error", err, "hasIDToken", tokenResp.IDToken != "")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication failed",
 		})

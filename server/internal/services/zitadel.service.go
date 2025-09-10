@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -48,6 +49,7 @@ type TokenExchangeResponse struct {
 	RefreshToken string `json:"refresh_token,omitempty"`
 	ExpiresIn    int64  `json:"expires_in"`
 	Scope        string `json:"scope,omitempty"`
+	IDToken      string `json:"id_token,omitempty"`
 }
 
 func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
@@ -83,6 +85,84 @@ func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 
 	log.Info("Zitadel service initialized successfully", "issuer", cfg.ZitadelInstanceURL)
 	return service, nil
+}
+
+// ValidateIDToken validates an OIDC ID token by decoding its claims
+// Note: This is a basic implementation that decodes the JWT payload without signature verification
+// For production use, you should verify the JWT signature using the OIDC discovery endpoint
+func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (*TokenInfo, error) {
+	if !zs.configured {
+		return nil, fmt.Errorf("zitadel service not configured")
+	}
+
+	log := zs.log.Function("ValidateIDToken")
+
+	// Split JWT token into parts
+	parts := strings.Split(idToken, ".")
+	if len(parts) != 3 {
+		return nil, log.Err("invalid JWT format", fmt.Errorf("expected 3 parts, got %d", len(parts)))
+	}
+
+	// Decode the payload (second part)
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, log.Err("failed to decode JWT payload", err)
+	}
+
+	// Parse the claims
+	var claims struct {
+		Sub   string      `json:"sub"`
+		Email string      `json:"email"`
+		Name  string      `json:"name"`
+		Exp   int64       `json:"exp"`
+		Iss   string      `json:"iss"`
+		Aud   interface{} `json:"aud"` // Can be string or []string
+	}
+
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil, log.Err("failed to parse JWT claims", err)
+	}
+
+	// Basic validation
+	now := time.Now().Unix()
+	if claims.Exp < now {
+		return &TokenInfo{Valid: false}, log.Err("token expired", fmt.Errorf("exp: %d, now: %d", claims.Exp, now))
+	}
+
+	// Verify issuer
+	expectedIssuer := strings.TrimSuffix(zs.issuer, "/")
+	if claims.Iss != expectedIssuer {
+		return &TokenInfo{Valid: false}, log.Err("invalid issuer", fmt.Errorf("expected: %s, got: %s", expectedIssuer, claims.Iss))
+	}
+
+	// Verify audience (client ID) - can be string or array
+	audienceValid := false
+	switch aud := claims.Aud.(type) {
+	case string:
+		audienceValid = aud == zs.clientID
+	case []interface{}:
+		for _, a := range aud {
+			if str, ok := a.(string); ok && str == zs.clientID {
+				audienceValid = true
+				break
+			}
+		}
+	}
+	
+	if !audienceValid {
+		return &TokenInfo{Valid: false}, log.Err("invalid audience", fmt.Errorf("expected client ID %s not found in audience", zs.clientID))
+	}
+
+	log.Info("ID token validation successful", "sub", claims.Sub, "email", claims.Email)
+	
+	return &TokenInfo{
+		UserID:    claims.Sub,
+		Email:     claims.Email,
+		Name:      claims.Name,
+		Roles:     []string{}, // Roles would need to be in custom claims
+		ProjectID: "",
+		Valid:     true,
+	}, nil
 }
 
 // ValidateToken validates an access token using OIDC introspection

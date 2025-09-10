@@ -8,10 +8,10 @@ const Landing: Component = () => {
 
   return (
     <Show when={isAuthenticated()} fallback={<Home />}>
+      <Home />
       <Dashboard />
     </Show>
   );
 };
 
 export default Landing;
-

@@ -36,16 +36,58 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
 
+// Token storage utilities
+const TOKEN_KEY = 'waugzee_auth_token';
+
+const getStoredToken = (): string | null => {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const setStoredToken = (token: string | null) => {
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  } catch {
+    // Silently fail if localStorage is not available
+  }
+};
+
+// Validate token format (basic JWT structure check)
+const isValidTokenFormat = (token: string): boolean => {
+  if (!token) return false;
+  const parts = token.split('.');
+  return parts.length === 3 && parts.every(part => part.length > 0);
+};
+
 export function AuthProvider(props: { children: JSX.Element }) {
   const navigate = useNavigate();
   const [user, setUser] = createStore<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = createSignal<boolean | null>(
     null,
   );
-  const [authToken, setAuthToken] = createSignal<string | null>(null);
+  const [authToken, setAuthToken] = createSignal<string | null>(getStoredToken());
   const [authConfig, setAuthConfig] = createSignal<AuthConfig | null>(null);
 
-  initializeTokenInterceptor(setAuthToken);
+  // Initialize token interceptor with persistence
+  const updateApiToken = initializeTokenInterceptor((token: string) => {
+    setAuthToken(token);
+    setStoredToken(token);
+  });
+
+  // Set initial token if we have one stored
+  createEffect(() => {
+    const token = authToken();
+    if (token) {
+      updateApiToken(token);
+    }
+  });
 
   // Initialize auth configuration
   const configQuery = apiClient.auth.config();
@@ -58,33 +100,55 @@ export function AuthProvider(props: { children: JSX.Element }) {
     }
   });
 
-  // Check current user if we have a token - but don't run if we don't have basic config yet
-  const meQuery = apiClient.auth.me();
-  createEffect(() => {
-    if (meQuery.isSuccess && meQuery.data?.user) {
-      setUser(meQuery.data.user);
-      setIsAuthenticated(true);
-    } else if (meQuery.isError) {
-      // Only set to false if we actually got an error (like 401)
-      // Don't set false if query just hasn't run yet
-      setIsAuthenticated(false);
-      setUser(null);
-    } else if (meQuery.isSuccess && !meQuery.data?.user) {
-      setIsAuthenticated(false);
-      setUser(null);
-    }
+  // Check if we should attempt auth/me based on stored token
+  const hasValidToken = () => {
+    const token = authToken();
+    return token && isValidTokenFormat(token);
+  };
 
-    // If config is loaded but queries are still pending, set a reasonable default
-    if (configQuery.isSuccess && meQuery.isPending) {
-      // Still loading, keep auth state null to show loading
+  // Only check current user if we have a valid token - otherwise immediately set as unauthenticated
+  createEffect(() => {
+    if (!hasValidToken()) {
+      setIsAuthenticated(false);
+      setUser(null);
       return;
     }
 
-    // If both config and me query failed, assume not authenticated
-    if (configQuery.isError && meQuery.isError) {
-      setIsAuthenticated(false);
-      setUser(null);
-    }
+    // We have a token, try to validate it with /me endpoint
+    const checkAuthStatus = async () => {
+      try {
+        const response = await fetch(`${env.apiUrl}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${authToken()}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.user) {
+            setUser(data.user);
+            setIsAuthenticated(true);
+          } else {
+            setIsAuthenticated(false);
+            setUser(null);
+          }
+        } else {
+          // Token is invalid, clear it
+          setAuthToken(null);
+          setStoredToken(null);
+          updateApiToken(null);
+          setIsAuthenticated(false);
+          setUser(null);
+        }
+      } catch (error) {
+        console.warn('Auth check failed:', error);
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+    };
+
+    checkAuthStatus();
   });
 
   const loginWithOIDC = async () => {
@@ -155,6 +219,8 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
       if (response.ok && data.access_token && data.user) {
         setAuthToken(data.access_token);
+        setStoredToken(data.access_token);
+        updateApiToken(data.access_token);
         setUser(data.user);
         setIsAuthenticated(true);
 
@@ -171,6 +237,8 @@ export function AuthProvider(props: { children: JSX.Element }) {
       setIsAuthenticated(false);
       setUser(null);
       setAuthToken(null);
+      setStoredToken(null);
+      updateApiToken(null);
 
       // Clean up stored state
       localStorage.removeItem("oidc_state");
@@ -187,12 +255,16 @@ export function AuthProvider(props: { children: JSX.Element }) {
       setUser(null);
       setIsAuthenticated(false);
       setAuthToken(null);
+      setStoredToken(null);
+      updateApiToken(null);
       navigate("/login");
     } catch {
       // Still clear local state even if server logout fails
       setUser(null);
       setIsAuthenticated(false);
       setAuthToken(null);
+      setStoredToken(null);
+      updateApiToken(null);
       navigate("/login");
     }
   };
@@ -209,7 +281,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
         logout,
       }}
     >
-      <Show when={isAuthenticated() !== null || configQuery.isError}>
+      <Show when={isAuthenticated() !== null || configQuery.isError || (!hasValidToken() && configQuery.isSuccess)}>
         {props.children}
       </Show>
     </AuthContext.Provider>

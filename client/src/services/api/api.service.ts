@@ -13,22 +13,49 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
+let currentToken: string | null = null;
+
 export const initializeTokenInterceptor = (
   setToken: (token: string) => void,
 ) => {
+  // Clear existing interceptors
+  apiClient.interceptors.request.clear();
   apiClient.interceptors.response.clear();
+
+  // Request interceptor to add Authorization header
+  apiClient.interceptors.request.use(
+    (config) => {
+      if (currentToken) {
+        config.headers.Authorization = `Bearer ${currentToken}`;
+      }
+      return config;
+    },
+    (error) => Promise.reject(error)
+  );
+
+  // Response interceptor to handle token updates
   apiClient.interceptors.response.use(
     (response) => {
       const token = response.headers["x-auth-token"];
       if (token) {
+        currentToken = token;
         setToken(token);
       }
       return response;
     },
     (error) => {
+      // Clear token on auth errors
+      if (error.response?.status === 401) {
+        currentToken = null;
+      }
       return Promise.reject(handleApiError(error));
     },
   );
+
+  // Return function to set current token
+  return (token: string | null) => {
+    currentToken = token;
+  };
 };
 
 // Enhanced error handling function
