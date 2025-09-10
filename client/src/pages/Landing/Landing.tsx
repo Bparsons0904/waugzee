@@ -14,3 +14,4 @@ const Landing: Component = () => {
 };
 
 export default Landing;
+

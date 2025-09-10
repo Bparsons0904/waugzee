@@ -1,6 +1,7 @@
 package models
 
 import (
+	"time"
 	"gorm.io/gorm"
 )
 
@@ -16,9 +17,11 @@ type User struct {
 	IsActive    bool    `gorm:"type:bool;default:true"  json:"isActive"`
 
 	// OIDC integration fields
-	OIDCUserID   string  `gorm:"type:text;uniqueIndex" json:"-"`
-	OIDCProvider *string `gorm:"type:text"             json:"oidcProvider,omitempty"`
-	LastLoginAt  *int64  `gorm:"type:bigint"           json:"lastLoginAt,omitempty"`
+	OIDCUserID      string    `gorm:"type:text;uniqueIndex"     json:"-"`
+	OIDCProvider    *string   `gorm:"type:text"                 json:"oidcProvider,omitempty"`
+	OIDCProjectID   *string   `gorm:"type:text"                 json:"-"`
+	LastLoginAt     *time.Time `gorm:"type:timestamp"           json:"lastLoginAt,omitempty"`
+	ProfileVerified bool      `gorm:"type:bool;default:false"   json:"profileVerified"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {
@@ -38,36 +41,43 @@ type LoginRequest struct {
 
 // OIDCUserCreateRequest represents data for creating a user from OIDC claims
 type OIDCUserCreateRequest struct {
-	OIDCUserID   string  `json:"oidcUserId"`
-	Email        *string `json:"email,omitempty"`
-	Name         *string `json:"name,omitempty"`
-	FirstName    string  `json:"firstName"`
-	LastName     string  `json:"lastName"`
-	OIDCProvider string  `json:"oidcProvider"`
-	TenantID     *string `json:"tenantId,omitempty"`
+	OIDCUserID      string  `json:"oidcUserId"`
+	Email           *string `json:"email,omitempty"`
+	Name            *string `json:"name,omitempty"`
+	FirstName       string  `json:"firstName"`
+	LastName        string  `json:"lastName"`
+	OIDCProvider    string  `json:"oidcProvider"`
+	OIDCProjectID   *string `json:"oidcProjectId,omitempty"`
+	ProfileVerified bool    `json:"profileVerified"`
 }
 
 // UserProfile represents public user profile information
 type UserProfile struct {
-	ID          string  `json:"id"`
-	FirstName   string  `json:"firstName"`
-	LastName    string  `json:"lastName"`
-	DisplayName string  `json:"displayName"`
-	Email       *string `json:"email,omitempty"`
-	IsActive    bool    `json:"isActive"`
-	LastLoginAt *int64  `json:"lastLoginAt,omitempty"`
+	ID              string     `json:"id"`
+	FirstName       string     `json:"firstName"`
+	LastName        string     `json:"lastName"`
+	FullName        string     `json:"fullName"`
+	DisplayName     string     `json:"displayName"`
+	Email           *string    `json:"email,omitempty"`
+	IsActive        bool       `json:"isActive"`
+	IsAdmin         bool       `json:"isAdmin"`
+	LastLoginAt     *time.Time `json:"lastLoginAt,omitempty"`
+	ProfileVerified bool       `json:"profileVerified"`
 }
 
 // ToProfile converts a User to a UserProfile (public information only)
 func (u *User) ToProfile() UserProfile {
 	return UserProfile{
-		ID:          u.ID.String(),
-		FirstName:   u.FirstName,
-		LastName:    u.LastName,
-		DisplayName: u.DisplayName,
-		Email:       u.Email,
-		IsActive:    u.IsActive,
-		LastLoginAt: u.LastLoginAt,
+		ID:              u.ID.String(),
+		FirstName:       u.FirstName,
+		LastName:        u.LastName,
+		FullName:        u.FullName,
+		DisplayName:     u.DisplayName,
+		Email:           u.Email,
+		IsActive:        u.IsActive,
+		IsAdmin:         u.IsAdmin,
+		LastLoginAt:     u.LastLoginAt,
+		ProfileVerified: u.ProfileVerified,
 	}
 }
 
@@ -77,17 +87,29 @@ func (u *User) IsOIDCUser() bool {
 }
 
 // UpdateFromOIDC updates user information from OIDC claims
-func (u *User) UpdateFromOIDC(oidcEmail, oidcName *string, provider string) {
-	if oidcEmail != nil {
+func (u *User) UpdateFromOIDC(oidcEmail, oidcName *string, provider string, projectID *string) {
+	now := time.Now()
+	u.LastLoginAt = &now
+
+	if oidcEmail != nil && *oidcEmail != "" {
 		u.Email = oidcEmail
 	}
 
-	if oidcName != nil {
+	if oidcName != nil && *oidcName != "" {
 		u.DisplayName = *oidcName
 	}
 
 	if provider != "" {
 		providerPtr := &provider
 		u.OIDCProvider = providerPtr
+	}
+
+	if projectID != nil {
+		u.OIDCProjectID = projectID
+	}
+
+	// Mark profile as verified if we have email from OIDC provider
+	if oidcEmail != nil && *oidcEmail != "" {
+		u.ProfileVerified = true
 	}
 }

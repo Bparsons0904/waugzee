@@ -21,7 +21,12 @@ This prevents wasted time and ensures accurate implementation.
 
 For comprehensive information about the migration strategy, architecture decisions, and implementation roadmap, see:
 
-**[PROJECT_PLAN.md](PROJECT_PLAN.md)** - Complete migration strategy and implementation plan
+**[docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md)** - Complete migration strategy and implementation plan
+
+Additional documentation available:
+- **[docs/API_IMPLEMENTATION_GUIDE.md](docs/API_IMPLEMENTATION_GUIDE.md)** - API development guidelines
+- **[docs/PHASE1_COMPLETION.md](docs/PHASE1_COMPLETION.md)** - Phase 1 completion status
+- **[docs/PGO_GUIDE.md](docs/PGO_GUIDE.md)** - Performance optimization guide
 
 ## Testing Philosophy
 
@@ -110,8 +115,8 @@ Full-stack vinyl record collection management application:
 
 ### Key Ports (Development)
 
-- Server API: http://localhost:8288 (WebSocket: ws://localhost:8288/ws)
-- Client App: http://localhost:3020
+- Server API: http://localhost:8289 (WebSocket: ws://localhost:8289/ws)
+- Client App: http://localhost:3021
 - PostgreSQL: localhost:5432
 - Valkey DB: localhost:6399
 
@@ -161,7 +166,7 @@ Full-stack vinyl record collection management application:
 - `server/internal/handlers/router.go` - API route definitions
 - `client/src/services/api/api.service.ts` - API client with interceptors
 - `Tiltfile` - Development environment configuration
-- `PROJECT_PLAN.md` - Complete project roadmap and architecture decisions
+- `docs/PROJECT_PLAN.md` - Complete project roadmap and architecture decisions
 
 ### Environment Configuration
 
@@ -204,8 +209,8 @@ Available MCP tools and their preferred usage:
 
 ## Migration Status
 
-This project is currently in **Phase 1: Foundation Setup**. See PROJECT_PLAN.md for detailed progress and next steps.
+This project is currently in **Phase 2: Authentication & User Management**. See docs/PROJECT_PLAN.md for detailed progress and next steps.
 
 ---
 
-**Project Status**: 🚧 **Active Development** - Foundation phase in progress
+**Project Status**: 🚧 **Active Development** - Phase 2: Authentication & User Management

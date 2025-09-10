@@ -152,3 +152,85 @@
 .authCard {
   animation: authSlideIn 0.6s ease-out;
 }
+
+// OIDC-specific styles
+.authContent {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.authInfo {
+  text-align: center;
+  margin-top: $spacing-md;
+}
+
+.authInfoText {
+  font-size: $font-size-sm;
+  color: $text-muted;
+  line-height: $line-height-loose;
+}
+
+.errorContainer {
+  text-align: center;
+  padding: $spacing-lg;
+  background: rgba($color-error-500, 0.1);
+  border: 1px solid rgba($color-error-500, 0.2);
+  border-radius: $border-radius-lg;
+  margin-bottom: $spacing-lg;
+}
+
+.errorMessage {
+  color: $color-error-700;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  margin: 0;
+}
+
+.retryButton {
+  margin-top: $spacing-md;
+  padding: $spacing-sm $spacing-md;
+  background: $color-error-500;
+  color: white;
+  border: none;
+  border-radius: $border-radius-md;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  cursor: pointer;
+  transition: background $transition-fast $transition-timing-default;
+  
+  &:hover {
+    background: $color-error-700;
+  }
+}
+
+.loadingContainer {
+  text-align: center;
+  padding: $spacing-xl;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba($color-primary-500, 0.2);
+  border-top-color: $color-primary-500;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto $spacing-md;
+}
+
+.successContainer {
+  text-align: center;
+  padding: $spacing-lg;
+  background: rgba($color-success-500, 0.1);
+  border: 1px solid rgba($color-success-500, 0.2);
+  border-radius: $border-radius-lg;
+  color: $color-success-700;
+  font-weight: $font-weight-medium;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

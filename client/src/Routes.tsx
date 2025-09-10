@@ -6,6 +6,7 @@ import { createEffect } from "solid-js";
 
 const LoginPage = lazy(() => import("@pages/Auth/Login"));
 const RegisterPage = lazy(() => import("@pages/Auth/Register"));
+const OidcCallbackPage = lazy(() => import("@pages/Auth/OidcCallback"));
 const ProfilePage = lazy(() => import("@pages/Profile/Profile"));
 const DashboardPage = lazy(() => import("@pages/Dashboard/Dashboard"));
 const LandingPage = lazy(() => import("@pages/Landing/Landing"));
@@ -38,6 +39,7 @@ export const Routes: Component = () => {
       <Route path="/" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
+      <Route path="/auth/callback" component={OidcCallbackPage} />
       <Route path="/dashboard" component={ProtectedRoute(DashboardPage)} />
       <Route path="/profile" component={ProtectedRoute(ProfilePage)} />
       {/* <Route path="/workstation" component={ProtectedRoute(WorkstationPage)} /> */}

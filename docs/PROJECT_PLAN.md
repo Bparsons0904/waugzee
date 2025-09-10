@@ -17,6 +17,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 ## Architecture Comparison
 
 ### Original Kleio Issues
+
 - SQLite with direct SQL queries
 - No proper user management (single-user)
 - Basic migration system with manual SQL files
@@ -26,6 +27,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 - Manual authentication handling
 
 ### Waugzee Advantages (Vim-Based)
+
 - PostgreSQL + Valkey (Redis) dual database architecture
 - Multi-user ready with Zitadel OIDC integration
 - GORM with proper migrations and UUID7 primary keys
@@ -41,13 +43,15 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 **Goals**: Establish core infrastructure and architecture
 
 **Tasks**:
+
 - [x] Create new project structure based on Vim architecture
 - [x] Set up project documentation (CLAUDE.md, PROJECT_PLAN.md)
-- [ ] Strip Vim to bare bones foundation
-- [ ] Update module names and basic configuration
-- [ ] Verify development environment setup
+- [x] Strip Vim to bare bones foundation
+- [x] Update module names and basic configuration
+- [x] Verify development environment setup
 
 **Deliverables**:
+
 - Clean project scaffolding
 - Working development environment with Tilt
 - Basic infrastructure (PostgreSQL + Valkey)
@@ -58,6 +62,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 **Goals**: Implement Zitadel OIDC integration and multi-user foundation
 
 **Tasks**:
+
 - Integrate Zitadel OIDC client
 - Create user management system with proper models
 - Implement JWT middleware and session management
@@ -65,6 +70,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 - Create authentication flow in frontend
 
 **Deliverables**:
+
 - Working OIDC authentication
 - User model with proper relationships
 - Protected API endpoints
@@ -75,6 +81,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 **Goals**: Establish vinyl collection data structures
 
 **Tasks**:
+
 - Create vinyl record models (Albums, Artists, Labels, etc.)
 - Implement equipment models (Turntables, Cartridges, Styluses)
 - Add session tracking models (Play sessions, Maintenance records)
@@ -82,6 +89,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 - Implement repository pattern for all entities
 
 **Deliverables**:
+
 - Complete data model architecture
 - Working migrations
 - Repository interfaces for all entities
@@ -92,6 +100,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 **Goals**: Port core Kleio functionality to new architecture
 
 **Tasks**:
+
 - Migrate Discogs integration service
 - Implement collection sync logic
 - Create play tracking system
@@ -99,6 +108,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 - Port analytics and reporting logic
 
 **Deliverables**:
+
 - Working Discogs integration
 - Collection sync functionality
 - Play logging system
@@ -109,6 +119,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 **Goals**: Complete REST API with proper error handling and validation
 
 **Tasks**:
+
 - Implement controllers using repository pattern
 - Add input validation and error handling
 - Create comprehensive API documentation
@@ -116,6 +127,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 - Implement WebSocket support for real-time features
 
 **Deliverables**:
+
 - Complete REST API
 - Proper error handling
 - API documentation
@@ -126,6 +138,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 **Goals**: Port and enhance user interface
 
 **Tasks**:
+
 - Port existing Kleio components to SolidJS structure
 - Implement authentication integration
 - Create responsive design system
@@ -133,6 +146,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 - Implement analytics dashboard
 
 **Deliverables**:
+
 - Complete frontend application
 - Responsive design
 - Real-time features
@@ -143,6 +157,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 **Goals**: Migrate existing data and deploy to production
 
 **Tasks**:
+
 - Create data migration scripts (SQLite → PostgreSQL)
 - Implement data validation and integrity checks
 - Set up production deployment pipeline
@@ -150,6 +165,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 - Performance testing and optimization
 
 **Deliverables**:
+
 - Data migration tools
 - Production deployment
 - Monitoring and logging
@@ -158,6 +174,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 ## Technical Architecture
 
 ### Backend Stack
+
 - **Language**: Go 1.24+
 - **Framework**: Fiber v2
 - **Database**: PostgreSQL 15+
@@ -167,6 +184,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 - **Architecture**: Repository pattern with dependency injection
 
 ### Frontend Stack
+
 - **Framework**: SolidJS with TypeScript
 - **Build Tool**: Vite
 - **Styling**: SCSS with CSS Modules
@@ -175,6 +193,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 - **Real-time**: WebSocket integration
 
 ### Infrastructure
+
 - **Development**: Tilt orchestration with Docker
 - **Database**: PostgreSQL with proper migrations
 - **Cache**: Valkey for sessions and temporary data
@@ -183,17 +202,20 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 ## Key Design Decisions
 
 ### Database Architecture
+
 - **PostgreSQL over SQLite**: Better concurrency, proper relationships, production-ready
 - **UUID7 Primary Keys**: Better for distributed systems, sortable UUIDs
 - **Dual Database Strategy**: PostgreSQL for persistent data, Valkey for cache/sessions
 - **GORM Migrations**: Type-safe migrations, better than raw SQL
 
 ### Authentication Strategy
+
 - **Zitadel OIDC**: Enterprise-grade authentication, multi-tenant ready
 - **JWT Tokens**: Stateless authentication, WebSocket compatible
 - **Session Management**: Valkey-based sessions for performance
 
 ### Architecture Patterns
+
 - **Repository Pattern**: Clean separation of data access logic
 - **Dependency Injection**: Testable, maintainable code
 - **Interface-Based Design**: Easy mocking and testing
@@ -202,6 +224,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 ## Development Environment
 
 ### Required Tools
+
 - Docker & Docker Compose
 - Tilt (for orchestration)
 - Go 1.24+
@@ -209,6 +232,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 - PostgreSQL client tools
 
 ### Development Workflow
+
 1. `tilt up` - Start entire development environment
 2. Access Tilt dashboard at http://localhost:10350
 3. Frontend at http://localhost:3020
@@ -216,6 +240,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 5. Hot reloading for both frontend and backend
 
 ### Key Development Commands
+
 ```bash
 # Start development
 tilt up
@@ -236,24 +261,29 @@ tilt trigger migrate-seed
 ## Migration Timeline
 
 ### Phase 1-2: Weeks 1-2
+
 - Foundation setup and authentication
 - Basic infrastructure working
 
 ### Phase 3-4: Weeks 3-4
+
 - Data models and business logic
 - Core functionality working
 
 ### Phase 5-6: Weeks 5-6
+
 - API and frontend completion
 - Full application working
 
 ### Phase 7: Week 7
+
 - Data migration and production deployment
 - Go-live preparation
 
 ## Success Criteria
 
 ### Phase 1 Complete When:
+
 - [x] Project structure established
 - [x] Documentation created
 - [ ] Development environment running via Tilt
@@ -261,6 +291,7 @@ tilt trigger migrate-seed
 - [ ] PostgreSQL + Valkey connectivity working
 
 ### Final Success Criteria:
+
 - All original Kleio functionality working
 - Multi-user authentication via Zitadel
 - Data successfully migrated from old system
@@ -271,11 +302,13 @@ tilt trigger migrate-seed
 ## Risk Mitigation
 
 ### Development Risks
+
 - **Zitadel Integration Complexity**: Start with basic OIDC, expand gradually
 - **Data Migration Challenges**: Create comprehensive migration scripts with rollback
 - **Performance Concerns**: Use established patterns from Vim project
 
 ### Deployment Risks
+
 - **Database Migration**: Extensive testing, backup procedures
 - **Authentication Integration**: Thorough testing with multiple users
 - **Performance Regression**: Load testing, monitoring
@@ -283,12 +316,14 @@ tilt trigger migrate-seed
 ## Current Status: Phase 1 In Progress
 
 ### Completed:
+
 - [x] Project structure created
 - [x] CLAUDE.md documentation
 - [x] PROJECT_PLAN.md created
 - [x] Base Vim structure copied
 
 ### Next Steps:
+
 - [ ] Strip unnecessary Vim components
 - [ ] Update Go module and configuration
 - [ ] Verify Tilt development environment
@@ -299,3 +334,4 @@ tilt trigger migrate-seed
 **Last Updated**: 2025-09-09  
 **Phase**: 1 - Foundation Setup  
 **Status**: 🚧 Active Development
+

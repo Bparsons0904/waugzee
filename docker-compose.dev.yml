@@ -33,7 +33,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: waugzee-client-${DOCKER_ENV:-dev}
     ports:
-      - "${CLIENT_PORT:-3021}:3020"
+      - "${CLIENT_PORT:-3021}:3021"
     volumes:
       - ./client:/app
       - client_node_modules:/app/node_modules
@@ -45,7 +45,7 @@ services:
       - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8288/ws}
       - VITE_ENV=${VITE_ENV:-local}
       - VITE_HOST=0.0.0.0
-      - VITE_PORT=3020 # Internal port should always be 3020
+      - VITE_PORT=3021 # Internal port should always be 3020
     working_dir: /app
     networks:
       - dev-network-dev

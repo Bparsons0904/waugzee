@@ -6,7 +6,7 @@ export default defineConfig({
   envDir: "../",
   plugins: [solidPlugin()],
   server: {
-    port: 3020,
+    port: 3021,
     host: "0.0.0.0",
     hmr: {
       protocol: "ws",

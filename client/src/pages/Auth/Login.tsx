@@ -1,57 +1,25 @@
-import { Component } from "solid-js";
-import { A } from "@solidjs/router";
+import { Component, createSignal, Show } from "solid-js";
 import styles from "./Auth.module.scss";
-import { TextInput } from "@components/common/forms/TextInput/TextInput";
 import { Button } from "@components/common/ui/Button/Button";
 import { useAuth } from "@context/AuthContext";
-import { Form } from "@components/common/forms/Form/Form";
-import { useForm } from "@context/FormContext";
 
 const Login: Component = () => {
-  const { login } = useAuth();
+  const { loginWithOIDC, authConfig } = useAuth();
+  const [loading, setLoading] = createSignal(false);
+  const [error, setError] = createSignal<string | null>(null);
 
-  const handleSubmit = (formData: Record<string, string>) => {
-    login({
-      login: formData.login,
-      password: formData.password,
-    });
-  };
-
-  const LoginFormContent: Component = () => {
-    const form = useForm();
-    
-    return (
-      <>
-        <TextInput
-          label="Username or Email"
-          name="login"
-          defaultValue="admin"
-          autoComplete="username"
-          minLength={3}
-          required
-        />
-        <TextInput
-          label="Password"
-          name="password"
-          type="password"
-          defaultValue="password"
-          autoComplete="current-password"
-          minLength={6}
-          required
-        />
-
-        <div class={styles.authActions}>
-          <Button 
-            type="submit" 
-            variant="gradient" 
-            size="lg"
-            disabled={!form.isFormValid()}
-          >
-            Sign In
-          </Button>
-        </div>
-      </>
-    );
+  const handleOIDCLogin = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      await loginWithOIDC();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Login failed";
+      setError(errorMessage);
+      console.error("Login error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -61,21 +29,39 @@ const Login: Component = () => {
           <div class={styles.authHeader}>
             <h1 class={styles.authTitle}>Welcome Back</h1>
             <p class={styles.authSubtitle}>
-              Sign in to continue your creative journey
+              Sign in to continue your vinyl journey
             </p>
           </div>
 
-          <Form class={styles.authForm} onSubmit={handleSubmit}>
-            <LoginFormContent />
-          </Form>
+          <div class={styles.authContent}>
+            <Show when={authConfig()?.configured} fallback={
+              <div class={styles.errorContainer}>
+                <p class={styles.errorMessage}>Authentication is not configured</p>
+              </div>
+            }>
+              <Show when={error()}>
+                <div class={styles.errorContainer}>
+                  <p class={styles.errorMessage}>{error()}</p>
+                </div>
+              </Show>
 
-          <div class={styles.authFooter}>
-            <p class={styles.authFooterText}>
-              Don't have an account?{" "}
-              <A href="/register" class={styles.authLink}>
-                Create one here
-              </A>
-            </p>
+              <div class={styles.authActions}>
+                <Button 
+                  variant="gradient" 
+                  size="lg"
+                  onClick={handleOIDCLogin}
+                  disabled={loading()}
+                >
+                  {loading() ? "Signing In..." : "Sign In with Zitadel"}
+                </Button>
+              </div>
+
+              <div class={styles.authInfo}>
+                <p class={styles.authInfoText}>
+                  You'll be redirected to our secure authentication provider to sign in.
+                </p>
+              </div>
+            </Show>
           </div>
         </div>
       </div>
