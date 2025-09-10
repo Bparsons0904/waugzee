@@ -2,10 +2,10 @@ package server
 
 import (
 	"fmt"
+	"time"
 	"waugzee/internal/app"
 	"waugzee/internal/handlers"
 	"waugzee/internal/logger"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
@@ -69,6 +69,7 @@ func New(app *app.App) (*AppServer, error) {
 	}
 
 	if err := handlers.Router(server, app); err != nil {
+		log.Er("failed to initialize handlers", err)
 		return &AppServer{}, log.Err("failed to initialize handlers", err)
 	}
 
@@ -79,9 +80,8 @@ func (s *AppServer) Listen(port int) error {
 	log := s.log.Function("Listen")
 
 	if port == 0 {
-		return log.Err(
+		return log.Error(
 			"Fatal error: invalid port",
-			fmt.Errorf("invalid port: %d", port),
 			"port", port,
 		)
 	}

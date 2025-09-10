@@ -24,6 +24,13 @@ type Config struct {
 	SecurityPepper       string `mapstructure:"SECURITY_PEPPER"`
 	SecurityJwtSecret    string `mapstructure:"SECURITY_JWT_SECRET"`
 	// SessionCookieName    string `mapstructure:"SESSION_COOKIE_NAME"`
+	// Zitadel OIDC Configuration
+	ZitadelDomain      string `mapstructure:"ZITADEL_DOMAIN"`
+	ZitadelClientID    string `mapstructure:"ZITADEL_CLIENT_ID"`
+	ZitadelClientSecret string `mapstructure:"ZITADEL_CLIENT_SECRET"`
+	ZitadelKeyPath     string `mapstructure:"ZITADEL_KEY_PATH"`
+	ZitadelProjectID   string `mapstructure:"ZITADEL_PROJECT_ID"`
+	ZitadelInstanceURL string `mapstructure:"ZITADEL_INSTANCE_URL"`
 }
 
 var ConfigInstance Config
@@ -40,6 +47,7 @@ func InitConfig() (Config, error) {
 		"GENERAL_VERSION", "ENVIRONMENT", "SERVER_PORT", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD",
 		"DB_CACHE_ADDRESS", "DB_CACHE_PORT", "DB_CACHE_RESET",
 		"CORS_ALLOW_ORIGINS", "SECURITY_SALT", "SECURITY_PEPPER", "SECURITY_JWT_SECRET",
+		"ZITADEL_DOMAIN", "ZITADEL_CLIENT_ID", "ZITADEL_CLIENT_SECRET", "ZITADEL_KEY_PATH", "ZITADEL_PROJECT_ID", "ZITADEL_INSTANCE_URL",
 	}
 	
 	for _, env := range envVars {

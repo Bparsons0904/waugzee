@@ -11,8 +11,8 @@ if os.path.exists('./.env.local'):
 
 # Configuration - use environment variables with defaults
 SERVER_PORT = os.getenv('SERVER_PORT', '8288')
-CLIENT_PORT = os.getenv('CLIENT_PORT', '3020')
-DB_CACHE_PORT= os.getenv('DB_CACHE_PORT', '6379')
+CLIENT_PORT = os.getenv('CLIENT_PORT', '3021')
+DB_CACHE_PORT= os.getenv('DB_CACHE_PORT', '6380')
 DOCKER_ENV = os.getenv('DOCKER_ENV', 'dev')
 TILT_PORT = os.getenv('TILT_PORT', '10350')
 

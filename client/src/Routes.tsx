@@ -9,13 +9,13 @@ const RegisterPage = lazy(() => import("@pages/Auth/Register"));
 const ProfilePage = lazy(() => import("@pages/Profile/Profile"));
 const DashboardPage = lazy(() => import("@pages/Dashboard/Dashboard"));
 const LandingPage = lazy(() => import("@pages/Landing/Landing"));
-const WorkstationComponent = lazy(() => import("@pages/Workstation/Workstation"));
-const LoadTestPage = lazy(() => import("@pages/LoadTest/LoadTest"));
+// const WorkstationComponent = lazy(() => import("@pages/Workstation/Workstation"));
+// const LoadTestPage = lazy(() => import("@pages/LoadTest/LoadTest"));
 
-// Create a 7x7 workstation wrapper
-const WorkstationPage: Component = () => {
-  return <WorkstationComponent gridRows={7} gridCols={7} />;
-};
+// // Create a 7x7 workstation wrapper
+// const WorkstationPage: Component = () => {
+//   return <WorkstationComponent gridRows={7} gridCols={7} />;
+// };
 
 const ProtectedRoute = (Component: Component) => {
   return () => {
@@ -40,8 +40,8 @@ export const Routes: Component = () => {
       <Route path="/register" component={RegisterPage} />
       <Route path="/dashboard" component={ProtectedRoute(DashboardPage)} />
       <Route path="/profile" component={ProtectedRoute(ProfilePage)} />
-      <Route path="/workstation" component={ProtectedRoute(WorkstationPage)} />
-      <Route path="/loadtest" component={ProtectedRoute(LoadTestPage)} />
+      {/* <Route path="/workstation" component={ProtectedRoute(WorkstationPage)} /> */}
+      {/* <Route path="/loadtest" component={ProtectedRoute(LoadTestPage)} /> */}
     </>
   );
 };

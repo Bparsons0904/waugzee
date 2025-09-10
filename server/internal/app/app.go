@@ -22,6 +22,7 @@ type App struct {
 
 	// Services
 	TransactionService *services.TransactionService
+	ZitadelService     *services.ZitadelService
 
 	// Repositories
 	UserRepo repositories.UserRepository
@@ -47,6 +48,10 @@ func New() (*App, error) {
 
 	// Initialize services
 	transactionService := services.NewTransactionService(db)
+	zitadelService, err := services.NewZitadelService(config)
+	if err != nil {
+		return &App{}, log.Err("failed to create Zitadel service", err)
+	}
 
 	// Initialize repositories
 	userRepo := repositories.New(db)
@@ -65,6 +70,7 @@ func New() (*App, error) {
 		Config:             config,
 		Middleware:         middleware,
 		TransactionService: transactionService,
+		ZitadelService:     zitadelService,
 		UserRepo:           userRepo,
 		UserController:     userController,
 		Websocket:          websocket,
@@ -92,6 +98,7 @@ func (a *App) validate() error {
 		a.Websocket,
 		a.EventBus,
 		a.TransactionService,
+		a.ZitadelService,
 		a.UserController,
 		a.Middleware,
 		a.UserRepo,
@@ -109,6 +116,12 @@ func (a *App) validate() error {
 func (a *App) Close() (err error) {
 	if a.EventBus != nil {
 		if closeErr := a.EventBus.Close(); closeErr != nil {
+			err = closeErr
+		}
+	}
+
+	if a.ZitadelService != nil {
+		if closeErr := a.ZitadelService.Close(); closeErr != nil {
 			err = closeErr
 		}
 	}

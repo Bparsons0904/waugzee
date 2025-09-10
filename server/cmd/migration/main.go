@@ -25,8 +25,6 @@ const (
 
 var MODELS_TO_MIGRATE = []any{
 	&User{},
-	&LoadTest{},
-	&TestData{},
 }
 
 func main() {

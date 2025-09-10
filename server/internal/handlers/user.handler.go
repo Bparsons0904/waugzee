@@ -36,7 +36,6 @@ func (h *UserHandler) Register() {
 }
 
 func (h *UserHandler) getUser(c *fiber.Ctx) error {
-
 	userID := uuid.MustParse("0198ca62-4fff-7923-9adb-f3a93a37fee2")
 	user := User{
 		BaseUUIDModel: BaseUUIDModel{
@@ -44,7 +43,6 @@ func (h *UserHandler) getUser(c *fiber.Ctx) error {
 		},
 		FirstName: "John",
 		LastName:  "Doe",
-		Login:     "johndoe",
 		IsAdmin:   true,
 	}
 

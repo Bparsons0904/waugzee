@@ -17,7 +17,7 @@ RUN npm ci && npm cache clean --force
 COPY . .
 
 # Expose the port Vite runs on
-EXPOSE 3020
+EXPOSE 3021
 
 # For development, always ensure latest dependencies are installed
 # This handles cases where package.json changed after image build

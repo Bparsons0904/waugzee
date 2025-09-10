@@ -6,7 +6,7 @@ RUN addgroup -g 999 valkey && adduser -D -s /bin/sh -u 999 -G valkey valkey || t
 
 # Create necessary directories
 RUN mkdir -p /data /var/log/valkey && \
-    chown -R valkey:valkey /data /var/log/valkey
+  chown -R valkey:valkey /data /var/log/valkey
 
 # Copy custom configuration
 COPY valkey.conf /usr/local/etc/valkey/valkey.conf
@@ -19,7 +19,7 @@ HEALTHCHECK --interval=300s --timeout=3s --start-period=5s --retries=3 \
   CMD valkey-cli ping || exit 1
 
 # Expose the standard Valkey port
-EXPOSE 6379
+EXPOSE 6380
 
 # Switch to valkey user
 USER valkey

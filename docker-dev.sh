@@ -3,11 +3,11 @@
 # Development Docker Compose helper script
 
 case "$1" in
-  up|start)
+  up | start)
     echo "Starting development environment..."
     docker compose up --build
     ;;
-  down|stop)
+  down | stop)
     echo "Stopping development environment..."
     docker compose down
     ;;
@@ -17,7 +17,8 @@ case "$1" in
     docker compose up --build
     ;;
   logs)
-    docker compose logs -f ${2:-}
+    # docker compose logs -f ${2:-}
+    docker compose logs -f "${2:-}"
     ;;
   clean)
     echo "Cleaning up Docker resources..."

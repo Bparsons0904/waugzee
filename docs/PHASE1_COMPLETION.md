@@ -142,7 +142,7 @@ GENERAL_VERSION=0.0.1
 SERVER_PORT=8288
 DB_NAME=waugzee_dev
 DB_USER=waugzee_dev_user
-DB_HOST=192.168.86.203
+DB_HOST=localhost
 DB_PORT=5432
 CORS_ALLOW_ORIGINS=http://localhost:3020
 ```
