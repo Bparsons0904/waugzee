@@ -193,8 +193,8 @@ func (r *userRepository) GetByOIDCUserID(ctx context.Context, oidcUserID string)
 	log := r.log.Function("GetByOIDCUserID")
 
 	var user User
-	// Note: GORM converts OIDCUserID struct field to o_id_c_user_id database column
-	if err := r.getDB(ctx).First(&user, "o_id_c_user_id = ?", oidcUserID).Error; err != nil {
+	// Query using the properly named oidc_user_id column
+	if err := r.getDB(ctx).First(&user, "oidc_user_id = ?", oidcUserID).Error; err != nil {
 		return nil, log.Err("failed to get user by OIDC user ID", err, "oidcUserID", oidcUserID)
 	}
 

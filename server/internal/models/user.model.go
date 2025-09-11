@@ -17,9 +17,9 @@ type User struct {
 	IsActive    bool    `gorm:"type:bool;default:true"  json:"isActive"`
 
 	// OIDC integration fields
-	OIDCUserID      string    `gorm:"type:text;uniqueIndex"     json:"-"`
-	OIDCProvider    *string   `gorm:"type:text"                 json:"oidcProvider,omitempty"`
-	OIDCProjectID   *string   `gorm:"type:text"                 json:"-"`
+	OIDCUserID      string    `gorm:"column:oidc_user_id;type:text;uniqueIndex"     json:"-"`
+	OIDCProvider    *string   `gorm:"column:oidc_provider;type:text"                 json:"oidcProvider,omitempty"`
+	OIDCProjectID   *string   `gorm:"column:oidc_project_id;type:text"                 json:"-"`
 	LastLoginAt     *time.Time `gorm:"type:timestamp"           json:"lastLoginAt,omitempty"`
 	ProfileVerified bool      `gorm:"type:bool;default:false"   json:"profileVerified"`
 }
