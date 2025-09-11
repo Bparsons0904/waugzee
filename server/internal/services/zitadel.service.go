@@ -30,6 +30,7 @@ type OIDCDiscovery struct {
 	JWKS_URI              string `json:"jwks_uri"`
 	IntrospectionEndpoint string `json:"introspection_endpoint"`
 	RevocationEndpoint    string `json:"revocation_endpoint"`
+	EndSessionEndpoint    string `json:"end_session_endpoint"`
 }
 
 // JWK represents a JSON Web Key
@@ -689,6 +690,149 @@ func (zs *ZitadelService) generateJWTAssertion() (string, error) {
 
 	log.Debug("JWT assertion generated successfully", "keyID", zs.keyID)
 	return signedToken, nil
+}
+
+// TokenRevocationRequest represents the token revocation request
+type TokenRevocationRequest struct {
+	Token         string `json:"token"`
+	TokenTypeHint string `json:"token_type_hint,omitempty"` // "access_token" or "refresh_token"
+}
+
+// TokenRevocationResponse represents the token revocation response
+type TokenRevocationResponse struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// RevokeToken revokes an access or refresh token with Zitadel
+func (zs *ZitadelService) RevokeToken(ctx context.Context, token string, tokenType string) error {
+	if !zs.configured {
+		return fmt.Errorf("zitadel service not configured")
+	}
+
+	log := zs.log.Function("RevokeToken")
+
+	// Get OIDC discovery to find revocation endpoint
+	discovery, err := zs.getOIDCDiscovery(ctx)
+	if err != nil {
+		return log.Err("failed to get OIDC discovery for token revocation", err)
+	}
+
+	if discovery.RevocationEndpoint == "" {
+		return log.Err("revocation endpoint not available", fmt.Errorf("revocation_endpoint not found in OIDC discovery"))
+	}
+
+	// Prepare form data for revocation request
+	data := url.Values{}
+	data.Set("token", token)
+	if tokenType != "" {
+		data.Set("token_type_hint", tokenType)
+	}
+
+	// Use JWT authentication if private key is available (machine-to-machine)
+	if zs.privateKey != nil {
+		jwtAssertion, err := zs.generateJWTAssertion()
+		if err != nil {
+			return log.Err("failed to generate JWT assertion for revocation", err)
+		}
+
+		// Use client_assertion method for JWT authentication
+		data.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+		data.Set("client_assertion", jwtAssertion)
+	} else if zs.clientSecret != "" {
+		// Fallback to client credentials for confidential clients
+		data.Set("client_id", zs.clientID)
+		data.Set("client_secret", zs.clientSecret)
+	} else {
+		// For public clients, only include client_id
+		data.Set("client_id", zs.clientID)
+	}
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		"POST",
+		discovery.RevocationEndpoint,
+		strings.NewReader(data.Encode()),
+	)
+	if err != nil {
+		return log.Err("failed to create token revocation request", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := zs.httpClient.Do(req)
+	if err != nil {
+		return log.Err("failed to make token revocation request", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Info("failed to close revocation response body", "error", closeErr)
+		}
+	}()
+
+	// RFC 7009 states that revocation endpoint should return 200 for successful revocation
+	// or invalid tokens (to prevent token scanning attacks)
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return log.Err("token revocation request failed",
+			fmt.Errorf("status code: %d", resp.StatusCode),
+			"responseBody", string(body))
+	}
+
+	log.Info("token revocation successful", "tokenType", tokenType, "endpoint", discovery.RevocationEndpoint)
+	return nil
+}
+
+// GetLogoutURL generates the OIDC logout URL using the end_session_endpoint
+func (zs *ZitadelService) GetLogoutURL(ctx context.Context, idTokenHint, postLogoutRedirectURI, state string) (string, error) {
+	if !zs.configured {
+		return "", fmt.Errorf("zitadel service not configured")
+	}
+
+	log := zs.log.Function("GetLogoutURL")
+
+	// Get OIDC discovery to find end session endpoint
+	discovery, err := zs.getOIDCDiscovery(ctx)
+	if err != nil {
+		return "", log.Err("failed to get OIDC discovery for logout URL", err)
+	}
+
+	if discovery.EndSessionEndpoint == "" {
+		return "", log.Err("end session endpoint not available", fmt.Errorf("end_session_endpoint not found in OIDC discovery"))
+	}
+
+	// Build logout URL with query parameters
+	logoutURL, err := url.Parse(discovery.EndSessionEndpoint)
+	if err != nil {
+		return "", log.Err("failed to parse end session endpoint", err)
+	}
+
+	params := url.Values{}
+	
+	// Add ID token hint if provided (recommended for better UX)
+	if idTokenHint != "" {
+		params.Set("id_token_hint", idTokenHint)
+	}
+
+	// Add post logout redirect URI if provided
+	if postLogoutRedirectURI != "" {
+		params.Set("post_logout_redirect_uri", postLogoutRedirectURI)
+	}
+
+	// Add state parameter if provided (for maintaining application state across logout)
+	if state != "" {
+		params.Set("state", state)
+	}
+
+	logoutURL.RawQuery = params.Encode()
+
+	log.Info("logout URL generated successfully", 
+		"endpoint", discovery.EndSessionEndpoint,
+		"hasIdToken", idTokenHint != "",
+		"hasRedirectURI", postLogoutRedirectURI != "")
+
+	return logoutURL.String(), nil
 }
 
 // Close cleans up the Zitadel service resources

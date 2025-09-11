@@ -2,14 +2,11 @@ package userController
 
 import (
 	"context"
-	"time"
 	"waugzee/config"
 	"waugzee/internal/events"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 type UserController struct {
@@ -52,51 +49,10 @@ func (c *UserController) Login(
 	}
 	user = *userPtr
 
-	// Broadcast user login event to WebSocket clients
-	if c.wsManager != nil {
-		go c.broadcastUserLogin(user)
-	}
-
 	return user, err
 }
 
 // TODO: implement
 func (c *UserController) Logout(sessionID string) (err error) {
 	return err
-}
-
-// TODO: implement
-func (c *UserController) Register(user User) (err error) {
-	ctx := context.Background()
-	if err = c.userRepo.Create(ctx, &user, c.Config); err != nil {
-		return err
-	}
-	return err
-}
-
-func (c *UserController) comparePassword(password, hashedPassword string) error {
-	password = password + c.Config.SecurityPepper
-	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// broadcastUserLogin sends a login event to WebSocket clients
-func (c *UserController) broadcastUserLogin(user User) {
-	log := c.log.Function("broadcastUserLogin")
-
-	userData := map[string]any{
-		"userId":    user.ID,
-		"firstName": user.FirstName,
-		"lastName":  user.LastName,
-		"isAdmin":   user.IsAdmin,
-		"loginTime": time.Now().Unix(),
-	}
-
-	log.Info("Broadcasting user login event", "userID", user.ID, "login")
-	if c.wsManager != nil {
-		c.wsManager.BroadcastUserLogin(user.ID.String(), userData)
-	}
 }

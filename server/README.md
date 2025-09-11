@@ -101,7 +101,7 @@ server/
 
 ### Prerequisites
 
-- Go 1.24+
+- Go 1.25+
 - Air (for hot reloading): `go install github.com/air-verse/air@latest`
 - golangci-lint (for linting): `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`
 

@@ -175,7 +175,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 
 ### Backend Stack
 
-- **Language**: Go 1.24+
+- **Language**: Go 1.25+
 - **Framework**: Fiber v2
 - **Database**: PostgreSQL 15+
 - **Cache**: Valkey (Redis-compatible)
@@ -227,7 +227,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 
 - Docker & Docker Compose
 - Tilt (for orchestration)
-- Go 1.24+
+- Go 1.25+
 - Node.js 22+
 - PostgreSQL client tools
 
@@ -334,4 +334,3 @@ tilt trigger migrate-seed
 **Last Updated**: 2025-09-09  
 **Phase**: 1 - Foundation Setup  
 **Status**: 🚧 Active Development
-

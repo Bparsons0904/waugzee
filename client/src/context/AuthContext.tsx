@@ -53,6 +53,7 @@ const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
 
 // Storage keys
 const TOKEN_KEY = "waugzee_auth_token";
+const ID_TOKEN_KEY = "waugzee_id_token";
 const OIDC_STATE_KEY = "oidc_state";
 const OIDC_REDIRECT_KEY = "oidc_redirect_uri";
 
@@ -75,6 +76,28 @@ const setStoredToken = (token: string | null) => {
     }
   } catch (error) {
     console.warn("Failed to write token to localStorage:", error);
+  }
+};
+
+// Secure ID token storage
+const getStoredIDToken = (): string | null => {
+  try {
+    return localStorage.getItem(ID_TOKEN_KEY);
+  } catch (error) {
+    console.warn("Failed to read ID token from localStorage:", error);
+    return null;
+  }
+};
+
+const setStoredIDToken = (idToken: string | null) => {
+  try {
+    if (idToken) {
+      localStorage.setItem(ID_TOKEN_KEY, idToken);
+    } else {
+      localStorage.removeItem(ID_TOKEN_KEY);
+    }
+  } catch (error) {
+    console.warn("Failed to write ID token to localStorage:", error);
   }
 };
 
@@ -473,19 +496,24 @@ export function AuthProvider(props: { children: JSX.Element }) {
       }
 
       // Exchange authorization code for access token
-      const response = await apiRequest<{ access_token: string; user: User }>(
-        "POST",
-        "/auth/token-exchange",
-        {
-          code,
-          redirect_uri: redirectUri,
-          state,
-        },
-      );
+      const response = await apiRequest<{
+        access_token: string;
+        user: User;
+        id_token?: string;
+      }>("POST", "/auth/token-exchange", {
+        code,
+        redirect_uri: redirectUri,
+        state,
+      });
 
       if (response?.access_token && response?.user) {
-        // Store the token
+        // Store the access token
         setStoredToken(response.access_token);
+
+        // Store the ID token if present (needed for OIDC logout)
+        if (response.id_token) {
+          setStoredIDToken(response.id_token);
+        }
 
         // Update consolidated state
         setAuthState({
@@ -526,23 +554,71 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
   const logout = async () => {
     try {
-      await apiRequest("POST", "/auth/logout");
-    } catch (error) {
-      console.warn("Server logout failed:", error);
-      // Continue with local cleanup even if server logout fails
-    } finally {
-      // Always clear local state
-      setStoredToken(null);
-      setAuthState({
-        status: "unauthenticated",
-        user: null,
-        token: null,
-        error: null,
+      // Get any stored refresh token (currently we only store access tokens)
+      const refreshToken = localStorage.getItem("refresh_token");
+      // Get stored ID token (needed for proper OIDC logout)
+      const idToken = getStoredIDToken();
+
+      // Prepare logout request with refresh token and ID token
+      const logoutBody = {
+        refresh_token: refreshToken,
+        id_token: idToken,
+        state: "logout-state",
+        post_logout_redirect_uri: `${window.location.origin}/login`,
+      };
+
+      console.debug("Initiating logout with server:", {
+        hasRefreshToken: !!refreshToken,
+        hasIdToken: !!idToken,
+        note: "Using default Zitadel post-logout redirect behavior",
       });
 
-      cleanupOIDCState();
-      navigate("/login");
+      // Call server logout endpoint
+      const response = await apiRequest<{
+        message: string;
+        logout_url?: string;
+        revoked_tokens?: string[];
+      }>("POST", "/auth/logout", logoutBody);
+
+      console.debug("Server logout response:", {
+        hasLogoutUrl: !!response?.logout_url,
+        revokedTokens: response?.revoked_tokens,
+      });
+
+      // If server returns a Zitadel logout URL, redirect there
+      if (response?.logout_url) {
+        // Clear local state first
+        setStoredToken(null);
+        setStoredIDToken(null);
+        localStorage.removeItem("refresh_token");
+        cleanupOIDCState();
+
+        // Redirect to Zitadel for proper logout
+        console.debug(
+          "Redirecting to Zitadel logout URL:",
+          response.logout_url,
+        );
+        window.location.href = response.logout_url;
+        return; // Don't continue with local navigation
+      }
+    } catch (error) {
+      console.warn("Server logout failed:", error);
+      // Continue with local cleanup even if server call fails
     }
+
+    // Fallback: Always clear local state and redirect to login
+    setStoredToken(null);
+    setStoredIDToken(null);
+    localStorage.removeItem("refresh_token");
+    setAuthState({
+      status: "unauthenticated",
+      user: null,
+      token: null,
+      error: null,
+    });
+
+    cleanupOIDCState();
+    navigate("/login");
   };
 
   return (

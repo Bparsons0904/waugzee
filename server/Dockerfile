@@ -1,5 +1,5 @@
 # Multi-stage build for Go backend
-FROM golang:1.24.3-alpine AS builder
+FROM golang:1.25.1-alpine AS builder
 
 # Install necessary packages for building
 RUN apk add --no-cache git make gcc musl-dev
