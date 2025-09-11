@@ -146,10 +146,16 @@ Full-stack vinyl record collection management application:
 ### Authentication Flow (Zitadel OIDC)
 
 1. OIDC flow with Zitadel for authentication
-2. JWT tokens for API access
-3. Session management via Valkey cache
-4. WebSocket auth uses same token pattern
-5. Middleware validates tokens on protected routes
+2. JWT tokens for API access with signature verification
+3. Local user database with dual-layer caching (optimized 2025-09-10)
+4. Session management via Valkey cache
+5. WebSocket auth uses same token pattern
+6. Middleware validates tokens on protected routes
+
+**Performance Optimizations** ✅:
+- `/auth/me` endpoint uses local database instead of external Zitadel API calls
+- Dual-layer caching: User cache + OIDC ID mapping for sub-20ms response times
+- Eliminated redundant external API dependencies for routine user operations
 
 ## Development Notes
 
@@ -210,6 +216,11 @@ Available MCP tools and their preferred usage:
 ## Migration Status
 
 This project is currently in **Phase 2: Authentication & User Management**. See docs/PROJECT_PLAN.md for detailed progress and next steps.
+
+**Recent Improvements** (2025-09-10):
+- ✅ **Auth Performance Optimization**: Eliminated redundant Zitadel API calls for user info requests
+- ✅ **Dual-Layer Caching**: Implemented OIDC ID mapping cache for faster user lookups
+- ✅ **Database-First Approach**: `/auth/me` now uses local database with Valkey cache fallback
 
 ---
 

@@ -119,11 +119,11 @@ func (h *AuthHandler) getCurrentUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Optionally fetch detailed user info from Zitadel
-	userInfo, err := h.zitadelService.GetUserInfo(c.Context(), authInfo.UserID)
+	// Fetch user from our local database using OIDC user ID
+	user, err := h.userRepo.GetByOIDCUserID(c.Context(), authInfo.UserID)
 	if err != nil {
-		log.Info("failed to fetch detailed user info", "error", err.Error(), "userID", authInfo.UserID)
-		// Return basic info from token if detailed fetch fails
+		log.Info("failed to fetch user from database", "error", err.Error(), "oidcUserID", authInfo.UserID)
+		// Fallback to basic info from token if database fetch fails
 		return c.JSON(fiber.Map{
 			"user": fiber.Map{
 				"id":       authInfo.UserID,
@@ -135,16 +135,13 @@ func (h *AuthHandler) getCurrentUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Return detailed user info
+	// Return user profile from our database (more complete and faster)
+	userProfile := user.ToProfile()
+	userProfile.ID = authInfo.UserID // Use OIDC ID for consistency with frontend
+
+	log.Info("user profile retrieved from database", "userID", user.ID, "oidcUserID", authInfo.UserID)
 	return c.JSON(fiber.Map{
-		"user": fiber.Map{
-			"id":       authInfo.UserID,
-			"email":    authInfo.Email,
-			"name":     authInfo.Name,
-			"roles":    authInfo.Roles,
-			"projectId": authInfo.ProjectID,
-			"detailed": userInfo,
-		},
+		"user": userProfile,
 	})
 }
 

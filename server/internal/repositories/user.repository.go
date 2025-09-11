@@ -107,11 +107,35 @@ func (r *userRepository) Update(ctx context.Context, user *User) error {
 		log.Warn("failed to update user in cache", "userID", user.ID, "error", err)
 	}
 
+	// Update OIDC ID to UUID mapping cache if user has OIDC ID
+	if user.OIDCUserID != "" {
+		oidcCacheKey := "oidc:" + user.OIDCUserID
+		if err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).
+			WithStruct(user.ID.String()).
+			WithTTL(USER_CACHE_EXPIRY).
+			WithContext(ctx).
+			Set(); err != nil {
+			log.Warn("failed to update OIDC mapping cache", "oidcUserID", user.OIDCUserID, "error", err)
+		}
+	}
+
 	return nil
 }
 
 func (r *userRepository) Delete(ctx context.Context, id string) error {
 	log := r.log.Function("Delete")
+
+	// Get user first to clean up OIDC mapping cache
+	var user User
+	if err := r.getDB(ctx).First(&user, "id = ?", id).Error; err == nil {
+		// Clean up OIDC mapping cache if user has OIDC ID
+		if user.OIDCUserID != "" {
+			oidcCacheKey := "oidc:" + user.OIDCUserID
+			if err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).Delete(); err != nil {
+				log.Warn("failed to remove OIDC mapping from cache", "oidcUserID", user.OIDCUserID, "error", err)
+			}
+		}
+	}
 
 	if err := r.getDB(ctx).Delete(&User{}, "id = ?", id).Error; err != nil {
 		return log.Err("failed to delete user", err, "id", id)
@@ -192,14 +216,37 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*User, e
 func (r *userRepository) GetByOIDCUserID(ctx context.Context, oidcUserID string) (*User, error) {
 	log := r.log.Function("GetByOIDCUserID")
 
+	// Try to get UUID from OIDC cache first
+	var userUUID string
+	oidcCacheKey := "oidc:" + oidcUserID
+	found, err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).Get(&userUUID)
+	if err == nil && found {
+		// Found UUID in cache, now get user by UUID (which uses primary cache)
+		var cachedUser User
+		if err := r.getCacheByID(ctx, userUUID, &cachedUser); err == nil {
+			log.Info("user found via OIDC cache", "userID", userUUID, "oidcUserID", oidcUserID)
+			return &cachedUser, nil
+		}
+	}
+
+	// Cache miss, query database
 	var user User
-	// Query using the properly named oidc_user_id column
 	if err := r.getDB(ctx).First(&user, "oidc_user_id = ?", oidcUserID).Error; err != nil {
 		return nil, log.Err("failed to get user by OIDC user ID", err, "oidcUserID", oidcUserID)
 	}
 
+	// Cache both the user and the OIDC -> UUID mapping
 	if err := r.addUserToCache(ctx, &user); err != nil {
 		log.Warn("failed to add user to cache", "userID", user.ID, "error", err)
+	}
+
+	// Cache OIDC ID to UUID mapping for faster future lookups
+	if err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).
+		WithStruct(user.ID.String()).
+		WithTTL(USER_CACHE_EXPIRY).
+		WithContext(ctx).
+		Set(); err != nil {
+		log.Warn("failed to cache OIDC mapping", "oidcUserID", oidcUserID, "error", err)
 	}
 
 	return &user, nil
@@ -232,6 +279,16 @@ func (r *userRepository) CreateFromOIDC(ctx context.Context, req OIDCUserCreateR
 
 	if err := r.addUserToCache(ctx, user); err != nil {
 		log.Warn("failed to add user to cache", "userID", user.ID, "error", err)
+	}
+
+	// Cache OIDC ID to UUID mapping for faster future lookups
+	oidcCacheKey := "oidc:" + user.OIDCUserID
+	if err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).
+		WithStruct(user.ID.String()).
+		WithTTL(USER_CACHE_EXPIRY).
+		WithContext(ctx).
+		Set(); err != nil {
+		log.Warn("failed to cache OIDC mapping", "oidcUserID", user.OIDCUserID, "error", err)
 	}
 
 	return user, nil
