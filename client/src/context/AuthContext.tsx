@@ -112,6 +112,14 @@ const generateSecureState = (): string => {
   return `${timestamp}-${entropy}`;
 };
 
+// Generate cryptographically secure nonce for replay attack protection
+const generateNonce = (): string => {
+  const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(randomBytes, (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("");
+};
+
 // PKCE utility functions
 const generateCodeVerifier = (): string => {
   const array = new Uint8Array(32);
@@ -331,6 +339,9 @@ export function AuthProvider(props: { children: JSX.Element }) {
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await generateCodeChallenge(codeVerifier);
 
+      // Generate nonce for replay attack protection
+      const nonce = generateNonce();
+
       // Store state and PKCE code verifier with fallback storage
       const stateStored = setStorageItem(OIDC_STATE_KEY, state);
       const redirectStored = setStorageItem(OIDC_REDIRECT_KEY, redirectUri);
@@ -358,17 +369,19 @@ export function AuthProvider(props: { children: JSX.Element }) {
         throw new Error("Failed to store PKCE code verifier");
       }
 
-      // Get authorization URL from backend using apiRequest with PKCE code challenge
+      // Get authorization URL from backend using apiRequest with PKCE code challenge and nonce
       const params = new URLSearchParams({
         state,
         redirect_uri: redirectUri,
         code_challenge: codeChallenge,
+        nonce: nonce,
       });
 
-      console.debug("Requesting auth URL with PKCE params:", {
+      console.debug("Requesting auth URL with PKCE and nonce params:", {
         state,
         redirect_uri: redirectUri,
         code_challenge: codeChallenge,
+        nonce: nonce,
         fullUrl: `/auth/login-url?${params.toString()}`,
       });
 

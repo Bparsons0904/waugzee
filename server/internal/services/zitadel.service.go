@@ -79,6 +79,7 @@ type TokenInfo struct {
 	Name      string
 	Roles     []string
 	ProjectID string
+	Nonce     string
 	Valid     bool
 }
 
@@ -235,6 +236,7 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 		jwt.RegisteredClaims
 		Email string `json:"email"`
 		Name  string `json:"name"`
+		Nonce string `json:"nonce"`
 		// Add other custom claims as needed
 		// Roles []string `json:"roles,omitempty"`
 	}
@@ -257,7 +259,8 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 		"sub", claims.Subject,
 		"email", customClaims.Email,
 		"exp", claims.ExpiresAt.Time,
-		"iss", claims.Issuer)
+		"iss", claims.Issuer,
+		"nonce", customClaims.Nonce)
 
 	return &TokenInfo{
 		UserID:    claims.Subject,
@@ -265,6 +268,7 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 		Name:      customClaims.Name,
 		Roles:     []string{}, // TODO: Extract from custom claims when roles are configured
 		ProjectID: "",         // TODO: Extract project ID if needed
+		Nonce:     customClaims.Nonce,
 		Valid:     true,
 	}, nil
 }
@@ -378,8 +382,8 @@ func (zs *ZitadelService) IsConfigured() bool {
 	return zs.configured
 }
 
-// GetAuthorizationURL generates authorization URL for OIDC flow with optional PKCE support
-func (zs *ZitadelService) GetAuthorizationURL(state, redirectURI, codeChallenge string) string {
+// GetAuthorizationURL generates authorization URL for OIDC flow with optional PKCE support and nonce
+func (zs *ZitadelService) GetAuthorizationURL(state, redirectURI, codeChallenge, nonce string) string {
 	if !zs.configured {
 		return ""
 	}
@@ -396,6 +400,11 @@ func (zs *ZitadelService) GetAuthorizationURL(state, redirectURI, codeChallenge 
 	// Add PKCE parameters if code challenge is provided
 	if codeChallenge != "" {
 		baseURL += fmt.Sprintf("&code_challenge=%s&code_challenge_method=S256", codeChallenge)
+	}
+
+	// Add nonce parameter if provided for replay attack protection
+	if nonce != "" {
+		baseURL += fmt.Sprintf("&nonce=%s", nonce)
 	}
 
 	return baseURL

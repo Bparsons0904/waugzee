@@ -266,7 +266,7 @@ func TestZitadelService_GetAuthorizationURL_PKCE(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			authURL := service.GetAuthorizationURL(tt.state, tt.redirectURI, tt.codeChallenge)
+			authURL := service.GetAuthorizationURL(tt.state, tt.redirectURI, tt.codeChallenge, "")
 			require.NotEmpty(t, authURL)
 			
 			for _, expectedContent := range tt.expectedContains {

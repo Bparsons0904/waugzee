@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"context"
+	"fmt"
 	"strings"
+	"time"
 	"waugzee/internal/app"
 	"waugzee/internal/database"
 	"waugzee/internal/handlers/middleware"
@@ -92,6 +95,7 @@ func (h *AuthHandler) getLoginURL(c *fiber.Ctx) error {
 	state := c.Query("state", "default-state")
 	redirectURI := c.Query("redirect_uri")
 	codeChallenge := c.Query("code_challenge") // PKCE code challenge
+	nonce := c.Query("nonce")                 // Nonce for replay attack protection
 
 	if redirectURI == "" {
 		log.Info("missing redirect_uri parameter")
@@ -100,7 +104,16 @@ func (h *AuthHandler) getLoginURL(c *fiber.Ctx) error {
 		})
 	}
 
-	authURL := h.zitadelService.GetAuthorizationURL(state, redirectURI, codeChallenge)
+	// Store nonce in cache if provided (for later validation during token exchange)
+	if nonce != "" {
+		err := h.storeNonce(c.Context(), nonce)
+		if err != nil {
+			log.Info("failed to store nonce", "error", err.Error())
+			// Continue without failing - nonce validation will be optional
+		}
+	}
+
+	authURL := h.zitadelService.GetAuthorizationURL(state, redirectURI, codeChallenge, nonce)
 	if authURL == "" {
 		log.Info("failed to generate authorization URL")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -376,6 +389,17 @@ func (h *AuthHandler) exchangeToken(c *fiber.Ctx) error {
 		})
 	}
 
+	// Validate nonce if present in ID token (anti-replay protection)
+	if tokenInfo.Nonce != "" {
+		if err := h.validateAndCleanupNonce(c.Context(), tokenInfo.Nonce); err != nil {
+			log.Info("nonce validation failed", "error", err.Error(), "nonce", tokenInfo.Nonce)
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Nonce validation failed",
+			})
+		}
+		log.Info("nonce validation successful", "nonce", tokenInfo.Nonce)
+	}
+
 	// Find or create user from OIDC claims
 	oidcReq := models.OIDCUserCreateRequest{
 		OIDCUserID:      tokenInfo.UserID,
@@ -514,6 +538,17 @@ func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
 		})
 	}
 
+	// Validate nonce if present in ID token (anti-replay protection)
+	if tokenInfo.Nonce != "" {
+		if err := h.validateAndCleanupNonce(c.Context(), tokenInfo.Nonce); err != nil {
+			log.Info("OIDC callback nonce validation failed", "error", err.Error(), "nonce", tokenInfo.Nonce)
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Authentication failed",
+			})
+		}
+		log.Info("OIDC callback nonce validation successful", "nonce", tokenInfo.Nonce)
+	}
+
 	// Find or create user from OIDC claims
 	oidcReq := models.OIDCUserCreateRequest{
 		OIDCUserID:      tokenInfo.UserID,
@@ -573,5 +608,67 @@ func (h *AuthHandler) getAllUsers(c *fiber.Ctx) error {
 		"message": "Admin endpoint - get all users",
 		"users":   []interface{}{},
 	})
+}
+
+// storeNonce stores a nonce value in the cache with TTL for later validation
+func (h *AuthHandler) storeNonce(ctx context.Context, nonce string) error {
+	log := h.log.Function("storeNonce")
+
+	if nonce == "" {
+		return fmt.Errorf("nonce is required")
+	}
+
+	// Store nonce with 10 minute TTL (same as OIDC state parameter lifetime)
+	err := database.NewCacheBuilder(h.db.Cache.Session, nonce).
+		WithHashPattern("nonce:%s").
+		WithValue("1"). // Simple marker value
+		WithTTL(10 * time.Minute).
+		WithContext(ctx).
+		Set()
+
+	if err != nil {
+		return log.Err("failed to store nonce in cache", err, "nonce", nonce)
+	}
+
+	log.Info("nonce stored successfully", "nonce", nonce)
+	return nil
+}
+
+// validateAndCleanupNonce validates a nonce from ID token and removes it from cache
+func (h *AuthHandler) validateAndCleanupNonce(ctx context.Context, nonce string) error {
+	log := h.log.Function("validateAndCleanupNonce")
+
+	if nonce == "" {
+		return fmt.Errorf("nonce is required")
+	}
+
+	// Check if nonce exists in cache
+	var result string
+	found, err := database.NewCacheBuilder(h.db.Cache.Session, nonce).
+		WithHashPattern("nonce:%s").
+		WithContext(ctx).
+		Get(&result)
+
+	if err != nil {
+		return log.Err("failed to validate nonce", err, "nonce", nonce)
+	}
+
+	if !found {
+		return log.Err("nonce not found or expired", fmt.Errorf("nonce validation failed"), "nonce", nonce)
+	}
+
+	// Remove nonce from cache (one-time use)
+	err = database.NewCacheBuilder(h.db.Cache.Session, nonce).
+		WithHashPattern("nonce:%s").
+		WithContext(ctx).
+		Delete()
+
+	if err != nil {
+		log.Warn("failed to cleanup nonce from cache", "error", err.Error(), "nonce", nonce)
+		// Don't fail validation if cleanup fails
+	}
+
+	log.Info("nonce validated and cleaned up successfully", "nonce", nonce)
+	return nil
 }
 
