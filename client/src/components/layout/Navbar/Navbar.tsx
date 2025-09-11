@@ -12,7 +12,7 @@ export const NavBar: Component = () => {
         <div class={styles.navbarContainer}>
           <div class={styles.navbarLogo}>
             <A href="/" class={styles.navbarTitle}>
-              VIM Wars
+              Waugzee
             </A>
           </div>
           <div class={styles.navbarMenu}>

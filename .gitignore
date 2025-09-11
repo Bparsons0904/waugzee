@@ -207,6 +207,9 @@ docs/_build/
 config/config.local.yaml
 **/config.local.*
 
+# Zitadel authentication files (contains private keys)
+zitadel.json
+
 # Test artifacts
 test-results/
 junit.xml
