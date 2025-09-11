@@ -11,24 +11,30 @@ type Endpoints = {
   };
 };
 
+type HasResponse = { response: z.ZodType<any, any, any>; };
+type HasBody = { body: z.ZodType<any, any, any>; };
+type HasPath = { path: (id: any) => string; };
+
 type Client<E extends Endpoints> = {
   [R in keyof E]: {
-    [A in keyof E[R]]: E[R][A] extends { method: 'POST' | 'PUT' | 'PATCH' | 'DELETE' } ? 
-      E[R][A] extends { body: unknown } ?
+    [A in keyof E[R]]: E[R][A] extends { method: 'POST' | 'PUT' | 'PATCH' | 'DELETE' } & HasResponse ? 
+      E[R][A] extends HasBody ?
         () => (options?: UseMutationOptions<z.infer<E[R][A]['response']>, unknown, z.infer<E[R][A]['body']>>) => 
           ReturnType<typeof useMutation<z.infer<E[R][A]['response']>, unknown, z.infer<E[R][A]['body']>>> :
         () => (options?: UseMutationOptions<z.infer<E[R][A]['response']>, unknown, void>) => 
           ReturnType<typeof useMutation<z.infer<E[R][A]['response']>, unknown, void>> :
-      E[R][A] extends { path: (id: unknown) => string } ? 
-        (params: Parameters<E[R][A]['path']>[0], options?: UseQueryOptions<z.infer<E[R][A]['response']>>) => 
-          ReturnType<typeof useQuery<z.infer<E[R][A]['response']>>> :
-        (options?: UseQueryOptions<z.infer<E[R][A]['response']>>) => 
-          ReturnType<typeof useQuery<z.infer<E[R][A]['response']>>>;
+      E[R][A] extends { method: 'GET' } & HasResponse ?
+        E[R][A] extends HasPath ?
+          (params: Parameters<E[R][A]['path']>[0], options?: UseQueryOptions<z.infer<E[R][A]['response']>>) => 
+            ReturnType<typeof useQuery<z.infer<E[R][A]['response']>>> :
+          (options?: UseQueryOptions<z.infer<E[R][A]['response']>>) => 
+            ReturnType<typeof useQuery<z.infer<E[R][A]['response']>>> :
+      never;
   };
 };
 
-function createApiClient<T extends Contract>(contract: T): Client<Endpoints> {
-  const client = {} as Client<Endpoints>;
+function createApiClient(contract: Contract): Client<typeof contract> {
+  const client = {} as Client<typeof contract>;
 
   for (const resource in contract) {
     client[resource] = {};
@@ -37,10 +43,13 @@ function createApiClient<T extends Contract>(contract: T): Client<Endpoints> {
 
       if (endpoint.method === 'POST' || endpoint.method === 'PUT' || endpoint.method === 'PATCH' || endpoint.method === 'DELETE') {
         client[resource][action] = () => (options) => {
-          return useMutation((data) => {
-            const path = typeof endpoint.path === 'function' ? endpoint.path(data.id) : endpoint.path;
-            return apiRequest(endpoint.method, path, data);
-          }, options);
+          return useMutation({
+            mutationFn: (data: any = {}) => {
+              const path = typeof endpoint.path === 'function' ? endpoint.path(data.id) : endpoint.path;
+              return apiRequest(endpoint.method, path, data);
+            },
+            ...options,
+          });
         };
       } else {
         client[resource][action] = (params, options) => {

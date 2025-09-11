@@ -91,6 +91,7 @@ func (h *AuthHandler) getLoginURL(c *fiber.Ctx) error {
 	// Get parameters from query string
 	state := c.Query("state", "default-state")
 	redirectURI := c.Query("redirect_uri")
+	codeChallenge := c.Query("code_challenge") // PKCE code challenge
 
 	if redirectURI == "" {
 		log.Info("missing redirect_uri parameter")
@@ -99,7 +100,7 @@ func (h *AuthHandler) getLoginURL(c *fiber.Ctx) error {
 		})
 	}
 
-	authURL := h.zitadelService.GetAuthorizationURL(state, redirectURI)
+	authURL := h.zitadelService.GetAuthorizationURL(state, redirectURI, codeChallenge)
 	if authURL == "" {
 		log.Info("failed to generate authorization URL")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -107,7 +108,7 @@ func (h *AuthHandler) getLoginURL(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Info("generated authorization URL", "state", state, "redirectURI", redirectURI)
+	log.Info("generated authorization URL", "state", state, "redirectURI", redirectURI, "hasPKCE", codeChallenge != "")
 	return c.JSON(fiber.Map{
 		"authorizationUrl": authURL,
 		"state":            state,
@@ -342,6 +343,8 @@ func (h *AuthHandler) exchangeToken(c *fiber.Ctx) error {
 			req.Code != "",
 			"redirectURI",
 			req.RedirectURI != "",
+			"hasCodeVerifier",
+			req.CodeVerifier != "",
 		)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Code and redirect_uri are required",
@@ -455,6 +458,11 @@ func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
 		state = c.FormValue("state")
 	}
 
+	codeVerifier := c.Query("code_verifier")
+	if codeVerifier == "" {
+		codeVerifier = c.FormValue("code_verifier")
+	}
+
 	if code == "" || redirectURI == "" {
 		log.Info(
 			"missing required parameters",
@@ -470,9 +478,10 @@ func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
 
 	// Exchange code for token
 	tokenReq := services.TokenExchangeRequest{
-		Code:        code,
-		RedirectURI: redirectURI,
-		State:       state,
+		Code:         code,
+		RedirectURI:  redirectURI,
+		State:        state,
+		CodeVerifier: codeVerifier, // Include PKCE code verifier
 	}
 
 	tokenResp, err := h.zitadelService.ExchangeCodeForToken(c.Context(), tokenReq)

@@ -84,9 +84,10 @@ type TokenInfo struct {
 
 // TokenExchangeRequest represents the token exchange request
 type TokenExchangeRequest struct {
-	Code        string `json:"code"`
-	RedirectURI string `json:"redirect_uri"`
-	State       string `json:"state,omitempty"`
+	Code         string `json:"code"`
+	RedirectURI  string `json:"redirect_uri"`
+	State        string `json:"state,omitempty"`
+	CodeVerifier string `json:"code_verifier,omitempty"` // PKCE code verifier
 }
 
 // TokenExchangeResponse represents the token exchange response
@@ -377,20 +378,27 @@ func (zs *ZitadelService) IsConfigured() bool {
 	return zs.configured
 }
 
-// GetAuthorizationURL generates authorization URL for OIDC flow
-func (zs *ZitadelService) GetAuthorizationURL(state, redirectURI string) string {
+// GetAuthorizationURL generates authorization URL for OIDC flow with optional PKCE support
+func (zs *ZitadelService) GetAuthorizationURL(state, redirectURI, codeChallenge string) string {
 	if !zs.configured {
 		return ""
 	}
 
-	// Build authorization URL
-	return fmt.Sprintf(
+	// Build base authorization URL
+	baseURL := fmt.Sprintf(
 		"%s/oauth/v2/authorize?client_id=%s&response_type=code&redirect_uri=%s&state=%s&scope=openid+profile+email",
 		strings.TrimSuffix(zs.issuer, "/"),
 		zs.clientID,
 		redirectURI,
 		state,
 	)
+
+	// Add PKCE parameters if code challenge is provided
+	if codeChallenge != "" {
+		baseURL += fmt.Sprintf("&code_challenge=%s&code_challenge_method=S256", codeChallenge)
+	}
+
+	return baseURL
 }
 
 // GetDiscoveryEndpoint returns the OIDC discovery endpoint
@@ -421,9 +429,16 @@ func (zs *ZitadelService) ExchangeCodeForToken(
 	data.Set("redirect_uri", req.RedirectURI)
 	data.Set("client_id", zs.clientID)
 
-	// Only add client secret if it's configured (for confidential clients)
-	if zs.clientSecret != "" {
+	// Use PKCE code verifier if provided (public client)
+	if req.CodeVerifier != "" {
+		data.Set("code_verifier", req.CodeVerifier)
+		log.Debug("using PKCE flow with code verifier")
+	} else if zs.clientSecret != "" {
+		// Fallback to client secret for confidential clients (M2M)
 		data.Set("client_secret", zs.clientSecret)
+		log.Debug("using client secret for confidential client")
+	} else {
+		log.Warn("neither code verifier nor client secret provided for token exchange")
 	}
 
 	httpReq, err := http.NewRequestWithContext(

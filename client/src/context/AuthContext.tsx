@@ -56,6 +56,7 @@ const TOKEN_KEY = "waugzee_auth_token";
 const ID_TOKEN_KEY = "waugzee_id_token";
 const OIDC_STATE_KEY = "oidc_state";
 const OIDC_REDIRECT_KEY = "oidc_redirect_uri";
+const PKCE_CODE_VERIFIER_KEY = "oidc_code_verifier";
 
 // Secure token storage
 const getStoredToken = (): string | null => {
@@ -111,6 +112,28 @@ const generateSecureState = (): string => {
   return `${timestamp}-${entropy}`;
 };
 
+// PKCE utility functions
+const generateCodeVerifier = (): string => {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return base64urlEncode(array);
+};
+
+const generateCodeChallenge = async (verifier: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return base64urlEncode(new Uint8Array(digest));
+};
+
+// Base64URL encoding (URL-safe, no padding)
+const base64urlEncode = (array: Uint8Array): string => {
+  return btoa(String.fromCharCode(...array))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+};
+
 // Storage utilities with fallbacks
 const setStorageItem = (key: string, value: string) => {
   try {
@@ -160,6 +183,7 @@ const removeStorageItem = (key: string) => {
 const cleanupOIDCState = () => {
   removeStorageItem(OIDC_STATE_KEY);
   removeStorageItem(OIDC_REDIRECT_KEY);
+  removeStorageItem(PKCE_CODE_VERIFIER_KEY);
 };
 
 export function AuthProvider(props: { children: JSX.Element }) {
@@ -303,18 +327,26 @@ export function AuthProvider(props: { children: JSX.Element }) {
       const state = generateSecureState();
       const redirectUri = `${window.location.origin}/auth/callback`;
 
-      // Store state with fallback storage
+      // Generate PKCE parameters
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+      // Store state and PKCE code verifier with fallback storage
       const stateStored = setStorageItem(OIDC_STATE_KEY, state);
       const redirectStored = setStorageItem(OIDC_REDIRECT_KEY, redirectUri);
+      const codeVerifierStored = setStorageItem(PKCE_CODE_VERIFIER_KEY, codeVerifier);
 
       // Log storage attempts but don't fail completely - we'll use URL fallback
       console.debug("OIDC state storage attempt:", {
         state,
         redirectUri,
+        codeChallenge,
         stateStored,
         redirectStored,
+        codeVerifierStored,
         verifyState: getStorageItem(OIDC_STATE_KEY),
         verifyRedirectUri: getStorageItem(OIDC_REDIRECT_KEY),
+        verifyCodeVerifier: getStorageItem(PKCE_CODE_VERIFIER_KEY) ? "[present]" : "[missing]",
         storageUsed: localStorage.getItem(OIDC_STATE_KEY)
           ? "localStorage"
           : sessionStorage.getItem(OIDC_STATE_KEY)
@@ -322,15 +354,21 @@ export function AuthProvider(props: { children: JSX.Element }) {
             : "none",
       });
 
-      // Get authorization URL from backend using apiRequest
+      if (!codeVerifierStored) {
+        throw new Error("Failed to store PKCE code verifier");
+      }
+
+      // Get authorization URL from backend using apiRequest with PKCE code challenge
       const params = new URLSearchParams({
         state,
         redirect_uri: redirectUri,
+        code_challenge: codeChallenge,
       });
 
-      console.debug("Requesting auth URL with params:", {
+      console.debug("Requesting auth URL with PKCE params:", {
         state,
         redirect_uri: redirectUri,
+        code_challenge: codeChallenge,
         fullUrl: `/auth/login-url?${params.toString()}`,
       });
 
@@ -356,6 +394,8 @@ export function AuthProvider(props: { children: JSX.Element }) {
       }
     } catch (error) {
       console.error("OIDC login failed:", error);
+      // Clean up any stored PKCE parameters on login failure
+      cleanupOIDCState();
       setAuthState("error", {
         type: "network",
         message: error instanceof Error ? error.message : "Login failed",
@@ -373,12 +413,14 @@ export function AuthProvider(props: { children: JSX.Element }) {
       // Verify state to prevent CSRF attacks
       const storedState = getStorageItem(OIDC_STATE_KEY);
       const storedRedirectUri = getStorageItem(OIDC_REDIRECT_KEY);
+      const codeVerifier = getStorageItem(PKCE_CODE_VERIFIER_KEY);
 
       console.debug("OIDC callback state validation:", {
         receivedState: state,
         storedState,
         receivedRedirectUri: redirectUri,
         storedRedirectUri,
+        hasCodeVerifier: !!codeVerifier,
         localStorageKeys: Object.keys(localStorage),
         sessionStorageKeys: Object.keys(sessionStorage),
         storageUsed: localStorage.getItem(OIDC_STATE_KEY)
@@ -387,6 +429,18 @@ export function AuthProvider(props: { children: JSX.Element }) {
             ? "sessionStorage"
             : "none",
       });
+
+      // Validate PKCE code verifier is present
+      if (!codeVerifier) {
+        const error = new Error("Missing PKCE code verifier");
+        console.error("OIDC PKCE validation failed:", {
+          hasCodeVerifier: !!codeVerifier,
+          allLocalStorageKeys: Object.keys(localStorage),
+          allSessionStorageKeys: Object.keys(sessionStorage),
+        });
+        setAuthState("error", { type: "csrf_error", message: error.message });
+        throw error;
+      }
 
       if (!storedState) {
         // Storage fallback validation - accept multiple valid formats
@@ -495,7 +549,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
         }
       }
 
-      // Exchange authorization code for access token
+      // Exchange authorization code for access token with PKCE code verifier
       const response = await apiRequest<{
         access_token: string;
         user: User;
@@ -504,6 +558,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
         code,
         redirect_uri: redirectUri,
         state,
+        code_verifier: codeVerifier,
       });
 
       if (response?.access_token && response?.user) {
@@ -523,7 +578,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           error: null,
         });
 
-        // Clean up stored state
+        // Clean up stored state and PKCE verifier
         cleanupOIDCState();
 
         navigate("/");
