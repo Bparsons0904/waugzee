@@ -9,10 +9,9 @@ import {
 } from "solid-js";
 import { createStore } from "solid-js/store";
 import { User, AuthConfig } from "src/types/User";
-import { apiRequest, setTokenGetter } from "@services/api/api.service";
+import { api, setTokenGetter } from "@services/api";
 import { oidcService } from "@services/oidc.service";
 import { AUTH_ENDPOINTS, USER_ENDPOINTS, FRONTEND_ROUTES } from "@constants/api.constants";
-import { retryWithExponentialBackoff, authRetryConfig } from "@utils/retry.utils";
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
 type AuthError =
@@ -97,10 +96,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
         error: null,
       });
 
-      const config = await retryWithExponentialBackoff(
-        () => apiRequest<AuthConfig>("GET", AUTH_ENDPOINTS.CONFIG),
-        authRetryConfig
-      );
+      const config = await api.get<AuthConfig>(AUTH_ENDPOINTS.CONFIG);
 
       // Initialize OIDC service with the configuration
       if (config.configured) {
@@ -177,7 +173,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       }
 
       // Try to get user info from backend
-      const response = await apiRequest<{ user: User }>("GET", USER_ENDPOINTS.ME);
+      const response = await api.get<{ user: User }>(USER_ENDPOINTS.ME);
 
       if (response?.user) {
         console.info('Session restored successfully', {
@@ -239,13 +235,11 @@ export function AuthProvider(props: { children: JSX.Element }) {
           return;
         }
 
-        const response = await apiRequest<{ user: User }>(
-          "GET",
+        const response = await api.get<{ user: User }>(
           USER_ENDPOINTS.ME,
-          undefined,
           {
             signal: controller.signal,
-          },
+          }
         );
 
         if (!cancelled && response?.user) {
@@ -323,7 +317,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
         throw new Error("Failed to complete authentication");
       }
 
-      const response = await apiRequest<{ user: User }>("GET", USER_ENDPOINTS.ME);
+      const response = await api.get<{ user: User }>(USER_ENDPOINTS.ME);
 
       if (response?.user) {
         setAuthState({

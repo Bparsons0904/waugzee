@@ -1,5 +1,5 @@
 import { RETRY_CONFIG } from '@constants/api.constants';
-import { ApiClientError, NetworkError } from '@services/api/apiTypes';
+import { ApiClientError, NetworkError } from '@services/api';
 
 /**
  * Exponential backoff retry utility for handling network errors
