@@ -61,15 +61,6 @@ interface WebSocketContextValue {
   onCacheInvalidation: (
     callback: (resourceType: string, resourceId: string) => void,
   ) => () => void;
-  onLoadTestProgress: (
-    callback: (testId: string, data: Record<string, unknown>) => void,
-  ) => () => void;
-  onLoadTestComplete: (
-    callback: (testId: string, data: Record<string, unknown>) => void,
-  ) => () => void;
-  onLoadTestError: (
-    callback: (testId: string, error: string) => void,
-  ) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue>(
@@ -367,43 +358,6 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     };
   };
 
-  const onLoadTestProgress = (
-    callback: (testId: string, data: Record<string, unknown>) => void,
-  ) => {
-    setLoadTestProgressCallbacks((prev) => [...prev, callback]);
-
-    // Return cleanup function
-    return () => {
-      setLoadTestProgressCallbacks((prev) =>
-        prev.filter((cb) => cb !== callback),
-      );
-    };
-  };
-
-  const onLoadTestComplete = (
-    callback: (testId: string, data: Record<string, unknown>) => void,
-  ) => {
-    setLoadTestCompleteCallbacks((prev) => [...prev, callback]);
-
-    // Return cleanup function
-    return () => {
-      setLoadTestCompleteCallbacks((prev) =>
-        prev.filter((cb) => cb !== callback),
-      );
-    };
-  };
-
-  const onLoadTestError = (
-    callback: (testId: string, error: string) => void,
-  ) => {
-    setLoadTestErrorCallbacks((prev) => [...prev, callback]);
-
-    // Return cleanup function
-    return () => {
-      setLoadTestErrorCallbacks((prev) => prev.filter((cb) => cb !== callback));
-    };
-  };
-
   const contextValue: WebSocketContextValue = {
     connectionState,
     isConnected,
@@ -413,9 +367,6 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     sendMessage,
     reconnect,
     onCacheInvalidation,
-    onLoadTestProgress,
-    onLoadTestComplete,
-    onLoadTestError,
   };
 
   return (
