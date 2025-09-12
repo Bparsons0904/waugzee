@@ -66,17 +66,37 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 			})
 		}
 
-		// Validate token with Zitadel
-		tokenInfo, err := zitadelService.ValidateToken(c.Context(), token)
+		// Validate token with Zitadel - try JWT first, fallback to introspection
+		var tokenInfo *services.TokenInfo
+		var err error
+		var validationMethod string
+
+		if isJWTToken(token) {
+			// Try JWT validation first (local, fast)
+			tokenInfo, err = zitadelService.ValidateIDToken(c.Context(), token)
+			validationMethod = "JWT"
+			
+			// If JWT validation fails due to token format/type, fallback to introspection
+			if err != nil {
+				log.Debug("JWT validation failed, falling back to introspection", "error", err.Error())
+				tokenInfo, err = zitadelService.ValidateToken(c.Context(), token)
+				validationMethod = "introspection_fallback"
+			}
+		} else {
+			// Not a JWT token, use introspection directly
+			tokenInfo, err = zitadelService.ValidateToken(c.Context(), token)
+			validationMethod = "introspection"
+		}
+
 		if err != nil {
-			log.Info("token validation failed", "error", err.Error())
+			log.Info("token validation failed", "method", validationMethod, "error", err.Error())
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Invalid token",
 			})
 		}
 
 		if !tokenInfo.Valid {
-			log.Info("token is not active")
+			log.Info("token is not active", "method", validationMethod)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Token is not active",
 			})
@@ -121,6 +141,8 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 
 		log.Info(
 			"user authenticated",
+			"method",
+			validationMethod,
 			"userID",
 			tokenInfo.UserID,
 			"email",
@@ -159,10 +181,30 @@ func (m *Middleware) OptionalAuth(zitadelService *services.ZitadelService) fiber
 			return c.Next() // No token, continue without auth
 		}
 
-		// Validate token with Zitadel
-		tokenInfo, err := zitadelService.ValidateToken(c.Context(), token)
+		// Validate token with Zitadel - try JWT first, fallback to introspection
+		var tokenInfo *services.TokenInfo
+		var err error
+		var validationMethod string
+
+		if isJWTToken(token) {
+			// Try JWT validation first (local, fast)
+			tokenInfo, err = zitadelService.ValidateIDToken(c.Context(), token)
+			validationMethod = "JWT"
+			
+			// If JWT validation fails due to token format/type, fallback to introspection
+			if err != nil {
+				log.Debug("JWT validation failed, falling back to introspection", "error", err.Error())
+				tokenInfo, err = zitadelService.ValidateToken(c.Context(), token)
+				validationMethod = "introspection_fallback"
+			}
+		} else {
+			// Not a JWT token, use introspection directly
+			tokenInfo, err = zitadelService.ValidateToken(c.Context(), token)
+			validationMethod = "introspection"
+		}
+
 		if err != nil || !tokenInfo.Valid {
-			log.Debug("optional auth token validation failed", "error", err)
+			log.Debug("optional auth token validation failed", "method", validationMethod, "error", err)
 			return c.Next() // Invalid token, continue without auth
 		}
 
@@ -203,7 +245,7 @@ func (m *Middleware) OptionalAuth(zitadelService *services.ZitadelService) fiber
 		}
 		c.SetUserContext(ctx)
 
-		log.Info("optional auth successful", "userID", tokenInfo.UserID, "email", tokenInfo.Email)
+		log.Info("optional auth successful", "method", validationMethod, "userID", tokenInfo.UserID, "email", tokenInfo.Email)
 		return c.Next()
 	}
 }
@@ -294,5 +336,14 @@ func GetUserFromContext(ctx context.Context) *models.User {
 		return nil
 	}
 	return user
+}
+
+// isJWTToken checks if a token has JWT structure (3 base64 segments separated by dots)
+func isJWTToken(token string) bool {
+	parts := strings.Split(token, ".")
+	return len(parts) == 3 &&
+		len(parts[0]) > 0 &&
+		len(parts[1]) > 0 &&
+		len(parts[2]) > 0
 }
 
