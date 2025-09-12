@@ -26,9 +26,7 @@ type OIDCDiscovery struct {
 	Issuer                string `json:"issuer"`
 	AuthorizationEndpoint string `json:"authorization_endpoint"`
 	TokenEndpoint         string `json:"token_endpoint"`
-	UserinfoEndpoint      string `json:"userinfo_endpoint"`
 	JWKS_URI              string `json:"jwks_uri"`
-	IntrospectionEndpoint string `json:"introspection_endpoint"`
 	RevocationEndpoint    string `json:"revocation_endpoint"`
 	EndSessionEndpoint    string `json:"end_session_endpoint"`
 }
@@ -56,7 +54,6 @@ type ZitadelService struct {
 	issuer       string
 	clientID     string
 	clientSecret string
-	apiID        string
 	privateKey   *rsa.PrivateKey
 	keyID        string
 	clientIDM2M  string
@@ -146,7 +143,6 @@ func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 		issuer:       cfg.ZitadelInstanceURL,
 		clientID:     cfg.ZitadelClientID,
 		clientSecret: cfg.ZitadelClientSecret,
-		apiID:        cfg.ZitadelAPIID,
 		privateKey:   privateKey,
 		keyID:        cfg.ZitadelKeyID,
 		clientIDM2M:  cfg.ZitadelClientIDM2M,
@@ -156,8 +152,7 @@ func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 
 	log.Info("Zitadel service initialized successfully",
 		"issuer", cfg.ZitadelInstanceURL,
-		"hasPrivateKey", privateKey != nil,
-		"apiID", cfg.ZitadelAPIID)
+		"hasPrivateKey", privateKey != nil)
 	return service, nil
 }
 
@@ -359,23 +354,6 @@ func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*Tok
 	}, nil
 }
 
-// GetUserInfo retrieves detailed user information by user ID
-func (zs *ZitadelService) GetUserInfo(ctx context.Context, userID string) (map[string]any, error) {
-	if !zs.configured {
-		return nil, fmt.Errorf("zitadel service not configured")
-	}
-
-	log := zs.log.Function("GetUserInfo")
-
-	// This is a placeholder implementation
-	// In a real implementation, you would call the Zitadel Management API
-	log.Info("user info requested", "userID", userID)
-
-	return map[string]any{
-		"id":   userID,
-		"note": "User info retrieval would require Zitadel Management API integration",
-	}, nil
-}
 
 // IsConfigured returns true if Zitadel is properly configured
 func (zs *ZitadelService) IsConfigured() bool {
@@ -410,13 +388,6 @@ func (zs *ZitadelService) GetAuthorizationURL(state, redirectURI, codeChallenge,
 	return baseURL
 }
 
-// GetDiscoveryEndpoint returns the OIDC discovery endpoint
-func (zs *ZitadelService) GetDiscoveryEndpoint() string {
-	if !zs.configured {
-		return ""
-	}
-	return strings.TrimSuffix(zs.issuer, "/") + "/.well-known/openid-configuration"
-}
 
 // ExchangeCodeForToken exchanges an authorization code for an access token
 func (zs *ZitadelService) ExchangeCodeForToken(
@@ -716,17 +687,6 @@ func (zs *ZitadelService) generateJWTAssertion() (string, error) {
 	return signedToken, nil
 }
 
-// TokenRevocationRequest represents the token revocation request
-type TokenRevocationRequest struct {
-	Token         string `json:"token"`
-	TokenTypeHint string `json:"token_type_hint,omitempty"` // "access_token" or "refresh_token"
-}
-
-// TokenRevocationResponse represents the token revocation response
-type TokenRevocationResponse struct {
-	Success bool   `json:"success"`
-	Error   string `json:"error,omitempty"`
-}
 
 // RevokeToken revokes an access or refresh token with Zitadel
 func (zs *ZitadelService) RevokeToken(ctx context.Context, token string, tokenType string) error {

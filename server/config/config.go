@@ -26,7 +26,6 @@ type Config struct {
 	ZitadelClientID      string `mapstructure:"ZITADEL_CLIENT_ID"`
 	ZitadelClientSecret  string `mapstructure:"ZITADEL_CLIENT_SECRET"`
 	ZitadelInstanceURL   string `mapstructure:"ZITADEL_INSTANCE_URL"`
-	ZitadelAPIID         string `mapstructure:"ZITADEL_API_ID"`
 	ZitadelPrivateKey    string `mapstructure:"ZITADEL_PRIVATE_KEY"`
 	ZitadelKeyID         string `mapstructure:"ZITADEL_KEY_ID"`
 	ZitadelClientIDM2M   string `mapstructure:"ZITADEL_CLIENT_ID_M2M"`
@@ -46,7 +45,7 @@ func InitConfig() (Config, error) {
 		"GENERAL_VERSION", "ENVIRONMENT", "SERVER_PORT", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD",
 		"DB_CACHE_ADDRESS", "DB_CACHE_PORT", "DB_CACHE_RESET",
 		"CORS_ALLOW_ORIGINS", "SECURITY_SALT", "SECURITY_PEPPER", "SECURITY_JWT_SECRET",
-		"ZITADEL_CLIENT_ID", "ZITADEL_CLIENT_SECRET", "ZITADEL_INSTANCE_URL", "ZITADEL_API_ID", "ZITADEL_PRIVATE_KEY", "ZITADEL_KEY_ID", "ZITADEL_CLIENT_ID_M2M",
+		"ZITADEL_CLIENT_ID", "ZITADEL_CLIENT_SECRET", "ZITADEL_INSTANCE_URL", "ZITADEL_PRIVATE_KEY", "ZITADEL_KEY_ID", "ZITADEL_CLIENT_ID_M2M",
 	}
 
 	for _, env := range envVars {
