@@ -130,6 +130,7 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 			})
 		}
 
+
 		// Store user in Fiber context
 		c.Locals(UserKeyFiber, user)
 

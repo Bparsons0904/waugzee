@@ -278,8 +278,18 @@ func (r *userRepository) FindOrCreateOIDCUser(
 	// First try to find by OIDC user ID
 	user, err := r.GetByOIDCUserID(ctx, req.OIDCUserID)
 	if err == nil {
-		// Update existing user with latest OIDC info
-		user.UpdateFromOIDC(req.Email, req.Name, req.OIDCProvider, req.OIDCProjectID)
+		// Update existing user with latest OIDC info using detailed method
+		user.UpdateFromOIDCDetailed(
+			req.OIDCUserID,
+			req.Email, 
+			req.Name, 
+			req.FirstName, 
+			req.LastName, 
+			req.OIDCProvider, 
+			req.OIDCProjectID, 
+			req.ProfileVerified,
+		)
+		
 		if err := r.Update(ctx, user); err != nil {
 			log.Warn("failed to update existing OIDC user", "error", err, "userID", user.ID)
 		}

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -111,6 +112,55 @@ func (u *User) UpdateFromOIDC(oidcEmail, oidcName *string, provider string, proj
 
 	// Mark profile as verified if we have email from OIDC provider
 	if oidcEmail != nil && *oidcEmail != "" {
+		u.ProfileVerified = true
+	}
+}
+
+// UpdateFromOIDCDetailed updates user information from detailed OIDC claims including name components
+func (u *User) UpdateFromOIDCDetailed(oidcUserID string, oidcEmail, oidcName *string, firstName, lastName, provider string, projectID *string, emailVerified bool) {
+	now := time.Now()
+	u.LastLoginAt = &now
+
+	// Preserve OIDC User ID - this is critical for linking sessions
+	if oidcUserID != "" {
+		u.OIDCUserID = oidcUserID
+	}
+
+	if oidcEmail != nil && *oidcEmail != "" {
+		u.Email = oidcEmail
+	}
+
+	// Update first/last names if provided
+	if firstName != "" {
+		u.FirstName = firstName
+	}
+	if lastName != "" {
+		u.LastName = lastName
+	}
+
+	// Rebuild FullName from components
+	if firstName != "" || lastName != "" {
+		u.FullName = strings.TrimSpace(firstName + " " + lastName)
+	}
+
+	// Update display name with preference: oidcName > FullName > existing
+	if oidcName != nil && *oidcName != "" {
+		u.DisplayName = *oidcName
+	} else if u.FullName != "" {
+		u.DisplayName = u.FullName
+	}
+
+	if provider != "" {
+		providerPtr := &provider
+		u.OIDCProvider = providerPtr
+	}
+
+	if projectID != nil {
+		u.OIDCProjectID = projectID
+	}
+
+	// Mark profile as verified based on email verification status
+	if emailVerified && oidcEmail != nil && *oidcEmail != "" {
 		u.ProfileVerified = true
 	}
 }

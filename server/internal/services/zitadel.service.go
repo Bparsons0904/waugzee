@@ -265,8 +265,7 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 		"sub", claims.Subject,
 		"email", customClaims.Email,
 		"exp", claims.ExpiresAt.Time,
-		"iss", claims.Issuer,
-		"nonce", customClaims.Nonce)
+		"iss", claims.Issuer)
 
 	// Build display name if 'name' is missing but we have given/family names
 	displayName := customClaims.Name
