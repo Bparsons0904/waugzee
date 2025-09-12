@@ -10,7 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/helmet"
+	"github.com/gofiber/helmet/v2"
 	fiberLogs "github.com/gofiber/fiber/v2/middleware/logger"
 )
 
@@ -61,7 +61,23 @@ func New(app *app.App) (*AppServer, error) {
 
 	server.Use(fiberLogs.New())
 	server.Use(compress.New())
-	server.Use(helmet.New())
+	
+	// Enhanced security headers
+	server.Use(helmet.New(helmet.Config{
+		XSSProtection:             "1; mode=block",
+		ContentTypeNosniff:        "nosniff",
+		XFrameOptions:             "DENY",
+		ReferrerPolicy:            "strict-origin-when-cross-origin",
+		CrossOriginEmbedderPolicy: "require-corp",
+		CrossOriginOpenerPolicy:   "same-origin",
+		CrossOriginResourcePolicy: "same-origin",
+		OriginAgentCluster:        "?1",
+		XDNSPrefetchControl:       "off",
+		XDownloadOptions:          "noopen",
+		XPermittedCrossDomain:     "none",
+		// CSP will be handled per-route basis for more flexibility
+		ContentSecurityPolicy: "",
+	}))
 
 	fiberApp := &AppServer{
 		FiberApp: server,

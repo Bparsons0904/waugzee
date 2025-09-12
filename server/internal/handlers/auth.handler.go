@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"strings"
+	"time"
 	"waugzee/internal/app"
 	"waugzee/internal/handlers/middleware"
 	"waugzee/internal/logger"
@@ -10,6 +11,7 @@ import (
 	authController "waugzee/internal/controllers/auth"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 )
 
 type AuthHandler struct {
@@ -34,11 +36,46 @@ func NewAuthHandler(app app.App, router fiber.Router) *AuthHandler {
 func (h *AuthHandler) Register() {
 	auth := h.router.Group("/auth")
 
-	// Public endpoints
+	// Rate limiting for sensitive auth endpoints
+	authRateLimit := limiter.New(limiter.Config{
+		Max:        10,                   // 10 requests
+		Expiration: 1 * time.Minute,     // per minute
+		KeyGenerator: func(c *fiber.Ctx) string {
+			// Rate limit by IP address
+			return c.IP()
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			h.log.Warn("Auth rate limit exceeded", "ip", c.IP(), "path", c.Path())
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Rate limit exceeded. Too many authentication requests.",
+				"retry_after": "60 seconds",
+			})
+		},
+		SkipFailedRequests:     false, // Count failed requests
+		SkipSuccessfulRequests: false, // Count all requests
+	})
+
+	// Stricter rate limiting for token exchange (most sensitive)
+	tokenRateLimit := limiter.New(limiter.Config{
+		Max:        5,                   // 5 requests  
+		Expiration: 1 * time.Minute,     // per minute
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return c.IP()
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			h.log.Warn("Token exchange rate limit exceeded", "ip", c.IP())
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Rate limit exceeded. Too many token exchange attempts.",
+				"retry_after": "60 seconds",
+			})
+		},
+	})
+
+	// Public endpoints with rate limiting
 	auth.Get("/config", h.getAuthConfig)
-	auth.Get("/login-url", h.getLoginURL)
-	auth.Post("/token-exchange", h.exchangeToken)
-	auth.Post("/callback", h.oidcCallback)
+	auth.Get("/login-url", authRateLimit, h.getLoginURL)
+	auth.Post("/token-exchange", tokenRateLimit, h.exchangeToken)
+	auth.Post("/callback", authRateLimit, h.oidcCallback)
 
 	// Protected endpoints - require valid OIDC token
 	protected := auth.Group("/", h.middleware.RequireAuth(h.zitadelService))
