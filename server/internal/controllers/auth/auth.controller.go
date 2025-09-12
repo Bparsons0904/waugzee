@@ -68,10 +68,14 @@ type TokenExchangeResult struct {
 }
 
 type OIDCCallbackRequest struct {
-	Code         string `json:"code"`
-	RedirectURI  string `json:"redirect_uri"`
+	Code         string `json:"code,omitempty"`          // For traditional code flow
+	RedirectURI  string `json:"redirect_uri,omitempty"`  // For traditional code flow
 	State        string `json:"state,omitempty"`
-	CodeVerifier string `json:"code_verifier,omitempty"`
+	CodeVerifier string `json:"code_verifier,omitempty"` // For traditional code flow
+	
+	// For client-side token flow (our new approach)
+	IDToken     string `json:"id_token,omitempty"`
+	AccessToken string `json:"access_token,omitempty"`
 }
 
 type LogoutRequest struct {
@@ -261,26 +265,45 @@ func (c *AuthController) validateToken(ctx context.Context, tokenResp *services.
 func (c *AuthController) getOrCreateOIDCUser(ctx context.Context, tokenInfo *services.TokenInfo) (*models.User, error) {
 	log := c.log.Function("getOrCreateOIDCUser")
 
-	oidcReq := models.OIDCUserCreateRequest{
-		OIDCUserID:      tokenInfo.UserID,
-		Email:           &tokenInfo.Email,
-		Name:            &tokenInfo.Name,
-		FirstName:       tokenInfo.Name,
-		LastName:        "",
-		OIDCProvider:    "zitadel",
-		OIDCProjectID:   &tokenInfo.ProjectID,
-		ProfileVerified: true,
-	}
-
-	// Split name into first/last if possible
-	if tokenInfo.Name != "" {
+	// Determine first and last names from various sources
+	firstName := tokenInfo.GivenName
+	lastName := tokenInfo.FamilyName
+	
+	// Fallback: parse the name field if given/family names aren't available
+	if firstName == "" && lastName == "" && tokenInfo.Name != "" {
 		names := strings.Fields(tokenInfo.Name)
 		if len(names) > 0 {
-			oidcReq.FirstName = names[0]
+			firstName = names[0]
 		}
 		if len(names) > 1 {
-			oidcReq.LastName = strings.Join(names[1:], " ")
+			lastName = strings.Join(names[1:], " ")
 		}
+	}
+	
+	// Use preferred name if available, otherwise build from first/last or use name
+	displayName := tokenInfo.Name
+	if displayName == "" && firstName != "" {
+		displayName = firstName
+		if lastName != "" {
+			displayName += " " + lastName
+		}
+	}
+
+	// Prepare email pointer (only if email is present and verified)
+	var emailPtr *string
+	if tokenInfo.Email != "" && tokenInfo.EmailVerified {
+		emailPtr = &tokenInfo.Email
+	}
+
+	oidcReq := models.OIDCUserCreateRequest{
+		OIDCUserID:      tokenInfo.UserID,
+		Email:           emailPtr,
+		Name:            &displayName,
+		FirstName:       firstName,
+		LastName:        lastName,
+		OIDCProvider:    "zitadel",
+		OIDCProjectID:   &tokenInfo.ProjectID,
+		ProfileVerified: tokenInfo.EmailVerified,
 	}
 
 	user, err := c.userRepo.FindOrCreateOIDCUser(ctx, oidcReq)
@@ -353,7 +376,7 @@ func (c *AuthController) validateAndCleanupNonce(ctx context.Context, nonce stri
 	return nil
 }
 
-// HandleOIDCCallback handles the OIDC callback from Zitadel
+// HandleOIDCCallback handles the OIDC callback - supports both code flow and token flow
 func (c *AuthController) HandleOIDCCallback(ctx context.Context, req OIDCCallbackRequest) (*TokenExchangeResult, error) {
 	log := c.log.Function("HandleOIDCCallback")
 
@@ -362,10 +385,56 @@ func (c *AuthController) HandleOIDCCallback(ctx context.Context, req OIDCCallbac
 		return nil, fmt.Errorf("authentication not configured")
 	}
 
-	if req.Code == "" || req.RedirectURI == "" {
-		log.Info("missing required parameters", "code", req.Code != "", "redirectURI", req.RedirectURI != "")
-		return nil, fmt.Errorf("code and redirect_uri are required")
+	// Check if this is a token-based callback (our new approach)
+	if req.IDToken != "" {
+		return c.handleTokenCallback(ctx, req)
 	}
+
+	// Fall back to traditional code-based callback
+	if req.Code == "" || req.RedirectURI == "" {
+		log.Info("missing required parameters", "code", req.Code != "", "redirectURI", req.RedirectURI != "", "hasIDToken", req.IDToken != "")
+		return nil, fmt.Errorf("either (code and redirect_uri) or id_token is required")
+	}
+
+	return c.handleCodeCallback(ctx, req)
+}
+
+// handleTokenCallback handles OIDC callback with pre-exchanged tokens
+func (c *AuthController) handleTokenCallback(ctx context.Context, req OIDCCallbackRequest) (*TokenExchangeResult, error) {
+	log := c.log.Function("handleTokenCallback")
+
+	// Validate the ID token and get user info
+	tokenInfo, err := c.zitadelService.ValidateIDToken(ctx, req.IDToken)
+	if err != nil {
+		log.Info("ID token validation failed", "error", err.Error())
+		return nil, fmt.Errorf("authentication failed")
+	}
+
+	if !tokenInfo.Valid {
+		log.Info("ID token is invalid")
+		return nil, fmt.Errorf("authentication failed")
+	}
+
+	// Find or create user from OIDC claims
+	user, err := c.getOrCreateOIDCUser(ctx, tokenInfo)
+	if err != nil {
+		log.Info("OIDC callback failed to create user", "error", err.Error(), "oidcUserID", tokenInfo.UserID)
+		return nil, fmt.Errorf("authentication failed")
+	}
+
+	log.Info("OIDC token callback successful", "userID", user.ID, "email", user.Email)
+	return &TokenExchangeResult{
+		AccessToken: req.AccessToken,
+		TokenType:   "Bearer",
+		ExpiresIn:   3600, // Default expiry, client will handle renewal
+		State:       req.State,
+		User:        user.ToProfile(),
+	}, nil
+}
+
+// handleCodeCallback handles traditional OIDC callback with authorization code
+func (c *AuthController) handleCodeCallback(ctx context.Context, req OIDCCallbackRequest) (*TokenExchangeResult, error) {
+	log := c.log.Function("handleCodeCallback")
 
 	// Exchange code for token
 	tokenReq := services.TokenExchangeRequest{
@@ -404,7 +473,7 @@ func (c *AuthController) HandleOIDCCallback(ctx context.Context, req OIDCCallbac
 		return nil, fmt.Errorf("authentication failed")
 	}
 
-	log.Info("OIDC callback successful", "userID", user.ID, "email", user.Email)
+	log.Info("OIDC code callback successful", "userID", user.ID, "email", user.Email)
 	return &TokenExchangeResult{
 		AccessToken: tokenResp.AccessToken,
 		TokenType:   tokenResp.TokenType,

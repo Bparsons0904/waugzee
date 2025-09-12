@@ -209,35 +209,18 @@ func (h *AuthHandler) exchangeToken(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-// oidcCallback handles the OIDC callback from Zitadel (alternative to token exchange)
+// oidcCallback handles the OIDC callback from the client with tokens
 func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
-	// Get parameters from query or body
-	code := c.Query("code")
-	if code == "" {
-		code = c.FormValue("code")
+	var req authController.OIDCCallbackRequest
+	if err := c.BodyParser(&req); err != nil {
+		h.log.Info("Failed to parse callback request body", "error", err.Error(), "contentType", c.Get("Content-Type"), "body", string(c.Body()))
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+			"details": err.Error(),
+		})
 	}
 
-	redirectURI := c.Query("redirect_uri")
-	if redirectURI == "" {
-		redirectURI = c.FormValue("redirect_uri")
-	}
-
-	state := c.Query("state")
-	if state == "" {
-		state = c.FormValue("state")
-	}
-
-	codeVerifier := c.Query("code_verifier")
-	if codeVerifier == "" {
-		codeVerifier = c.FormValue("code_verifier")
-	}
-
-	req := authController.OIDCCallbackRequest{
-		Code:         code,
-		RedirectURI:  redirectURI,
-		State:        state,
-		CodeVerifier: codeVerifier,
-	}
+	h.log.Info("Received OIDC callback request", "hasIDToken", req.IDToken != "", "hasAccessToken", req.AccessToken != "", "state", req.State)
 
 	response, err := h.authController.HandleOIDCCallback(c.Context(), req)
 	if err != nil {

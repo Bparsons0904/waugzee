@@ -71,13 +71,17 @@ type ZitadelService struct {
 
 // TokenInfo represents validated token information
 type TokenInfo struct {
-	UserID    string
-	Email     string
-	Name      string
-	Roles     []string
-	ProjectID string
-	Nonce     string
-	Valid     bool
+	UserID          string
+	Email           string
+	Name            string
+	GivenName       string
+	FamilyName      string
+	PreferredName   string
+	EmailVerified   bool
+	Roles           []string
+	ProjectID       string
+	Nonce           string
+	Valid           bool
 }
 
 // TokenExchangeRequest represents the token exchange request
@@ -229,9 +233,13 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 	// Parse custom claims for user info (need to parse the original token again for custom claims)
 	var customClaims struct {
 		jwt.RegisteredClaims
-		Email string `json:"email"`
-		Name  string `json:"name"`
-		Nonce string `json:"nonce"`
+		Email           string `json:"email"`
+		Name            string `json:"name"`
+		GivenName       string `json:"given_name"`
+		FamilyName      string `json:"family_name"`
+		PreferredName   string `json:"preferred_username"`
+		EmailVerified   bool   `json:"email_verified"`
+		Nonce           string `json:"nonce"`
 		// Add other custom claims as needed
 		// Roles []string `json:"roles,omitempty"`
 	}
@@ -257,14 +265,24 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 		"iss", claims.Issuer,
 		"nonce", customClaims.Nonce)
 
+	// Build display name if 'name' is missing but we have given/family names
+	displayName := customClaims.Name
+	if displayName == "" && (customClaims.GivenName != "" || customClaims.FamilyName != "") {
+		displayName = strings.TrimSpace(customClaims.GivenName + " " + customClaims.FamilyName)
+	}
+
 	return &TokenInfo{
-		UserID:    claims.Subject,
-		Email:     customClaims.Email,
-		Name:      customClaims.Name,
-		Roles:     []string{}, // TODO: Extract from custom claims when roles are configured
-		ProjectID: "",         // TODO: Extract project ID if needed
-		Nonce:     customClaims.Nonce,
-		Valid:     true,
+		UserID:        claims.Subject,
+		Email:         customClaims.Email,
+		Name:          displayName,
+		GivenName:     customClaims.GivenName,
+		FamilyName:    customClaims.FamilyName,
+		PreferredName: customClaims.PreferredName,
+		EmailVerified: customClaims.EmailVerified,
+		Roles:         []string{}, // TODO: Extract from custom claims when roles are configured
+		ProjectID:     "",         // TODO: Extract project ID if needed
+		Nonce:         customClaims.Nonce,
+		Valid:         true,
 	}, nil
 }
 

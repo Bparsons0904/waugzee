@@ -264,12 +264,34 @@ export function AuthProvider(props: { children: JSX.Element }) {
         throw new Error("OIDC service is not initialized yet");
       }
 
+      // Complete the OIDC client-side callback to get tokens first
       const oidcUser = await oidcService.signInRedirectCallback();
 
-      if (!oidcUser?.access_token) {
-        throw new Error("Failed to complete authentication");
+      if (!oidcUser?.access_token || !oidcUser?.id_token) {
+        throw new Error("Failed to complete OIDC authentication - missing tokens");
       }
 
+      // Temporarily update the token in auth state so the API call can use it
+      setAuthState("token", oidcUser.access_token);
+
+      // Call our backend's callback endpoint with the ID token to create/update the user
+      try {
+        const callbackResponse = await api.post(AUTH_ENDPOINTS.CALLBACK, {
+          id_token: oidcUser.id_token,
+          access_token: oidcUser.access_token,
+          state: typeof oidcUser.state === 'string' ? oidcUser.state : JSON.stringify(oidcUser.state),
+        });
+
+        console.info('Backend callback successful:', {
+          userId: callbackResponse?.user?.id,
+          email: callbackResponse?.user?.email,
+        });
+      } catch (backendError) {
+        console.error('Backend callback failed:', backendError);
+        throw new Error("Failed to register user with backend");
+      }
+
+      // Finally, get the user info from our backend (which should now exist)
       const response = await api.get<{ user: User }>(USER_ENDPOINTS.ME);
 
       if (response?.user) {
@@ -282,7 +304,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
         navigate(FRONTEND_ROUTES.HOME);
       } else {
-        throw new Error("Failed to get user info from backend");
+        throw new Error("Failed to get user info from backend after callback");
       }
     } catch (error) {
       console.error("OIDC callback failed:", error);
