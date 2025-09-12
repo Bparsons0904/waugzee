@@ -1,12 +1,15 @@
 package websockets
 
 import (
+	"context"
 	"log/slog"
 	"time"
 	"waugzee/config"
 	"waugzee/internal/database"
 	"waugzee/internal/events"
 	"waugzee/internal/logger"
+	"waugzee/internal/repositories"
+	"waugzee/internal/services"
 
 	"github.com/gofiber/websocket/v2"
 	"github.com/google/uuid"
@@ -56,17 +59,21 @@ type Client struct {
 }
 
 type Manager struct {
-	hub      *Hub
-	db       database.DB
-	config   config.Config
-	log      logger.Logger
-	eventBus *events.EventBus
+	hub            *Hub
+	db             database.DB
+	config         config.Config
+	log            logger.Logger
+	eventBus       *events.EventBus
+	zitadelService *services.ZitadelService
+	userRepo       repositories.UserRepository
 }
 
 func New(
 	db database.DB,
 	eventBus *events.EventBus,
 	config config.Config,
+	zitadelService *services.ZitadelService,
+	userRepo repositories.UserRepository,
 ) (*Manager, error) {
 	log := logger.New("websockets")
 
@@ -77,10 +84,12 @@ func New(
 			unregister: make(chan *Client),
 			clients:    make(map[string]*Client),
 		},
-		db:       db,
-		config:   config,
-		log:      log,
-		eventBus: eventBus,
+		db:             db,
+		config:         config,
+		log:            log,
+		eventBus:       eventBus,
+		zitadelService: zitadelService,
+		userRepo:       userRepo,
 	}
 
 	log.Function("New").Info("Starting websocket hub")
@@ -267,9 +276,37 @@ func (c *Client) handleAuthResponse(message Message) {
 		return
 	}
 
-	c.Status = STATUS_AUTHENTICATED
+	// Validate token using the consolidated method
+	tokenInfo, validationMethod, err := c.Manager.zitadelService.ValidateTokenWithFallback(
+		context.Background(),
+		token,
+	)
+	if err != nil {
+		log.Info("WebSocket token validation failed", "clientID", c.ID, "error", err.Error())
+		c.sendAuthFailure("Authentication failed")
+		return
+	}
 
-	log.Info("Client authenticated successfully", "clientID", c.ID, "userID", c.UserID)
+	// Get user from database using OIDC User ID
+	user, err := c.Manager.userRepo.GetByOIDCUserID(context.Background(), tokenInfo.UserID)
+	if err != nil {
+		log.Info("WebSocket user not found in database", 
+			"clientID", c.ID, 
+			"oidcUserID", tokenInfo.UserID, 
+			"error", err.Error())
+		c.sendAuthFailure("User not found")
+		return
+	}
+
+	// Set client as authenticated with the validated user
+	c.Status = STATUS_AUTHENTICATED
+	c.UserID = user.ID
+
+	log.Info("WebSocket client authenticated successfully", 
+		"clientID", c.ID, 
+		"userID", user.ID, 
+		"email", tokenInfo.Email,
+		"method", validationMethod)
 
 	c.Manager.promoteClientToAuthenticated(c)
 

@@ -2,11 +2,11 @@ package repositories
 
 import (
 	"context"
+	"time"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/services"
-	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -64,8 +64,6 @@ func (r *userRepository) GetByID(ctx context.Context, id string) (*User, error) 
 	return &user, nil
 }
 
-
-
 func (r *userRepository) Update(ctx context.Context, user *User) error {
 	log := r.log.Function("Update")
 
@@ -85,7 +83,13 @@ func (r *userRepository) Update(ctx context.Context, user *User) error {
 			WithTTL(USER_CACHE_EXPIRY).
 			WithContext(ctx).
 			Set(); err != nil {
-			log.Warn("failed to update OIDC mapping cache", "oidcUserID", user.OIDCUserID, "error", err)
+			log.Warn(
+				"failed to update OIDC mapping cache",
+				"oidcUserID",
+				user.OIDCUserID,
+				"error",
+				err,
+			)
 		}
 	}
 
@@ -102,7 +106,13 @@ func (r *userRepository) Delete(ctx context.Context, id string) error {
 		if user.OIDCUserID != "" {
 			oidcCacheKey := "oidc:" + user.OIDCUserID
 			if err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).Delete(); err != nil {
-				log.Warn("failed to remove OIDC mapping from cache", "oidcUserID", user.OIDCUserID, "error", err)
+				log.Warn(
+					"failed to remove OIDC mapping from cache",
+					"oidcUserID",
+					user.OIDCUserID,
+					"error",
+					err,
+				)
 			}
 		}
 	}
@@ -160,7 +170,6 @@ func (r *userRepository) getDBByID(ctx context.Context, userID string, user *Use
 	return nil
 }
 
-
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*User, error) {
 	log := r.log.Function("GetByEmail")
 
@@ -215,7 +224,10 @@ func (r *userRepository) GetByOIDCUserID(ctx context.Context, oidcUserID string)
 	return &user, nil
 }
 
-func (r *userRepository) CreateFromOIDC(ctx context.Context, req OIDCUserCreateRequest) (*User, error) {
+func (r *userRepository) CreateFromOIDC(
+	ctx context.Context,
+	req OIDCUserCreateRequest,
+) (*User, error) {
 	log := r.log.Function("CreateFromOIDC")
 
 	user := &User{
@@ -257,7 +269,10 @@ func (r *userRepository) CreateFromOIDC(ctx context.Context, req OIDCUserCreateR
 	return user, nil
 }
 
-func (r *userRepository) FindOrCreateOIDCUser(ctx context.Context, req OIDCUserCreateRequest) (*User, error) {
+func (r *userRepository) FindOrCreateOIDCUser(
+	ctx context.Context,
+	req OIDCUserCreateRequest,
+) (*User, error) {
 	log := r.log.Function("FindOrCreateOIDCUser")
 
 	// First try to find by OIDC user ID

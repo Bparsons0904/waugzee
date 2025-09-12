@@ -9,9 +9,6 @@ import (
 	"gorm.io/gorm"
 )
 
-func stringPtr(s string) *string {
-	return &s
-}
 
 func Seed(db *gorm.DB, config config.Config, log logger.Logger) error {
 	log = log.Function("seed")

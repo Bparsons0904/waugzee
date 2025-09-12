@@ -58,7 +58,7 @@ func New() (*App, error) {
 	// Initialize repositories
 	userRepo := repositories.New(db)
 
-	websocket, err := websockets.New(db, eventBus, config)
+	websocket, err := websockets.New(db, eventBus, config, zitadelService, userRepo)
 	if err != nil {
 		return &App{}, log.Err("failed to create websocket manager", err)
 	}

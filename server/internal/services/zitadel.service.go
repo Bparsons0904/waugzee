@@ -233,15 +233,18 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 	// Parse custom claims for user info (need to parse the original token again for custom claims)
 	var customClaims struct {
 		jwt.RegisteredClaims
-		Email           string `json:"email"`
-		Name            string `json:"name"`
-		GivenName       string `json:"given_name"`
-		FamilyName      string `json:"family_name"`
-		PreferredName   string `json:"preferred_username"`
-		EmailVerified   bool   `json:"email_verified"`
-		Nonce           string `json:"nonce"`
-		// Add other custom claims as needed
-		// Roles []string `json:"roles,omitempty"`
+		Email           string   `json:"email"`
+		Name            string   `json:"name"`
+		GivenName       string   `json:"given_name"`
+		FamilyName      string   `json:"family_name"`
+		PreferredName   string   `json:"preferred_username"`
+		EmailVerified   bool     `json:"email_verified"`
+		Nonce           string   `json:"nonce"`
+		// Zitadel specific claims
+		Roles           []string `json:"urn:zitadel:iam:org:project:roles"`
+		ProjectID       string   `json:"urn:zitadel:iam:org:project:id"`
+		// Alternative project ID location
+		AzpProjectID    string   `json:"azp"`
 	}
 
 	// Parse again with custom claims struct
@@ -271,6 +274,12 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 		displayName = strings.TrimSpace(customClaims.GivenName + " " + customClaims.FamilyName)
 	}
 
+	// Extract project ID (try multiple claim locations)
+	projectID := customClaims.ProjectID
+	if projectID == "" {
+		projectID = customClaims.AzpProjectID
+	}
+
 	return &TokenInfo{
 		UserID:        claims.Subject,
 		Email:         customClaims.Email,
@@ -279,8 +288,8 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 		FamilyName:    customClaims.FamilyName,
 		PreferredName: customClaims.PreferredName,
 		EmailVerified: customClaims.EmailVerified,
-		Roles:         []string{}, // TODO: Extract from custom claims when roles are configured
-		ProjectID:     "",         // TODO: Extract project ID if needed
+		Roles:         customClaims.Roles,
+		ProjectID:     projectID,
 		Nonce:         customClaims.Nonce,
 		Valid:         true,
 	}, nil
@@ -347,10 +356,18 @@ func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*Tok
 	}
 
 	var introspectResp struct {
-		Active bool   `json:"active"`
-		Sub    string `json:"sub"`
-		Email  string `json:"email"`
-		Name   string `json:"name"`
+		Active        bool     `json:"active"`
+		Sub           string   `json:"sub"`
+		Email         string   `json:"email"`
+		Name          string   `json:"name"`
+		GivenName     string   `json:"given_name"`
+		FamilyName    string   `json:"family_name"`
+		PreferredName string   `json:"preferred_username"`
+		EmailVerified bool     `json:"email_verified"`
+		// Zitadel specific claims
+		Roles         []string `json:"urn:zitadel:iam:org:project:roles"`
+		ProjectID     string   `json:"urn:zitadel:iam:org:project:id"`
+		AzpProjectID  string   `json:"azp"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&introspectResp); err != nil {
@@ -361,14 +378,30 @@ func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*Tok
 		return &TokenInfo{Valid: false}, nil
 	}
 
+	// Build display name if not provided but we have given/family names
+	displayName := introspectResp.Name
+	if displayName == "" && (introspectResp.GivenName != "" || introspectResp.FamilyName != "") {
+		displayName = strings.TrimSpace(introspectResp.GivenName + " " + introspectResp.FamilyName)
+	}
+
+	// Extract project ID (try multiple claim locations)
+	projectID := introspectResp.ProjectID
+	if projectID == "" {
+		projectID = introspectResp.AzpProjectID
+	}
+
 	// Extract user information from introspection response
 	return &TokenInfo{
-		UserID:    introspectResp.Sub,
-		Email:     introspectResp.Email,
-		Name:      introspectResp.Name,
-		Roles:     []string{}, // Roles would need to be extracted from custom claims
-		ProjectID: "",         // Project ID not needed for OIDC flow
-		Valid:     true,
+		UserID:        introspectResp.Sub,
+		Email:         introspectResp.Email,
+		Name:          displayName,
+		GivenName:     introspectResp.GivenName,
+		FamilyName:    introspectResp.FamilyName,
+		PreferredName: introspectResp.PreferredName,
+		EmailVerified: introspectResp.EmailVerified,
+		Roles:         introspectResp.Roles,
+		ProjectID:     projectID,
+		Valid:         true,
 	}, nil
 }
 
@@ -851,6 +884,69 @@ func (zs *ZitadelService) GetConfig() ZitadelConfig {
 		InstanceURL: zs.issuer,
 		ClientID:    zs.clientID,
 	}
+}
+
+// ValidateTokenWithFallback validates a token using JWT-first approach with introspection fallback
+func (zs *ZitadelService) ValidateTokenWithFallback(ctx context.Context, token string) (*TokenInfo, string, error) {
+	log := zs.log.Function("ValidateTokenWithFallback")
+
+	// Skip auth if Zitadel is not configured
+	if !zs.IsConfigured() {
+		log.Warn("Zitadel not configured, skipping token validation")
+		return nil, "", fmt.Errorf("zitadel service not configured")
+	}
+
+	// Validate token with Zitadel - try JWT first, fallback to introspection
+	var tokenInfo *TokenInfo
+	var err error
+	var validationMethod string
+
+	if isJWTToken(token) {
+		// Try JWT validation first (local, fast)
+		tokenInfo, err = zs.ValidateIDToken(ctx, token)
+		validationMethod = "JWT"
+		
+		// If JWT validation fails due to token format/type, fallback to introspection
+		if err != nil {
+			log.Debug("JWT validation failed, falling back to introspection", "error", err.Error())
+			tokenInfo, err = zs.ValidateToken(ctx, token)
+			validationMethod = "introspection_fallback"
+		}
+	} else {
+		// Not a JWT token, use introspection directly
+		tokenInfo, err = zs.ValidateToken(ctx, token)
+		validationMethod = "introspection"
+	}
+
+	if err != nil {
+		log.Info("token validation failed", "method", validationMethod, "error", err.Error())
+		return nil, "", fmt.Errorf("token validation failed: %w", err)
+	}
+
+	if !tokenInfo.Valid {
+		log.Info("token is not active", "method", validationMethod)
+		return nil, "", fmt.Errorf("token is not active")
+	}
+
+	log.Info(
+		"token validated successfully",
+		"method",
+		validationMethod,
+		"userID",
+		tokenInfo.UserID,
+		"email",
+		tokenInfo.Email,
+	)
+	return tokenInfo, validationMethod, nil
+}
+
+// isJWTToken checks if a token has JWT structure (3 base64 segments separated by dots)
+func isJWTToken(token string) bool {
+	parts := strings.Split(token, ".")
+	return len(parts) == 3 &&
+		len(parts[0]) > 0 &&
+		len(parts[1]) > 0 &&
+		len(parts[2]) > 0
 }
 
 // Close cleans up the Zitadel service resources

@@ -21,6 +21,16 @@ type AuthError =
   | { type: "csrf_error"; message: string }
   | null;
 
+interface CallbackResponse {
+  access_token: string;
+  token_type: string;
+  refresh_token?: string;
+  expires_in: number;
+  id_token?: string;
+  state?: string;
+  user: User;
+}
+
 type AuthState = {
   status: AuthStatus;
   user: User | null;
@@ -276,7 +286,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
       // Call our backend's callback endpoint with the ID token to create/update the user
       try {
-        const callbackResponse = await api.post(AUTH_ENDPOINTS.CALLBACK, {
+        const callbackResponse = await api.post<CallbackResponse>(AUTH_ENDPOINTS.CALLBACK, {
           id_token: oidcUser.id_token,
           access_token: oidcUser.access_token,
           state: typeof oidcUser.state === 'string' ? oidcUser.state : JSON.stringify(oidcUser.state),

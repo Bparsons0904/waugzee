@@ -6,7 +6,8 @@ import { Button } from "@components/common/ui/Button/Button";
 const Dashboard: Component = () => {
   const { user } = useAuth();
 
-  const handleAction = (_action: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleAction = (..._args: unknown[]) => {
     // Handle actions here
     // TODO: Implement specific action handling
   };

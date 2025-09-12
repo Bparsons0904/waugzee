@@ -26,9 +26,6 @@ export const MessageType = {
   AUTH_SUCCESS: "auth_success",
   AUTH_FAILURE: "auth_failure",
   INVALIDATE_CACHE: "invalidateCache",
-  LOADTEST_PROGRESS: "loadtest_progress",
-  LOADTEST_COMPLETE: "loadtest_complete",
-  LOADTEST_ERROR: "loadtest_error",
 } as const;
 
 export type ChannelType = "system" | "user";
@@ -98,24 +95,15 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
   const [cacheInvalidationCallbacks, setCacheInvalidationCallbacks] =
     createSignal<Array<(resourceType: string, resourceId: string) => void>>([]);
 
-  // Load test callbacks
-  const [loadTestProgressCallbacks, setLoadTestProgressCallbacks] =
-    createSignal<Array<(testId: string, data: Record<string, unknown>) => void>>([]);
-  const [loadTestCompleteCallbacks, setLoadTestCompleteCallbacks] =
-    createSignal<Array<(testId: string, data: Record<string, unknown>) => void>>([]);
-  const [loadTestErrorCallbacks, setLoadTestErrorCallbacks] =
-    createSignal<Array<(testId: string, error: string) => void>>([]);
-
-  const log = (_message: string, ..._args: unknown[]) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const log = (..._args: unknown[]) => {
     // Debug logging disabled for production
     // if (debug) {
-    //   console.log(`[WebSocket] ${message}`, ...args);
+    //   console.log(`[WebSocket] ${_args[0]}`, ..._args.slice(1));
     // }
   };
 
   const getWebSocketUrl = () => {
-    // TODO: Remove to enable Auth
-    return env.wsUrl;
     if (!isAuthenticated() || !authToken()) {
       return null;
     }
@@ -124,8 +112,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
 
   const handleAuthRequest = () => {
     log("Handling auth request");
-    // TODO: Remove to enable Auth
-    const token = authToken() ?? "token";
+    const token = authToken();
 
     if (!token) {
       log("No auth token available");
@@ -174,49 +161,6 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
               ? message.data.reason
               : "Authentication failed",
           );
-          break;
-
-        case MessageType.LOADTEST_PROGRESS:
-          if (message.data?.testId) {
-            const testId = message.data.testId as string;
-            log("Load test progress received:", testId, message.data);
-            loadTestProgressCallbacks().forEach((callback) => {
-              try {
-                callback(testId, message.data!);
-              } catch (error) {
-                log("Load test progress callback error:", error);
-              }
-            });
-          }
-          break;
-
-        case MessageType.LOADTEST_COMPLETE:
-          if (message.data?.testId) {
-            const testId = message.data.testId as string;
-            log("Load test complete received:", testId, message.data);
-            loadTestCompleteCallbacks().forEach((callback) => {
-              try {
-                callback(testId, message.data!);
-              } catch (error) {
-                log("Load test complete callback error:", error);
-              }
-            });
-          }
-          break;
-
-        case MessageType.LOADTEST_ERROR:
-          if (message.data?.testId && message.data?.error) {
-            const testId = message.data.testId as string;
-            const error = message.data.error as string;
-            log("Load test error received:", testId, error);
-            loadTestErrorCallbacks().forEach((callback) => {
-              try {
-                callback(testId, error);
-              } catch (error) {
-                log("Load test error callback error:", error);
-              }
-            });
-          }
           break;
 
         default:
@@ -456,9 +400,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
 
     // Return cleanup function
     return () => {
-      setLoadTestErrorCallbacks((prev) =>
-        prev.filter((cb) => cb !== callback),
-      );
+      setLoadTestErrorCallbacks((prev) => prev.filter((cb) => cb !== callback));
     };
   };
 

@@ -38,8 +38,8 @@ func (h *AuthHandler) Register() {
 
 	// Rate limiting for sensitive auth endpoints
 	authRateLimit := limiter.New(limiter.Config{
-		Max:        10,                   // 10 requests
-		Expiration: 1 * time.Minute,     // per minute
+		Max:        10,              // 10 requests
+		Expiration: 1 * time.Minute, // per minute
 		KeyGenerator: func(c *fiber.Ctx) string {
 			// Rate limit by IP address
 			return c.IP()
@@ -47,7 +47,7 @@ func (h *AuthHandler) Register() {
 		LimitReached: func(c *fiber.Ctx) error {
 			h.log.Warn("Auth rate limit exceeded", "ip", c.IP(), "path", c.Path())
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-				"error": "Rate limit exceeded. Too many authentication requests.",
+				"error":       "Rate limit exceeded. Too many authentication requests.",
 				"retry_after": "60 seconds",
 			})
 		},
@@ -57,15 +57,15 @@ func (h *AuthHandler) Register() {
 
 	// Stricter rate limiting for token exchange (most sensitive)
 	tokenRateLimit := limiter.New(limiter.Config{
-		Max:        5,                   // 5 requests  
-		Expiration: 1 * time.Minute,     // per minute
+		Max:        5,               // 5 requests
+		Expiration: 1 * time.Minute, // per minute
 		KeyGenerator: func(c *fiber.Ctx) string {
 			return c.IP()
 		},
 		LimitReached: func(c *fiber.Ctx) error {
 			h.log.Warn("Token exchange rate limit exceeded", "ip", c.IP())
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-				"error": "Rate limit exceeded. Too many token exchange attempts.",
+				"error":       "Rate limit exceeded. Too many token exchange attempts.",
 				"retry_after": "60 seconds",
 			})
 		},
@@ -108,7 +108,7 @@ func (h *AuthHandler) getLoginURL(c *fiber.Ctx) error {
 	state := c.Query("state", "default-state")
 	redirectURI := c.Query("redirect_uri")
 	codeChallenge := c.Query("code_challenge") // PKCE code challenge
-	nonce := c.Query("nonce")                 // Nonce for replay attack protection
+	nonce := c.Query("nonce")                  // Nonce for replay attack protection
 
 	if redirectURI == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -131,16 +131,24 @@ func (h *AuthHandler) getLoginURL(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-
-
 // logout handles user logout with proper OIDC token revocation and cache cleanup
 func (h *AuthHandler) logout(c *fiber.Ctx) error {
+	log := h.log.Function("logout")
 	authInfo := middleware.GetAuthInfo(c)
 
 	// Parse request body for logout parameters
 	var reqBody authController.LogoutRequest
 	if err := c.BodyParser(&reqBody); err != nil {
-		// Continue with logout even if body parsing fails
+		// Continue with logout even if body parsing fails - optional logout parameters
+		log.Error(
+			"Failed to parse logout request body",
+			"error",
+			err.Error(),
+			"contentType",
+			c.Get("Content-Type"),
+			"body",
+			string(c.Body()),
+		)
 	}
 
 	// Extract access token from Authorization header
@@ -173,7 +181,6 @@ func (h *AuthHandler) logout(c *fiber.Ctx) error {
 
 	return c.JSON(response)
 }
-
 
 // exchangeToken handles the OIDC authorization code exchange for access token
 func (h *AuthHandler) exchangeToken(c *fiber.Ctx) error {
@@ -213,14 +220,30 @@ func (h *AuthHandler) exchangeToken(c *fiber.Ctx) error {
 func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
 	var req authController.OIDCCallbackRequest
 	if err := c.BodyParser(&req); err != nil {
-		h.log.Info("Failed to parse callback request body", "error", err.Error(), "contentType", c.Get("Content-Type"), "body", string(c.Body()))
+		h.log.Info(
+			"Failed to parse callback request body",
+			"error",
+			err.Error(),
+			"contentType",
+			c.Get("Content-Type"),
+			"body",
+			string(c.Body()),
+		)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
+			"error":   "Invalid request body",
 			"details": err.Error(),
 		})
 	}
 
-	h.log.Info("Received OIDC callback request", "hasIDToken", req.IDToken != "", "hasAccessToken", req.AccessToken != "", "state", req.State)
+	h.log.Info(
+		"Received OIDC callback request",
+		"hasIDToken",
+		req.IDToken != "",
+		"hasAccessToken",
+		req.AccessToken != "",
+		"state",
+		req.State,
+	)
 
 	response, err := h.authController.HandleOIDCCallback(c.Context(), req)
 	if err != nil {
@@ -250,7 +273,7 @@ func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
 // getAllUsers returns all users (admin only)
 func (h *AuthHandler) getAllUsers(c *fiber.Ctx) error {
 	authInfo := middleware.GetAuthInfo(c)
-	
+
 	// Convert middleware AuthInfo to controller AuthInfo
 	var controllerAuthInfo *authController.AuthInfo
 	if authInfo != nil {
@@ -272,5 +295,3 @@ func (h *AuthHandler) getAllUsers(c *fiber.Ctx) error {
 
 	return c.JSON(response)
 }
-
-

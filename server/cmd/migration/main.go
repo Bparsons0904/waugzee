@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"waugzee/cmd/migration/initialize"
 	"waugzee/cmd/migration/seed"
 	"waugzee/config"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
-	"strconv"
 
+	_ "github.com/lib/pq"
 	migrate "github.com/rubenv/sql-migrate"
 	"gorm.io/gorm"
-	_ "github.com/lib/pq"
 )
 
 const (

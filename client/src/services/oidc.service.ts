@@ -28,7 +28,7 @@ export class OIDCService {
   /**
    * Discover OIDC configuration from the provider
    */
-  private async discoverOIDCConfiguration(instanceUrl: string): Promise<any> {
+  private async discoverOIDCConfiguration(instanceUrl: string): Promise<Record<string, unknown>> {
     console.debug('Attempting OIDC discovery for:', instanceUrl);
     
     // Try multiple discovery URL patterns for Zitadel
