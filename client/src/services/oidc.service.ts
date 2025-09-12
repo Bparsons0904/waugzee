@@ -26,6 +26,59 @@ export class OIDCService {
   private eventCallbacks: OIDCEventCallbacks = {};
 
   /**
+   * Discover OIDC configuration from the provider
+   */
+  private async discoverOIDCConfiguration(instanceUrl: string): Promise<any> {
+    console.debug('Attempting OIDC discovery for:', instanceUrl);
+    
+    // Try multiple discovery URL patterns for Zitadel
+    const discoveryUrls = [
+      `${instanceUrl}/.well-known/openid-configuration`, // Zitadel standard (hyphen)
+      `${instanceUrl}/.well-known/openid_configuration`, // Generic OIDC standard (underscore)
+      `${instanceUrl}/oidc/v1/.well-known/openid-configuration`, // Zitadel with path prefix
+    ];
+    
+    for (const discoveryUrl of discoveryUrls) {
+      try {
+        console.debug(`Trying discovery URL: ${discoveryUrl}`);
+        const response = await fetch(discoveryUrl);
+        
+        if (response.ok) {
+          const metadata = await response.json();
+          console.debug('OIDC discovery successful:', {
+            discoveryUrl,
+            issuer: metadata.issuer,
+            endpoints: {
+              authorization: metadata.authorization_endpoint,
+              token: metadata.token_endpoint,
+              userinfo: metadata.userinfo_endpoint,
+              end_session: metadata.end_session_endpoint,
+            }
+          });
+          
+          return metadata;
+        } else {
+          console.debug(`Discovery URL failed: ${discoveryUrl} - ${response.status} ${response.statusText}`);
+        }
+      } catch (error) {
+        console.debug(`Discovery URL error: ${discoveryUrl} -`, error);
+      }
+    }
+    
+    console.warn('All OIDC discovery URLs failed, falling back to Zitadel endpoints');
+    
+    // Fallback to hardcoded Zitadel endpoints
+    return {
+      issuer: instanceUrl,
+      authorization_endpoint: `${instanceUrl}/oauth/v2/authorize`,
+      token_endpoint: `${instanceUrl}/oauth/v2/token`,
+      userinfo_endpoint: `${instanceUrl}/oidc/v1/userinfo`,
+      end_session_endpoint: `${instanceUrl}/oidc/v1/end_session`,
+      jwks_uri: `${instanceUrl}/oauth/v2/keys`,
+    };
+  }
+
+  /**
    * Initialize the OIDC service with auth configuration
    */
   async initialize(config: AuthConfig): Promise<void> {
@@ -44,6 +97,9 @@ export class OIDCService {
     }
 
     this.config = config;
+
+    // Discover OIDC endpoints dynamically
+    const discoveredMetadata = await this.discoverOIDCConfiguration(config.instanceUrl);
 
     const settings: UserManagerSettings = {
       // Core OIDC settings
@@ -71,15 +127,8 @@ export class OIDCService {
       filterProtocolClaims: true,
       staleStateAgeInSeconds: 900, // 15 minutes
 
-      // Custom metadata for Zitadel compatibility
-      metadata: {
-        issuer: config.instanceUrl,
-        authorization_endpoint: `${config.instanceUrl}/oauth/v2/authorize`,
-        token_endpoint: `${config.instanceUrl}/oauth/v2/token`,
-        userinfo_endpoint: `${config.instanceUrl}/oidc/v1/userinfo`,
-        end_session_endpoint: `${config.instanceUrl}/oidc/v1/end_session`,
-        jwks_uri: `${config.instanceUrl}/oauth/v2/keys`,
-      },
+      // Use discovered metadata instead of hardcoded endpoints
+      metadata: discoveredMetadata,
     };
 
     try {

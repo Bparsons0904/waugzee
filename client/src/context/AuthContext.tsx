@@ -62,6 +62,21 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
   setTokenGetter(() => authState.token);
 
+  // Define performLocalLogout early so it can be used in callbacks
+  const performLocalLogout = () => {
+    console.info('Performing local logout - clearing all auth state');
+    
+    // Clear all local state
+    setAuthState({
+      status: "unauthenticated",
+      user: null,
+      token: null,
+      error: null,
+    });
+
+    navigate(FRONTEND_ROUTES.LOGIN);
+  };
+
   createEffect(async () => {
     if (!authState.oidcInitialized) return;
 
@@ -113,6 +128,9 @@ export function AuthProvider(props: { children: JSX.Element }) {
           oidcInitialized: true,
           error: null,
         });
+
+        // Attempt to restore session on startup
+        await attemptSessionRestoration();
       } else {
         setAuthState({
           config,
@@ -136,8 +154,61 @@ export function AuthProvider(props: { children: JSX.Element }) {
         },
       });
     }
-    // loadAuthConfig();
   });
+
+  // Session restoration logic
+  const attemptSessionRestoration = async () => {
+    try {
+      console.debug('Attempting to restore user session...');
+      
+      // Check if we have a valid OIDC user
+      const isAuthenticated = await oidcService.isAuthenticated();
+      const oidcUser = await oidcService.getUser();
+
+      if (!isAuthenticated || !oidcUser) {
+        console.debug('No valid OIDC session found');
+        setAuthState({
+          status: "unauthenticated",
+          user: null,
+          token: null,
+          error: null,
+        });
+        return;
+      }
+
+      // Try to get user info from backend
+      const response = await apiRequest<{ user: User }>("GET", AUTH_ENDPOINTS.ME);
+
+      if (response?.user) {
+        console.info('Session restored successfully', {
+          userId: response.user.id,
+          email: response.user.email,
+        });
+        
+        setAuthState({
+          status: "authenticated",
+          user: response.user,
+          token: oidcUser.access_token,
+          error: null,
+        });
+      } else {
+        console.warn('Backend user info not found, clearing session');
+        await oidcService.clearUserSession();
+        performLocalLogout();
+      }
+    } catch (error) {
+      console.warn('Session restoration failed:', error);
+      setAuthState({
+        status: "unauthenticated",
+        user: null,
+        token: null,
+        error: {
+          type: "network",
+          message: "Failed to restore session",
+        },
+      });
+    }
+  };
 
   createEffect(() => {
     if (
@@ -287,34 +358,40 @@ export function AuthProvider(props: { children: JSX.Element }) {
   };
 
   const logout = async () => {
+    console.info('Logout initiated');
+    
     try {
       if (!authState.oidcInitialized) {
-        console.warn(
-          "OIDC service not initialized, performing local logout only",
-        );
+        console.warn('OIDC service not initialized, performing local logout only');
         performLocalLogout();
         return;
       }
 
-      await oidcService.signOut();
+      // Try OIDC logout first
+      try {
+        await oidcService.signOut();
+        console.debug('OIDC signOut completed successfully');
+      } catch (oidcError) {
+        console.warn('OIDC signOut failed, forcing local cleanup:', oidcError);
+        
+        // Force clear OIDC session even if signOut fails
+        try {
+          await oidcService.clearUserSession();
+          console.debug('OIDC session cleared forcibly');
+        } catch (clearError) {
+          console.error('Failed to clear OIDC session:', clearError);
+        }
+      }
+
+      // Always perform local logout regardless of OIDC result
       performLocalLogout();
+      
     } catch (error) {
-      console.warn("OIDC logout failed, performing local logout:", error);
-      // Fallback: Clear local state and navigate to login
+      console.error('Logout process failed, performing emergency cleanup:', error);
+      
+      // Emergency cleanup - ensure we always clear local state
       performLocalLogout();
     }
-  };
-
-  const performLocalLogout = () => {
-    // Clear all local state
-    setAuthState({
-      status: "unauthenticated",
-      user: null,
-      token: null,
-      error: null,
-    });
-
-    navigate(FRONTEND_ROUTES.LOGIN);
   };
 
   return (
