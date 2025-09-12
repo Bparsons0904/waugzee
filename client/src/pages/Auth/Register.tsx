@@ -8,6 +8,7 @@ import { Form } from "@components/common/forms/Form/Form";
 import { useForm } from "@context/FormContext";
 import { validators } from "../../utils/validation";
 import { RegisterRequest } from "../../types/User";
+import { FRONTEND_ROUTES } from "@constants/api.constants";
 
 const Register: Component = () => {
   const auth = useAuth(); // Note: register function not yet implemented in new AuthContext
@@ -118,7 +119,7 @@ const Register: Component = () => {
           <div class={styles.authFooter}>
             <p class={styles.authFooterText}>
               Already have an account?{" "}
-              <A href="/login" class={styles.authLink}>
+              <A href={FRONTEND_ROUTES.LOGIN} class={styles.authLink}>
                 Sign in here
               </A>
             </p>

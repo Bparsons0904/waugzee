@@ -3,6 +3,7 @@ import { Component, lazy } from "solid-js";
 import { useAuth } from "@context/AuthContext";
 import { useNavigate } from "@solidjs/router";
 import { createEffect } from "solid-js";
+import { FRONTEND_ROUTES } from "@constants/api.constants";
 
 const LoginPage = lazy(() => import("@pages/Auth/Login"));
 const RegisterPage = lazy(() => import("@pages/Auth/Register"));
@@ -26,7 +27,7 @@ const ProtectedRoute = (Component: Component) => {
 
     createEffect(() => {
       if (isAuthenticated() === false) {
-        navigate("/", { replace: true });
+        navigate(FRONTEND_ROUTES.HOME, { replace: true });
       }
     });
 
@@ -37,13 +38,13 @@ const ProtectedRoute = (Component: Component) => {
 export const Routes: Component = () => {
   return (
     <>
-      <Route path="/" component={LandingPage} />
-      <Route path="/login" component={LoginPage} />
-      <Route path="/register" component={RegisterPage} />
-      <Route path="/auth/callback" component={OidcCallbackPage} />
-      <Route path="/auth/silent-callback" component={SilentCallbackPage} />
-      <Route path="/dashboard" component={ProtectedRoute(DashboardPage)} />
-      <Route path="/profile" component={ProtectedRoute(ProfilePage)} />
+      <Route path={FRONTEND_ROUTES.HOME} component={LandingPage} />
+      <Route path={FRONTEND_ROUTES.LOGIN} component={LoginPage} />
+      <Route path={FRONTEND_ROUTES.REGISTER} component={RegisterPage} />
+      <Route path={FRONTEND_ROUTES.CALLBACK} component={OidcCallbackPage} />
+      <Route path={FRONTEND_ROUTES.SILENT_CALLBACK} component={SilentCallbackPage} />
+      <Route path={FRONTEND_ROUTES.DASHBOARD} component={ProtectedRoute(DashboardPage)} />
+      <Route path={FRONTEND_ROUTES.PROFILE} component={ProtectedRoute(ProfilePage)} />
       {/* <Route path="/workstation" component={ProtectedRoute(WorkstationPage)} /> */}
       {/* <Route path="/loadtest" component={ProtectedRoute(LoadTestPage)} /> */}
     </>

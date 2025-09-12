@@ -3,6 +3,7 @@ import { A } from "@solidjs/router";
 import { Button } from "@components/common/ui/Button/Button";
 import { useAuth } from "@context/AuthContext";
 import styles from "./Home.module.scss";
+import { FRONTEND_ROUTES } from "@constants/api.constants";
 
 const Home: Component = () => {
   const { isAuthenticated } = useAuth();
@@ -45,7 +46,7 @@ const Home: Component = () => {
             and designed for exceptional user experiences.
           </p>
           <div class={styles.heroCta}>
-            <A href={isAuthenticated() ? "/dashboard" : "/login"} class={styles.btnLink}>
+            <A href={isAuthenticated() ? FRONTEND_ROUTES.DASHBOARD : FRONTEND_ROUTES.LOGIN} class={styles.btnLink}>
               <Button variant="gradient" size="lg">
                 {isAuthenticated() ? "Go to Dashboard" : "Get Started"}
               </Button>

@@ -1,5 +1,15 @@
 import { UserManager, UserManagerSettings, User as OidcUser, WebStorageStateStore } from 'oidc-client-ts';
 import { AuthConfig } from 'src/types/User';
+import { FRONTEND_ROUTES } from '@constants/api.constants';
+
+/**
+ * Event callback types for OIDC service events
+ */
+export interface OIDCEventCallbacks {
+  onTokenExpired?: () => void;
+  onSilentRenewError?: (error: Error) => void;
+  onUserSignedOut?: () => void;
+}
 
 /**
  * OIDC Service using oidc-client-ts for secure authentication
@@ -8,10 +18,12 @@ import { AuthConfig } from 'src/types/User';
  * - Implements automatic token refresh
  * - Provides proper CSRF protection with state validation
  * - Handles PKCE flow securely
+ * - Proper token expiry handling with automatic logout
  */
 export class OIDCService {
   private userManager: UserManager | null = null;
   private config: AuthConfig | null = null;
+  private eventCallbacks: OIDCEventCallbacks = {};
 
   /**
    * Initialize the OIDC service with auth configuration
@@ -24,9 +36,9 @@ export class OIDCService {
     // Validate URLs to prevent "Invalid URL" constructor errors
     try {
       new URL(config.instanceUrl);
-      new URL(`${window.location.origin}/auth/callback`);
-      new URL(`${window.location.origin}/auth/silent-callback`);
-      new URL(`${window.location.origin}/login`);
+      new URL(`${window.location.origin}${FRONTEND_ROUTES.CALLBACK}`);
+      new URL(`${window.location.origin}${FRONTEND_ROUTES.SILENT_CALLBACK}`);
+      new URL(`${window.location.origin}${FRONTEND_ROUTES.LOGIN}`);
     } catch (error) {
       throw new Error(`Invalid URL in OIDC configuration: ${error instanceof Error ? error.message : 'Unknown URL error'}`);
     }
@@ -37,15 +49,15 @@ export class OIDCService {
       // Core OIDC settings
       authority: config.instanceUrl,
       client_id: config.clientId,
-      redirect_uri: `${window.location.origin}/auth/callback`,
-      post_logout_redirect_uri: `${window.location.origin}/login`,
+      redirect_uri: `${window.location.origin}${FRONTEND_ROUTES.CALLBACK}`,
+      post_logout_redirect_uri: `${window.location.origin}${FRONTEND_ROUTES.LOGIN}`,
       response_type: 'code',
       scope: 'openid profile email offline_access',
 
       // Security settings
       automaticSilentRenew: true, // Automatic token refresh
       includeIdTokenInSilentRenew: true,
-      silent_redirect_uri: `${window.location.origin}/auth/silent-callback`,
+      silent_redirect_uri: `${window.location.origin}${FRONTEND_ROUTES.SILENT_CALLBACK}`,
 
       // PKCE (Proof Key for Code Exchange) for enhanced security
       response_mode: 'query',
@@ -101,15 +113,20 @@ export class OIDCService {
       console.debug('Access token expiring, attempting renewal...');
     });
 
+    // Token expired - trigger logout if automatic renewal fails
     this.userManager.events.addAccessTokenExpired(() => {
-      console.debug('Access token expired');
-      // The automatic renewal should handle this, but we can add fallback logic here
+      console.warn('Access token expired - triggering logout');
+      if (this.eventCallbacks.onTokenExpired) {
+        this.eventCallbacks.onTokenExpired();
+      }
     });
 
-    // Silent renewal success
+    // Silent renewal failed - trigger logout
     this.userManager.events.addSilentRenewError((error) => {
-      console.error('Silent token renewal failed:', error);
-      // Could trigger a logout or redirect to login page
+      console.error('Silent token renewal failed - triggering logout:', error);
+      if (this.eventCallbacks.onSilentRenewError) {
+        this.eventCallbacks.onSilentRenewError(new Error(error.message || 'Silent renewal failed'));
+      }
     });
 
     // User loaded successfully
@@ -126,9 +143,12 @@ export class OIDCService {
       console.debug('User session terminated');
     });
 
-    // Handle errors
+    // User signed out
     this.userManager.events.addUserSignedOut(() => {
-      console.debug('User signed out');
+      console.debug('User signed out - triggering logout callback');
+      if (this.eventCallbacks.onUserSignedOut) {
+        this.eventCallbacks.onUserSignedOut();
+      }
     });
   }
 
@@ -168,7 +188,7 @@ export class OIDCService {
     }
 
     const user = await this.getUser();
-    return !!(user && !user.expired);
+    return user !== null && !user.expired;
   }
 
   /**
@@ -305,6 +325,47 @@ export class OIDCService {
    */
   isInitialized(): boolean {
     return this.userManager !== null;
+  }
+
+  /**
+   * Set event callbacks for OIDC events
+   */
+  setEventCallbacks(callbacks: OIDCEventCallbacks): void {
+    this.eventCallbacks = { ...this.eventCallbacks, ...callbacks };
+  }
+
+  /**
+   * Check if the current user's token is expired or about to expire
+   */
+  async isTokenExpired(): Promise<boolean> {
+    const user = await this.getUser();
+    if (!user) return true;
+
+    // Check if token is already expired
+    if (user.expired) return true;
+
+    // Check if token expires within the next 5 minutes (configurable buffer)
+    const now = Math.floor(Date.now() / 1000);
+    const expiresAt = user.expires_at || 0;
+    const bufferSeconds = 5 * 60; // 5 minutes
+
+    return (expiresAt - now) <= bufferSeconds;
+  }
+
+  /**
+   * Get token expiry information
+   */
+  async getTokenExpiry(): Promise<{ expiresAt: number; expiresInSeconds: number } | null> {
+    const user = await this.getUser();
+    if (!user || !user.expires_at) return null;
+
+    const now = Math.floor(Date.now() / 1000);
+    const expiresInSeconds = user.expires_at - now;
+
+    return {
+      expiresAt: user.expires_at,
+      expiresInSeconds: Math.max(0, expiresInSeconds),
+    };
   }
 }
 

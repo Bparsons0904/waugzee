@@ -6,6 +6,7 @@ import {
   NetworkError,
   RequestConfig,
 } from "./apiTypes";
+import { retryWithExponentialBackoff, dataRetryConfig } from "@utils/retry.utils";
 
 export const apiClient = axios.create({
   baseURL: env.apiUrl + "/api",
@@ -17,14 +18,20 @@ export const apiClient = axios.create({
   },
 });
 
-// Token management for secure authentication
-let currentToken: string | null = null;
+// Token getter function - will be set by AuthContext to avoid closure issues
+let getAuthToken: (() => string | null) | null = null;
+
+// Function to set the token getter (called by AuthContext)
+export const setTokenGetter = (getter: () => string | null) => {
+  getAuthToken = getter;
+};
 
 // Request interceptor to add Authorization header
 apiClient.interceptors.request.use(
   (config) => {
-    if (currentToken) {
-      config.headers.Authorization = `Bearer ${currentToken}`;
+    const token = getAuthToken?.();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -37,18 +44,6 @@ apiClient.interceptors.response.use(
   (error) => Promise.reject(handleApiError(error)),
 );
 
-// Token management functions
-export const setApiToken = (token: string | null) => {
-  currentToken = token;
-};
-
-export const getApiToken = (): string | null => {
-  return currentToken;
-};
-
-export const clearApiToken = () => {
-  currentToken = null;
-};
 
 // Enhanced error handling function
 const handleApiError = (error: AxiosError): ApiClientError | NetworkError => {
@@ -75,28 +70,33 @@ const handleApiError = (error: AxiosError): ApiClientError | NetworkError => {
   }
 };
 
-// Generic API request function
+// Generic API request function with retry logic
 export const apiRequest = async <T>(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   url: string,
   data?: unknown,
   config?: RequestConfig,
 ): Promise<T> => {
-  try {
-    const response = await apiClient.request({
-      method,
-      url,
-      data,
-      ...config,
-    });
+  const makeRequest = async (): Promise<T> => {
+    try {
+      const response = await apiClient.request({
+        method,
+        url,
+        data,
+        ...config,
+      });
 
-    return response.data;
-  } catch (error) {
-    if (error instanceof ApiClientError || error instanceof NetworkError) {
-      throw error;
+      return response.data;
+    } catch (error) {
+      if (error instanceof ApiClientError || error instanceof NetworkError) {
+        throw error;
+      }
+      throw handleApiError(error as AxiosError);
     }
-    throw handleApiError(error as AxiosError);
-  }
+  };
+
+  // Use retry logic for data requests
+  return retryWithExponentialBackoff(makeRequest, dataRetryConfig);
 };
 
 // Convenience methods with better typing

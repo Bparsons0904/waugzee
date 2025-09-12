@@ -2,6 +2,7 @@ import { Component, Match, Switch } from "solid-js";
 import { A } from "@solidjs/router";
 import styles from "./NavBar.module.scss";
 import { useAuth } from "@context/AuthContext";
+import { FRONTEND_ROUTES } from "@constants/api.constants";
 
 export const NavBar: Component = () => {
   const { isAuthenticated, logout } = useAuth();
@@ -11,7 +12,7 @@ export const NavBar: Component = () => {
       <nav class={styles.navbar}>
         <div class={styles.navbarContainer}>
           <div class={styles.navbarLogo}>
-            <A href="/" class={styles.navbarTitle}>
+            <A href={FRONTEND_ROUTES.HOME} class={styles.navbarTitle}>
               Waugzee
             </A>
           </div>
@@ -19,7 +20,7 @@ export const NavBar: Component = () => {
             <ul class={styles.navbarItems}>
               <li class={styles.navbarItem}>
                 <A
-                  href="/"
+                  href={FRONTEND_ROUTES.HOME}
                   class={styles.navbarLink}
                   activeClass={styles.active}
                   end
@@ -49,7 +50,7 @@ export const NavBar: Component = () => {
                   </li>
                   <li class={styles.navbarItem}>
                     <A
-                      href="/profile"
+                      href={FRONTEND_ROUTES.PROFILE}
                       class={styles.navbarLink}
                       activeClass={styles.active}
                     >
@@ -71,7 +72,7 @@ export const NavBar: Component = () => {
                 <Switch>
                   <Match when={!isAuthenticated()}>
                     <A
-                      href="/login"
+                      href={FRONTEND_ROUTES.LOGIN}
                       class={styles.navbarLink}
                       activeClass={styles.active}
                     >
@@ -79,7 +80,7 @@ export const NavBar: Component = () => {
                     </A>
                   </Match>
                   <Match when={isAuthenticated()}>
-                    <A href="/" class={styles.navbarLink} onClick={logout}>
+                    <A href={FRONTEND_ROUTES.HOME} class={styles.navbarLink} onClick={logout}>
                       Logout
                     </A>
                   </Match>
