@@ -36,7 +36,6 @@ export const HEALTH_ENDPOINTS = {
 export const FRONTEND_ROUTES = {
   HOME: '/',
   LOGIN: '/auth/login',
-  REGISTER: '/auth/register', 
   CALLBACK: '/auth/callback',
   SILENT_CALLBACK: '/auth/silent-callback',
   DASHBOARD: '/dashboard',

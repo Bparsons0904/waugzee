@@ -14,13 +14,6 @@ export const useLogin = () => {
   }));
 };
 
-export const useRegister = () => {
-  return useMutation(() => ({
-    mutationFn: (credentials: LoginCredentials) =>
-      postApi<User, LoginCredentials>("users/register", credentials),
-  }));
-};
-
 export const useLogout = () => {
   return useMutation(() => ({
     mutationFn: () => postApi("users/logout", {}),

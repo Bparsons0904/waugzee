@@ -2,7 +2,6 @@ import { z } from "zod";
 import {
   User,
   LoginRequest,
-  RegisterRequest,
   AuthConfig,
   TokenExchangeRequest,
   TokenExchangeResponse,
@@ -55,12 +54,6 @@ export const apiContract = {
     getById: {
       path: (id: string) => `/api/users/${id}`,
       method: "GET",
-      response: User,
-    },
-    create: {
-      path: "/users",
-      method: "POST",
-      body: RegisterRequest,
       response: User,
     },
   },

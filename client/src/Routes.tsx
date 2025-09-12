@@ -6,7 +6,6 @@ import { createEffect } from "solid-js";
 import { FRONTEND_ROUTES } from "@constants/api.constants";
 
 const LoginPage = lazy(() => import("@pages/Auth/Login"));
-const RegisterPage = lazy(() => import("@pages/Auth/Register"));
 const OidcCallbackPage = lazy(() => import("@pages/Auth/OidcCallback"));
 const SilentCallbackPage = lazy(() => import("@pages/Auth/SilentCallback"));
 const ProfilePage = lazy(() => import("@pages/Profile/Profile"));
@@ -40,7 +39,6 @@ export const Routes: Component = () => {
     <>
       <Route path={FRONTEND_ROUTES.HOME} component={LandingPage} />
       <Route path={FRONTEND_ROUTES.LOGIN} component={LoginPage} />
-      <Route path={FRONTEND_ROUTES.REGISTER} component={RegisterPage} />
       <Route path={FRONTEND_ROUTES.CALLBACK} component={OidcCallbackPage} />
       <Route path={FRONTEND_ROUTES.SILENT_CALLBACK} component={SilentCallbackPage} />
       <Route path={FRONTEND_ROUTES.DASHBOARD} component={ProtectedRoute(DashboardPage)} />
