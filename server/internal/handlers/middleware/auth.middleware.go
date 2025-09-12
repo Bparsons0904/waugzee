@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"context"
+	"slices"
 	"strings"
+	"waugzee/internal/models"
 	"waugzee/internal/services"
 
 	"github.com/gofiber/fiber/v2"
@@ -12,8 +14,10 @@ import (
 type AuthContextKey string
 
 const (
-	AuthInfoKey AuthContextKey = "auth_info"
-	UserIDKey   AuthContextKey = "user_id"
+	AuthInfoKey  AuthContextKey = "auth_info"
+	UserIDKey    AuthContextKey = "user_id"
+	UserKey      AuthContextKey = "user"
+	UserKeyFiber string         = "User" // Fiber context key (string)
 )
 
 // AuthInfo contains user authentication information
@@ -91,12 +95,39 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 		c.Locals(string(AuthInfoKey), authInfo)
 		c.Locals(string(UserIDKey), tokenInfo.UserID)
 
+		// Fetch user from database using OIDC User ID
+		user, err := m.userRepo.GetByOIDCUserID(c.Context(), tokenInfo.UserID)
+		if err != nil {
+			log.Info(
+				"user not found in database",
+				"oidcUserID",
+				tokenInfo.UserID,
+				"error",
+				err.Error(),
+			)
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "User not found",
+			})
+		}
+
+		// Store user in Fiber context
+		c.Locals(UserKeyFiber, user)
+
 		// Add to Go context for services
 		ctx := context.WithValue(c.Context(), AuthInfoKey, authInfo)
 		ctx = context.WithValue(ctx, UserIDKey, tokenInfo.UserID)
+		ctx = context.WithValue(ctx, UserKey, user)
 		c.SetUserContext(ctx)
 
-		log.Info("user authenticated", "userID", tokenInfo.UserID, "email", tokenInfo.Email)
+		log.Info(
+			"user authenticated",
+			"userID",
+			tokenInfo.UserID,
+			"email",
+			tokenInfo.Email,
+			"dbUserID",
+			user.ID,
+		)
 		return c.Next()
 	}
 }
@@ -148,9 +179,28 @@ func (m *Middleware) OptionalAuth(zitadelService *services.ZitadelService) fiber
 		c.Locals(string(AuthInfoKey), authInfo)
 		c.Locals(string(UserIDKey), tokenInfo.UserID)
 
+		// Try to fetch user from database using OIDC User ID
+		user, err := m.userRepo.GetByOIDCUserID(c.Context(), tokenInfo.UserID)
+		if err != nil {
+			log.Debug(
+				"user not found in database for optional auth",
+				"oidcUserID",
+				tokenInfo.UserID,
+				"error",
+				err.Error(),
+			)
+			// Continue without user for optional auth
+		} else {
+			// Store user in Fiber context if found
+			c.Locals(UserKeyFiber, user)
+		}
+
 		// Add to Go context for services
 		ctx := context.WithValue(c.Context(), AuthInfoKey, authInfo)
 		ctx = context.WithValue(ctx, UserIDKey, tokenInfo.UserID)
+		if user != nil {
+			ctx = context.WithValue(ctx, UserKey, user)
+		}
 		c.SetUserContext(ctx)
 
 		log.Info("optional auth successful", "userID", tokenInfo.UserID, "email", tokenInfo.Email)
@@ -172,14 +222,20 @@ func (m *Middleware) RequireRole(role string) fiber.Handler {
 		}
 
 		// Check if user has the required role
-		for _, userRole := range authInfo.Roles {
-			if userRole == role {
-				log.Info("role check passed", "userID", authInfo.UserID, "role", role)
-				return c.Next()
-			}
+		if slices.Contains(authInfo.Roles, role) {
+			log.Info("role check passed", "userID", authInfo.UserID, "role", role)
+			return c.Next()
 		}
 
-		log.Info("insufficient permissions", "userID", authInfo.UserID, "requiredRole", role, "userRoles", authInfo.Roles)
+		log.Info(
+			"insufficient permissions",
+			"userID",
+			authInfo.UserID,
+			"requiredRole",
+			role,
+			"userRoles",
+			authInfo.Roles,
+		)
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 			"error": "Insufficient permissions",
 		})
@@ -221,3 +277,22 @@ func GetUserIDFromContext(ctx context.Context) string {
 	}
 	return userID
 }
+
+// GetUser extracts user from Fiber context
+func GetUser(c *fiber.Ctx) *models.User {
+	user, ok := c.Locals(UserKeyFiber).(*models.User)
+	if !ok {
+		return nil
+	}
+	return user
+}
+
+// GetUserFromContext extracts user from Go context
+func GetUserFromContext(ctx context.Context) *models.User {
+	user, ok := ctx.Value(UserKey).(*models.User)
+	if !ok {
+		return nil
+	}
+	return user
+}
+

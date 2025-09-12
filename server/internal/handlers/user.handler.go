@@ -76,27 +76,17 @@ func (h *UserHandler) login(c *fiber.Ctx) error {
 
 // getCurrentUser returns information about the currently authenticated user
 func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
-	authInfo := middleware.GetAuthInfo(c)
-	if authInfo == nil {
+	// Get user directly from middleware context
+	user := middleware.GetUser(c)
+	if user == nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication required",
 		})
 	}
 
-	// Convert middleware AuthInfo to controller AuthInfo
-	controllerAuthInfo := &userController.AuthInfo{
-		UserID:    authInfo.UserID,
-		Email:     authInfo.Email,
-		Name:      authInfo.Name,
-		Roles:     authInfo.Roles,
-		ProjectID: authInfo.ProjectID,
-	}
-
-	response, err := h.controller.GetCurrentUser(c.Context(), controllerAuthInfo)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+	// Convert to user profile for response
+	response := fiber.Map{
+		"user": user.ToProfile(),
 	}
 
 	return c.JSON(response)

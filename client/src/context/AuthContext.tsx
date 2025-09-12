@@ -124,9 +124,6 @@ export function AuthProvider(props: { children: JSX.Element }) {
           oidcInitialized: true,
           error: null,
         });
-
-        // Attempt to restore session on startup
-        await attemptSessionRestoration();
       } else {
         setAuthState({
           config,
@@ -152,60 +149,6 @@ export function AuthProvider(props: { children: JSX.Element }) {
     }
   });
 
-  // Session restoration logic
-  const attemptSessionRestoration = async () => {
-    try {
-      console.debug('Attempting to restore user session...');
-      
-      // Check if we have a valid OIDC user
-      const isAuthenticated = await oidcService.isAuthenticated();
-      const oidcUser = await oidcService.getUser();
-
-      if (!isAuthenticated || !oidcUser) {
-        console.debug('No valid OIDC session found');
-        setAuthState({
-          status: "unauthenticated",
-          user: null,
-          token: null,
-          error: null,
-        });
-        return;
-      }
-
-      // Try to get user info from backend
-      const response = await api.get<{ user: User }>(USER_ENDPOINTS.ME);
-
-      if (response?.user) {
-        console.info('Session restored successfully', {
-          userId: response.user.id,
-          email: response.user.email,
-        });
-        
-        setAuthState({
-          status: "authenticated",
-          user: response.user,
-          token: oidcUser.access_token,
-          error: null,
-        });
-      } else {
-        console.warn('Backend user info not found, clearing session');
-        await oidcService.clearUserSession();
-        performLocalLogout();
-      }
-    } catch (error) {
-      console.warn('Session restoration failed:', error);
-      setAuthState({
-        status: "unauthenticated",
-        user: null,
-        token: null,
-        error: {
-          type: "network",
-          message: "Failed to restore session",
-        },
-      });
-    }
-  };
-
   createEffect(() => {
     if (
       authState.configLoading ||
@@ -220,12 +163,14 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
     const checkAuthStatus = async () => {
       try {
+        console.debug('Checking authentication status...');
         setAuthState("error", null);
 
         const isAuthenticated = await oidcService.isAuthenticated();
         const oidcUser = await oidcService.getUser();
 
         if (!isAuthenticated || !oidcUser || cancelled) {
+          console.debug('No valid OIDC session found');
           setAuthState({
             status: "unauthenticated",
             user: null,
@@ -235,6 +180,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           return;
         }
 
+        // Get user info from backend
         const response = await api.get<{ user: User }>(
           USER_ENDPOINTS.ME,
           {
@@ -243,6 +189,11 @@ export function AuthProvider(props: { children: JSX.Element }) {
         );
 
         if (!cancelled && response?.user) {
+          console.info('Authentication successful', {
+            userId: response.user.id,
+            email: response.user.email,
+          });
+          
           setAuthState({
             status: "authenticated",
             user: response.user,
@@ -250,6 +201,8 @@ export function AuthProvider(props: { children: JSX.Element }) {
             error: null,
           });
         } else if (!cancelled) {
+          console.warn('Backend user info not found, clearing session');
+          await oidcService.clearUserSession();
           setAuthState({
             status: "unauthenticated",
             user: null,
@@ -259,7 +212,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
         }
       } catch (error) {
         if (!cancelled) {
-          console.warn("Auth check failed:", error);
+          console.warn("Authentication check failed:", error);
           setAuthState({
             status: "unauthenticated",
             user: null,
