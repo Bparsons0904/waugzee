@@ -14,6 +14,8 @@ import {
   setApiToken,
   clearApiToken,
 } from "@services/api/api.service";
+import { oidcService } from "@services/oidc.service";
+import { User as OidcUser } from "oidc-client-ts";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -30,6 +32,7 @@ type AuthState = {
   token: string | null;
   config: AuthConfig | null;
   configLoading: boolean;
+  oidcInitialized: boolean;
   error: AuthError;
 };
 
@@ -41,157 +44,37 @@ type AuthContextValue = {
   authToken: () => string | null;
   authConfig: () => AuthConfig | null;
   loginWithOIDC: () => Promise<void>;
-  handleOIDCCallback: (
-    code: string,
-    state: string,
-    redirectUri: string,
-  ) => Promise<void>;
+  handleOIDCCallback: () => Promise<void>;
   logout: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
 
-// Storage keys
-const TOKEN_KEY = "waugzee_auth_token";
-const ID_TOKEN_KEY = "waugzee_id_token";
-const OIDC_STATE_KEY = "oidc_state";
-const OIDC_REDIRECT_KEY = "oidc_redirect_uri";
-const PKCE_CODE_VERIFIER_KEY = "oidc_code_verifier";
+// In-memory token storage - more secure than localStorage
+// Tokens are cleared when the browser tab is closed
+let currentOidcUser: OidcUser | null = null;
 
-// Secure token storage
-const getStoredToken = (): string | null => {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch (error) {
-    console.warn("Failed to read token from localStorage:", error);
-    return null;
-  }
+/**
+ * Get the current OIDC user from secure in-memory storage
+ * Currently unused but kept for potential future use
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const getCurrentOidcUser = (): OidcUser | null => {
+  return currentOidcUser;
 };
 
-const setStoredToken = (token: string | null) => {
-  try {
-    if (token) {
-      localStorage.setItem(TOKEN_KEY, token);
-    } else {
-      localStorage.removeItem(TOKEN_KEY);
-    }
-  } catch (error) {
-    console.warn("Failed to write token to localStorage:", error);
-  }
+/**
+ * Set the current OIDC user in secure in-memory storage
+ */
+const setCurrentOidcUser = (user: OidcUser | null): void => {
+  currentOidcUser = user;
 };
 
-// Secure ID token storage
-const getStoredIDToken = (): string | null => {
-  try {
-    return localStorage.getItem(ID_TOKEN_KEY);
-  } catch (error) {
-    console.warn("Failed to read ID token from localStorage:", error);
-    return null;
-  }
-};
-
-const setStoredIDToken = (idToken: string | null) => {
-  try {
-    if (idToken) {
-      localStorage.setItem(ID_TOKEN_KEY, idToken);
-    } else {
-      localStorage.removeItem(ID_TOKEN_KEY);
-    }
-  } catch (error) {
-    console.warn("Failed to write ID token to localStorage:", error);
-  }
-};
-
-// Enhanced state parameter generation with timestamp and entropy
-const generateSecureState = (): string => {
-  const timestamp = Date.now().toString();
-  const randomBytes = crypto.getRandomValues(new Uint8Array(16));
-  const entropy = Array.from(randomBytes, (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
-  return `${timestamp}-${entropy}`;
-};
-
-// Generate cryptographically secure nonce for replay attack protection
-const generateNonce = (): string => {
-  const randomBytes = crypto.getRandomValues(new Uint8Array(32));
-  return Array.from(randomBytes, (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
-};
-
-// PKCE utility functions
-const generateCodeVerifier = (): string => {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  return base64urlEncode(array);
-};
-
-const generateCodeChallenge = async (verifier: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(verifier);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return base64urlEncode(new Uint8Array(digest));
-};
-
-// Base64URL encoding (URL-safe, no padding)
-const base64urlEncode = (array: Uint8Array): string => {
-  return btoa(String.fromCharCode(...array))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-};
-
-// Storage utilities with fallbacks
-const setStorageItem = (key: string, value: string) => {
-  try {
-    // Try localStorage first
-    localStorage.setItem(key, value);
-    return true;
-  } catch (error) {
-    console.warn("localStorage failed, trying sessionStorage:", error);
-    try {
-      // Fallback to sessionStorage
-      sessionStorage.setItem(key, value);
-      return true;
-    } catch (sessionError) {
-      console.error(
-        "Both localStorage and sessionStorage failed:",
-        sessionError,
-      );
-      return false;
-    }
-  }
-};
-
-const getStorageItem = (key: string): string | null => {
-  try {
-    // Try localStorage first
-    const item = localStorage.getItem(key);
-    if (item) return item;
-
-    // Fallback to sessionStorage
-    return sessionStorage.getItem(key);
-  } catch (error) {
-    console.warn("Storage access failed:", error);
-    return null;
-  }
-};
-
-const removeStorageItem = (key: string) => {
-  try {
-    localStorage.removeItem(key);
-    sessionStorage.removeItem(key);
-  } catch (error) {
-    console.warn("Storage cleanup failed:", error);
-  }
-};
-
-// Utility to clean up OIDC state
-const cleanupOIDCState = () => {
-  removeStorageItem(OIDC_STATE_KEY);
-  removeStorageItem(OIDC_REDIRECT_KEY);
-  removeStorageItem(PKCE_CODE_VERIFIER_KEY);
+/**
+ * Clear the current OIDC user from in-memory storage
+ */
+const clearCurrentOidcUser = (): void => {
+  currentOidcUser = null;
 };
 
 export function AuthProvider(props: { children: JSX.Element }) {
@@ -201,9 +84,10 @@ export function AuthProvider(props: { children: JSX.Element }) {
   const [authState, setAuthState] = createStore<AuthState>({
     status: "loading",
     user: null,
-    token: getStoredToken(),
+    token: null, // Will be managed by oidc-client-ts
     config: null,
     configLoading: true,
+    oidcInitialized: false,
     error: null,
   });
 
@@ -211,35 +95,79 @@ export function AuthProvider(props: { children: JSX.Element }) {
   const isAuthenticated = () => authState.status === "authenticated";
   const isLoading = () => authState.status === "loading";
 
-  // Initialize API token from stored token
-  createEffect(() => {
-    const token = authState.token;
-    if (token) {
-      setApiToken(token);
-    } else {
+  // Initialize API token from OIDC user - only after OIDC is initialized
+  createEffect(async () => {
+    if (!authState.oidcInitialized) {
+      return;
+    }
+
+    try {
+      const token = await oidcService.getAccessToken();
+      if (token) {
+        setApiToken(token);
+        setAuthState("token", token);
+      } else {
+        clearApiToken();
+        setAuthState("token", null);
+      }
+    } catch (error) {
+      console.warn("Failed to get access token:", error);
       clearApiToken();
+      setAuthState("token", null);
     }
   });
 
-  // Initialize auth configuration using consistent apiRequest
+  // Initialize auth configuration and OIDC service
   const loadAuthConfig = async () => {
     try {
-      setAuthState("configLoading", true);
-      const config = await apiRequest<AuthConfig>("GET", "/auth/config");
       setAuthState({
-        config,
-        configLoading: false,
+        configLoading: true,
+        oidcInitialized: false,
         error: null,
       });
+      console.debug("Loading auth configuration...");
+
+      const config = await apiRequest<AuthConfig>("GET", "/auth/config");
+      console.debug("Auth config loaded:", { configured: config.configured });
+
+      // Initialize OIDC service with the configuration
+      if (config.configured) {
+        console.debug("Initializing OIDC service with config:", {
+          instanceUrl: config.instanceUrl,
+          clientId: config.clientId,
+        });
+
+        await oidcService.initialize(config);
+        console.debug("OIDC service initialized successfully");
+
+        setAuthState({
+          config,
+          configLoading: false,
+          oidcInitialized: true,
+          error: null,
+        });
+      } else {
+        console.debug("OIDC not configured, skipping initialization");
+        setAuthState({
+          config,
+          configLoading: false,
+          oidcInitialized: false,
+          error: null,
+        });
+      }
     } catch (error) {
-      console.warn("Auth config load failed:", error);
+      console.error("Auth config load failed:", error);
       // Set a default config if the config endpoint fails
       setAuthState({
         config: { configured: false },
         configLoading: false,
+        oidcInitialized: false,
         error: {
           type: "config_error",
-          message: "Failed to load auth configuration",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to load auth configuration",
         },
       });
     }
@@ -250,21 +178,16 @@ export function AuthProvider(props: { children: JSX.Element }) {
     loadAuthConfig();
   });
 
-  // Auth status check with proper config loading race condition prevention
+  // Auth status check using OIDC service
   createEffect(() => {
-    const { configLoading, token } = authState;
+    const { configLoading, oidcInitialized, config } = authState;
 
-    // Wait for config to load before attempting auth operations
-    if (configLoading) {
-      return;
-    }
-
-    // Only check auth status if we have a token
-    if (!token) {
-      setAuthState({
-        status: "unauthenticated",
-        user: null,
-        error: null,
+    // Wait for config to load and OIDC to be initialized before attempting auth operations
+    if (configLoading || !config?.configured || !oidcInitialized) {
+      console.debug("Skipping auth check - waiting for initialization", {
+        configLoading,
+        configured: config?.configured,
+        oidcInitialized,
       });
       return;
     }
@@ -276,6 +199,28 @@ export function AuthProvider(props: { children: JSX.Element }) {
       try {
         setAuthState("error", null);
 
+        // Check if user is authenticated via OIDC
+        const isAuthenticated = await oidcService.isAuthenticated();
+        const oidcUser = await oidcService.getUser();
+
+        if (!isAuthenticated || !oidcUser || cancelled) {
+          setAuthState({
+            status: "unauthenticated",
+            user: null,
+            token: null,
+            error: null,
+          });
+          clearCurrentOidcUser();
+          return;
+        }
+
+        // Store OIDC user in memory
+        setCurrentOidcUser(oidcUser);
+
+        // Ensure the access token is set in the API client before making requests
+        setApiToken(oidcUser.access_token);
+
+        // Get user info from our backend (which has additional user data)
         const response = await apiRequest<{ user: User }>(
           "GET",
           "/auth/me",
@@ -289,13 +234,15 @@ export function AuthProvider(props: { children: JSX.Element }) {
           setAuthState({
             status: "authenticated",
             user: response.user,
+            token: oidcUser.access_token,
             error: null,
           });
         } else if (!cancelled) {
           setAuthState({
             status: "unauthenticated",
             user: null,
-            error: { type: "auth_failed", message: "Authentication failed" },
+            token: null,
+            error: { type: "auth_failed", message: "Failed to get user info" },
           });
         }
       } catch (error) {
@@ -304,6 +251,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           setAuthState({
             status: "unauthenticated",
             user: null,
+            token: null,
             error: {
               type: "network",
               message:
@@ -312,6 +260,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
                   : "Authentication check failed",
             },
           });
+          clearCurrentOidcUser();
         }
       }
     };
@@ -326,277 +275,72 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
   const loginWithOIDC = async () => {
     try {
-      const config = authState.config;
+      const { config, oidcInitialized } = authState;
+
       if (!config?.configured) {
         throw new Error("OIDC is not configured");
       }
 
-      // Generate enhanced state for CSRF protection
-      const state = generateSecureState();
-      const redirectUri = `${window.location.origin}/auth/callback`;
-
-      // Generate PKCE parameters
-      const codeVerifier = generateCodeVerifier();
-      const codeChallenge = await generateCodeChallenge(codeVerifier);
-
-      // Generate nonce for replay attack protection
-      const nonce = generateNonce();
-
-      // Store state and PKCE code verifier with fallback storage
-      const stateStored = setStorageItem(OIDC_STATE_KEY, state);
-      const redirectStored = setStorageItem(OIDC_REDIRECT_KEY, redirectUri);
-      const codeVerifierStored = setStorageItem(PKCE_CODE_VERIFIER_KEY, codeVerifier);
-
-      // Log storage attempts but don't fail completely - we'll use URL fallback
-      console.debug("OIDC state storage attempt:", {
-        state,
-        redirectUri,
-        codeChallenge,
-        stateStored,
-        redirectStored,
-        codeVerifierStored,
-        verifyState: getStorageItem(OIDC_STATE_KEY),
-        verifyRedirectUri: getStorageItem(OIDC_REDIRECT_KEY),
-        verifyCodeVerifier: getStorageItem(PKCE_CODE_VERIFIER_KEY) ? "[present]" : "[missing]",
-        storageUsed: localStorage.getItem(OIDC_STATE_KEY)
-          ? "localStorage"
-          : sessionStorage.getItem(OIDC_STATE_KEY)
-            ? "sessionStorage"
-            : "none",
-      });
-
-      if (!codeVerifierStored) {
-        throw new Error("Failed to store PKCE code verifier");
+      if (!oidcInitialized) {
+        throw new Error("OIDC service is not initialized yet");
       }
 
-      // Get authorization URL from backend using apiRequest with PKCE code challenge and nonce
-      const params = new URLSearchParams({
-        state,
-        redirect_uri: redirectUri,
-        code_challenge: codeChallenge,
-        nonce: nonce,
-      });
+      console.debug("Starting OIDC authentication flow");
 
-      console.debug("Requesting auth URL with PKCE and nonce params:", {
-        state,
-        redirect_uri: redirectUri,
-        code_challenge: codeChallenge,
-        nonce: nonce,
-        fullUrl: `/auth/login-url?${params.toString()}`,
-      });
-
-      const response = await apiRequest<{ authorizationUrl: string }>(
-        "GET",
-        `/auth/login-url?${params.toString()}`,
-      );
-
-      console.debug("Received auth URL response:", {
-        authorizationUrl: response?.authorizationUrl,
-        sentState: state,
-        // Parse the state from the auth URL to see if backend modified it
-        authUrlState: response?.authorizationUrl
-          ? new URL(response.authorizationUrl).searchParams.get("state")
-          : null,
-      });
-
-      if (response?.authorizationUrl) {
-        // Redirect to Zitadel for authentication
-        window.location.href = response.authorizationUrl;
-      } else {
-        throw new Error("Failed to get authorization URL");
-      }
+      // Use oidc-client-ts for secure authentication flow
+      // This handles PKCE, state generation, and CSRF protection automatically
+      await oidcService.signInRedirect();
     } catch (error) {
       console.error("OIDC login failed:", error);
-      // Clean up any stored PKCE parameters on login failure
-      cleanupOIDCState();
       setAuthState("error", {
-        type: "network",
+        type: "auth_failed",
         message: error instanceof Error ? error.message : "Login failed",
       });
       throw error;
     }
   };
 
-  const handleOIDCCallback = async (
-    code: string,
-    state: string,
-    redirectUri: string,
-  ) => {
+  const handleOIDCCallback = async () => {
     try {
-      // Verify state to prevent CSRF attacks
-      const storedState = getStorageItem(OIDC_STATE_KEY);
-      const storedRedirectUri = getStorageItem(OIDC_REDIRECT_KEY);
-      const codeVerifier = getStorageItem(PKCE_CODE_VERIFIER_KEY);
+      const { oidcInitialized } = authState;
 
-      console.debug("OIDC callback state validation:", {
-        receivedState: state,
-        storedState,
-        receivedRedirectUri: redirectUri,
-        storedRedirectUri,
-        hasCodeVerifier: !!codeVerifier,
-        localStorageKeys: Object.keys(localStorage),
-        sessionStorageKeys: Object.keys(sessionStorage),
-        storageUsed: localStorage.getItem(OIDC_STATE_KEY)
-          ? "localStorage"
-          : sessionStorage.getItem(OIDC_STATE_KEY)
-            ? "sessionStorage"
-            : "none",
-      });
-
-      // Validate PKCE code verifier is present
-      if (!codeVerifier) {
-        const error = new Error("Missing PKCE code verifier");
-        console.error("OIDC PKCE validation failed:", {
-          hasCodeVerifier: !!codeVerifier,
-          allLocalStorageKeys: Object.keys(localStorage),
-          allSessionStorageKeys: Object.keys(sessionStorage),
-        });
-        setAuthState("error", { type: "csrf_error", message: error.message });
-        throw error;
+      if (!oidcInitialized) {
+        throw new Error("OIDC service is not initialized yet");
       }
 
-      if (!storedState) {
-        // Storage fallback validation - accept multiple valid formats
-        const timestampEntropyPattern = /^\d{13}-[a-f0-9]{32}$/; // our format: timestamp-entropy
-        const uuidPattern =
-          /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i; // UUID format
-        const shortStatePattern = /^[a-f0-9-]{8,}$/i; // Any reasonable hex-dash format
+      console.debug("Handling OIDC callback");
 
-        const isTimestampFormat = timestampEntropyPattern.test(state);
-        const isUuidFormat = uuidPattern.test(state);
-        const isShortStateFormat = shortStatePattern.test(state);
-        const isValidStateFormat =
-          isTimestampFormat || isUuidFormat || isShortStateFormat;
+      // Use oidc-client-ts to handle the callback
+      // This automatically validates state, PKCE, and exchanges the code for tokens
+      const oidcUser = await oidcService.signInRedirectCallback();
 
-        console.warn("OIDC state fallback validation:", {
-          receivedState: state,
-          isTimestampFormat,
-          isUuidFormat,
-          isShortStateFormat,
-          isValidStateFormat,
-          storageCleared: {
-            localStorage: Object.keys(localStorage).length === 0,
-            sessionStorage: Object.keys(sessionStorage).length === 0,
-          },
-        });
-
-        if (!isValidStateFormat) {
-          const error = new Error(
-            "Invalid state format - state appears malformed",
-          );
-          console.error("OIDC state validation failed:", {
-            receivedState: state,
-            stateLength: state?.length,
-            allLocalStorageKeys: Object.keys(localStorage),
-            allSessionStorageKeys: Object.keys(sessionStorage),
-          });
-          setAuthState("error", { type: "csrf_error", message: error.message });
-          throw error;
-        }
-
-        // Additional timestamp validation only for our timestamp format
-        if (isTimestampFormat) {
-          const timestamp = parseInt(state.split("-")[0]);
-          const now = Date.now();
-          const tenMinutes = 10 * 60 * 1000;
-
-          if (now - timestamp > tenMinutes) {
-            console.warn(
-              "State timestamp is old but accepting for development:",
-              {
-                receivedState: state,
-                ageMs: now - timestamp,
-                maxAgeMs: tenMinutes,
-              },
-            );
-            // Don't throw error in development - just log warning
-          }
-        }
-
-        console.warn(
-          "OIDC state not found in storage but format is valid - proceeding with fallback validation",
-        );
+      if (!oidcUser || !oidcUser.access_token) {
+        throw new Error("Failed to complete authentication");
       }
 
-      if (storedState && state !== storedState) {
-        // In development, log the mismatch but don't fail completely
-        const isDevelopment =
-          import.meta.env.DEV || window.location.hostname === "localhost";
+      // Store OIDC user in memory
+      setCurrentOidcUser(oidcUser);
 
-        if (isDevelopment) {
-          console.warn(
-            "State mismatch in development mode - proceeding anyway:",
-            {
-              received: state,
-              stored: storedState,
-              note: "This would fail in production",
-            },
-          );
-        } else {
-          const error = new Error(
-            `State mismatch - received: ${state}, stored: ${storedState}`,
-          );
-          setAuthState("error", { type: "csrf_error", message: error.message });
-          throw error;
-        }
-      }
+      // CRITICAL FIX: Set the access token in the API client BEFORE making requests
+      setApiToken(oidcUser.access_token);
+      console.debug("Access token set in API client");
 
-      if (storedRedirectUri && redirectUri !== storedRedirectUri) {
-        // In development, log the mismatch but don't fail completely
-        const isDevelopment =
-          import.meta.env.DEV || window.location.hostname === "localhost";
+      // Now get user info from our backend (which has additional user data)
+      const response = await apiRequest<{ user: User }>("GET", "/auth/me");
 
-        if (isDevelopment) {
-          console.warn(
-            "Redirect URI mismatch in development mode - proceeding anyway:",
-            {
-              received: redirectUri,
-              stored: storedRedirectUri,
-              note: "This would fail in production",
-            },
-          );
-        } else {
-          const error = new Error("Invalid redirect URI");
-          setAuthState("error", { type: "csrf_error", message: error.message });
-          throw error;
-        }
-      }
-
-      // Exchange authorization code for access token with PKCE code verifier
-      const response = await apiRequest<{
-        access_token: string;
-        user: User;
-        id_token?: string;
-      }>("POST", "/auth/token-exchange", {
-        code,
-        redirect_uri: redirectUri,
-        state,
-        code_verifier: codeVerifier,
-      });
-
-      if (response?.access_token && response?.user) {
-        // Store the access token
-        setStoredToken(response.access_token);
-
-        // Store the ID token if present (needed for OIDC logout)
-        if (response.id_token) {
-          setStoredIDToken(response.id_token);
-        }
-
+      if (response?.user) {
         // Update consolidated state
         setAuthState({
           status: "authenticated",
           user: response.user,
-          token: response.access_token,
+          token: oidcUser.access_token,
           error: null,
         });
 
-        // Clean up stored state and PKCE verifier
-        cleanupOIDCState();
-
+        console.debug("Authentication completed successfully");
         navigate("/");
       } else {
-        throw new Error("Token exchange failed");
+        throw new Error("Failed to get user info from backend");
       }
     } catch (error) {
       console.error("OIDC callback failed:", error);
@@ -605,6 +349,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       setAuthState({
         status: "unauthenticated",
         user: null,
+        token: null,
         error: {
           type: "auth_failed",
           message:
@@ -614,7 +359,9 @@ export function AuthProvider(props: { children: JSX.Element }) {
         },
       });
 
-      cleanupOIDCState();
+      // Clear any stored user data and API token
+      clearCurrentOidcUser();
+      clearApiToken();
 
       throw error;
     }
@@ -622,62 +369,36 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
   const logout = async () => {
     try {
-      // Get any stored refresh token (currently we only store access tokens)
-      const refreshToken = localStorage.getItem("refresh_token");
-      // Get stored ID token (needed for proper OIDC logout)
-      const idToken = getStoredIDToken();
+      const { oidcInitialized } = authState;
 
-      // Prepare logout request with refresh token and ID token
-      const logoutBody = {
-        refresh_token: refreshToken,
-        id_token: idToken,
-        state: "logout-state",
-        post_logout_redirect_uri: `${window.location.origin}/login`,
-      };
-
-      console.debug("Initiating logout with server:", {
-        hasRefreshToken: !!refreshToken,
-        hasIdToken: !!idToken,
-        note: "Using default Zitadel post-logout redirect behavior",
-      });
-
-      // Call server logout endpoint
-      const response = await apiRequest<{
-        message: string;
-        logout_url?: string;
-        revoked_tokens?: string[];
-      }>("POST", "/auth/logout", logoutBody);
-
-      console.debug("Server logout response:", {
-        hasLogoutUrl: !!response?.logout_url,
-        revokedTokens: response?.revoked_tokens,
-      });
-
-      // If server returns a Zitadel logout URL, redirect there
-      if (response?.logout_url) {
-        // Clear local state first
-        setStoredToken(null);
-        setStoredIDToken(null);
-        localStorage.removeItem("refresh_token");
-        cleanupOIDCState();
-
-        // Redirect to Zitadel for proper logout
-        console.debug(
-          "Redirecting to Zitadel logout URL:",
-          response.logout_url,
+      if (!oidcInitialized) {
+        console.warn(
+          "OIDC service not initialized, performing local logout only",
         );
-        window.location.href = response.logout_url;
-        return; // Don't continue with local navigation
+        // Fallback to local cleanup
+        performLocalLogout();
+        return;
       }
-    } catch (error) {
-      console.warn("Server logout failed:", error);
-      // Continue with local cleanup even if server call fails
-    }
 
-    // Fallback: Always clear local state and redirect to login
-    setStoredToken(null);
-    setStoredIDToken(null);
-    localStorage.removeItem("refresh_token");
+      console.debug("Initiating secure OIDC logout");
+
+      // Use oidc-client-ts for secure logout
+      // This will redirect to the OIDC provider's logout endpoint
+      await oidcService.signOut();
+
+      // The logout will redirect to the provider, so we shouldn't reach this point
+      // But if we do, clear local state as a fallback
+      performLocalLogout();
+    } catch (error) {
+      console.warn("OIDC logout failed, performing local logout:", error);
+      // Fallback: Clear local state and navigate to login
+      performLocalLogout();
+    }
+  };
+
+  const performLocalLogout = () => {
+    // Clear all local state
+    clearCurrentOidcUser();
     setAuthState({
       status: "unauthenticated",
       user: null,
@@ -685,7 +406,9 @@ export function AuthProvider(props: { children: JSX.Element }) {
       error: null,
     });
 
-    cleanupOIDCState();
+    // Clear API token
+    clearApiToken();
+
     navigate("/login");
   };
 
@@ -703,7 +426,12 @@ export function AuthProvider(props: { children: JSX.Element }) {
         logout,
       }}
     >
-      <Show when={!authState.configLoading && authState.status !== "loading"}>
+      <Show
+        when={
+          !authState.configLoading &&
+          (authState.config?.configured === false || authState.oidcInitialized)
+        }
+      >
         {props.children}
       </Show>
     </AuthContext.Provider>
@@ -713,3 +441,4 @@ export function AuthProvider(props: { children: JSX.Element }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
+

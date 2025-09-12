@@ -859,6 +859,22 @@ func (zs *ZitadelService) GetLogoutURL(ctx context.Context, idTokenHint, postLog
 	return logoutURL.String(), nil
 }
 
+// ZitadelConfig represents the OIDC configuration for clients
+type ZitadelConfig struct {
+	Domain      string `json:"domain"`
+	InstanceURL string `json:"instanceUrl"`
+	ClientID    string `json:"clientId"`
+}
+
+// GetConfig returns the OIDC configuration for client consumption
+func (zs *ZitadelService) GetConfig() ZitadelConfig {
+	return ZitadelConfig{
+		Domain:      strings.TrimPrefix(zs.issuer, "https://"),
+		InstanceURL: zs.issuer,
+		ClientID:    zs.clientID,
+	}
+}
+
 // Close cleans up the Zitadel service resources
 func (zs *ZitadelService) Close() error {
 	// No resources to clean up for HTTP client

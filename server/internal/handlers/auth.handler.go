@@ -72,11 +72,14 @@ func (h *AuthHandler) getAuthConfig(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get actual configuration values from the Zitadel service
+	config := h.zitadelService.GetConfig()
+
 	return c.JSON(fiber.Map{
 		"configured":  true,
-		"domain":      "configured", // Domain info available via service
-		"instanceUrl": "configured", // Instance URL available via service
-		"clientId":    "configured", // Client ID available via service
+		"domain":      config.Domain,
+		"instanceUrl": config.InstanceURL,
+		"clientId":    config.ClientID,
 	})
 }
 
