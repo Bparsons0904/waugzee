@@ -16,7 +16,6 @@ export const AUTH_ENDPOINTS = {
   LOGIN_URL: `${API_PATHS.AUTH}/login-url`,
   TOKEN_EXCHANGE: `${API_PATHS.AUTH}/token-exchange`,
   CALLBACK: `${API_PATHS.AUTH}/callback`,
-  ME: `${API_PATHS.AUTH}/me`,
   LOGOUT: `${API_PATHS.AUTH}/logout`,
   ADMIN_USERS: `${API_PATHS.AUTH}/admin/users`,
 } as const;
@@ -24,6 +23,7 @@ export const AUTH_ENDPOINTS = {
 // User endpoints
 export const USER_ENDPOINTS = {
   LIST: API_PATHS.USERS,
+  ME: `${API_PATHS.USERS}/me`,
   PROFILE: (id: string) => `${API_PATHS.USERS}/${id}`,
 } as const;
 

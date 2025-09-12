@@ -42,7 +42,6 @@ func (h *AuthHandler) Register() {
 
 	// Protected endpoints - require valid OIDC token
 	protected := auth.Group("/", h.middleware.RequireAuth(h.zitadelService))
-	protected.Get("/me", h.getCurrentUser)
 	protected.Post("/logout", h.logout)
 
 	// Admin endpoints - require admin role
@@ -95,33 +94,6 @@ func (h *AuthHandler) getLoginURL(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-// getCurrentUser returns information about the currently authenticated user
-func (h *AuthHandler) getCurrentUser(c *fiber.Ctx) error {
-	authInfo := middleware.GetAuthInfo(c)
-	if authInfo == nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Authentication required",
-		})
-	}
-
-	// Convert middleware AuthInfo to controller AuthInfo
-	controllerAuthInfo := &authController.AuthInfo{
-		UserID:    authInfo.UserID,
-		Email:     authInfo.Email,
-		Name:      authInfo.Name,
-		Roles:     authInfo.Roles,
-		ProjectID: authInfo.ProjectID,
-	}
-
-	response, err := h.authController.GetCurrentUserInfo(c.Context(), controllerAuthInfo)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	return c.JSON(response)
-}
 
 
 // logout handles user logout with proper OIDC token revocation and cache cleanup

@@ -11,7 +11,7 @@ import { createStore } from "solid-js/store";
 import { User, AuthConfig } from "src/types/User";
 import { apiRequest, setTokenGetter } from "@services/api/api.service";
 import { oidcService } from "@services/oidc.service";
-import { AUTH_ENDPOINTS, FRONTEND_ROUTES } from "@constants/api.constants";
+import { AUTH_ENDPOINTS, USER_ENDPOINTS, FRONTEND_ROUTES } from "@constants/api.constants";
 import { retryWithExponentialBackoff, authRetryConfig } from "@utils/retry.utils";
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -177,7 +177,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       }
 
       // Try to get user info from backend
-      const response = await apiRequest<{ user: User }>("GET", AUTH_ENDPOINTS.ME);
+      const response = await apiRequest<{ user: User }>("GET", USER_ENDPOINTS.ME);
 
       if (response?.user) {
         console.info('Session restored successfully', {
@@ -241,7 +241,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
         const response = await apiRequest<{ user: User }>(
           "GET",
-          AUTH_ENDPOINTS.ME,
+          USER_ENDPOINTS.ME,
           undefined,
           {
             signal: controller.signal,
@@ -323,7 +323,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
         throw new Error("Failed to complete authentication");
       }
 
-      const response = await apiRequest<{ user: User }>("GET", AUTH_ENDPOINTS.ME);
+      const response = await apiRequest<{ user: User }>("GET", USER_ENDPOINTS.ME);
 
       if (response?.user) {
         setAuthState({

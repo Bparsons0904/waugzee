@@ -3,8 +3,10 @@ package handlers
 import (
 	"waugzee/internal/app"
 	userController "waugzee/internal/controllers/users"
+	"waugzee/internal/handlers/middleware"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
+	"waugzee/internal/services"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -12,13 +14,15 @@ import (
 
 type UserHandler struct {
 	Handler
-	controller userController.UserController
+	controller     userController.UserController
+	zitadelService *services.ZitadelService
 }
 
 func NewUserHandler(app app.App, router fiber.Router) *UserHandler {
 	log := logger.New("handlers").File("user_handler")
 	return &UserHandler{
-		controller: *app.UserController,
+		controller:     *app.UserController,
+		zitadelService: app.ZitadelService,
 		Handler: Handler{
 			log:        log,
 			router:     router,
@@ -33,6 +37,10 @@ func (h *UserHandler) Register() {
 
 	users.Get("/", h.getUser)
 	users.Post("/logout", h.logout)
+
+	// Protected user endpoints - require valid OIDC token
+	protected := users.Group("/", h.middleware.RequireAuth(h.zitadelService))
+	protected.Get("/me", h.getCurrentUser)
 }
 
 func (h *UserHandler) getUser(c *fiber.Ctx) error {
@@ -64,4 +72,32 @@ func (h *UserHandler) login(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"message": "success", "user": "user"})
+}
+
+// getCurrentUser returns information about the currently authenticated user
+func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
+	authInfo := middleware.GetAuthInfo(c)
+	if authInfo == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authentication required",
+		})
+	}
+
+	// Convert middleware AuthInfo to controller AuthInfo
+	controllerAuthInfo := &userController.AuthInfo{
+		UserID:    authInfo.UserID,
+		Email:     authInfo.Email,
+		Name:      authInfo.Name,
+		Roles:     authInfo.Roles,
+		ProjectID: authInfo.ProjectID,
+	}
+
+	response, err := h.controller.GetCurrentUser(c.Context(), controllerAuthInfo)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(response)
 }

@@ -27,11 +27,6 @@ export const apiContract = {
       body: TokenExchangeRequest,
       response: TokenExchangeResponse,
     },
-    me: {
-      path: "/auth/me",
-      method: "GET",
-      response: z.object({ user: User }),
-    },
     logout: {
       path: "/auth/logout",
       method: "POST",
@@ -46,6 +41,11 @@ export const apiContract = {
     },
   },
   users: {
+    me: {
+      path: "/users/me",
+      method: "GET",
+      response: z.object({ user: User }),
+    },
     get: {
       path: "/users",
       method: "GET",
