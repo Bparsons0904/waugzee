@@ -118,7 +118,7 @@ const HomePageDashboard: Component = () => {
       <div class={styles.container}>
         <section class={styles.hero}>
           <h1 class={styles.heroTitle}>
-            Welcome back, {user?.firstName || "User"}!
+            Welcome back, {user()?.firstName || "User"}!
           </h1>
           <p class={styles.heroSubtitle}>
             Ready to dive into your vinyl collection?
@@ -199,7 +199,7 @@ const HomePageDashboard: Component = () => {
             {isLoading() ? (
               <div class={styles.activitySkeleton}>
                 {[1, 2, 3].map((i) => (
-                  <div key={i} class={styles.skeletonItem}>
+                  <div class={styles.skeletonItem}>
                     <div class={styles.skeletonIcon}></div>
                     <div class={styles.skeletonContent}>
                       <div class={styles.skeletonTitle}></div>
@@ -210,7 +210,7 @@ const HomePageDashboard: Component = () => {
               </div>
             ) : (
               recentActivity().map((activity) => (
-                <div key={activity.id} class={styles.activityItem}>
+                <div class={styles.activityItem}>
                   <div class={styles.activityIcon}>
                     {getActivityIcon(activity.type)}
                   </div>

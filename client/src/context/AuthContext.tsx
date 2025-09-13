@@ -37,7 +37,7 @@ interface CallbackResponse {
 
 type AuthState = {
   status: AuthStatus;
-  user: () => User | null;
+  user: User | null;
   token: string | null;
   config: AuthConfig | null;
   configLoading: boolean;
@@ -65,7 +65,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
   const [authState, setAuthState] = createStore<AuthState>({
     status: "loading",
-    user: () => null,
+    user: null,
     token: null,
     config: null,
     configLoading: true,
@@ -84,7 +84,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
     // Clear all local state
     setAuthState({
       status: "unauthenticated",
-      user: () => null,
+      user: null,
       token: null,
       error: null,
     });
@@ -192,7 +192,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           console.debug("No valid OIDC session found");
           setAuthState({
             status: "unauthenticated",
-            user: () => null,
+            user: null,
             token: null,
             error: null,
           });
@@ -212,7 +212,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
           setAuthState({
             status: "authenticated",
-            user: () => response.user,
+            user: response.user,
             token: oidcUser.access_token,
             error: null,
           });
@@ -221,7 +221,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           await oidcService.clearUserSession();
           setAuthState({
             status: "unauthenticated",
-            user: () => null,
+            user: null,
             token: null,
             error: { type: "auth_failed", message: "Failed to get user info" },
           });
@@ -231,7 +231,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           console.warn("Authentication check failed:", error);
           setAuthState({
             status: "unauthenticated",
-            user: () => null,
+            user: null,
             token: null,
             error: {
               type: "network",
@@ -321,7 +321,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       if (response?.user) {
         setAuthState({
           status: "authenticated",
-          user: () => response.user,
+          user: response.user,
           token: oidcUser.access_token,
           error: null,
         });
@@ -335,7 +335,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
       setAuthState({
         status: "unauthenticated",
-        user: () => null,
+        user: null,
         token: null,
         error: {
           type: "auth_failed",
@@ -355,7 +355,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       console.warn("Cannot update user - not authenticated");
       return;
     }
-    setAuthState("user", () => user);
+    setAuthState("user", user);
     console.debug("User state updated directly");
   };
 
@@ -369,7 +369,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       const response = await api.get<{ user: User }>(USER_ENDPOINTS.ME);
 
       if (response?.user) {
-        setAuthState("user", () => response.user);
+        setAuthState("user", response.user);
         console.debug("User refreshed successfully");
       } else {
         console.warn("Failed to refresh user - no user data returned");

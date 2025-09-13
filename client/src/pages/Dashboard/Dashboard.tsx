@@ -90,7 +90,7 @@ const Dashboard: Component = () => {
       <div class={styles.container}>
         <header class={styles.header}>
           <h1 class={styles.headerTitle}>
-            Welcome back, {user?.firstName || "User"}!
+            Welcome back, {user()?.firstName || "User"}!
           </h1>
           <p class={styles.headerSubtitle}>
             Manage your vinyl collection and track your listening sessions.

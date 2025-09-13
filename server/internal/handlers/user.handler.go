@@ -76,5 +76,4 @@ func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"user": user})
-	return c.JSON(fiber.Map{"user": user})
 }
