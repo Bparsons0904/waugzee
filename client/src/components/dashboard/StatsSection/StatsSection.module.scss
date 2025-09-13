@@ -1,0 +1,46 @@
+@import "../../../styles/_colors";
+@import "../../../styles/_variables";
+
+.statsSection {
+  margin: $spacing-xl 0;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-md;
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.statCard {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-lg;
+}
+
+.statIcon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.statContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.statNumber {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  margin: 0 0 $spacing-xs 0;
+  color: $text-default;
+}
+
+.statLabel {
+  font-size: $font-size-sm;
+  color: $text-muted;
+  margin: 0;
+}

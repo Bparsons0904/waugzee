@@ -2,6 +2,7 @@ import { Component } from "solid-js";
 import { A } from "@solidjs/router";
 import { Button } from "@components/common/ui/Button/Button";
 import { Image } from "@components/common/ui/Image/Image";
+import { Card } from "@components/common/ui/Card/Card";
 import { FRONTEND_ROUTES } from "@constants/api.constants";
 import styles from "./LandingPage.module.scss";
 
@@ -73,7 +74,7 @@ const LandingPage: Component = () => {
           </h2>
           <div class={styles.socialGrid}>
             {featureCards.map((card) => (
-              <div class={styles.socialCard}>
+              <Card class={styles.socialCardContent}>
                 <div class={styles.socialCardImage}>
                   <Image
                     src={card.image}
@@ -85,7 +86,7 @@ const LandingPage: Component = () => {
                 </div>
                 <h3 class={styles.socialCardTitle}>{card.title}</h3>
                 <p class={styles.socialCardDescription}>{card.description}</p>
-              </div>
+              </Card>
             ))}
           </div>
         </div>

@@ -1,0 +1,154 @@
+@use "@styles/variables" as *;
+@use "@styles/colors" as *;
+
+.container {
+  padding: 0;
+}
+
+.infoSection {
+  margin-bottom: $spacing-2xl;
+}
+
+.sectionTitle {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+  margin-bottom: $spacing-md;
+  line-height: $line-height-tight;
+}
+
+.text {
+  color: $text-muted;
+  margin-bottom: $spacing-lg;
+  line-height: $line-height-normal;
+  font-size: $font-size-md;
+}
+
+.instructionList {
+  list-style-type: decimal;
+  padding-left: $spacing-lg;
+  margin-bottom: $spacing-xl;
+
+  li {
+    margin-bottom: $spacing-sm;
+    color: $text-muted;
+    line-height: $line-height-normal;
+  }
+}
+
+.link {
+  color: $text-link;
+  text-decoration: none;
+  font-weight: $font-weight-medium;
+  transition: color $transition-normal $transition-timing-default;
+
+  &:hover {
+    color: $text-link-hover;
+    text-decoration: underline;
+  }
+
+  &:focus {
+    outline: none;
+    text-decoration: underline;
+    box-shadow: 0 0 0 2px $shadow-color-primary;
+    border-radius: $border-radius-sm;
+  }
+}
+
+.form {
+  margin-bottom: $spacing-2xl;
+}
+
+.formGroup {
+  margin-bottom: $spacing-lg;
+}
+
+
+.errorMessage {
+  margin-bottom: $spacing-lg;
+  padding: $spacing-md;
+  background-color: $bg-error-subtle;
+  color: $text-error;
+  border-radius: $border-radius-lg;
+  border-left: $border-width-thicker solid $border-error;
+  font-size: $font-size-sm;
+  line-height: $line-height-normal;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-md;
+}
+
+.primaryButton {
+  padding: $spacing-md $spacing-xl;
+  background-color: $button-primary-bg;
+  color: $button-primary-text;
+  font-weight: $font-weight-medium;
+  border: none;
+  border-radius: $border-radius-lg;
+  cursor: pointer;
+  font-size: $font-size-md;
+  transition:
+    background-color $transition-normal $transition-timing-default,
+    opacity $transition-normal $transition-timing-default,
+    box-shadow $transition-normal $transition-timing-default;
+
+  &:hover:not(:disabled) {
+    background-color: $button-primary-hover;
+    box-shadow: $shadow-md;
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px $shadow-color-primary;
+  }
+
+  &:active:not(:disabled) {
+    background-color: $button-primary-active;
+    box-shadow: $shadow-sm;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+}
+
+.footer {
+  padding-top: $spacing-lg;
+  border-top: $border-width-thin solid $border-default;
+}
+
+.footerText {
+  color: $text-light;
+  font-size: $font-size-sm;
+  line-height: $line-height-normal;
+  text-align: center;
+  margin: 0;
+}
+
+// Responsive design
+@media (max-width: $breakpoint-sm) {
+  .container {
+    padding: $spacing-md;
+  }
+
+  .sectionTitle {
+    font-size: $font-size-lg;
+  }
+
+  .instructionList {
+    padding-left: $spacing-md;
+  }
+
+  .actions {
+    flex-direction: column;
+    
+    .primaryButton {
+      width: 100%;
+    }
+  }
+}

@@ -1,0 +1,91 @@
+@use "../../styles/variables" as *;
+@use "../../styles/colors" as *;
+
+.card {
+  background-color: $bg-surface;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-md;
+  border: $border-width-thin solid $border-default;
+  transition: 
+    transform $transition-fast $transition-timing-smooth,
+    box-shadow $transition-fast $transition-timing-smooth,
+    border-color $transition-fast $transition-timing-smooth;
+  overflow: hidden;
+  cursor: default;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $shadow-lg;
+    border-color: $border-strong;
+  }
+}
+
+// Size variants
+.cardSmall {
+  min-height: 120px;
+  max-width: 280px;
+}
+
+.cardMedium {
+  min-height: 180px;
+  max-width: 320px;
+}
+
+.cardLarge {
+  min-height: 240px;
+  max-width: 400px;
+}
+
+// Padding variants
+.paddingNone {
+  padding: 0;
+}
+
+.paddingTight {
+  padding: $spacing-sm;
+}
+
+.paddingNormal {
+  padding: $spacing-lg;
+}
+
+.paddingLoose {
+  padding: $spacing-xl;
+}
+
+// Variant styles
+.cardDefault {
+  // Default styling already applied in base .card
+}
+
+.cardElevated {
+  box-shadow: $shadow-lg;
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: $shadow-xl;
+  }
+}
+
+.cardOutlined {
+  box-shadow: $shadow-none;
+  border: $border-width-thick solid $border-strong;
+  
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: $shadow-sm;
+    border-color: $border-primary;
+  }
+}
+
+// Clickable cards
+.card[role="button"] {
+  cursor: pointer;
+}
+
+// Focus states for accessibility
+.card:focus-visible {
+  outline: none;
+  box-shadow: $shadow-md, $focus-ring;
+  border-color: $border-focus;
+}
