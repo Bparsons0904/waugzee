@@ -1,9 +1,26 @@
-import { Component } from "solid-js";
+import { Component, createSignal, onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
+import { useAuth } from "@context/AuthContext";
 import styles from "./Home.module.scss";
+
+interface DashboardStats {
+  totalRecords: number;
+  totalPlays: number;
+  listeningHours: number;
+  favoriteGenre: string;
+}
 
 const Home: Component = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  const [stats, setStats] = createSignal<DashboardStats>({
+    totalRecords: 0,
+    totalPlays: 0,
+    listeningHours: 0,
+    favoriteGenre: "Loading...",
+  });
+  const [isLoading, setIsLoading] = createSignal(true);
 
   const handleLogPlay = () => {
     navigate("/log");
@@ -30,10 +47,71 @@ const Home: Component = () => {
     navigate("/analytics");
   };
 
+  onMount(async () => {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setStats({
+        totalRecords: 247,
+        totalPlays: 1430,
+        listeningHours: 89,
+        favoriteGenre: "Jazz",
+      });
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  });
+
   return (
     <div class={styles.container}>
-      <h1 class={styles.title}>Welcome to Waugzee</h1>
+      <h1 class={styles.title}>Welcome back, {user?.firstName || "User"}!</h1>
       <p class={styles.subtitle}>Your personal vinyl collection tracker</p>
+
+      <section class={styles.statsSection}>
+        <div class={styles.statsGrid}>
+          <div class={styles.statCard}>
+            <div class={styles.statIcon}>💽</div>
+            <div class={styles.statContent}>
+              <h3 class={styles.statNumber}>
+                {isLoading() ? "--" : stats().totalRecords.toLocaleString()}
+              </h3>
+              <p class={styles.statLabel}>Records</p>
+            </div>
+          </div>
+          
+          <div class={styles.statCard}>
+            <div class={styles.statIcon}>▶️</div>
+            <div class={styles.statContent}>
+              <h3 class={styles.statNumber}>
+                {isLoading() ? "--" : stats().totalPlays.toLocaleString()}
+              </h3>
+              <p class={styles.statLabel}>Plays</p>
+            </div>
+          </div>
+          
+          <div class={styles.statCard}>
+            <div class={styles.statIcon}>⏱️</div>
+            <div class={styles.statContent}>
+              <h3 class={styles.statNumber}>
+                {isLoading() ? "--h" : `${stats().listeningHours}h`}
+              </h3>
+              <p class={styles.statLabel}>Hours</p>
+            </div>
+          </div>
+          
+          <div class={styles.statCard}>
+            <div class={styles.statIcon}>🎯</div>
+            <div class={styles.statContent}>
+              <h3 class={styles.statNumber}>
+                {isLoading() ? "--" : stats().favoriteGenre}
+              </h3>
+              <p class={styles.statLabel}>Top Genre</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div class={styles.cardGrid}>
         <div class={styles.card}>
