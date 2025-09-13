@@ -22,7 +22,6 @@ type AuthControllerInterface interface {
 	GetAuthConfig() (*AuthConfigResponse, error)
 	HandleOIDCCallback(ctx context.Context, req OIDCCallbackRequest) (*TokenExchangeResult, error)
 	LogoutUser(ctx context.Context, req LogoutRequest, authInfo *AuthInfo) (*LogoutResponse, error)
-	IsConfigured() bool
 }
 
 type AuthConfigResponse struct {
@@ -32,7 +31,6 @@ type AuthConfigResponse struct {
 	ClientID    string `json:"clientId,omitempty"`
 	Message     string `json:"message,omitempty"`
 }
-
 
 type TokenExchangeResult struct {
 	AccessToken  string `json:"access_token"`
@@ -62,11 +60,6 @@ type LogoutResponse struct {
 	Message       string   `json:"message"`
 	LogoutURL     string   `json:"logout_url,omitempty"`
 	RevokedTokens []string `json:"revoked_tokens,omitempty"`
-}
-
-type AllUsersResponse struct {
-	Message string        `json:"message"`
-	Users   []interface{} `json:"users"`
 }
 
 type AuthInfo struct {
@@ -114,9 +107,6 @@ func (ac *AuthController) GetAuthConfig() (*AuthConfigResponse, error) {
 	}, nil
 }
 
-
-
-
 // getOrCreateOIDCUser finds or creates a user from OIDC token claims
 func (ac *AuthController) getOrCreateOIDCUser(
 	ctx context.Context,
@@ -148,24 +138,33 @@ func (ac *AuthController) getOrCreateOIDCUser(
 		}
 	}
 
-	// Prepare email pointer (only if email is present and verified)
-	var emailPtr *string
-	if tokenInfo.Email != "" && tokenInfo.EmailVerified {
-		emailPtr = &tokenInfo.Email
-	}
-
-	oidcReq := OIDCUserCreateRequest{
-		OIDCUserID:      tokenInfo.UserID,
-		Email:           emailPtr,
-		Name:            &displayName,
+	// Create User struct directly
+	user := &User{
 		FirstName:       firstName,
 		LastName:        lastName,
-		OIDCProvider:    "zitadel",
-		OIDCProjectID:   &tokenInfo.ProjectID,
+		FullName:        displayName,
+		DisplayName:     displayName,
+		IsAdmin:         false,
+		IsActive:        true,
+		OIDCUserID:      tokenInfo.UserID,
 		ProfileVerified: tokenInfo.EmailVerified,
 	}
 
-	user, err := ac.userRepo.FindOrCreateOIDCUser(ctx, oidcReq)
+	// Set email only if present and verified
+	if tokenInfo.Email != "" && tokenInfo.EmailVerified {
+		user.Email = &tokenInfo.Email
+	}
+
+	// Set OIDC provider
+	provider := "zitadel"
+	user.OIDCProvider = &provider
+
+	// Set project ID if available
+	if tokenInfo.ProjectID != "" {
+		user.OIDCProjectID = &tokenInfo.ProjectID
+	}
+
+	user, err := ac.userRepo.FindOrCreateOIDCUser(ctx, user)
 	if err != nil {
 		log.Info(
 			"failed to find or create OIDC user",
@@ -180,18 +179,12 @@ func (ac *AuthController) getOrCreateOIDCUser(
 	return user, nil
 }
 
-
-
 // HandleOIDCCallback handles the OIDC callback - supports both code flow and token flow
 func (ac *AuthController) HandleOIDCCallback(
 	ctx context.Context,
 	req OIDCCallbackRequest,
 ) (*TokenExchangeResult, error) {
 	log := ac.log.Function("HandleOIDCCallback")
-
-	if !ac.zitadelService.IsConfigured() {
-		return nil, log.Error("authentication not configured")
-	}
 
 	tokenInfo, err := ac.zitadelService.ValidateIDToken(ctx, req.IDToken)
 	if err != nil {
@@ -243,7 +236,7 @@ func (ac *AuthController) LogoutUser(
 	var revokedTokens []string
 
 	// Revoke access token if present
-	if req.AccessToken != "" && ac.zitadelService.IsConfigured() {
+	if req.AccessToken != "" {
 		if err := ac.zitadelService.RevokeToken(ctx, req.AccessToken, "access_token"); err != nil {
 			log.Warn("failed to revoke access token", "error", err.Error())
 		} else {
@@ -253,7 +246,7 @@ func (ac *AuthController) LogoutUser(
 	}
 
 	// Revoke refresh token if provided
-	if req.RefreshToken != "" && ac.zitadelService.IsConfigured() {
+	if req.RefreshToken != "" {
 		if err := ac.zitadelService.RevokeToken(ctx, req.RefreshToken, "refresh_token"); err != nil {
 			log.Warn("failed to revoke refresh token", "error", err.Error())
 		} else {
@@ -279,19 +272,17 @@ func (ac *AuthController) LogoutUser(
 
 	// Generate logout URL
 	var logoutURL string
-	if ac.zitadelService.IsConfigured() {
-		url, err := ac.zitadelService.GetLogoutURL(
-			ctx,
-			req.IDToken,
-			req.PostLogoutRedirectURI,
-			req.State,
-		)
-		if err != nil {
-			log.Warn("failed to generate logout URL", "error", err.Error())
-		} else {
-			logoutURL = url
-			log.Info("logout URL generated successfully")
-		}
+	url, err := ac.zitadelService.GetLogoutURL(
+		ctx,
+		req.IDToken,
+		req.PostLogoutRedirectURI,
+		req.State,
+	)
+	if err != nil {
+		log.Warn("failed to generate logout URL", "error", err.Error())
+	} else {
+		logoutURL = url
+		log.Info("logout URL generated successfully")
 	}
 
 	if userID != "" {
@@ -345,22 +336,3 @@ func (ac *AuthController) clearUserCacheByOIDC(ctx context.Context, oidcUserID s
 
 	return nil
 }
-
-// GetAllUsers returns all users (admin only)
-func (ac *AuthController) GetAllUsers(
-	ctx context.Context,
-	authInfo *AuthInfo,
-) (*AllUsersResponse, error) {
-	log := ac.log.Function("GetAllUsers")
-
-	if authInfo != nil {
-		log.Info("admin requesting all users", "adminID", authInfo.UserID)
-	}
-
-	// This is a placeholder - in a real implementation, you'd fetch users from Zitadel
-	return &AllUsersResponse{
-		Message: "Admin endpoint - get all users",
-		Users:   []interface{}{},
-	}, nil
-}
-

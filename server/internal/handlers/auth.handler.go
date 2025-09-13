@@ -113,9 +113,7 @@ func (h *AuthHandler) logout(c *fiber.Ctx) error {
 
 	response, err := h.authController.LogoutUser(c.Context(), reqBody, controllerAuthInfo)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	return c.JSON(response)

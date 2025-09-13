@@ -23,68 +23,24 @@ type User struct {
 	OIDCProjectID   *string    `gorm:"column:oidc_project_id;type:text"          json:"-"`
 }
 
-func (u *User) BeforeCreate(tx *gorm.DB) error {
-	fullName := u.FirstName + " " + u.LastName
-	u.FullName = fullName
-	if u.DisplayName == "" {
-		u.DisplayName = fullName
+func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
+	if u.FirstName != "" || u.LastName != "" {
+		if u.FullName == "" {
+			u.FullName = strings.TrimSpace(u.FirstName + " " + u.LastName)
+		}
+		if u.DisplayName == "" {
+			u.DisplayName = u.FullName
+		}
 	}
-	return nil
+
+	return err
 }
 
-// TODO: Does all this below here stay here?
-type LoginRequest struct {
-	Login    string `json:"login"`
-	Password string `json:"password"`
-}
-
-// OIDCUserCreateRequest represents data for creating a user from OIDC claims
-type OIDCUserCreateRequest struct {
-	OIDCUserID      string  `json:"oidcUserId"`
-	Email           *string `json:"email,omitempty"`
-	Name            *string `json:"name,omitempty"`
-	FirstName       string  `json:"firstName"`
-	LastName        string  `json:"lastName"`
-	OIDCProvider    string  `json:"oidcProvider"`
-	OIDCProjectID   *string `json:"oidcProjectId,omitempty"`
-	ProfileVerified bool    `json:"profileVerified"`
-}
-
-// IsOIDCUser returns true if the user was created via OIDC
 func (u *User) IsOIDCUser() bool {
 	return u.OIDCUserID != ""
 }
 
-// UpdateFromOIDC updates user information from OIDC claims
-func (u *User) UpdateFromOIDC(oidcEmail, oidcName *string, provider string, projectID *string) {
-	now := time.Now()
-	u.LastLoginAt = &now
-
-	if oidcEmail != nil && *oidcEmail != "" {
-		u.Email = oidcEmail
-	}
-
-	if oidcName != nil && *oidcName != "" {
-		u.DisplayName = *oidcName
-	}
-
-	if provider != "" {
-		providerPtr := &provider
-		u.OIDCProvider = providerPtr
-	}
-
-	if projectID != nil {
-		u.OIDCProjectID = projectID
-	}
-
-	// Mark profile as verified if we have email from OIDC provider
-	if oidcEmail != nil && *oidcEmail != "" {
-		u.ProfileVerified = true
-	}
-}
-
-// UpdateFromOIDCDetailed updates user information from detailed OIDC claims including name components
-func (u *User) UpdateFromOIDCDetailed(
+func (u *User) UpdateFromOIDC(
 	oidcUserID string,
 	oidcEmail, oidcName *string,
 	firstName, lastName, provider string,
@@ -94,7 +50,6 @@ func (u *User) UpdateFromOIDCDetailed(
 	now := time.Now()
 	u.LastLoginAt = &now
 
-	// Preserve OIDC User ID - this is critical for linking sessions
 	if oidcUserID != "" {
 		u.OIDCUserID = oidcUserID
 	}
@@ -103,7 +58,6 @@ func (u *User) UpdateFromOIDCDetailed(
 		u.Email = oidcEmail
 	}
 
-	// Update first/last names if provided
 	if firstName != "" {
 		u.FirstName = firstName
 	}
@@ -111,12 +65,10 @@ func (u *User) UpdateFromOIDCDetailed(
 		u.LastName = lastName
 	}
 
-	// Rebuild FullName from components
 	if firstName != "" || lastName != "" {
 		u.FullName = strings.TrimSpace(firstName + " " + lastName)
 	}
 
-	// Update display name with preference: oidcName > FullName > existing
 	if oidcName != nil && *oidcName != "" {
 		u.DisplayName = *oidcName
 	} else if u.FullName != "" {
