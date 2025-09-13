@@ -67,30 +67,10 @@ func (r *userRepository) GetByID(ctx context.Context, id string) (*User, error) 
 func (r *userRepository) Update(ctx context.Context, user *User) error {
 	log := r.log.Function("Update")
 
-	if err := r.getDB(ctx).Save(user).Error; err != nil {
+	db := r.getDB(ctx).Set("waugzee:cache", r.db.Cache.User)
+
+	if err := db.Save(user).Error; err != nil {
 		return log.Err("failed to update user", err, "user", user)
-	}
-
-	if err := r.addUserToCache(ctx, user); err != nil {
-		log.Warn("failed to update user in cache", "userID", user.ID, "error", err)
-	}
-
-	// Update OIDC ID to UUID mapping cache if user has OIDC ID
-	if user.OIDCUserID != "" {
-		oidcCacheKey := "oidc:" + user.OIDCUserID
-		if err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).
-			WithStruct(user.ID.String()).
-			WithTTL(USER_CACHE_EXPIRY).
-			WithContext(ctx).
-			Set(); err != nil {
-			log.Warn(
-				"failed to update OIDC mapping cache",
-				"oidcUserID",
-				user.OIDCUserID,
-				"error",
-				err,
-			)
-		}
 	}
 
 	return nil
@@ -284,7 +264,7 @@ func (r *userRepository) FindOrCreateOIDCUser(
 			user.OIDCProjectID,
 			user.ProfileVerified,
 		)
-		
+
 		if err := r.Update(ctx, existingUser); err != nil {
 			log.Warn("failed to update existing OIDC user", "error", err, "userID", existingUser.ID)
 		}
@@ -303,16 +283,21 @@ func (r *userRepository) FindOrCreateOIDCUser(
 			}
 			existingUser.UpdateFromOIDC(
 				user.OIDCUserID,
-				user.Email, 
-				&user.DisplayName, 
-				user.FirstName, 
-				user.LastName, 
-				oidcProvider, 
-				user.OIDCProjectID, 
+				user.Email,
+				&user.DisplayName,
+				user.FirstName,
+				user.LastName,
+				oidcProvider,
+				user.OIDCProjectID,
 				user.ProfileVerified,
 			)
 			if err := r.Update(ctx, existingUser); err != nil {
-				return nil, log.Err("failed to link existing user to OIDC", err, "userID", existingUser.ID)
+				return nil, log.Err(
+					"failed to link existing user to OIDC",
+					err,
+					"userID",
+					existingUser.ID,
+				)
 			}
 			return existingUser, nil
 		}
