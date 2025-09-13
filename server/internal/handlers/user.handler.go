@@ -2,9 +2,10 @@ package handlers
 
 import (
 	"waugzee/internal/app"
-	userController "waugzee/internal/controllers/users"
+	"waugzee/internal/handlers/middleware"
 	"waugzee/internal/handlers/middleware"
 	"waugzee/internal/logger"
+	"waugzee/internal/services"
 	"waugzee/internal/services"
 
 	"github.com/gofiber/fiber/v2"
@@ -75,5 +76,6 @@ func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
 		})
 	}
 
+	return c.JSON(fiber.Map{"user": user})
 	return c.JSON(fiber.Map{"user": user})
 }

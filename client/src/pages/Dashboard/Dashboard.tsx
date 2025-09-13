@@ -23,66 +23,10 @@ const Dashboard: Component = () => {
   });
   const [isLoading, setIsLoading] = createSignal(true);
 
-  onMount(async () => {
-    try {
-      // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setStats({
-        totalRecords: 247,
-        totalPlays: 1430,
-        listeningHours: 89,
-        favoriteGenre: "Jazz",
-      });
-    } catch (error) {
-      console.error("Failed to load dashboard stats:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  });
-
-  const actionCards = [
-    {
-      title: "Log Play",
-      description: "Record when you play a record from your collection.",
-      icon: "🎵",
-      action: () => navigate("/log"),
-    },
-    {
-      title: "View Collection",
-      description: "Browse and search through your vinyl collection.",
-      icon: "💽",
-      action: () => navigate("/collection"),
-    },
-    {
-      title: "Play History",
-      description: "View your listening history and statistics.",
-      icon: "📊",
-      action: () => navigate("/history"),
-    },
-    {
-      title: "Equipment",
-      description: "Manage your turntables, cartridges, and styluses.",
-      icon: "🎧",
-      action: () => navigate("/equipment"),
-    },
-    {
-      title: "Sync Collection",
-      description: "Sync your collection with your Discogs library.",
-      icon: "🔄",
-      action: () => handleSync(),
-    },
-    {
-      title: "Analytics",
-      description: "Explore insights about your collection and listening habits.",
-      icon: "📈",
-      action: () => navigate("/analytics"),
-    },
-  ];
-
-  const handleSync = () => {
-    // TODO: Implement collection sync
-    console.log("Syncing collection...");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleAction = (..._args: unknown[]) => {
+    // Handle actions here
+    // TODO: Implement specific action handling
   };
 
   return (

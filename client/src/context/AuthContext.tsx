@@ -44,7 +44,7 @@ type AuthState = {
 type AuthContextValue = {
   authState: AuthState;
   isAuthenticated: () => boolean;
-  user: () => User | null;
+  user: User | null;
   authToken: () => string | null;
   authConfig: () => AuthConfig | null;
   loginWithOIDC: () => Promise<void>;
@@ -314,7 +314,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           error: null,
         });
 
-        navigate(FRONTEND_ROUTES.ROOT);
+        navigate(FRONTEND_ROUTES.HOME);
       } else {
         throw new Error("Failed to get user info from backend after callback");
       }
@@ -369,7 +369,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
   const logout = async () => {
     console.info('Logout initiated');
-
+    
     try {
       if (!authState.oidcInitialized) {
         console.warn('OIDC service not initialized, performing local logout only');
@@ -383,7 +383,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
         console.debug('OIDC signOut completed successfully');
       } catch (oidcError) {
         console.warn('OIDC signOut failed, forcing local cleanup:', oidcError);
-
+        
         // Force clear OIDC session even if signOut fails
         try {
           await oidcService.clearUserSession();
@@ -395,10 +395,10 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
       // Always perform local logout regardless of OIDC result
       performLocalLogout();
-
+      
     } catch (error) {
       console.error('Logout process failed, performing emergency cleanup:', error);
-
+      
       // Emergency cleanup - ensure we always clear local state
       performLocalLogout();
     }
@@ -409,7 +409,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       value={{
         authState,
         isAuthenticated,
-        user: () => authState.user,
+        user: authState.user,
         authToken: () => authState.token,
         authConfig: () => authState.config,
         loginWithOIDC,

@@ -68,7 +68,7 @@ func New() (*App, error) {
 	// Initialize controllers with repositories and services
 	middleware := middleware.New(db, eventBus, config, userRepo)
 	authController := authController.New(zitadelService, userRepo, db)
-	userController := userController.New(userRepo, discogsService, config)
+	userController := userController.New(userRepo, config)
 
 	app := &App{
 		Database:           db,
@@ -106,7 +106,6 @@ func (a *App) validate() error {
 		a.EventBus,
 		a.TransactionService,
 		a.ZitadelService,
-		a.DiscogsService,
 		a.AuthController,
 		a.UserController,
 		a.Middleware,

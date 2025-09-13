@@ -49,7 +49,3 @@ export interface UpdateDiscogsTokenRequest {
   token: string;
 }
 
-export interface UpdateDiscogsTokenResponse {
-  user: User;
-}
-
