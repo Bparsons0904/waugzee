@@ -30,6 +30,7 @@ const (
 	PING_INTERVAL              = 30 * time.Second
 	PONG_TIMEOUT               = 60 * time.Second
 	WRITE_TIMEOUT              = 10 * time.Second
+	AUTH_HANDSHAKE_TIMEOUT     = 10 * time.Second
 	MAX_MESSAGE_SIZE           = 1024 * 1024 // 1 MB
 	SEND_CHANNEL_SIZE          = 64
 )
@@ -137,6 +138,37 @@ func (m *Manager) HandleWebSocket(c *websocket.Conn) {
 		m.hub.unregister <- client
 		if err := c.Close(); err != nil {
 			log.Er("failed to close connection", err)
+		}
+	}()
+
+	// Start auth timeout goroutine
+	go func() {
+		time.Sleep(AUTH_HANDSHAKE_TIMEOUT)
+		if client.Status == STATUS_UNAUTHENTICATED {
+			log.Warn("Client failed to authenticate within timeout, disconnecting", 
+				"clientID", clientID, 
+				"timeout", AUTH_HANDSHAKE_TIMEOUT)
+			
+			authTimeout := Message{
+				ID:        uuid.New().String(),
+				Type:      MESSAGE_TYPE_AUTH_FAILURE,
+				Channel:   "system",
+				Action:    "authentication_timeout",
+				Data:      map[string]any{"reason": "Authentication timeout"},
+				Timestamp: time.Now(),
+			}
+			
+			select {
+			case client.send <- authTimeout:
+				// Message sent, now close after a brief delay
+				time.Sleep(100 * time.Millisecond)
+			default:
+				// Channel is full or closed, proceed to close immediately
+			}
+			
+			if err := c.Close(); err != nil {
+				log.Er("failed to close connection after auth timeout", err, "clientID", clientID)
+			}
 		}
 	}()
 

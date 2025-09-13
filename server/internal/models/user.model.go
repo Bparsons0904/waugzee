@@ -9,21 +9,18 @@ import (
 
 type User struct {
 	BaseUUIDModel
-	// Basic user info
-	FirstName   string  `gorm:"type:text"               json:"firstName"`
-	LastName    string  `gorm:"type:text"               json:"lastName"`
-	FullName    string  `gorm:"type:text"               json:"fullName"`
-	DisplayName string  `gorm:"type:text"               json:"displayName"`
-	Email       *string `gorm:"type:text;uniqueIndex"   json:"email"`
-	IsAdmin     bool    `gorm:"type:bool;default:false" json:"isAdmin"`
-	IsActive    bool    `gorm:"type:bool;default:true"  json:"isActive"`
-
-	// OIDC integration fields
-	OIDCUserID      string     `gorm:"column:oidc_user_id;type:text;uniqueIndex" json:"-"`
-	OIDCProvider    *string    `gorm:"column:oidc_provider;type:text"            json:"oidcProvider,omitempty"`
-	OIDCProjectID   *string    `gorm:"column:oidc_project_id;type:text"          json:"-"`
+	FirstName       string     `gorm:"type:text"                                 json:"firstName"`
+	LastName        string     `gorm:"type:text"                                 json:"lastName"`
+	FullName        string     `gorm:"type:text"                                 json:"fullName"`
+	DisplayName     string     `gorm:"type:text"                                 json:"displayName"`
+	Email           *string    `gorm:"type:text;uniqueIndex"                     json:"email"`
+	IsAdmin         bool       `gorm:"type:bool;default:false"                   json:"isAdmin"`
+	IsActive        bool       `gorm:"type:bool;default:true"                    json:"isActive"`
 	LastLoginAt     *time.Time `gorm:"type:timestamp"                            json:"lastLoginAt,omitempty"`
 	ProfileVerified bool       `gorm:"type:bool;default:false"                   json:"profileVerified"`
+	OIDCUserID      string     `gorm:"column:oidc_user_id;type:text;uniqueIndex" json:"-"`
+	OIDCProvider    *string    `gorm:"column:oidc_provider;type:text"            json:"-"`
+	OIDCProjectID   *string    `gorm:"column:oidc_project_id;type:text"          json:"-"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {
@@ -51,36 +48,6 @@ type OIDCUserCreateRequest struct {
 	OIDCProvider    string  `json:"oidcProvider"`
 	OIDCProjectID   *string `json:"oidcProjectId,omitempty"`
 	ProfileVerified bool    `json:"profileVerified"`
-}
-
-// UserProfile represents public user profile information
-type UserProfile struct {
-	ID              string     `json:"id"`
-	FirstName       string     `json:"firstName"`
-	LastName        string     `json:"lastName"`
-	FullName        string     `json:"fullName"`
-	DisplayName     string     `json:"displayName"`
-	Email           *string    `json:"email,omitempty"`
-	IsActive        bool       `json:"isActive"`
-	IsAdmin         bool       `json:"isAdmin"`
-	LastLoginAt     *time.Time `json:"lastLoginAt,omitempty"`
-	ProfileVerified bool       `json:"profileVerified"`
-}
-
-// ToProfile converts a User to a UserProfile (public information only)
-func (u *User) ToProfile() UserProfile {
-	return UserProfile{
-		ID:              u.ID.String(),
-		FirstName:       u.FirstName,
-		LastName:        u.LastName,
-		FullName:        u.FullName,
-		DisplayName:     u.DisplayName,
-		Email:           u.Email,
-		IsActive:        u.IsActive,
-		IsAdmin:         u.IsAdmin,
-		LastLoginAt:     u.LastLoginAt,
-		ProfileVerified: u.ProfileVerified,
-	}
 }
 
 // IsOIDCUser returns true if the user was created via OIDC
@@ -117,7 +84,13 @@ func (u *User) UpdateFromOIDC(oidcEmail, oidcName *string, provider string, proj
 }
 
 // UpdateFromOIDCDetailed updates user information from detailed OIDC claims including name components
-func (u *User) UpdateFromOIDCDetailed(oidcUserID string, oidcEmail, oidcName *string, firstName, lastName, provider string, projectID *string, emailVerified bool) {
+func (u *User) UpdateFromOIDCDetailed(
+	oidcUserID string,
+	oidcEmail, oidcName *string,
+	firstName, lastName, provider string,
+	projectID *string,
+	emailVerified bool,
+) {
 	now := time.Now()
 	u.LastLoginAt = &now
 

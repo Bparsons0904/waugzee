@@ -13,11 +13,8 @@ export const API_PATHS = {
 // Authentication endpoints
 export const AUTH_ENDPOINTS = {
   CONFIG: `${API_PATHS.AUTH}/config`,
-  LOGIN_URL: `${API_PATHS.AUTH}/login-url`,
-  TOKEN_EXCHANGE: `${API_PATHS.AUTH}/token-exchange`,
   CALLBACK: `${API_PATHS.AUTH}/callback`,
   LOGOUT: `${API_PATHS.AUTH}/logout`,
-  ADMIN_USERS: `${API_PATHS.AUTH}/admin/users`,
 } as const;
 
 // User endpoints

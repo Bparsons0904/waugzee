@@ -36,7 +36,6 @@ func NewAuthHandler(app app.App, router fiber.Router) *AuthHandler {
 func (h *AuthHandler) Register() {
 	auth := h.router.Group("/auth")
 
-	// Rate limiting for sensitive auth endpoints
 	authRateLimit := limiter.New(limiter.Config{
 		Max:        10,              // 10 requests
 		Expiration: 1 * time.Minute, // per minute
@@ -55,42 +54,13 @@ func (h *AuthHandler) Register() {
 		SkipSuccessfulRequests: false, // Count all requests
 	})
 
-	// Stricter rate limiting for token exchange (most sensitive)
-	tokenRateLimit := limiter.New(limiter.Config{
-		Max:        5,               // 5 requests
-		Expiration: 1 * time.Minute, // per minute
-		KeyGenerator: func(c *fiber.Ctx) string {
-			return c.IP()
-		},
-		LimitReached: func(c *fiber.Ctx) error {
-			h.log.Warn("Token exchange rate limit exceeded", "ip", c.IP())
-			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-				"error":       "Rate limit exceeded. Too many token exchange attempts.",
-				"retry_after": "60 seconds",
-			})
-		},
-	})
-
-	// Public endpoints with rate limiting
 	auth.Get("/config", h.getAuthConfig)
-	auth.Get("/login-url", authRateLimit, h.getLoginURL)
-	auth.Post("/token-exchange", tokenRateLimit, h.exchangeToken)
 	auth.Post("/callback", authRateLimit, h.oidcCallback)
 
-	// Protected endpoints - require valid OIDC token
 	protected := auth.Group("/", h.middleware.RequireAuth(h.zitadelService))
 	protected.Post("/logout", h.logout)
-
-	// Admin endpoints - require admin role
-	admin := auth.Group(
-		"/admin",
-		h.middleware.RequireAuth(h.zitadelService),
-		h.middleware.RequireRole("admin"),
-	)
-	admin.Get("/users", h.getAllUsers)
 }
 
-// getAuthConfig returns authentication configuration for the client
 func (h *AuthHandler) getAuthConfig(c *fiber.Ctx) error {
 	config, err := h.authController.GetAuthConfig()
 	if err != nil {
@@ -102,44 +72,13 @@ func (h *AuthHandler) getAuthConfig(c *fiber.Ctx) error {
 	return c.JSON(config)
 }
 
-// getLoginURL generates an authorization URL for OIDC login flow
-func (h *AuthHandler) getLoginURL(c *fiber.Ctx) error {
-	// Get parameters from query string
-	state := c.Query("state", "default-state")
-	redirectURI := c.Query("redirect_uri")
-	codeChallenge := c.Query("code_challenge") // PKCE code challenge
-	nonce := c.Query("nonce")                  // Nonce for replay attack protection
-
-	if redirectURI == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "redirect_uri parameter is required",
-		})
-	}
-
-	response, err := h.authController.GenerateAuthURL(state, redirectURI, codeChallenge, nonce)
-	if err != nil {
-		if err.Error() == "authentication not configured" {
-			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	return c.JSON(response)
-}
-
-// logout handles user logout with proper OIDC token revocation and cache cleanup
 func (h *AuthHandler) logout(c *fiber.Ctx) error {
 	log := h.log.Function("logout")
 	authInfo := middleware.GetAuthInfo(c)
 
-	// Parse request body for logout parameters
 	var reqBody authController.LogoutRequest
 	if err := c.BodyParser(&reqBody); err != nil {
-		// Continue with logout even if body parsing fails - optional logout parameters
+		// Continue with logout even if body parsing fails
 		log.Error(
 			"Failed to parse logout request body",
 			"error",
@@ -182,41 +121,6 @@ func (h *AuthHandler) logout(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-// exchangeToken handles the OIDC authorization code exchange for access token
-func (h *AuthHandler) exchangeToken(c *fiber.Ctx) error {
-	var req services.TokenExchangeRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
-	}
-
-	response, err := h.authController.ValidateAndExchangeToken(c.Context(), req)
-	if err != nil {
-		switch err.Error() {
-		case "authentication not configured":
-			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		case "code and redirect_uri are required":
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		case "token exchange failed", "invalid token received", "nonce validation failed":
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		default:
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		}
-	}
-
-	return c.JSON(response)
-}
-
-// oidcCallback handles the OIDC callback from the client with tokens
 func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
 	var req authController.OIDCCallbackRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -247,49 +151,8 @@ func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
 
 	response, err := h.authController.HandleOIDCCallback(c.Context(), req)
 	if err != nil {
-		switch err.Error() {
-		case "authentication not configured":
-			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		case "code and redirect_uri are required":
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		case "authentication failed":
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		default:
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		}
-	}
-
-	return c.JSON(response)
-}
-
-// getAllUsers returns all users (admin only)
-func (h *AuthHandler) getAllUsers(c *fiber.Ctx) error {
-	authInfo := middleware.GetAuthInfo(c)
-
-	// Convert middleware AuthInfo to controller AuthInfo
-	var controllerAuthInfo *authController.AuthInfo
-	if authInfo != nil {
-		controllerAuthInfo = &authController.AuthInfo{
-			UserID:    authInfo.UserID,
-			Email:     authInfo.Email,
-			Name:      authInfo.Name,
-			Roles:     authInfo.Roles,
-			ProjectID: authInfo.ProjectID,
-		}
-	}
-
-	response, err := h.authController.GetAllUsers(c.Context(), controllerAuthInfo)
-	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
+			"error": "Authentication failed",
 		})
 	}
 

@@ -29,14 +29,11 @@ func NewUserHandler(app app.App, router fiber.Router) *UserHandler {
 func (h *UserHandler) Register() {
 	users := h.router.Group("/users")
 
-	// Protected user endpoints - require valid OIDC token
 	protected := users.Group("/", h.middleware.RequireAuth(h.zitadelService))
 	protected.Get("/me", h.getCurrentUser)
 }
 
-// getCurrentUser returns information about the currently authenticated user
 func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
-	// Get user directly from middleware context
 	user := middleware.GetUser(c)
 	if user == nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -44,10 +41,5 @@ func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Convert to user profile for response
-	response := fiber.Map{
-		"user": user.ToProfile(),
-	}
-
-	return c.JSON(response)
+	return c.JSON(fiber.Map{"user": user})
 }
