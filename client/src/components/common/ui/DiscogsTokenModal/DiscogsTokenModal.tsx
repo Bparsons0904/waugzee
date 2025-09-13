@@ -1,5 +1,6 @@
 import { Component, createSignal, Show } from "solid-js";
 import { TextInput } from "../../forms/TextInput/TextInput";
+import { updateDiscogsToken } from "../../../../services/user.service";
 import styles from "./DiscogsTokenModal.module.scss";
 
 interface DiscogsTokenModalProps {
@@ -22,11 +23,8 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
     setLocalError(null);
 
     try {
-      // TODO: Replace with actual API call to save Discogs token
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
-
-      // For now, just simulate success
-      console.log("Discogs token saved:", tokenValue);
+      const response = await updateDiscogsToken({ token: tokenValue });
+      console.log("Discogs token saved successfully:", response.user);
       setToken("");
       props.onClose();
     } catch (error) {

@@ -20,6 +20,7 @@ type User struct {
 	IsActive        bool       `gorm:"type:bool;default:true"                    json:"isActive"`
 	LastLoginAt     *time.Time `gorm:"type:timestamp"                            json:"lastLoginAt,omitempty"`
 	ProfileVerified bool       `gorm:"type:bool;default:false"                   json:"profileVerified"`
+	DiscogsToken    *string    `gorm:"type:text"                                 json:"discogsToken,omitempty"`
 	OIDCUserID      string     `gorm:"column:oidc_user_id;type:text;uniqueIndex" json:"-"`
 	OIDCProvider    *string    `gorm:"column:oidc_provider;type:text"            json:"-"`
 	OIDCProjectID   *string    `gorm:"column:oidc_project_id;type:text"          json:"-"`

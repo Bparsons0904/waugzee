@@ -21,6 +21,7 @@ export const AUTH_ENDPOINTS = {
 export const USER_ENDPOINTS = {
   LIST: API_PATHS.USERS,
   ME: `${API_PATHS.USERS}/me`,
+  ME_DISCOGS: `${API_PATHS.USERS}/me/discogs`,
   PROFILE: (id: string) => `${API_PATHS.USERS}/${id}`,
 } as const;
 
