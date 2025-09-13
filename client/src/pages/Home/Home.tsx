@@ -1,97 +1,190 @@
-import { Component } from "solid-js";
-import { A } from "@solidjs/router";
-import { Button } from "@components/common/ui/Button/Button";
+import { Component, createSignal, onMount, createMemo } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { useAuth } from "@context/AuthContext";
+import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
+import { DiscogsTokenModal } from "@components/common/ui/DiscogsTokenModal";
+import {
+  StatsSection,
+  StatItem,
+} from "@components/dashboard/StatsSection/StatsSection";
+import {
+  ActionsSection,
+  ActionItem,
+} from "@components/dashboard/ActionsSection/ActionsSection";
 import styles from "./Home.module.scss";
-import { FRONTEND_ROUTES } from "@constants/api.constants";
+
+interface DashboardStats {
+  totalRecords: number;
+  totalPlays: number;
+  listeningHours: number;
+  favoriteGenre: string;
+}
 
 const Home: Component = () => {
-  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const featureCards = [
+  const [stats, setStats] = createSignal<DashboardStats>({
+    totalRecords: 0,
+    totalPlays: 0,
+    listeningHours: 0,
+    favoriteGenre: "Loading...",
+  });
+  const [isLoading, setIsLoading] = createSignal(true);
+  const [showTokenModal, setShowTokenModal] = createSignal(false);
+
+  // const hasDiscogsToken = user()?.discogsToken;
+  //
+  // console.log("hasDiscogsToken:", hasDiscogsToken);
+
+  const handleLogPlay = () => {
+    navigate("/log");
+  };
+
+  const handleViewCollection = () => {
+    navigate("/collection");
+  };
+
+  const handleViewPlayHistory = () => {
+    navigate("/playHistory");
+  };
+
+  const handleViewStyluses = () => {
+    navigate("/equipment");
+  };
+
+  const handleSyncCollection = () => {
+    if (!user()?.discogsToken) {
+      setShowTokenModal(true);
+    } else {
+      // TODO: Implement sync with Discogs
+      console.log("Sync collection functionality not yet implemented");
+    }
+  };
+
+  const handleTokenModalClose = () => {
+    setShowTokenModal(false);
+  };
+
+  const handleViewAnalytics = () => {
+    navigate("/analytics");
+  };
+
+  const statsItems = createMemo((): StatItem[] => [
     {
-      title: "Modern Development",
-      description:
-        "Built with the latest technologies and best practices for optimal performance and developer experience.",
-      placeholder: "Modern development tools",
+      icon: "💽",
+      value: isLoading() ? "--" : stats().totalRecords.toLocaleString(),
+      label: "Records",
+      isLoading: isLoading(),
     },
     {
-      title: "Scalable Architecture",
-      description:
-        "Designed with scalability in mind, supporting growth from prototype to production.",
-      placeholder: "Scalable system architecture",
+      icon: "▶️",
+      value: isLoading() ? "--" : stats().totalPlays.toLocaleString(),
+      label: "Plays",
+      isLoading: isLoading(),
     },
     {
-      title: "User-Centered Design",
-      description:
-        "Focused on providing an excellent user experience with intuitive interfaces and smooth interactions.",
-      placeholder: "User-centered design",
+      icon: "⏱️",
+      value: isLoading() ? "--h" : `${stats().listeningHours}h`,
+      label: "Hours",
+      isLoading: isLoading(),
     },
     {
-      title: "Community Driven",
-      description:
-        "Open to collaboration and built to serve the needs of its community.",
-      placeholder: "Community collaboration",
+      icon: "🎯",
+      value: isLoading() ? "--" : stats().favoriteGenre,
+      label: "Top Genre",
+      isLoading: isLoading(),
     },
-  ];
+  ]);
+
+  const actionItems = createMemo((): ActionItem[] => [
+    {
+      title: "Log Play",
+      description: "Record when you play a record from your collection.",
+      buttonText: "Log Now",
+      onClick: handleLogPlay,
+    },
+    {
+      title: "View Play History",
+      description: "View your play history and listening statistics.",
+      buttonText: "View Stats",
+      onClick: handleViewPlayHistory,
+    },
+    {
+      title: "View Collection",
+      description: "Browse and search through your vinyl collection.",
+      buttonText: "View Collection",
+      onClick: handleViewCollection,
+    },
+    {
+      title: "View Styluses",
+      description: "View, edit and add styluses to track wear.",
+      buttonText: "View Styluses",
+      onClick: handleViewStyluses,
+    },
+    {
+      title: "Sync Collection",
+      description: user()?.discogsToken
+        ? "Sync your Waugzee collection with your Discogs library."
+        : "Connect your Discogs account to sync your collection.",
+      buttonText: user()?.discogsToken ? "Sync Now" : "Connect Discogs",
+      onClick: handleSyncCollection,
+    },
+    {
+      title: "View Analytics",
+      description:
+        "Explore insights about your collection and listening habits.",
+      buttonText: "View Insights",
+      onClick: handleViewAnalytics,
+    },
+  ]);
+
+  onMount(async () => {
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      setStats({
+        totalRecords: 247,
+        totalPlays: 1430,
+        listeningHours: 89,
+        favoriteGenre: "Jazz",
+      });
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  });
 
   return (
-    <div class={styles.homePage}>
-      {/* Hero Section */}
-      <section class={styles.hero}>
-        <div class={styles.container}>
-          <h1 class={styles.heroTitle}>Welcome to Our Platform</h1>
-          <p class={styles.heroSubtitle}>
-            A modern, scalable platform built with the latest technologies
-            and designed for exceptional user experiences.
-          </p>
-          <div class={styles.heroCta}>
-            <A href={isAuthenticated() ? FRONTEND_ROUTES.DASHBOARD : FRONTEND_ROUTES.LOGIN} class={styles.btnLink}>
-              <Button variant="gradient" size="lg">
-                {isAuthenticated() ? "Go to Dashboard" : "Get Started"}
-              </Button>
-            </A>
-          </div>
-          <div class={styles.heroImage}>
-            [Platform overview - placeholder image]
-          </div>
+    <div class={styles.container}>
+      <div class={styles.header}>
+        <div>
+          <h1 class={styles.title}>
+            Welcome back, {user()?.firstName || "User"}!
+          </h1>
+          <p class={styles.subtitle}>Your personal vinyl collection tracker</p>
         </div>
-      </section>
+        <button
+          class={styles.primaryButton}
+          onClick={() => setShowTokenModal(true)}
+        >
+          {user()?.discogsToken ? "Update Discogs Token" : "Connect Discogs"}
+        </button>
+      </div>
 
-      {/* Features Section */}
-      <section class={styles.socialFun}>
-        <div class={styles.container}>
-          <h2 class={styles.sectionTitle}>Built for Excellence</h2>
-          <div class={styles.socialGrid}>
-            {featureCards.map((card) => (
-              <div class={styles.socialCard}>
-                <div class={styles.socialCardImage}>
-                  [Image: {card.placeholder}]
-                </div>
-                <h3 class={styles.socialCardTitle}>{card.title}</h3>
-                <p class={styles.socialCardDescription}>{card.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <StatsSection stats={statsItems()} />
 
-      {/* Footer CTA */}
-      <section class={styles.footerCta}>
-        <div class={styles.container}>
-          <h2 class={styles.footerTitle}>Ready to Get Started?</h2>
-          <p class={styles.footerSubtitle}>
-            Join our platform and experience the difference modern development makes.
-          </p>
-          <A href={isAuthenticated() ? "/dashboard" : "/login"} class={styles.btnLink}>
-            <Button variant="gradient" size="lg">
-              {isAuthenticated()
-                ? "Go to Dashboard"
-                : "Get Started - It's Free!"}
-            </Button>
-          </A>
-        </div>
-      </section>
+      <ActionsSection actions={actionItems()} />
+
+      <Modal
+        isOpen={showTokenModal()}
+        onClose={handleTokenModalClose}
+        size={ModalSize.Large}
+        title="Discogs API Configuration"
+      >
+        <DiscogsTokenModal onClose={handleTokenModalClose} />
+      </Modal>
     </div>
   );
 };

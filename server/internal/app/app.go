@@ -24,6 +24,7 @@ type App struct {
 	// Services
 	TransactionService *services.TransactionService
 	ZitadelService     *services.ZitadelService
+	DiscogsService     *services.DiscogsService
 
 	// Repositories
 	UserRepo repositories.UserRepository
@@ -54,6 +55,7 @@ func New() (*App, error) {
 	if err != nil {
 		return &App{}, log.Err("failed to create Zitadel service", err)
 	}
+	discogsService := services.NewDiscogsService()
 
 	// Initialize repositories
 	userRepo := repositories.New(db)
@@ -66,7 +68,7 @@ func New() (*App, error) {
 	// Initialize controllers with repositories and services
 	middleware := middleware.New(db, eventBus, config, userRepo)
 	authController := authController.New(zitadelService, userRepo, db)
-	userController := userController.New(userRepo, config)
+	userController := userController.New(userRepo, discogsService, config)
 
 	app := &App{
 		Database:           db,
@@ -74,6 +76,7 @@ func New() (*App, error) {
 		Middleware:         middleware,
 		TransactionService: transactionService,
 		ZitadelService:     zitadelService,
+		DiscogsService:     discogsService,
 		UserRepo:           userRepo,
 		AuthController:     authController,
 		UserController:     userController,

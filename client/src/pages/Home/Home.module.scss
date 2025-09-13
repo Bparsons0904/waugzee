@@ -1,84 +1,74 @@
-.homePage {
-  min-height: 100vh;
-}
-
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 $spacing-md;
+  padding: 2rem;
 }
 
-// Hero Section
-.hero {
-  background: $bg-hero-gradient;
-  padding: 4rem 0;
-  text-align: center;
-  color: $text-inverse;
-  min-height: 80vh;
+.header {
   display: flex;
-  align-items: center;
-}
-
-.heroTitle {
-  font-size: 3.5rem;
-  font-weight: $font-weight-bold;
-  margin-bottom: 1rem;
-  background: linear-gradient(135deg, $color-white 0%, $color-gray-100 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1.2;
-
-  @include breakpoint(md) {
-    font-size: 2.5rem;
-  }
-}
-
-.heroSubtitle {
-  font-size: $font-size-xl;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 2rem;
-  opacity: 0.9;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
-  line-height: 1.6;
-}
+  gap: 2rem;
 
-.heroCta {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  margin-bottom: 3rem;
-  flex-wrap: wrap;
-
-  @include breakpoint(md) {
+  @media (max-width: 768px) {
     flex-direction: column;
     align-items: center;
+    text-align: center;
+    gap: 1rem;
   }
 }
 
-.btnLink {
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  font-size: 1.2rem;
+  color: #666;
+  margin: 0;
+}
+
+
+.primaryButton {
+  padding: 0.8rem 1.5rem;
+  background-color: #3273dc;
+  color: white;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
   text-decoration: none;
+  display: inline-block;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+  &:hover {
+    background-color: #2366d1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(50, 115, 220, 0.3);
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  @media (max-width: 768px) {
+    width: 100%;
+    max-width: 300px;
+  }
 }
 
-.heroImage {
-  width: 100%;
-  max-width: 500px;
-  height: 300px;
-  background: $glass-bg;
-  border-radius: $border-radius-xl;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: $font-size-lg;
-  color: rgba($color-white, 0.8);
-  backdrop-filter: blur(10px);
-  border: 1px solid $glass-border;
-  box-shadow: 0 8px 32px rgba($color-black, 0.2);
-}
-
-// Story Demo Section
 .storyDemo {
   background: $bg-surface;
   padding: 4rem 0;
@@ -86,9 +76,9 @@
 
 .sectionTitle {
   text-align: center;
-  font-size: 2.5rem;
-  color: $text-inverse;
-  margin-bottom: 3rem;
+  font-size: $font-size-4xl;
+  color: $text-default;
+  margin-bottom: $spacing-2xl;
   font-weight: $font-weight-bold;
 }
 
@@ -171,86 +161,100 @@
   font-size: $font-size-md;
 }
 
-// Social Fun Section
 .socialFun {
-  background: $bg-social-gradient;
-  padding: 4rem 0;
-  color: $text-inverse;
+  background: $bg-surface;
+  padding: $spacing-3xl 0;
+  color: $text-default;
 }
 
 .socialGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 2rem;
-  margin-bottom: 3rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-2xl;
+  margin-bottom: $spacing-2xl;
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
 
-  @include breakpoint(md) {
+  @media (min-width: $breakpoint-xl) {
+    grid-template-columns: repeat(4, 1fr);
+    max-width: 1400px;
+  }
+
+  @media (max-width: $breakpoint-md) {
     grid-template-columns: 1fr;
+    gap: $spacing-xl;
   }
 }
 
 .socialCard {
-  background: $glass-bg;
-  border-radius: $border-radius-xl;
-  padding: 2rem;
+  background: $bg-surface;
+  border-radius: $border-radius-lg;
+  padding: $spacing-2xl;
   text-align: center;
-  backdrop-filter: blur(10px);
-  border: 1px solid $glass-border;
-  transition: all $transition-fast $transition-timing-default;
+  border: $border-width-thin solid $border-default;
+  box-shadow: $shadow-md;
+  transition: transform $transition-fast, box-shadow $transition-fast;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
 
   &:hover {
     transform: translateY(-5px);
-    background: $glass-bg-strong;
-    box-shadow: 0 10px 30px rgba($color-black, 0.2);
+    box-shadow: $shadow-lg;
   }
 }
 
 .socialCardImage {
   width: 100%;
-  height: 200px;
-  background: rgba($color-white, 0.2);
+  height: 240px;
+  background: $bg-subtle;
   border-radius: $border-radius-lg;
-  margin-bottom: 1rem;
+  margin-bottom: $spacing-lg;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba($color-white, 0.8);
+  color: $text-muted;
   font-size: $font-size-sm;
-  border: 1px solid rgba($color-white, 0.1);
+  border: $border-width-thin solid $border-default;
+  overflow: hidden;
 }
 
 .socialCardTitle {
-  font-size: $font-size-xl;
-  margin-bottom: 0.5rem;
+  font-size: $font-size-2xl;
+  margin-bottom: $spacing-md;
   font-weight: $font-weight-semibold;
+  color: $text-default;
 }
 
 .socialCardDescription {
-  opacity: 0.9;
-  line-height: 1.6;
+  color: $text-muted;
+  line-height: $line-height-normal;
+  font-size: $font-size-lg;
+  flex-grow: 1;
 }
 
-// Footer CTA
 .footerCta {
-  background: $color-gray-800;
-  padding: 4rem 0;
+  background: $bg-subtle;
+  padding: $spacing-3xl 0;
   text-align: center;
-  color: $text-inverse;
+  color: $text-default;
+  border-top: $border-width-thin solid $border-default;
 }
 
 .footerTitle {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
+  font-size: $font-size-4xl;
+  margin-bottom: $spacing-md;
   font-weight: $font-weight-bold;
+  color: $text-default;
 }
 
 .footerSubtitle {
   font-size: $font-size-xl;
-  margin-bottom: 2rem;
-  opacity: 0.9;
+  margin-bottom: $spacing-xl;
+  color: $text-muted;
 }
 
-// Animations
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -266,44 +270,18 @@
   animation: fadeIn 0.6s ease-in-out;
 }
 
-// Responsive adjustments
-@include breakpoint(md) {
-  .hero {
-    padding: 2rem 0;
-    min-height: 60vh;
+@media (max-width: 768px) {
+  .title {
+    font-size: 1.75rem;
   }
 
-  .heroTitle {
-    font-size: 2.5rem;
-  }
-
-  .heroSubtitle {
-    font-size: $font-size-lg;
-  }
-
-  .heroCta {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .storyChain {
-    padding: 1rem;
-  }
-
-  .storySegment {
-    padding: 1rem;
-  }
-
-  .socialFun {
-    padding: 2rem 0;
-  }
-
-  .footerCta {
-    padding: 2rem 0;
-  }
-
-  .footerTitle {
-    font-size: 2rem;
+  .subtitle {
+    font-size: 1.1rem;
   }
 }
 
+@media (max-width: 480px) {
+  .container {
+    padding: 1.5rem;
+  }
+}

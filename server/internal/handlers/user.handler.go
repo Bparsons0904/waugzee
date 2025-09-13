@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"waugzee/internal/app"
+	userController "waugzee/internal/controllers/users"
 	"waugzee/internal/handlers/middleware"
 	"waugzee/internal/logger"
 	"waugzee/internal/services"
@@ -12,12 +13,14 @@ import (
 type UserHandler struct {
 	Handler
 	zitadelService *services.ZitadelService
+	userController *userController.UserController
 }
 
 func NewUserHandler(app app.App, router fiber.Router) *UserHandler {
 	log := logger.New("handlers").File("user_handler")
 	return &UserHandler{
 		zitadelService: app.ZitadelService,
+		userController: app.UserController,
 		Handler: Handler{
 			log:        log,
 			router:     router,
@@ -31,6 +34,7 @@ func (h *UserHandler) Register() {
 
 	protected := users.Group("/", h.middleware.RequireAuth(h.zitadelService))
 	protected.Get("/me", h.getCurrentUser)
+	protected.Put("/me/discogs", h.updateDiscogsToken)
 }
 
 func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
@@ -41,5 +45,36 @@ func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
 		})
 	}
 
+	return c.JSON(fiber.Map{"user": user})
+}
+
+func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
+	user := middleware.GetUser(c)
+
+	var req userController.UpdateDiscogsTokenRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	user, err := h.userController.UpdateDiscogsToken(c.Context(), user, req)
+	if err != nil {
+		if err.Error() == "token is required" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Token is required",
+			})
+		}
+		if err.Error() == "invalid discogs token" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid Discogs token",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to save token",
+		})
+	}
+
+	return c.JSON(fiber.Map{"user": user})
 	return c.JSON(fiber.Map{"user": user})
 }

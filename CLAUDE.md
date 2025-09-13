@@ -189,11 +189,53 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 
 ## Development Notes
 
+### Coding Standards
+
+**Clean Code Principles:**
+- **Self-documenting code**: Use descriptive variable and function names instead of comments
+- **Comments only for critical areas**: Limit comments to complex business logic or hard-to-understand algorithms
+- **No obvious comments**: Avoid comments that simply restate what the code does
+- **SCSS variables over hardcoded values**: Always use design system variables instead of magic numbers
+- **Consistent formatting**: Follow project linting and formatting rules
+
+**Comment Guidelines:**
+- ✅ **Good**: `// Fallback to introspection for legacy tokens without 'sub' claim`
+- ✅ **Good**: `// CRITICAL: Reset loaded state when switching to fallback to prevent flashing`
+- ❌ **Avoid**: `// Increased padding for larger cards` 
+- ❌ **Avoid**: `// Set background color to white`
+- ❌ **Avoid**: `// Hero Section` or `// Features Section`
+
+**SCSS/CSS Standards:**
+- **Use design system variables**: `$spacing-xl` not `2rem`, `$text-default` not `#333`
+- **Semantic class names**: `.featureCard` not `.socialCard`, `.heroImage` not `.cardImage`
+- **Mobile-first responsive**: Use `@media (min-width: ...)` for larger screens
+- **Consistent spacing**: Use spacing scale variables (`$spacing-xs` through `$spacing-3xl`)
+- **No magic numbers**: All values should reference design system variables
+
+**Component Development:**
+- **Single responsibility**: Each component should have one clear purpose
+- **Proper TypeScript**: Full type safety with interfaces for all props
+- **Loading states**: Use skeleton loading for better UX
+- **Error boundaries**: Handle error states gracefully with fallbacks
+- **Accessibility**: Proper alt text, ARIA labels, keyboard navigation
+- **Testing**: Comprehensive test coverage for component behavior
+
 ### File Structure Guidelines
 
 - **NEVER create index.js/ts files unless absolutely necessary** - Use direct imports instead
 - Index files create confusion and make navigation harder as projects grow
 - Prefer explicit imports like `import { Modal } from "./components/Modal/Modal"`
+- **Component organization**: Each component in own directory with `.tsx` and `.module.scss`
+
+### Reference Repository
+
+**Legacy Code Reference**: The `/oldReferenceOnlyRepository` directory contains the complete legacy implementation for reference purposes:
+
+- **Models & Logic**: Reference existing data models, business logic patterns, and API structures
+- **Styling & UI**: Reference SCSS patterns, component structures, and design system elements  
+- **Implementation Patterns**: Reference proven patterns for features like collection management, equipment tracking, and user workflows
+
+**Important**: This directory is for reference only - do not modify files in this location. Use it to understand existing patterns when implementing new features in the current codebase.
 
 ### Key Files to Understand
 
@@ -203,6 +245,30 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 - `client/src/services/api/api.service.ts` - API client with interceptors
 - `Tiltfile` - Development environment configuration
 - `docs/PROJECT_PLAN.md` - Complete project roadmap and architecture decisions
+- `/oldReferenceOnlyRepository/` - Legacy implementation for reference
+
+### Current Development: Logged-In Home Dashboard
+
+**Status**: Ready to implement user dashboard for authenticated users
+
+**Approach**: 
+- **Dual Home Experience**: Landing page for guests, dashboard for authenticated users
+- **Dashboard Components**: Collection overview, recent activity, quick actions
+- **Data Integration**: Connect to backend APIs for user-specific data
+- **Reference Implementation**: Use `/oldReferenceOnlyRepository/kleio/clio/src/pages/Home/Home.tsx` for dashboard patterns
+
+**Dashboard Requirements** (Based on Kleio Reference):
+- **Collection Overview**: Quick stats and recent additions
+- **Quick Actions**: Log play, view collection, manage equipment, sync with Discogs
+- **Recent Activity**: Latest plays, cleaning records, equipment updates  
+- **Equipment Status**: Stylus wear monitoring, maintenance reminders
+- **Analytics Preview**: Top genres, listening patterns, collection insights
+
+**Implementation Notes**:
+- Use existing `Image` component for album artwork
+- Follow established card layout patterns from landing page
+- Implement proper loading states with skeletons
+- Ensure responsive design (2x2 grid → single column)
 
 ### Environment Configuration
 
