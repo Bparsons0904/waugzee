@@ -84,23 +84,6 @@ type TokenInfo struct {
 	Valid           bool
 }
 
-// TokenExchangeRequest represents the token exchange request
-type TokenExchangeRequest struct {
-	Code         string `json:"code"`
-	RedirectURI  string `json:"redirect_uri"`
-	State        string `json:"state,omitempty"`
-	CodeVerifier string `json:"code_verifier,omitempty"` // PKCE code verifier
-}
-
-// TokenExchangeResponse represents the token exchange response
-type TokenExchangeResponse struct {
-	AccessToken  string `json:"access_token"`
-	TokenType    string `json:"token_type"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	ExpiresIn    int64  `json:"expires_in"`
-	Scope        string `json:"scope,omitempty"`
-	IDToken      string `json:"id_token,omitempty"`
-}
 
 func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 	log := logger.New("ZitadelService")
@@ -309,7 +292,7 @@ func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*Tok
 	data := url.Values{}
 	data.Set("token", token)
 
-	// Use JWT authentication if private key is available (machine-to-machine)
+	// Use JWT assertion for M2M authentication if private key is available
 	if zs.privateKey != nil {
 		jwtAssertion, err := zs.generateJWTAssertion()
 		if err != nil {
@@ -319,10 +302,12 @@ func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*Tok
 		// Use client_assertion method for JWT authentication
 		data.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
 		data.Set("client_assertion", jwtAssertion)
-	} else if zs.clientSecret != "" {
-		// Fallback to client credentials for confidential clients
+	} else {
+		// Fallback to client_id/client_secret for web client
 		data.Set("client_id", zs.clientID)
-		data.Set("client_secret", zs.clientSecret)
+		if zs.clientSecret != "" {
+			data.Set("client_secret", zs.clientSecret)
+		}
 	}
 
 	req, err := http.NewRequestWithContext(
@@ -410,105 +395,7 @@ func (zs *ZitadelService) IsConfigured() bool {
 	return zs.configured
 }
 
-// GetAuthorizationURL generates authorization URL for OIDC flow with optional PKCE support and nonce
-func (zs *ZitadelService) GetAuthorizationURL(state, redirectURI, codeChallenge, nonce string) string {
-	if !zs.configured {
-		return ""
-	}
 
-	// Build base authorization URL
-	baseURL := fmt.Sprintf(
-		"%s/oauth/v2/authorize?client_id=%s&response_type=code&redirect_uri=%s&state=%s&scope=openid+profile+email",
-		strings.TrimSuffix(zs.issuer, "/"),
-		zs.clientID,
-		redirectURI,
-		state,
-	)
-
-	// Add PKCE parameters if code challenge is provided
-	if codeChallenge != "" {
-		baseURL += fmt.Sprintf("&code_challenge=%s&code_challenge_method=S256", codeChallenge)
-	}
-
-	// Add nonce parameter if provided for replay attack protection
-	if nonce != "" {
-		baseURL += fmt.Sprintf("&nonce=%s", nonce)
-	}
-
-	return baseURL
-}
-
-
-// ExchangeCodeForToken exchanges an authorization code for an access token
-func (zs *ZitadelService) ExchangeCodeForToken(
-	ctx context.Context,
-	req TokenExchangeRequest,
-) (*TokenExchangeResponse, error) {
-	if !zs.configured {
-		return nil, fmt.Errorf("zitadel service not configured")
-	}
-
-	log := zs.log.Function("ExchangeCodeForToken")
-
-	// Create token exchange request
-	tokenURL := strings.TrimSuffix(zs.issuer, "/") + "/oauth/v2/token"
-
-	data := url.Values{}
-	data.Set("grant_type", "authorization_code")
-	data.Set("code", req.Code)
-	data.Set("redirect_uri", req.RedirectURI)
-	data.Set("client_id", zs.clientID)
-
-	// Use PKCE code verifier if provided (public client)
-	if req.CodeVerifier != "" {
-		data.Set("code_verifier", req.CodeVerifier)
-		log.Debug("using PKCE flow with code verifier")
-	} else if zs.clientSecret != "" {
-		// Fallback to client secret for confidential clients (M2M)
-		data.Set("client_secret", zs.clientSecret)
-		log.Debug("using client secret for confidential client")
-	} else {
-		log.Warn("neither code verifier nor client secret provided for token exchange")
-	}
-
-	httpReq, err := http.NewRequestWithContext(
-		ctx,
-		"POST",
-		tokenURL,
-		strings.NewReader(data.Encode()),
-	)
-	if err != nil {
-		return nil, log.Err("failed to create token exchange request", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	httpReq.Header.Set("Accept", "application/json")
-
-	resp, err := zs.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, log.Err("failed to make token exchange request", err)
-	}
-	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			log.Info("failed to close response body", "error", closeErr)
-		}
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, log.Err(
-			"token exchange request failed",
-			fmt.Errorf("status code: %d", resp.StatusCode),
-		)
-	}
-
-	var tokenResp TokenExchangeResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return nil, log.Err("failed to decode token response", err)
-	}
-
-	log.Info("token exchange successful", "tokenType", tokenResp.TokenType)
-	return &tokenResp, nil
-}
 
 // getOIDCDiscovery fetches and caches the OIDC discovery document
 func (zs *ZitadelService) getOIDCDiscovery(ctx context.Context) (*OIDCDiscovery, error) {
@@ -706,37 +593,6 @@ func (zs *ZitadelService) getPublicKeyForToken(
 	return publicKey, nil
 }
 
-// generateJWTAssertion creates a JWT assertion for machine-to-machine authentication
-func (zs *ZitadelService) generateJWTAssertion() (string, error) {
-	if zs.privateKey == nil {
-		return "", fmt.Errorf("private key not configured")
-	}
-
-	log := zs.log.Function("generateJWTAssertion")
-
-	now := time.Now()
-	claims := jwt.RegisteredClaims{
-		Issuer:    zs.clientIDM2M, // Use machine-to-machine clientId from zitadel.json
-		Subject:   zs.clientIDM2M, // Use machine-to-machine clientId from zitadel.json
-		Audience:  []string{strings.TrimSuffix(zs.issuer, "/")},
-		ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
-		IssuedAt:  jwt.NewNumericDate(now),
-		NotBefore: jwt.NewNumericDate(now),
-	}
-
-	// Create token with key ID in header
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = zs.keyID
-
-	signedToken, err := token.SignedString(zs.privateKey)
-	if err != nil {
-		return "", log.Err("failed to sign JWT assertion", err)
-	}
-
-	log.Debug("JWT assertion generated successfully", "keyID", zs.keyID)
-	return signedToken, nil
-}
-
 
 // RevokeToken revokes an access or refresh token with Zitadel
 func (zs *ZitadelService) RevokeToken(ctx context.Context, token string, tokenType string) error {
@@ -763,7 +619,7 @@ func (zs *ZitadelService) RevokeToken(ctx context.Context, token string, tokenTy
 		data.Set("token_type_hint", tokenType)
 	}
 
-	// Use JWT authentication if private key is available (machine-to-machine)
+	// Use JWT assertion for M2M authentication if private key is available
 	if zs.privateKey != nil {
 		jwtAssertion, err := zs.generateJWTAssertion()
 		if err != nil {
@@ -773,13 +629,12 @@ func (zs *ZitadelService) RevokeToken(ctx context.Context, token string, tokenTy
 		// Use client_assertion method for JWT authentication
 		data.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
 		data.Set("client_assertion", jwtAssertion)
-	} else if zs.clientSecret != "" {
-		// Fallback to client credentials for confidential clients
-		data.Set("client_id", zs.clientID)
-		data.Set("client_secret", zs.clientSecret)
 	} else {
-		// For public clients, only include client_id
+		// Fallback to client_id/client_secret for web client
 		data.Set("client_id", zs.clientID)
+		if zs.clientSecret != "" {
+			data.Set("client_secret", zs.clientSecret)
+		}
 	}
 
 	req, err := http.NewRequestWithContext(
@@ -946,6 +801,37 @@ func isJWTToken(token string) bool {
 		len(parts[0]) > 0 &&
 		len(parts[1]) > 0 &&
 		len(parts[2]) > 0
+}
+
+// generateJWTAssertion creates a JWT assertion for machine-to-machine authentication
+func (zs *ZitadelService) generateJWTAssertion() (string, error) {
+	if zs.privateKey == nil {
+		return "", fmt.Errorf("private key not configured")
+	}
+
+	log := zs.log.Function("generateJWTAssertion")
+
+	now := time.Now()
+	claims := jwt.RegisteredClaims{
+		Issuer:    zs.clientIDM2M, // Use machine-to-machine clientId
+		Subject:   zs.clientIDM2M, // Use machine-to-machine clientId
+		Audience:  []string{strings.TrimSuffix(zs.issuer, "/")},
+		ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
+		IssuedAt:  jwt.NewNumericDate(now),
+		NotBefore: jwt.NewNumericDate(now),
+	}
+
+	// Create token with key ID in header
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = zs.keyID
+
+	signedToken, err := token.SignedString(zs.privateKey)
+	if err != nil {
+		return "", log.Err("failed to sign JWT assertion", err)
+	}
+
+	log.Debug("JWT assertion generated successfully", "keyID", zs.keyID)
+	return signedToken, nil
 }
 
 // Close cleans up the Zitadel service resources

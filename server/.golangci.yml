@@ -1,15 +1,30 @@
 version: "2"
 
-linters:
-  # enable:
-  # - staticcheck
-  # - govet
-  # - revive
-  # - goimports
-  settings:
-    staticcheck:
-      dot-import-whitelist:
-        - server/internal/models
-
 run:
   timeout: 5m
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
+  sort-results: true
+  color: always
+
+linters:
+  enable:
+    - staticcheck
+    - govet
+    - revive
+
+issues:
+  exclude-rules:
+    - path: internal/models/
+      text: "dot-imports"
+      linters:
+        - revive
+    - path: _test\.go
+      linters:
+        - staticcheck
+        - govet
+        - revive

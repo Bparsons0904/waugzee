@@ -21,7 +21,7 @@ type AuthController struct {
 type AuthControllerInterface interface {
 	GetAuthConfig() (*AuthConfigResponse, error)
 	HandleOIDCCallback(ctx context.Context, req OIDCCallbackRequest) (*TokenExchangeResult, error)
-	LogoutUser(ctx context.Context, req LogoutRequest, authInfo *AuthInfo) (*LogoutResponse, error)
+	LogoutUser(ctx context.Context, req LogoutRequest, user *User) (*LogoutResponse, error)
 }
 
 type AuthConfigResponse struct {
@@ -62,13 +62,6 @@ type LogoutResponse struct {
 	RevokedTokens []string `json:"revoked_tokens,omitempty"`
 }
 
-type AuthInfo struct {
-	UserID    string   `json:"user_id"`
-	Email     string   `json:"email"`
-	Name      string   `json:"name"`
-	Roles     []string `json:"roles"`
-	ProjectID string   `json:"project_id"`
-}
 
 func New(
 	zitadelService *services.ZitadelService,
@@ -223,14 +216,14 @@ func (ac *AuthController) HandleOIDCCallback(
 func (ac *AuthController) LogoutUser(
 	ctx context.Context,
 	req LogoutRequest,
-	authInfo *AuthInfo,
+	user *User,
 ) (*LogoutResponse, error) {
 	log := ac.log.Function("LogoutUser")
 
 	var userID string
-	if authInfo != nil {
-		userID = authInfo.UserID
-		log.Info("processing logout request", "userID", userID)
+	if user != nil {
+		userID = user.OIDCUserID
+		log.Info("processing logout request", "userID", userID, "dbUserID", user.ID)
 	}
 
 	var revokedTokens []string
@@ -255,18 +248,18 @@ func (ac *AuthController) LogoutUser(
 		}
 	}
 
-	// Clear user cache data if we have auth info
-	if authInfo != nil {
-		if err := ac.clearUserCacheByOIDC(ctx, authInfo.UserID); err != nil {
+	// Clear user cache data if we have user info
+	if user != nil {
+		if err := ac.clearUserCacheByOIDC(ctx, user.OIDCUserID); err != nil {
 			log.Warn(
 				"failed to clear user cache",
 				"error",
 				err.Error(),
 				"oidcUserID",
-				authInfo.UserID,
+				user.OIDCUserID,
 			)
 		} else {
-			log.Info("user cache cleared successfully", "oidcUserID", authInfo.UserID)
+			log.Info("user cache cleared successfully", "oidcUserID", user.OIDCUserID)
 		}
 	}
 

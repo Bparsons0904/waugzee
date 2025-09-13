@@ -74,15 +74,14 @@ func (h *AuthHandler) getAuthConfig(c *fiber.Ctx) error {
 
 func (h *AuthHandler) logout(c *fiber.Ctx) error {
 	log := h.log.Function("logout")
-	authInfo := middleware.GetAuthInfo(c)
+	user := middleware.GetUser(c)
 
 	var reqBody authController.LogoutRequest
 	if err := c.BodyParser(&reqBody); err != nil {
 		// Continue with logout even if body parsing fails
-		log.Error(
+		log.Er(
 			"Failed to parse logout request body",
-			"error",
-			err.Error(),
+			err,
 			"contentType",
 			c.Get("Content-Type"),
 			"body",
@@ -99,19 +98,7 @@ func (h *AuthHandler) logout(c *fiber.Ctx) error {
 		}
 	}
 
-	// Convert middleware AuthInfo to controller AuthInfo
-	var controllerAuthInfo *authController.AuthInfo
-	if authInfo != nil {
-		controllerAuthInfo = &authController.AuthInfo{
-			UserID:    authInfo.UserID,
-			Email:     authInfo.Email,
-			Name:      authInfo.Name,
-			Roles:     authInfo.Roles,
-			ProjectID: authInfo.ProjectID,
-		}
-	}
-
-	response, err := h.authController.LogoutUser(c.Context(), reqBody, controllerAuthInfo)
+	response, err := h.authController.LogoutUser(c.Context(), reqBody, user)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
