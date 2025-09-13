@@ -1,4 +1,5 @@
 import { Component, createSignal, Show } from "solid-js";
+import { useAuth } from "../../../../context/AuthContext";
 import { TextInput } from "../../forms/TextInput/TextInput";
 import { updateDiscogsToken } from "../../../../services/user.service";
 import styles from "./DiscogsTokenModal.module.scss";
@@ -8,6 +9,7 @@ interface DiscogsTokenModalProps {
 }
 
 export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
+  const { updateUser } = useAuth();
   const [token, setToken] = createSignal("");
   const [localError, setLocalError] = createSignal<string | null>(null);
 
@@ -25,6 +27,10 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
     try {
       const response = await updateDiscogsToken({ token: tokenValue });
       console.log("Discogs token saved successfully:", response.user);
+
+      // Update user state directly with the response data
+      updateUser(response.user);
+
       setToken("");
       props.onClose();
     } catch (error) {

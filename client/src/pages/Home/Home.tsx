@@ -32,7 +32,10 @@ const Home: Component = () => {
   });
   const [isLoading, setIsLoading] = createSignal(true);
   const [showTokenModal, setShowTokenModal] = createSignal(false);
-  const [hasDiscogsToken, setHasDiscogsToken] = createSignal(false);
+
+  // const hasDiscogsToken = user()?.discogsToken;
+  //
+  // console.log("hasDiscogsToken:", hasDiscogsToken);
 
   const handleLogPlay = () => {
     navigate("/log");
@@ -51,7 +54,7 @@ const Home: Component = () => {
   };
 
   const handleSyncCollection = () => {
-    if (!hasDiscogsToken()) {
+    if (!user()?.discogsToken) {
       setShowTokenModal(true);
     } else {
       // TODO: Implement sync with Discogs
@@ -59,6 +62,9 @@ const Home: Component = () => {
     }
   };
 
+  const handleTokenModalClose = () => {
+    setShowTokenModal(false);
+  };
 
   const handleViewAnalytics = () => {
     navigate("/analytics");
@@ -118,10 +124,10 @@ const Home: Component = () => {
     },
     {
       title: "Sync Collection",
-      description: hasDiscogsToken()
+      description: user()?.discogsToken
         ? "Sync your Waugzee collection with your Discogs library."
         : "Connect your Discogs account to sync your collection.",
-      buttonText: hasDiscogsToken() ? "Sync Now" : "Connect Discogs",
+      buttonText: user()?.discogsToken ? "Sync Now" : "Connect Discogs",
       onClick: handleSyncCollection,
     },
     {
@@ -155,7 +161,7 @@ const Home: Component = () => {
       <div class={styles.header}>
         <div>
           <h1 class={styles.title}>
-            Welcome back, {user?.firstName || "User"}!
+            Welcome back, {user()?.firstName || "User"}!
           </h1>
           <p class={styles.subtitle}>Your personal vinyl collection tracker</p>
         </div>
@@ -163,7 +169,7 @@ const Home: Component = () => {
           class={styles.primaryButton}
           onClick={() => setShowTokenModal(true)}
         >
-          {hasDiscogsToken() ? "Update Discogs Token" : "Connect Discogs"}
+          {user()?.discogsToken ? "Update Discogs Token" : "Connect Discogs"}
         </button>
       </div>
 
@@ -173,11 +179,11 @@ const Home: Component = () => {
 
       <Modal
         isOpen={showTokenModal()}
-        onClose={() => setShowTokenModal(false)}
+        onClose={handleTokenModalClose}
         size={ModalSize.Large}
         title="Discogs API Configuration"
       >
-        <DiscogsTokenModal onClose={() => setShowTokenModal(false)} />
+        <DiscogsTokenModal onClose={handleTokenModalClose} />
       </Modal>
     </div>
   );
