@@ -1,0 +1,179 @@
+.imageContainer {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  overflow: hidden;
+  background-color: $bg-subtle;
+  border-radius: $border-radius-md;
+  
+  &:hover {
+    cursor: pointer;
+  }
+}
+
+// Aspect ratio containers
+.aspectSquare {
+  aspect-ratio: 1 / 1;
+}
+
+.aspectAlbum {
+  aspect-ratio: 1 / 1; // Standard vinyl album cover
+}
+
+.aspectWide {
+  aspect-ratio: 16 / 9;
+}
+
+.aspectHero {
+  aspect-ratio: 21 / 9; // Wide hero image
+  
+  @media (max-width: $breakpoint-md) {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+// Image element
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity $transition-normal $transition-timing-smooth;
+  display: block;
+  
+  &.loaded {
+    opacity: 1;
+  }
+}
+
+// Skeleton loading state
+.skeleton {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    $bg-muted 25%,
+    $bg-subtle 50%,
+    $bg-muted 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: inherit;
+  animation-delay: 200ms; // Slight delay to prevent flash on fast loads
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+// Error state
+.errorState {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: $bg-muted;
+  color: $text-light;
+  text-align: center;
+  padding: $spacing-md;
+}
+
+.errorIcon {
+  font-size: $font-size-2xl;
+  margin-bottom: $spacing-sm;
+  opacity: 0.6;
+}
+
+.errorText {
+  font-size: $font-size-sm;
+  margin: 0;
+  opacity: 0.8;
+}
+
+// Vinyl-specific styling variants
+.vinylAlbum {
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-md;
+  transition: transform $transition-fast, box-shadow $transition-fast;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $shadow-lg;
+  }
+}
+
+.vinylArtist {
+  border-radius: $border-radius-full;
+  aspect-ratio: 1 / 1;
+}
+
+// Size variants
+.small {
+  max-width: 120px;
+}
+
+.medium {
+  max-width: 240px;
+}
+
+.large {
+  max-width: 360px;
+}
+
+.hero {
+  width: 100%;
+  max-width: none;
+}
+
+// Loading placeholder for specific use cases
+.albumPlaceholder {
+  background: linear-gradient(
+    135deg,
+    $color-gray-100 0%,
+    $color-gray-200 50%,
+    $color-gray-100 100%
+  );
+  
+  &::before {
+    content: "♪";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: $font-size-4xl;
+    color: $text-light;
+    opacity: 0.5;
+  }
+}
+
+.equipmentPlaceholder {
+  background: linear-gradient(
+    135deg,
+    $color-gray-100 0%,
+    $color-gray-200 50%,
+    $color-gray-100 100%
+  );
+  
+  &::before {
+    content: "🎧";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: $font-size-4xl;
+    opacity: 0.5;
+  }
+}

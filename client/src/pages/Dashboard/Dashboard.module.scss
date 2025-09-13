@@ -73,58 +73,23 @@
   text-align: center;
 }
 
-.cardsGrid {
+.cardGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: $spacing-xl;
 
   @media (max-width: $breakpoint-lg) {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: $spacing-lg;
+  }
+
+  @media (max-width: $breakpoint-md) {
+    grid-template-columns: 1fr;
   }
 }
 
-.emptyState {
-  text-align: center;
-  padding: $spacing-3xl $spacing-lg;
-  color: $text-muted;
+.actionCard {
   background: $bg-surface;
-  border-radius: $border-radius-xl;
-  box-shadow: $shadow-sm;
-
-  h3 {
-    font-size: $font-size-lg;
-    font-weight: $font-weight-semibold;
-    color: $text-default;
-    margin-bottom: $spacing-sm;
-  }
-
-  p {
-    font-size: $font-size-md;
-    line-height: $line-height-normal;
-  }
-}
-
-.emptyIcon {
-  font-size: 48px;
-  margin-bottom: $spacing-md;
-  opacity: 0.5;
-}
-
-.creationSection {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: $spacing-xl;
-
-  @media (max-width: $breakpoint-lg) {
-    grid-template-columns: 1fr;
-    gap: $spacing-lg;
-  }
-}
-
-.creationCard {
-  background: $bg-hero-gradient;
-  color: $text-inverse;
   border-radius: $border-radius-xl;
   padding: $spacing-xl;
   text-align: center;
@@ -136,49 +101,79 @@
     transform: translateY(-2px);
     box-shadow: $shadow-md;
   }
-
-  &.creationCardSecondary {
-    background: linear-gradient(135deg, $color-accent-400 0%, $color-error-500 100%);
-  }
 }
 
-.creationIcon {
+.cardIcon {
   font-size: 32px;
-  margin-bottom: $spacing-sm * 1.5;
+  margin-bottom: $spacing-md;
   display: block;
 }
 
-.creationTitle {
+.cardTitle {
   font-size: $font-size-lg;
   font-weight: $font-weight-semibold;
+  color: $text-default;
   margin-bottom: $spacing-sm;
   line-height: $line-height-heading;
 }
 
-.creationDescription {
-  opacity: 0.9;
+.cardDescription {
+  color: $text-muted;
   margin-bottom: $spacing-md;
   font-size: $font-size-sm;
   line-height: $line-height-normal;
 }
 
-.creationButton {
-  background: $button-tertiary-bg;
-  color: $button-tertiary-text;
-  border: none;
-  padding: $spacing-sm $spacing-md;
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: $spacing-lg;
+
+  @media (max-width: $breakpoint-lg) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: $breakpoint-md) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.statCard {
+  background: $bg-surface;
   border-radius: $border-radius-lg;
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-  cursor: pointer;
-  transition: all $transition-fast ease;
+  padding: $spacing-lg;
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  box-shadow: $shadow-sm;
+  transition: transform $transition-fast ease, box-shadow $transition-fast ease;
 
   &:hover {
-    background: $button-tertiary-hover;
     transform: translateY(-1px);
+    box-shadow: $shadow-md;
   }
+}
 
-  &:active {
-    transform: translateY(0);
-  }
+.statIcon {
+  font-size: 24px;
+  opacity: 0.8;
+}
+
+.statContent {
+  flex: 1;
+}
+
+.statNumber {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  color: $text-default;
+  margin-bottom: $spacing-xs;
+  line-height: $line-height-heading;
+}
+
+.statLabel {
+  color: $text-muted;
+  font-size: $font-size-sm;
+  margin: 0;
+  line-height: $line-height-normal;
 }

@@ -1,57 +1,54 @@
 .homePage {
   min-height: 100vh;
+  background-color: $bg-body;
 }
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 $spacing-md;
+  padding: 0 $spacing-xl;
 }
 
-// Hero Section
 .hero {
-  background: $bg-hero-gradient;
-  padding: 4rem 0;
+  background-color: $bg-surface;
+  padding: $spacing-3xl 0;
   text-align: center;
-  color: $text-inverse;
+  color: $text-default;
   min-height: 80vh;
   display: flex;
   align-items: center;
 }
 
 .heroTitle {
-  font-size: 3.5rem;
+  font-size: $font-size-5xl;
   font-weight: $font-weight-bold;
-  margin-bottom: 1rem;
-  background: linear-gradient(135deg, $color-white 0%, $color-gray-100 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1.2;
+  margin-bottom: $spacing-md;
+  color: $text-default;
+  line-height: $line-height-heading;
 
-  @include breakpoint(md) {
-    font-size: 2.5rem;
+  @media (max-width: $breakpoint-md) {
+    font-size: $font-size-4xl;
   }
 }
 
 .heroSubtitle {
   font-size: $font-size-xl;
-  margin-bottom: 2rem;
-  opacity: 0.9;
+  margin-bottom: $spacing-xl;
+  color: $text-muted;
   max-width: 600px;
   margin-left: auto;
   margin-right: auto;
-  line-height: 1.6;
+  line-height: $line-height-normal;
 }
 
 .heroCta {
   display: flex;
-  gap: 1rem;
+  gap: $spacing-md;
   justify-content: center;
-  margin-bottom: 3rem;
+  margin-bottom: $spacing-2xl;
   flex-wrap: wrap;
 
-  @include breakpoint(md) {
+  @media (max-width: $breakpoint-md) {
     flex-direction: column;
     align-items: center;
   }
@@ -63,22 +60,29 @@
 
 .heroImage {
   width: 100%;
-  max-width: 500px;
-  height: 300px;
-  background: $glass-bg;
-  border-radius: $border-radius-xl;
+  max-width: 600px;
+  height: auto;
   margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: $font-size-lg;
-  color: rgba($color-white, 0.8);
-  backdrop-filter: blur(10px);
-  border: 1px solid $glass-border;
-  box-shadow: 0 8px 32px rgba($color-black, 0.2);
+  border-radius: $border-radius-xl;
+  overflow: hidden;
+  box-shadow: $shadow-lg;
+
+  background: transparent;
+  border: none;
+
+  img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
 }
 
-// Story Demo Section
+.heroImageContent {
+  width: 100%;
+  height: auto;
+  border-radius: inherit;
+}
+
 .storyDemo {
   background: $bg-surface;
   padding: 4rem 0;
@@ -86,9 +90,9 @@
 
 .sectionTitle {
   text-align: center;
-  font-size: 2.5rem;
-  color: $text-inverse;
-  margin-bottom: 3rem;
+  font-size: $font-size-4xl;
+  color: $text-default;
+  margin-bottom: $spacing-2xl;
   font-weight: $font-weight-bold;
 }
 
@@ -171,86 +175,100 @@
   font-size: $font-size-md;
 }
 
-// Social Fun Section
 .socialFun {
-  background: $bg-social-gradient;
-  padding: 4rem 0;
-  color: $text-inverse;
+  background: $bg-surface;
+  padding: $spacing-3xl 0;
+  color: $text-default;
 }
 
 .socialGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 2rem;
-  margin-bottom: 3rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-2xl;
+  margin-bottom: $spacing-2xl;
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
 
-  @include breakpoint(md) {
+  @media (min-width: $breakpoint-xl) {
+    grid-template-columns: repeat(4, 1fr);
+    max-width: 1400px;
+  }
+
+  @media (max-width: $breakpoint-md) {
     grid-template-columns: 1fr;
+    gap: $spacing-xl;
   }
 }
 
 .socialCard {
-  background: $glass-bg;
-  border-radius: $border-radius-xl;
-  padding: 2rem;
+  background: $bg-surface;
+  border-radius: $border-radius-lg;
+  padding: $spacing-2xl;
   text-align: center;
-  backdrop-filter: blur(10px);
-  border: 1px solid $glass-border;
-  transition: all $transition-fast $transition-timing-default;
+  border: $border-width-thin solid $border-default;
+  box-shadow: $shadow-md;
+  transition: transform $transition-fast, box-shadow $transition-fast;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
 
   &:hover {
     transform: translateY(-5px);
-    background: $glass-bg-strong;
-    box-shadow: 0 10px 30px rgba($color-black, 0.2);
+    box-shadow: $shadow-lg;
   }
 }
 
 .socialCardImage {
   width: 100%;
-  height: 200px;
-  background: rgba($color-white, 0.2);
+  height: 240px;
+  background: $bg-subtle;
   border-radius: $border-radius-lg;
-  margin-bottom: 1rem;
+  margin-bottom: $spacing-lg;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba($color-white, 0.8);
+  color: $text-muted;
   font-size: $font-size-sm;
-  border: 1px solid rgba($color-white, 0.1);
+  border: $border-width-thin solid $border-default;
+  overflow: hidden;
 }
 
 .socialCardTitle {
-  font-size: $font-size-xl;
-  margin-bottom: 0.5rem;
+  font-size: $font-size-2xl;
+  margin-bottom: $spacing-md;
   font-weight: $font-weight-semibold;
+  color: $text-default;
 }
 
 .socialCardDescription {
-  opacity: 0.9;
-  line-height: 1.6;
+  color: $text-muted;
+  line-height: $line-height-normal;
+  font-size: $font-size-lg;
+  flex-grow: 1;
 }
 
-// Footer CTA
 .footerCta {
-  background: $color-gray-800;
-  padding: 4rem 0;
+  background: $bg-subtle;
+  padding: $spacing-3xl 0;
   text-align: center;
-  color: $text-inverse;
+  color: $text-default;
+  border-top: $border-width-thin solid $border-default;
 }
 
 .footerTitle {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
+  font-size: $font-size-4xl;
+  margin-bottom: $spacing-md;
   font-weight: $font-weight-bold;
+  color: $text-default;
 }
 
 .footerSubtitle {
   font-size: $font-size-xl;
-  margin-bottom: 2rem;
-  opacity: 0.9;
+  margin-bottom: $spacing-xl;
+  color: $text-muted;
 }
 
-// Animations
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -266,15 +284,14 @@
   animation: fadeIn 0.6s ease-in-out;
 }
 
-// Responsive adjustments
-@include breakpoint(md) {
+@media (max-width: $breakpoint-md) {
   .hero {
-    padding: 2rem 0;
+    padding: $spacing-xl 0;
     min-height: 60vh;
   }
 
   .heroTitle {
-    font-size: 2.5rem;
+    font-size: $font-size-4xl;
   }
 
   .heroSubtitle {
@@ -286,24 +303,19 @@
     align-items: center;
   }
 
-  .storyChain {
-    padding: 1rem;
-  }
-
-  .storySegment {
-    padding: 1rem;
-  }
-
   .socialFun {
-    padding: 2rem 0;
+    padding: $spacing-xl 0;
   }
 
   .footerCta {
-    padding: 2rem 0;
+    padding: $spacing-xl 0;
   }
 
   .footerTitle {
-    font-size: 2rem;
+    font-size: $font-size-3xl;
+  }
+
+  .container {
+    padding: 0 $spacing-lg;
   }
 }
-
