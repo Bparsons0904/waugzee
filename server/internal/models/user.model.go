@@ -1,102 +1,110 @@
 package models
 
 import (
+	"strings"
 	"time"
+	"waugzee/internal/database"
+	"waugzee/internal/logger"
+
 	"gorm.io/gorm"
 )
 
 type User struct {
 	BaseUUIDModel
-	// Basic user info
-	FirstName   string  `gorm:"type:text"               json:"firstName"`
-	LastName    string  `gorm:"type:text"               json:"lastName"`
-	FullName    string  `gorm:"type:text"               json:"fullName"`
-	DisplayName string  `gorm:"type:text"               json:"displayName"`
-	Email       *string `gorm:"type:text;uniqueIndex"   json:"email"`
-	IsAdmin     bool    `gorm:"type:bool;default:false" json:"isAdmin"`
-	IsActive    bool    `gorm:"type:bool;default:true"  json:"isActive"`
-
-	// OIDC integration fields
-	OIDCUserID      string    `gorm:"type:text;uniqueIndex"     json:"-"`
-	OIDCProvider    *string   `gorm:"type:text"                 json:"oidcProvider,omitempty"`
-	OIDCProjectID   *string   `gorm:"type:text"                 json:"-"`
-	LastLoginAt     *time.Time `gorm:"type:timestamp"           json:"lastLoginAt,omitempty"`
-	ProfileVerified bool      `gorm:"type:bool;default:false"   json:"profileVerified"`
+	FirstName       string     `gorm:"type:text"                                 json:"firstName"`
+	LastName        string     `gorm:"type:text"                                 json:"lastName"`
+	FullName        string     `gorm:"type:text"                                 json:"fullName"`
+	DisplayName     string     `gorm:"type:text"                                 json:"displayName"`
+	Email           *string    `gorm:"type:text;uniqueIndex"                     json:"email"`
+	IsAdmin         bool       `gorm:"type:bool;default:false"                   json:"isAdmin"`
+	IsActive        bool       `gorm:"type:bool;default:true"                    json:"isActive"`
+	LastLoginAt     *time.Time `gorm:"type:timestamp"                            json:"lastLoginAt,omitempty"`
+	ProfileVerified bool       `gorm:"type:bool;default:false"                   json:"profileVerified"`
+	OIDCUserID      string     `gorm:"column:oidc_user_id;type:text;uniqueIndex" json:"-"`
+	OIDCProvider    *string    `gorm:"column:oidc_provider;type:text"            json:"-"`
+	OIDCProjectID   *string    `gorm:"column:oidc_project_id;type:text"          json:"-"`
 }
 
-func (u *User) BeforeCreate(tx *gorm.DB) error {
-	fullName := u.FirstName + " " + u.LastName
-	u.FullName = fullName
-	if u.DisplayName == "" {
-		u.DisplayName = fullName
+func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
+	if u.FirstName != "" || u.LastName != "" {
+		if u.FullName == "" {
+			u.FullName = strings.TrimSpace(u.FirstName + " " + u.LastName)
+		}
+		if u.DisplayName == "" {
+			u.DisplayName = u.FullName
+		}
 	}
-	return nil
+
+	return err
 }
 
-// TODO: Does all this below here stay here?
-type LoginRequest struct {
-	Login    string `json:"login"`
-	Password string `json:"password"`
-}
-
-// OIDCUserCreateRequest represents data for creating a user from OIDC claims
-type OIDCUserCreateRequest struct {
-	OIDCUserID      string  `json:"oidcUserId"`
-	Email           *string `json:"email,omitempty"`
-	Name            *string `json:"name,omitempty"`
-	FirstName       string  `json:"firstName"`
-	LastName        string  `json:"lastName"`
-	OIDCProvider    string  `json:"oidcProvider"`
-	OIDCProjectID   *string `json:"oidcProjectId,omitempty"`
-	ProfileVerified bool    `json:"profileVerified"`
-}
-
-// UserProfile represents public user profile information
-type UserProfile struct {
-	ID              string     `json:"id"`
-	FirstName       string     `json:"firstName"`
-	LastName        string     `json:"lastName"`
-	FullName        string     `json:"fullName"`
-	DisplayName     string     `json:"displayName"`
-	Email           *string    `json:"email,omitempty"`
-	IsActive        bool       `json:"isActive"`
-	IsAdmin         bool       `json:"isAdmin"`
-	LastLoginAt     *time.Time `json:"lastLoginAt,omitempty"`
-	ProfileVerified bool       `json:"profileVerified"`
-}
-
-// ToProfile converts a User to a UserProfile (public information only)
-func (u *User) ToProfile() UserProfile {
-	return UserProfile{
-		ID:              u.ID.String(),
-		FirstName:       u.FirstName,
-		LastName:        u.LastName,
-		FullName:        u.FullName,
-		DisplayName:     u.DisplayName,
-		Email:           u.Email,
-		IsActive:        u.IsActive,
-		IsAdmin:         u.IsAdmin,
-		LastLoginAt:     u.LastLoginAt,
-		ProfileVerified: u.ProfileVerified,
-	}
-}
-
-// IsOIDCUser returns true if the user was created via OIDC
 func (u *User) IsOIDCUser() bool {
 	return u.OIDCUserID != ""
 }
 
-// UpdateFromOIDC updates user information from OIDC claims
-func (u *User) UpdateFromOIDC(oidcEmail, oidcName *string, provider string, projectID *string) {
+func (u *User) AfterUpdate(tx *gorm.DB) error {
+	log := logger.New("User").Function("AfterUpdate")
+	cacheInterface, exists := tx.Get("waugzee:cache")
+	if !exists {
+		return nil
+	}
+
+	cache, ok := cacheInterface.(database.CacheClient)
+	if !ok {
+		return nil
+	}
+
+	err := database.NewCacheBuilder(cache, u.ID).Delete()
+	log.Warn("failed to remove user from cache", "userID", u.ID, "error", err)
+
+	if u.OIDCUserID != "" {
+		oidcCacheKey := "oidc:" + u.OIDCUserID
+		err := database.NewCacheBuilder(cache, oidcCacheKey).Delete()
+		log.Warn(
+			"failed to remove OIDC mapping from cache",
+			"oidcUserID",
+			u.OIDCUserID,
+			"error",
+			err,
+		)
+	}
+
+	return nil
+}
+
+func (u *User) UpdateFromOIDC(
+	oidcUserID string,
+	oidcEmail, oidcName *string,
+	firstName, lastName, provider string,
+	projectID *string,
+	emailVerified bool,
+) {
 	now := time.Now()
 	u.LastLoginAt = &now
+
+	if oidcUserID != "" {
+		u.OIDCUserID = oidcUserID
+	}
 
 	if oidcEmail != nil && *oidcEmail != "" {
 		u.Email = oidcEmail
 	}
 
+	if firstName != "" {
+		u.FirstName = firstName
+	}
+	if lastName != "" {
+		u.LastName = lastName
+	}
+
+	if firstName != "" || lastName != "" {
+		u.FullName = strings.TrimSpace(firstName + " " + lastName)
+	}
+
 	if oidcName != nil && *oidcName != "" {
 		u.DisplayName = *oidcName
+	} else if u.FullName != "" {
+		u.DisplayName = u.FullName
 	}
 
 	if provider != "" {
@@ -108,8 +116,8 @@ func (u *User) UpdateFromOIDC(oidcEmail, oidcName *string, provider string, proj
 		u.OIDCProjectID = projectID
 	}
 
-	// Mark profile as verified if we have email from OIDC provider
-	if oidcEmail != nil && *oidcEmail != "" {
+	// Mark profile as verified based on email verification status
+	if emailVerified && oidcEmail != nil && *oidcEmail != "" {
 		u.ProfileVerified = true
 	}
 }

@@ -40,6 +40,8 @@ export default defineConfig({
       "@services": path.resolve(__dirname, "./src/services/"),
       "@context": path.resolve(__dirname, "./src/context/"),
       "@types": path.resolve(__dirname, "./src/types/"),
+      "@constants": path.resolve(__dirname, "./src/constants/"),
+      "@utils": path.resolve(__dirname, "./src/utils/"),
     },
     conditions: ["development", "browser"],
   },

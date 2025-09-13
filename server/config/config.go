@@ -23,11 +23,12 @@ type Config struct {
 	SecuritySalt         int    `mapstructure:"SECURITY_SALT"`
 	SecurityPepper       string `mapstructure:"SECURITY_PEPPER"`
 	SecurityJwtSecret    string `mapstructure:"SECURITY_JWT_SECRET"`
-	// SessionCookieName    string `mapstructure:"SESSION_COOKIE_NAME"`
-	// Zitadel OIDC Configuration
-	ZitadelClientID    string `mapstructure:"ZITADEL_CLIENT_ID"`
-	ZitadelClientSecret string `mapstructure:"ZITADEL_CLIENT_SECRET"`
-	ZitadelInstanceURL string `mapstructure:"ZITADEL_INSTANCE_URL"`
+	ZitadelClientID      string `mapstructure:"ZITADEL_CLIENT_ID"`
+	ZitadelClientSecret  string `mapstructure:"ZITADEL_CLIENT_SECRET"`
+	ZitadelInstanceURL   string `mapstructure:"ZITADEL_INSTANCE_URL"`
+	ZitadelPrivateKey    string `mapstructure:"ZITADEL_PRIVATE_KEY"`
+	ZitadelKeyID         string `mapstructure:"ZITADEL_KEY_ID"`
+	ZitadelClientIDM2M   string `mapstructure:"ZITADEL_CLIENT_ID_M2M"`
 }
 
 var ConfigInstance Config
@@ -44,9 +45,9 @@ func InitConfig() (Config, error) {
 		"GENERAL_VERSION", "ENVIRONMENT", "SERVER_PORT", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD",
 		"DB_CACHE_ADDRESS", "DB_CACHE_PORT", "DB_CACHE_RESET",
 		"CORS_ALLOW_ORIGINS", "SECURITY_SALT", "SECURITY_PEPPER", "SECURITY_JWT_SECRET",
-		"ZITADEL_CLIENT_ID", "ZITADEL_CLIENT_SECRET", "ZITADEL_INSTANCE_URL",
+		"ZITADEL_CLIENT_ID", "ZITADEL_CLIENT_SECRET", "ZITADEL_INSTANCE_URL", "ZITADEL_PRIVATE_KEY", "ZITADEL_KEY_ID", "ZITADEL_CLIENT_ID_M2M",
 	}
-	
+
 	for _, env := range envVars {
 		if err := viper.BindEnv(env); err != nil {
 			log.Warn("Failed to bind environment variable", "env", env, "error", err)
@@ -60,7 +61,7 @@ func InitConfig() (Config, error) {
 		log.Info("Environment variables detected, skipping file loading")
 	} else {
 		log.Info("Environment variables not found, attempting to load from files")
-		
+
 		// Load base .env file
 		viper.SetConfigFile(".env")
 		viper.SetConfigType("env")
@@ -104,6 +105,28 @@ func validateConfig(config Config, log logger.Logger) error {
 			fmt.Errorf("invalid port: %d", config.ServerPort),
 			"port", config.ServerPort,
 		)
+	}
+
+	// Validate Zitadel configuration
+	if config.ZitadelInstanceURL != "" {
+		if config.ZitadelClientID == "" {
+			return log.Err(
+				"Fatal error: ZITADEL_CLIENT_ID required when ZITADEL_INSTANCE_URL is set",
+				nil,
+			)
+		}
+		if config.ZitadelPrivateKey != "" && config.ZitadelKeyID == "" {
+			return log.Err(
+				"Fatal error: ZITADEL_KEY_ID required when ZITADEL_PRIVATE_KEY is set",
+				nil,
+			)
+		}
+		if config.ZitadelPrivateKey != "" && config.ZitadelClientIDM2M == "" {
+			return log.Err(
+				"Fatal error: ZITADEL_CLIENT_ID_M2M required when ZITADEL_PRIVATE_KEY is set",
+				nil,
+			)
+		}
 	}
 
 	ConfigInstance = config

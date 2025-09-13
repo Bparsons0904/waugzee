@@ -1,5 +1,3 @@
-// Reusable query and mutation hooks with axios + TanStack Query integration
-
 import { 
   useQuery, 
   useMutation, 
@@ -9,36 +7,35 @@ import {
   UseQueryResult,
   UseMutationResult,
 } from '@tanstack/solid-query';
-import { getApi, postApi, putApi, patchApi, deleteApi } from './api.service';
-import { ApiClientError } from './apiTypes';
+import { api, ApiClientError } from './api';
 import { Accessor } from 'solid-js';
-import { useToast } from '../../context/ToastContext';
+import { useToast } from '../context/ToastContext';
+import { AxiosRequestConfig } from 'axios';
 
-// Enhanced query options with better defaults
+// Enhanced query options
 export interface ApiQueryOptions<T> extends Omit<UseQueryOptions<T>, 'queryKey' | 'queryFn'> {
   enabled?: boolean | Accessor<boolean>;
-  staleTime?: number;
 }
 
-// Enhanced mutation options
+// Enhanced mutation options with common patterns
 export interface ApiMutationOptions<T, V> extends Omit<UseMutationOptions<T, Error, V>, 'mutationFn'> {
   invalidateQueries?: readonly (readonly unknown[])[];
-  onSuccessToast?: string | ((data: T, variables: V) => string);
-  onErrorToast?: string | ((error: Error) => string);
+  successMessage?: string | ((data: T, variables: V) => string);
+  errorMessage?: string | ((error: Error) => string);
   onSuccess?: (data: T, variables: V, context: unknown) => void;
   onError?: (error: Error, variables: V, context: unknown) => void;
 }
 
-// Generic API query hook
+// Generic query hook
 export function useApiQuery<T>(
   queryKey: readonly unknown[],
   url: string,
-  params?: Record<string, unknown>,
+  config?: AxiosRequestConfig,
   options?: ApiQueryOptions<T>
 ): UseQueryResult<T, Error> {
   return useQuery(() => ({
     queryKey,
-    queryFn: () => getApi<T>(url, params),
+    queryFn: () => api.get<T>(url, config),
     refetchOnWindowFocus: false,
     retry: (failureCount, error) => {
       // Don't retry on client errors (4xx)
@@ -53,10 +50,11 @@ export function useApiQuery<T>(
   }));
 }
 
-// Generic API mutation hook
+// Generic mutation hook
 export function useApiMutation<T, V = unknown>(
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-  url: string,
+  url: string | ((variables: V) => string), // Support dynamic URLs
+  config?: AxiosRequestConfig,
   options?: ApiMutationOptions<T, V>
 ): UseMutationResult<T, Error, V> {
   const queryClient = useQueryClient();
@@ -64,15 +62,17 @@ export function useApiMutation<T, V = unknown>(
 
   return useMutation(() => ({
     mutationFn: (variables: V) => {
+      const requestUrl = typeof url === 'function' ? url(variables) : url;
+      
       switch (method) {
         case 'POST':
-          return postApi<T, V>(url, variables);
+          return api.post<T>(requestUrl, variables, config);
         case 'PUT':
-          return putApi<T, V>(url, variables);
+          return api.put<T>(requestUrl, variables, config);
         case 'PATCH':
-          return patchApi<T, V>(url, variables);
+          return api.patch<T>(requestUrl, variables, config);
         case 'DELETE':
-          return deleteApi<T>(url);
+          return api.delete<T>(requestUrl, config);
         default:
           throw new Error(`Unsupported method: ${method}`);
       }
@@ -86,10 +86,10 @@ export function useApiMutation<T, V = unknown>(
       }
 
       // Handle success toast
-      if (options?.onSuccessToast) {
-        const message = typeof options.onSuccessToast === 'function' 
-          ? options.onSuccessToast(data, variables)
-          : options.onSuccessToast;
+      if (options?.successMessage) {
+        const message = typeof options.successMessage === 'function' 
+          ? options.successMessage(data, variables)
+          : options.successMessage;
         toast.showSuccess(message);
       }
 
@@ -98,10 +98,10 @@ export function useApiMutation<T, V = unknown>(
     },
     onError: (error, variables, context) => {
       // Handle error toast
-      if (options?.onErrorToast) {
-        const message = typeof options.onErrorToast === 'function'
-          ? options.onErrorToast(error)
-          : options.onErrorToast;
+      if (options?.errorMessage) {
+        const message = typeof options.errorMessage === 'function'
+          ? options.errorMessage(error)
+          : options.errorMessage;
         toast.showError(message);
       }
 
@@ -112,93 +112,80 @@ export function useApiMutation<T, V = unknown>(
   }));
 }
 
-// Convenience hooks for common operations
+// Convenience hooks
 export function useApiGet<T>(
   queryKey: readonly unknown[],
   url: string,
   params?: Record<string, unknown>,
   options?: ApiQueryOptions<T>
 ) {
-  return useApiQuery<T>(queryKey, url, params, options);
+  const config = params ? { params } : undefined;
+  return useApiQuery<T>(queryKey, url, config, options);
 }
 
 export function useApiPost<T, V = unknown>(
-  url: string,
+  url: string | ((variables: V) => string),
+  config?: AxiosRequestConfig,
   options?: ApiMutationOptions<T, V>
 ) {
-  return useApiMutation<T, V>('POST', url, options);
+  return useApiMutation<T, V>('POST', url, config, options);
 }
 
 export function useApiPut<T, V = unknown>(
-  url: string,
+  url: string | ((variables: V) => string),
+  config?: AxiosRequestConfig,
   options?: ApiMutationOptions<T, V>
 ) {
-  return useApiMutation<T, V>('PUT', url, options);
+  return useApiMutation<T, V>('PUT', url, config, options);
 }
 
 export function useApiPatch<T, V = unknown>(
-  url: string,
+  url: string | ((variables: V) => string),
+  config?: AxiosRequestConfig,
   options?: ApiMutationOptions<T, V>
 ) {
-  return useApiMutation<T, V>('PATCH', url, options);
+  return useApiMutation<T, V>('PATCH', url, config, options);
 }
 
 export function useApiDelete<T>(
   url: string,
+  config?: AxiosRequestConfig,
   options?: ApiMutationOptions<T, void>
 ) {
-  return useApiMutation<T, void>('DELETE', url, options);
+  return useApiMutation<T, void>('DELETE', url, config, options);
 }
 
-// Advanced hooks for common patterns
-
-// Paginated query hook
+// Paginated query hook for common pagination pattern
 export function useApiPaginatedQuery<T>(
   baseQueryKey: readonly unknown[],
   url: string,
   page: number,
   limit: number = 10,
-  params?: Record<string, unknown>,
+  additionalParams?: Record<string, unknown>,
   options?: ApiQueryOptions<T>
 ) {
-  const queryKey = [...baseQueryKey, 'paginated', { page, limit, ...params }];
-  const queryParams = { page, limit, ...params };
+  const queryKey = [...baseQueryKey, 'paginated', { page, limit, ...additionalParams }];
+  const params = { page, limit, ...additionalParams };
   
-  return useApiQuery<T>(queryKey, url, queryParams, options);
+  return useApiGet<T>(queryKey, url, params, options);
 }
 
-// Infinite query hook (for "load more" functionality)
-export function useApiInfiniteQuery<T>(
-  queryKey: readonly unknown[],
-  url: string,
-  options?: {
-    pageParam?: string;
-    initialPageParam?: unknown;
-    getNextPageParam?: (lastPage: T) => unknown;
-  } & ApiQueryOptions<T>
-) {
-  // This would need to be implemented with useInfiniteQuery from TanStack Query
-  // For now, return a regular query
-  return useApiQuery<T>(queryKey, url, undefined, options);
-}
-
-// Search hook with debouncing
+// Search hook with enabled condition
 export function useApiSearch<T>(
   baseQueryKey: readonly unknown[],
   url: string,
   searchQuery: Accessor<string>,
-  _debounceMs?: number,
+  minLength: number = 3,
   options?: ApiQueryOptions<T>
 ) {
-  // This would need debouncing logic - for now return basic search
   const queryKey = [...baseQueryKey, 'search', searchQuery()];
   
-  return useApiQuery<T>(
+  return useApiGet<T>(
     queryKey,
     url,
     { q: searchQuery() },
     {
-      enabled: () => searchQuery().length > 2, // Only search with 3+ characters
+      enabled: () => searchQuery().length >= minLength,
       ...options,
     }
   );

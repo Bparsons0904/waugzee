@@ -57,13 +57,3 @@ export const LoginRequest = z.object({
 
 export type LoginRequest = z.infer<typeof LoginRequest>;
 
-export const RegisterRequest = z.object({
-  firstName: z.string(),
-  lastName: z.string(),
-  displayName: z.string(),
-  login: z.string(),
-  email: z.string().email(),
-  password: z.string(),
-});
-
-export type RegisterRequest = z.infer<typeof RegisterRequest>;

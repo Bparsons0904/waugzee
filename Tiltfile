@@ -21,7 +21,7 @@ DEV_MODE = True
 
 # Go Server with Air hot reloading - Volume mount approach
 docker_build(
-    'vim-actions-server-dev-' + DOCKER_ENV,
+    'waugzee-server-' + DOCKER_ENV,
     context='./server',
     dockerfile='./server/Dockerfile.dev',
     target='development',
@@ -41,7 +41,7 @@ docker_build(
 
 # SolidJS Client with Vite hot reloading  
 docker_build(
-    'vim-actions-client-dev-' + DOCKER_ENV,
+    'waugzee-client-' + DOCKER_ENV,
     context='./client',
     dockerfile='./client/Dockerfile.dev',
     live_update=[
@@ -78,7 +78,7 @@ docker_build(
 
 # Valkey database service
 docker_build(
-    'vim-actions-valkey-dev-' + DOCKER_ENV,
+    'waugzee-valkey-' + DOCKER_ENV,
     context='./database/valkey',
     dockerfile='./database/valkey/Dockerfile.dev',
     live_update=[
@@ -187,7 +187,7 @@ if DEV_MODE:
     # Client full check - runs all three checks
     local_resource(
         'client-1-check-all',
-        cmd='cd client && [ ! -d node_modules ] && echo "❌ ERROR: node_modules not found. Run npm install first." && exit 1 || (npm run test:run && npm run lint:check && npx tsc --noEmit --skipLibCheck)',
+        cmd='cd client && npm run test:run && npm run lint:check && npx tsc --noEmit --skipLibCheck',
         deps=['./client/src', './client/package.json'],
         ignore=['./client/node_modules', './client/dist'],
         labels=['3-client'],
@@ -199,7 +199,7 @@ if DEV_MODE:
     # Client tests
     local_resource(
         'client-2-tests',
-        cmd='cd client && [ ! -d node_modules ] && echo "❌ ERROR: node_modules not found. Run npm install first." && exit 1 || npm run test:run',
+        cmd='cd client && npm run test:run',
         deps=['./client/src'],
         ignore=['./client/node_modules', './client/dist'],
         labels=['3-client'],
@@ -211,7 +211,7 @@ if DEV_MODE:
     # Client linting
     local_resource(
         'client-3-lint',
-        cmd='cd client && [ ! -d node_modules ] && echo "❌ ERROR: node_modules not found. Run npm install first." && exit 1 || npm run lint:check',
+        cmd='cd client && npm run lint:check',
         deps=['./client/src'],
         ignore=['./client/node_modules', './client/dist'],
         labels=['3-client'],
@@ -223,7 +223,7 @@ if DEV_MODE:
     # TypeScript compilation check
     local_resource(
         'client-4-typecheck',
-        cmd='cd client && [ ! -d node_modules ] && echo "❌ ERROR: node_modules not found. Run npm install first." && exit 1 || npx tsc --noEmit --skipLibCheck',
+        cmd='cd client && npx tsc --noEmit --skipLibCheck',
         deps=['./client/src'],
         ignore=['./client/node_modules', './client/dist'],
         labels=['3-client'],

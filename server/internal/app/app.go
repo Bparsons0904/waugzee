@@ -10,6 +10,7 @@ import (
 	"waugzee/internal/services"
 	"waugzee/internal/websockets"
 
+	authController "waugzee/internal/controllers/auth"
 	userController "waugzee/internal/controllers/users"
 )
 
@@ -28,6 +29,7 @@ type App struct {
 	UserRepo repositories.UserRepository
 
 	// Controllers
+	AuthController authController.AuthControllerInterface
 	UserController *userController.UserController
 }
 
@@ -56,14 +58,15 @@ func New() (*App, error) {
 	// Initialize repositories
 	userRepo := repositories.New(db)
 
-	websocket, err := websockets.New(db, eventBus, config)
+	websocket, err := websockets.New(db, eventBus, config, zitadelService, userRepo)
 	if err != nil {
 		return &App{}, log.Err("failed to create websocket manager", err)
 	}
 
 	// Initialize controllers with repositories and services
 	middleware := middleware.New(db, eventBus, config, userRepo)
-	userController := userController.New(eventBus, userRepo, config)
+	authController := authController.New(zitadelService, userRepo, db)
+	userController := userController.New(userRepo, config)
 
 	app := &App{
 		Database:           db,
@@ -72,6 +75,7 @@ func New() (*App, error) {
 		TransactionService: transactionService,
 		ZitadelService:     zitadelService,
 		UserRepo:           userRepo,
+		AuthController:     authController,
 		UserController:     userController,
 		Websocket:          websocket,
 		EventBus:           eventBus,
@@ -99,6 +103,7 @@ func (a *App) validate() error {
 		a.EventBus,
 		a.TransactionService,
 		a.ZitadelService,
+		a.AuthController,
 		a.UserController,
 		a.Middleware,
 		a.UserRepo,

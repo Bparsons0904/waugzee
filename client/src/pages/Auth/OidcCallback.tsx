@@ -1,29 +1,17 @@
 import { Component, createEffect, createSignal } from "solid-js";
-import { useSearchParams } from "@solidjs/router";
 import { useAuth } from "@context/AuthContext";
 import styles from "./Auth.module.scss";
 
 const OidcCallback: Component = () => {
-  const [searchParams] = useSearchParams();
   const { handleOIDCCallback } = useAuth();
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
 
   createEffect(async () => {
     try {
-      const code = searchParams.code;
-      const state = searchParams.state;
-      const redirectUri = `${window.location.origin}/auth/callback`;
-
-      if (!code) {
-        throw new Error("Authorization code not received");
-      }
-
-      if (!state) {
-        throw new Error("State parameter not received");
-      }
-
-      await handleOIDCCallback(code, state, redirectUri);
+      // The new handleOIDCCallback doesn't need parameters
+      // as oidc-client-ts handles reading URL parameters automatically
+      await handleOIDCCallback();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Authentication failed";
       setError(errorMessage);

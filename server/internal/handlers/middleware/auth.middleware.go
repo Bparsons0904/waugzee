@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"strings"
+	"waugzee/internal/models"
 	"waugzee/internal/services"
 
 	"github.com/gofiber/fiber/v2"
@@ -12,31 +13,15 @@ import (
 type AuthContextKey string
 
 const (
-	AuthInfoKey AuthContextKey = "auth_info"
-	UserIDKey   AuthContextKey = "user_id"
+	UserKey      AuthContextKey = "user"
+	UserKeyFiber string         = "User" // Fiber context key (string)
 )
-
-// AuthInfo contains user authentication information
-type AuthInfo struct {
-	UserID    string
-	Email     string
-	Name      string
-	Roles     []string
-	ProjectID string
-}
 
 // RequireAuth middleware validates OIDC tokens and requires authentication
 func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.Handler {
 	log := m.log.Function("RequireAuth")
 
 	return func(c *fiber.Ctx) error {
-		// Skip auth if Zitadel is not configured
-		if !zitadelService.IsConfigured() {
-			log.Warn("Zitadel not configured, skipping authentication")
-			return c.Next()
-		}
-
-		// Extract token from Authorization header
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
 			log.Info("missing authorization header")
@@ -62,162 +47,60 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 			})
 		}
 
-		// Validate token with Zitadel
-		tokenInfo, err := zitadelService.ValidateToken(c.Context(), token)
+		// Validate token with Zitadel using hybrid approach
+		tokenInfo, validationMethod, err := zitadelService.ValidateTokenWithFallback(
+			c.Context(),
+			token,
+		)
 		if err != nil {
-			log.Info("token validation failed", "error", err.Error())
+			log.Info("token validation failed", "method", validationMethod, "error", err.Error())
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Invalid token",
 			})
 		}
 
-		if !tokenInfo.Valid {
-			log.Info("token is not active")
+		// Fetch user from database using OIDC User ID
+		user, err := m.userRepo.GetByOIDCUserID(c.Context(), tokenInfo.UserID)
+		if err != nil {
+			log.Info(
+				"user not found in database",
+				"oidcUserID",
+				tokenInfo.UserID,
+				"error",
+				err.Error(),
+			)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Token is not active",
+				"error": "User not found",
 			})
 		}
 
-		// Store auth info in context
-		authInfo := &AuthInfo{
-			UserID:    tokenInfo.UserID,
-			Email:     tokenInfo.Email,
-			Name:      tokenInfo.Name,
-			Roles:     tokenInfo.Roles,
-			ProjectID: tokenInfo.ProjectID,
-		}
-
-		// Add to Fiber context
-		c.Locals(string(AuthInfoKey), authInfo)
-		c.Locals(string(UserIDKey), tokenInfo.UserID)
+		// Store user in Fiber context
+		c.Locals(UserKeyFiber, user)
 
 		// Add to Go context for services
-		ctx := context.WithValue(c.Context(), AuthInfoKey, authInfo)
-		ctx = context.WithValue(ctx, UserIDKey, tokenInfo.UserID)
+		ctx := context.WithValue(c.Context(), UserKey, user)
 		c.SetUserContext(ctx)
 
-		log.Info("user authenticated", "userID", tokenInfo.UserID, "email", tokenInfo.Email)
+		log.Info(
+			"user authenticated",
+			"method",
+			validationMethod,
+			"userID",
+			tokenInfo.UserID,
+			"email",
+			tokenInfo.Email,
+			"dbUserID",
+			user.ID,
+		)
 		return c.Next()
 	}
 }
 
-// OptionalAuth middleware validates OIDC tokens but doesn't require authentication
-func (m *Middleware) OptionalAuth(zitadelService *services.ZitadelService) fiber.Handler {
-	log := m.log.Function("OptionalAuth")
-
-	return func(c *fiber.Ctx) error {
-		// Skip auth if Zitadel is not configured
-		if !zitadelService.IsConfigured() {
-			return c.Next()
-		}
-
-		// Extract token from Authorization header
-		authHeader := c.Get("Authorization")
-		if authHeader == "" {
-			return c.Next() // No token, continue without auth
-		}
-
-		// Check for Bearer token format
-		tokenParts := strings.Split(authHeader, " ")
-		if len(tokenParts) != 2 || strings.ToLower(tokenParts[0]) != "bearer" {
-			return c.Next() // Invalid format, continue without auth
-		}
-
-		token := tokenParts[1]
-		if token == "" {
-			return c.Next() // No token, continue without auth
-		}
-
-		// Validate token with Zitadel
-		tokenInfo, err := zitadelService.ValidateToken(c.Context(), token)
-		if err != nil || !tokenInfo.Valid {
-			log.Debug("optional auth token validation failed", "error", err)
-			return c.Next() // Invalid token, continue without auth
-		}
-
-		// Store auth info in context
-		authInfo := &AuthInfo{
-			UserID:    tokenInfo.UserID,
-			Email:     tokenInfo.Email,
-			Name:      tokenInfo.Name,
-			Roles:     tokenInfo.Roles,
-			ProjectID: tokenInfo.ProjectID,
-		}
-
-		// Add to Fiber context
-		c.Locals(string(AuthInfoKey), authInfo)
-		c.Locals(string(UserIDKey), tokenInfo.UserID)
-
-		// Add to Go context for services
-		ctx := context.WithValue(c.Context(), AuthInfoKey, authInfo)
-		ctx = context.WithValue(ctx, UserIDKey, tokenInfo.UserID)
-		c.SetUserContext(ctx)
-
-		log.Info("optional auth successful", "userID", tokenInfo.UserID, "email", tokenInfo.Email)
-		return c.Next()
-	}
-}
-
-// RequireRole middleware checks if the authenticated user has a specific role
-func (m *Middleware) RequireRole(role string) fiber.Handler {
-	log := m.log.Function("RequireRole")
-
-	return func(c *fiber.Ctx) error {
-		authInfo := GetAuthInfo(c)
-		if authInfo == nil {
-			log.Info("no auth info found for role check", "requiredRole", role)
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Authentication required",
-			})
-		}
-
-		// Check if user has the required role
-		for _, userRole := range authInfo.Roles {
-			if userRole == role {
-				log.Info("role check passed", "userID", authInfo.UserID, "role", role)
-				return c.Next()
-			}
-		}
-
-		log.Info("insufficient permissions", "userID", authInfo.UserID, "requiredRole", role, "userRoles", authInfo.Roles)
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "Insufficient permissions",
-		})
-	}
-}
-
-// GetAuthInfo extracts auth info from Fiber context
-func GetAuthInfo(c *fiber.Ctx) *AuthInfo {
-	authInfo, ok := c.Locals(string(AuthInfoKey)).(*AuthInfo)
+// GetUser extracts user from Fiber context
+func GetUser(c *fiber.Ctx) *models.User {
+	user, ok := c.Locals(UserKeyFiber).(*models.User)
 	if !ok {
 		return nil
 	}
-	return authInfo
-}
-
-// GetUserID extracts user ID from Fiber context
-func GetUserID(c *fiber.Ctx) string {
-	userID, ok := c.Locals(string(UserIDKey)).(string)
-	if !ok {
-		return ""
-	}
-	return userID
-}
-
-// GetAuthInfoFromContext extracts auth info from Go context
-func GetAuthInfoFromContext(ctx context.Context) *AuthInfo {
-	authInfo, ok := ctx.Value(AuthInfoKey).(*AuthInfo)
-	if !ok {
-		return nil
-	}
-	return authInfo
-}
-
-// GetUserIDFromContext extracts user ID from Go context
-func GetUserIDFromContext(ctx context.Context) string {
-	userID, ok := ctx.Value(UserIDKey).(string)
-	if !ok {
-		return ""
-	}
-	return userID
+	return user
 }
