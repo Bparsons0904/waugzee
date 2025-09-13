@@ -20,7 +20,7 @@ export const NavBar: Component = () => {
             <ul class={styles.navbarItems}>
               <li class={styles.navbarItem}>
                 <A
-                  href={FRONTEND_ROUTES.HOME}
+                  href="/"
                   class={styles.navbarLink}
                   activeClass={styles.active}
                   end
