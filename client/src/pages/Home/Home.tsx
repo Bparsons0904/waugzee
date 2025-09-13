@@ -12,7 +12,6 @@ import {
   ActionItem,
 } from "@components/dashboard/ActionsSection/ActionsSection";
 import styles from "./Home.module.scss";
-import { FRONTEND_ROUTES } from "@constants/api.constants";
 
 interface DashboardStats {
   totalRecords: number;

@@ -1,15 +1,19 @@
 package userController
 
 import (
+	"context"
 	"waugzee/config"
 	"waugzee/internal/logger"
+	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
+	"waugzee/internal/services"
 )
 
 type UserController struct {
-	userRepo repositories.UserRepository
-	Config   config.Config
-	log      logger.Logger
+	userRepo       repositories.UserRepository
+	discogsService *services.DiscogsService
+	Config         config.Config
+	log            logger.Logger
 }
 
 func New(

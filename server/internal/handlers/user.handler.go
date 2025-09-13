@@ -2,10 +2,9 @@ package handlers
 
 import (
 	"waugzee/internal/app"
-	"waugzee/internal/handlers/middleware"
+	userController "waugzee/internal/controllers/users"
 	"waugzee/internal/handlers/middleware"
 	"waugzee/internal/logger"
-	"waugzee/internal/services"
 	"waugzee/internal/services"
 
 	"github.com/gofiber/fiber/v2"

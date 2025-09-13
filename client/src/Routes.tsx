@@ -26,7 +26,7 @@ const ProtectedRoute = (Component: Component) => {
 
     createEffect(() => {
       if (isAuthenticated() === false) {
-        navigate(FRONTEND_ROUTES.ROOT, { replace: true });
+        navigate(FRONTEND_ROUTES.HOME, { replace: true });
       }
     });
 
