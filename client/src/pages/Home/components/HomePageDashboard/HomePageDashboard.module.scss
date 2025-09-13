@@ -1,0 +1,372 @@
+.homePageDashboard {
+  min-height: 100vh;
+  background-color: $bg-body;
+  padding: $spacing-xl 0;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 $spacing-xl;
+}
+
+.hero {
+  text-align: center;
+  margin-bottom: $spacing-3xl;
+}
+
+.heroTitle {
+  font-size: $font-size-4xl;
+  font-weight: $font-weight-bold;
+  margin-bottom: $spacing-md;
+  color: $text-default;
+  line-height: $line-height-heading;
+
+  @media (max-width: $breakpoint-md) {
+    font-size: $font-size-3xl;
+  }
+}
+
+.heroSubtitle {
+  font-size: $font-size-xl;
+  color: $text-muted;
+  line-height: $line-height-normal;
+}
+
+.sectionTitle {
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+  margin-bottom: $spacing-xl;
+}
+
+.statsSection {
+  margin-bottom: $spacing-3xl;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: $spacing-lg;
+
+  @media (max-width: $breakpoint-lg) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: $breakpoint-sm) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.statCard {
+  background: $bg-surface;
+  border-radius: $border-radius-lg;
+  padding: $spacing-xl;
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  border: $border-width-thin solid $border-default;
+  box-shadow: $shadow-sm;
+  transition: transform $transition-fast, box-shadow $transition-fast;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $shadow-md;
+  }
+}
+
+.statIcon {
+  font-size: $font-size-2xl;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: $bg-subtle;
+  border-radius: $border-radius-lg;
+}
+
+.statContent {
+  flex: 1;
+}
+
+.statNumber {
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  color: $text-default;
+  margin-bottom: $spacing-xs;
+  line-height: 1;
+}
+
+.statLabel {
+  font-size: $font-size-sm;
+  color: $text-muted;
+  margin: 0;
+}
+
+.actionsSection {
+  margin-bottom: $spacing-3xl;
+}
+
+.actionsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: $spacing-lg;
+
+  @media (max-width: $breakpoint-lg) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: $breakpoint-sm) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.actionLink {
+  text-decoration: none;
+  color: inherit;
+}
+
+.actionCard {
+  background: $bg-surface;
+  border-radius: $border-radius-lg;
+  padding: $spacing-xl;
+  text-align: center;
+  border: $border-width-thin solid $border-default;
+  box-shadow: $shadow-sm;
+  transition: transform $transition-fast, box-shadow $transition-fast;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: $shadow-md;
+  }
+}
+
+.actionIcon {
+  font-size: $font-size-3xl;
+  margin-bottom: $spacing-sm;
+}
+
+.actionTitle {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+  margin-bottom: $spacing-xs;
+}
+
+.actionDescription {
+  font-size: $font-size-sm;
+  color: $text-muted;
+  margin-bottom: $spacing-md;
+  flex-grow: 1;
+}
+
+.activitySection {
+  margin-bottom: $spacing-3xl;
+}
+
+.activityHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-xl;
+
+  @media (max-width: $breakpoint-sm) {
+    flex-direction: column;
+    gap: $spacing-md;
+    align-items: flex-start;
+  }
+}
+
+.viewAllLink {
+  font-size: $font-size-sm;
+  color: $color-primary-600;
+  text-decoration: none;
+  font-weight: $font-weight-medium;
+
+  &:hover {
+    color: $color-primary-700;
+    text-decoration: underline;
+  }
+}
+
+.activityList {
+  background: $bg-surface;
+  border-radius: $border-radius-lg;
+  border: $border-width-thin solid $border-default;
+  overflow: hidden;
+}
+
+.activityItem {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-lg;
+  border-bottom: $border-width-thin solid $border-default;
+  transition: background-color $transition-fast;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background-color: $bg-subtle;
+  }
+}
+
+.activityIcon {
+  font-size: $font-size-lg;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: $bg-subtle;
+  border-radius: $border-radius-full;
+}
+
+.activityContent {
+  flex: 1;
+}
+
+.activityTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  color: $text-default;
+  margin-bottom: $spacing-xs;
+}
+
+.activitySubtitle {
+  font-size: $font-size-sm;
+  color: $text-muted;
+  margin: 0;
+}
+
+.activityTime {
+  font-size: $font-size-xs;
+  color: $text-muted;
+  font-weight: $font-weight-medium;
+}
+
+.activitySkeleton {
+  background: $bg-surface;
+  border-radius: $border-radius-lg;
+  border: $border-width-thin solid $border-default;
+  overflow: hidden;
+}
+
+.skeletonItem {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-lg;
+  border-bottom: $border-width-thin solid $border-default;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.skeletonIcon {
+  width: 40px;
+  height: 40px;
+  background: $bg-subtle;
+  border-radius: $border-radius-full;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonContent {
+  flex: 1;
+}
+
+.skeletonTitle {
+  height: 16px;
+  background: $bg-subtle;
+  border-radius: $border-radius-sm;
+  margin-bottom: $spacing-xs;
+  width: 60%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonSubtitle {
+  height: 14px;
+  background: $bg-subtle;
+  border-radius: $border-radius-sm;
+  width: 40%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.ctaSection {
+  text-align: center;
+}
+
+.ctaCard {
+  background: $bg-surface;
+  border-radius: $border-radius-xl;
+  padding: $spacing-3xl;
+  border: $border-width-thin solid $border-default;
+  box-shadow: $shadow-md;
+}
+
+.ctaTitle {
+  font-size: $font-size-3xl;
+  font-weight: $font-weight-bold;
+  color: $text-default;
+  margin-bottom: $spacing-md;
+}
+
+.ctaDescription {
+  font-size: $font-size-lg;
+  color: $text-muted;
+  margin-bottom: $spacing-xl;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ctaLink {
+  text-decoration: none;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (max-width: $breakpoint-md) {
+  .container {
+    padding: 0 $spacing-lg;
+  }
+
+  .heroTitle {
+    font-size: $font-size-3xl;
+  }
+
+  .heroSubtitle {
+    font-size: $font-size-lg;
+  }
+
+  .sectionTitle {
+    font-size: $font-size-xl;
+  }
+
+  .ctaTitle {
+    font-size: $font-size-2xl;
+  }
+
+  .ctaDescription {
+    font-size: $font-size-md;
+  }
+
+  .ctaCard {
+    padding: $spacing-2xl;
+  }
+}
