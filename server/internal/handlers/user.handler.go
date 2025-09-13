@@ -58,8 +58,10 @@ func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
 		})
 	}
 
+	// Update user with new token
 	user, err := h.userController.UpdateDiscogsToken(c.Context(), user, req)
 	if err != nil {
+		h.log.Err("Failed to update user discogs token", err)
 		if err.Error() == "token is required" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "Token is required",

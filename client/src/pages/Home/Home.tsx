@@ -12,6 +12,7 @@ import {
   ActionItem,
 } from "@components/dashboard/ActionsSection/ActionsSection";
 import styles from "./Home.module.scss";
+import { FRONTEND_ROUTES } from "@constants/api.constants";
 
 interface DashboardStats {
   totalRecords: number;
@@ -54,7 +55,7 @@ const Home: Component = () => {
   };
 
   const handleSyncCollection = () => {
-    if (!user()?.discogsToken) {
+    if (!user?.discogsToken) {
       setShowTokenModal(true);
     } else {
       // TODO: Implement sync with Discogs
@@ -124,10 +125,10 @@ const Home: Component = () => {
     },
     {
       title: "Sync Collection",
-      description: user()?.discogsToken
+      description: user?.discogsToken
         ? "Sync your Waugzee collection with your Discogs library."
         : "Connect your Discogs account to sync your collection.",
-      buttonText: user()?.discogsToken ? "Sync Now" : "Connect Discogs",
+      buttonText: user?.discogsToken ? "Sync Now" : "Connect Discogs",
       onClick: handleSyncCollection,
     },
     {
@@ -161,7 +162,7 @@ const Home: Component = () => {
       <div class={styles.header}>
         <div>
           <h1 class={styles.title}>
-            Welcome back, {user()?.firstName || "User"}!
+            Welcome back, {user?.firstName || "User"}!
           </h1>
           <p class={styles.subtitle}>Your personal vinyl collection tracker</p>
         </div>
@@ -169,7 +170,7 @@ const Home: Component = () => {
           class={styles.primaryButton}
           onClick={() => setShowTokenModal(true)}
         >
-          {user()?.discogsToken ? "Update Discogs Token" : "Connect Discogs"}
+          {user?.discogsToken ? "Update Discogs Token" : "Connect Discogs"}
         </button>
       </div>
 

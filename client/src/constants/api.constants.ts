@@ -32,7 +32,7 @@ export const HEALTH_ENDPOINTS = {
 
 // Frontend route constants (for consistency with backend auth routes)
 export const FRONTEND_ROUTES = {
-  ROOT: '/',
+  HOME: '/',
   LOGIN: '/auth/login',
   CALLBACK: '/auth/callback',
   SILENT_CALLBACK: '/auth/silent-callback',

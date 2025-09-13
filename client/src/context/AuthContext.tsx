@@ -44,7 +44,7 @@ type AuthState = {
 type AuthContextValue = {
   authState: AuthState;
   isAuthenticated: () => boolean;
-  user: () => User | null;
+  user: User | null;
   authToken: () => string | null;
   authConfig: () => AuthConfig | null;
   loginWithOIDC: () => Promise<void>;
@@ -314,7 +314,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           error: null,
         });
 
-        navigate(FRONTEND_ROUTES.ROOT);
+        navigate(FRONTEND_ROUTES.HOME);
       } else {
         throw new Error("Failed to get user info from backend after callback");
       }
@@ -409,7 +409,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       value={{
         authState,
         isAuthenticated,
-        user: () => authState.user,
+        user: authState.user,
         authToken: () => authState.token,
         authConfig: () => authState.config,
         loginWithOIDC,

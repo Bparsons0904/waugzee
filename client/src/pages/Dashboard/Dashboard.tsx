@@ -27,7 +27,7 @@ const Dashboard: Component = () => {
     try {
       // TODO: Replace with actual API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       setStats({
         totalRecords: 247,
         totalPlays: 1430,

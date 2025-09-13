@@ -52,4 +52,3 @@ export interface UpdateDiscogsTokenRequest {
 export interface UpdateDiscogsTokenResponse {
   user: User;
 }
-
