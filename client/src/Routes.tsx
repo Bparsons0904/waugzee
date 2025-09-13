@@ -4,14 +4,13 @@ import { useAuth } from "@context/AuthContext";
 import { useNavigate } from "@solidjs/router";
 import { createEffect } from "solid-js";
 import { FRONTEND_ROUTES } from "@constants/api.constants";
+import { ConditionalRoot } from "@components/ConditionalRoot/ConditionalRoot";
 
 const LoginPage = lazy(() => import("@pages/Auth/Login"));
 const OidcCallbackPage = lazy(() => import("@pages/Auth/OidcCallback"));
 const SilentCallbackPage = lazy(() => import("@pages/Auth/SilentCallback"));
 const ProfilePage = lazy(() => import("@pages/Profile/Profile"));
 const DashboardPage = lazy(() => import("@pages/Dashboard/Dashboard"));
-const LandingPage = lazy(() => import("@pages/LandingPage/LandingPage"));
-const HomePage = lazy(() => import("@pages/Home/Home"));
 // const WorkstationComponent = lazy(() => import("@pages/Workstation/Workstation"));
 // const LoadTestPage = lazy(() => import("@pages/LoadTest/LoadTest"));
 
@@ -27,7 +26,7 @@ const ProtectedRoute = (Component: Component) => {
 
     createEffect(() => {
       if (isAuthenticated() === false) {
-        navigate(FRONTEND_ROUTES.LANDING, { replace: true });
+        navigate(FRONTEND_ROUTES.ROOT, { replace: true });
       }
     });
 
@@ -38,8 +37,7 @@ const ProtectedRoute = (Component: Component) => {
 export const Routes: Component = () => {
   return (
     <>
-      <Route path={FRONTEND_ROUTES.LANDING} component={LandingPage} />
-      <Route path={FRONTEND_ROUTES.HOME} component={ProtectedRoute(HomePage)} />
+      <Route path="/" component={ConditionalRoot} />
       <Route path={FRONTEND_ROUTES.LOGIN} component={LoginPage} />
       <Route path={FRONTEND_ROUTES.CALLBACK} component={OidcCallbackPage} />
       <Route

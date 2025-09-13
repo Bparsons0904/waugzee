@@ -314,7 +314,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           error: null,
         });
 
-        navigate(FRONTEND_ROUTES.HOME);
+        navigate(FRONTEND_ROUTES.ROOT);
       } else {
         throw new Error("Failed to get user info from backend after callback");
       }

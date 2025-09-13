@@ -12,7 +12,7 @@ export const NavBar: Component = () => {
       <nav class={styles.navbar}>
         <div class={styles.navbarContainer}>
           <div class={styles.navbarLogo}>
-            <A href={FRONTEND_ROUTES.HOME} class={styles.navbarTitle}>
+            <A href={FRONTEND_ROUTES.ROOT} class={styles.navbarTitle}>
               Waugzee
             </A>
           </div>
@@ -20,7 +20,7 @@ export const NavBar: Component = () => {
             <ul class={styles.navbarItems}>
               <li class={styles.navbarItem}>
                 <A
-                  href={FRONTEND_ROUTES.HOME}
+                  href={FRONTEND_ROUTES.ROOT}
                   class={styles.navbarLink}
                   activeClass={styles.active}
                   end
@@ -80,7 +80,7 @@ export const NavBar: Component = () => {
                     </A>
                   </Match>
                   <Match when={isAuthenticated()}>
-                    <A href={FRONTEND_ROUTES.HOME} class={styles.navbarLink} onClick={logout}>
+                    <A href={FRONTEND_ROUTES.ROOT} class={styles.navbarLink} onClick={logout}>
                       Logout
                     </A>
                   </Match>
