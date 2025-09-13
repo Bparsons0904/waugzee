@@ -76,21 +76,7 @@ func New(
 	}
 }
 
-func (ac *AuthController) IsConfigured() bool {
-	return ac.zitadelService.IsConfigured()
-}
-
 func (ac *AuthController) GetAuthConfig() (*AuthConfigResponse, error) {
-	log := ac.log.Function("GetAuthConfig")
-
-	if !ac.zitadelService.IsConfigured() {
-		log.Info("Zitadel not configured")
-		return &AuthConfigResponse{
-			Configured: false,
-			Message:    "Authentication not configured",
-		}, nil
-	}
-
 	config := ac.zitadelService.GetConfig()
 	return &AuthConfigResponse{
 		Configured:  true,

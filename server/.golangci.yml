@@ -23,7 +23,7 @@ issues:
       text: "dot-imports"
       linters:
         - revive
-    - path: _test\.go
+    - path: _test\.go$
       linters:
         - staticcheck
         - govet

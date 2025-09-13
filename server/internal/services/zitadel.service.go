@@ -57,7 +57,6 @@ type ZitadelService struct {
 	privateKey   *rsa.PrivateKey
 	keyID        string
 	clientIDM2M  string
-	configured   bool
 
 	// OIDC discovery and JWK caching
 	discovery     *OIDCDiscovery
@@ -88,14 +87,10 @@ type TokenInfo struct {
 func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 	log := logger.New("ZitadelService")
 
-	// Skip initialization if Zitadel is not configured
+	// Require Zitadel configuration
 	if cfg.ZitadelInstanceURL == "" || cfg.ZitadelClientID == "" {
-		log.Info("Zitadel configuration not found, service will be disabled")
-		return &ZitadelService{
-			config:     cfg,
-			log:        log,
-			configured: false,
-		}, nil
+		return nil, log.Err("Zitadel configuration required but not provided", 
+			fmt.Errorf("missing ZitadelInstanceURL or ZitadelClientID"))
 	}
 
 	// Parse private key if available (for machine-to-machine authentication)
@@ -133,7 +128,6 @@ func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 		privateKey:   privateKey,
 		keyID:        cfg.ZitadelKeyID,
 		clientIDM2M:  cfg.ZitadelClientIDM2M,
-		configured:   true,
 		cacheTTL:     15 * time.Minute, // Cache OIDC discovery and JWKS for 15 minutes
 	}
 
@@ -145,10 +139,6 @@ func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 
 // ValidateIDToken validates an OIDC ID token with proper JWT signature verification
 func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (*TokenInfo, error) {
-	if !zs.configured {
-		return nil, fmt.Errorf("zitadel service not configured")
-	}
-
 	log := zs.log.Function("ValidateIDToken")
 
 	// Parse JWT token with signature verification
@@ -279,9 +269,6 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 
 // ValidateToken validates an access token using OIDC introspection
 func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*TokenInfo, error) {
-	if !zs.configured {
-		return nil, fmt.Errorf("zitadel service not configured")
-	}
 
 	log := zs.log.Function("ValidateToken")
 
@@ -390,18 +377,11 @@ func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*Tok
 }
 
 
-// IsConfigured returns true if Zitadel is properly configured
-func (zs *ZitadelService) IsConfigured() bool {
-	return zs.configured
-}
 
 
 
 // getOIDCDiscovery fetches and caches the OIDC discovery document
 func (zs *ZitadelService) getOIDCDiscovery(ctx context.Context) (*OIDCDiscovery, error) {
-	if !zs.configured {
-		return nil, fmt.Errorf("zitadel service not configured")
-	}
 
 	log := zs.log.Function("getOIDCDiscovery")
 
@@ -464,9 +444,6 @@ func (zs *ZitadelService) getOIDCDiscovery(ctx context.Context) (*OIDCDiscovery,
 
 // getJWKS fetches and caches the JSON Web Key Set
 func (zs *ZitadelService) getJWKS(ctx context.Context) (*JWKSet, error) {
-	if !zs.configured {
-		return nil, fmt.Errorf("zitadel service not configured")
-	}
 
 	log := zs.log.Function("getJWKS")
 
@@ -530,9 +507,6 @@ func (zs *ZitadelService) getPublicKeyForToken(
 	ctx context.Context,
 	kidHeader string,
 ) (*rsa.PublicKey, error) {
-	if !zs.configured {
-		return nil, fmt.Errorf("zitadel service not configured")
-	}
 
 	log := zs.log.Function("getPublicKeyForToken")
 
@@ -596,9 +570,6 @@ func (zs *ZitadelService) getPublicKeyForToken(
 
 // RevokeToken revokes an access or refresh token with Zitadel
 func (zs *ZitadelService) RevokeToken(ctx context.Context, token string, tokenType string) error {
-	if !zs.configured {
-		return fmt.Errorf("zitadel service not configured")
-	}
 
 	log := zs.log.Function("RevokeToken")
 
@@ -675,9 +646,6 @@ func (zs *ZitadelService) RevokeToken(ctx context.Context, token string, tokenTy
 
 // GetLogoutURL generates the OIDC logout URL using the end_session_endpoint
 func (zs *ZitadelService) GetLogoutURL(ctx context.Context, idTokenHint, postLogoutRedirectURI, state string) (string, error) {
-	if !zs.configured {
-		return "", fmt.Errorf("zitadel service not configured")
-	}
 
 	log := zs.log.Function("GetLogoutURL")
 
@@ -743,12 +711,6 @@ func (zs *ZitadelService) GetConfig() ZitadelConfig {
 // ValidateTokenWithFallback validates a token using JWT-first approach with introspection fallback
 func (zs *ZitadelService) ValidateTokenWithFallback(ctx context.Context, token string) (*TokenInfo, string, error) {
 	log := zs.log.Function("ValidateTokenWithFallback")
-
-	// Skip auth if Zitadel is not configured
-	if !zs.IsConfigured() {
-		log.Warn("Zitadel not configured, skipping token validation")
-		return nil, "", fmt.Errorf("zitadel service not configured")
-	}
 
 	// Validate token with Zitadel - try JWT first, fallback to introspection
 	var tokenInfo *TokenInfo

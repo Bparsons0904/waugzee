@@ -17,19 +17,11 @@ const (
 	UserKeyFiber string         = "User" // Fiber context key (string)
 )
 
-
 // RequireAuth middleware validates OIDC tokens and requires authentication
 func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.Handler {
 	log := m.log.Function("RequireAuth")
 
 	return func(c *fiber.Ctx) error {
-		// Skip auth if Zitadel is not configured
-		if !zitadelService.IsConfigured() {
-			log.Warn("Zitadel not configured, skipping authentication")
-			return c.Next()
-		}
-
-		// Extract token from Authorization header
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
 			log.Info("missing authorization header")
@@ -56,15 +48,16 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 		}
 
 		// Validate token with Zitadel using hybrid approach
-		tokenInfo, validationMethod, err := zitadelService.ValidateTokenWithFallback(c.Context(), token)
-
+		tokenInfo, validationMethod, err := zitadelService.ValidateTokenWithFallback(
+			c.Context(),
+			token,
+		)
 		if err != nil {
 			log.Info("token validation failed", "method", validationMethod, "error", err.Error())
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Invalid token",
 			})
 		}
-
 
 		// Fetch user from database using OIDC User ID
 		user, err := m.userRepo.GetByOIDCUserID(c.Context(), tokenInfo.UserID)
@@ -111,5 +104,3 @@ func GetUser(c *fiber.Ctx) *models.User {
 	}
 	return user
 }
-
-

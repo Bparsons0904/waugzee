@@ -68,7 +68,7 @@ func TestZitadelService_RevokeToken(t *testing.T) {
 
 	service, err := NewZitadelService(cfg)
 	require.NoError(t, err)
-	require.True(t, service.IsConfigured())
+	require.NotNil(t, service)
 
 	ctx := context.Background()
 
@@ -116,7 +116,7 @@ func TestZitadelService_GetLogoutURL(t *testing.T) {
 
 	service, err := NewZitadelService(cfg)
 	require.NoError(t, err)
-	require.True(t, service.IsConfigured())
+	require.NotNil(t, service)
 
 	ctx := context.Background()
 
@@ -181,41 +181,17 @@ func TestZitadelService_GetLogoutURL(t *testing.T) {
 	}
 }
 
-func TestZitadelService_RevokeToken_NotConfigured(t *testing.T) {
-	// Test with unconfigured service
+func TestZitadelService_NotConfigured(t *testing.T) {
+	// Test with unconfigured service - should fail at creation
 	cfg := config.Config{
 		ZitadelInstanceURL: "",
 		ZitadelClientID:    "",
 	}
 
 	service, err := NewZitadelService(cfg)
-	require.NoError(t, err)
-	require.False(t, service.IsConfigured())
-
-	ctx := context.Background()
-
-	err = service.RevokeToken(ctx, "token", "access_token")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "zitadel service not configured")
-}
-
-func TestZitadelService_GetLogoutURL_NotConfigured(t *testing.T) {
-	// Test with unconfigured service
-	cfg := config.Config{
-		ZitadelInstanceURL: "",
-		ZitadelClientID:    "",
-	}
-
-	service, err := NewZitadelService(cfg)
-	require.NoError(t, err)
-	require.False(t, service.IsConfigured())
-
-	ctx := context.Background()
-
-	logoutURL, err := service.GetLogoutURL(ctx, "", "", "")
-	assert.Error(t, err)
-	assert.Empty(t, logoutURL)
-	assert.Contains(t, err.Error(), "zitadel service not configured")
+	require.Error(t, err)
+	require.Nil(t, service)
+	assert.Contains(t, err.Error(), "missing ZitadelInstanceURL or ZitadelClientID")
 }
 
 
