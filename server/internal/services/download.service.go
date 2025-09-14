@@ -20,7 +20,8 @@ import (
 // Discogs S3 configuration constants
 const (
 	DiscogsS3BaseURL = "https://discogs-data-dumps.s3-us-west-2.amazonaws.com/data"
-	DiscogsTimeoutSec = 300  // 5 minutes for large files
+	DiscogsTimeoutSec = 3600      // 1 hour HTTP client timeout (safety net)
+	DiscogsStallTimeoutSec = 300  // 5 minutes stall timeout (no progress detection)
 	DiscogsUserAgent = "Waugzee/1.0 (Discogs Data Sync)"
 	DiscogsMaxRetries = 5
 )
@@ -89,7 +90,7 @@ func (ds *DownloadService) DownloadChecksum(ctx context.Context, yearMonth strin
 	)
 
 	// Create download directory
-	downloadDir := fmt.Sprintf("/tmp/discogs-%s", yearMonth)
+	downloadDir := fmt.Sprintf("/app/discogs-data/%s", yearMonth)
 	if err := ds.ensureDirectory(downloadDir); err != nil {
 		return log.Err("failed to create download directory", err, "directory", downloadDir)
 	}
@@ -190,8 +191,16 @@ func (ds *DownloadService) DownloadXMLFile(ctx context.Context, yearMonth, fileT
 	}
 
 	// Validate file type
-	if fileType != "artists" && fileType != "labels" {
-		return log.Err("invalid file type", fmt.Errorf("expected 'artists' or 'labels', got: %s", fileType))
+	validFileTypes := []string{"artists", "labels", "masters", "releases"}
+	isValid := false
+	for _, validType := range validFileTypes {
+		if fileType == validType {
+			isValid = true
+			break
+		}
+	}
+	if !isValid {
+		return log.Err("invalid file type", fmt.Errorf("expected one of %v, got: %s", validFileTypes, fileType))
 	}
 
 	// Use current year-month for URL construction (always download current month data)
@@ -208,7 +217,7 @@ func (ds *DownloadService) DownloadXMLFile(ctx context.Context, yearMonth, fileT
 	)
 
 	// Create download directory
-	downloadDir := fmt.Sprintf("/tmp/discogs-%s", yearMonth)
+	downloadDir := fmt.Sprintf("/app/discogs-data/%s", yearMonth)
 	if err := ds.ensureDirectory(downloadDir); err != nil {
 		return log.Err("failed to create download directory", err, "directory", downloadDir)
 	}
@@ -338,7 +347,7 @@ func (ds *DownloadService) downloadFileWithRetry(ctx context.Context, url, targe
 		"url", url)
 }
 
-// downloadFile downloads a single file from URL to targetFile
+// downloadFile downloads a single file from URL to targetFile with progress-based timeout
 func (ds *DownloadService) downloadFile(ctx context.Context, url, targetFile string) error {
 	log := ds.log.Function("downloadFile")
 
@@ -381,13 +390,20 @@ func (ds *DownloadService) downloadFile(ctx context.Context, url, targetFile str
 		}
 	}()
 
-	// Track download progress
+	// Track download progress with stall detection
 	contentLength := resp.ContentLength
 	downloaded := int64(0)
-
-	// Copy response body to file with progress tracking
-	buffer := make([]byte, 32*1024) // 32KB buffer
+	lastProgressTime := time.Now()
 	lastLogTime := time.Now()
+	stallTimeout := time.Duration(DiscogsStallTimeoutSec) * time.Second
+
+	log.Info("Starting download with progress-based timeout",
+		"url", url,
+		"stallTimeoutSec", DiscogsStallTimeoutSec,
+		"contentLength", contentLength)
+
+	// Copy response body to file with progress tracking and stall detection
+	buffer := make([]byte, 32*1024) // 32KB buffer
 
 	for {
 		select {
@@ -396,18 +412,33 @@ func (ds *DownloadService) downloadFile(ctx context.Context, url, targetFile str
 		default:
 		}
 
+		// Check for stall - if no progress for stallTimeout, abort
+		if time.Since(lastProgressTime) > stallTimeout {
+			return log.Err("download stalled - no progress detected",
+				fmt.Errorf("no progress for %v seconds", DiscogsStallTimeoutSec),
+				"url", url,
+				"downloaded", downloaded,
+				"stallTimeoutSec", DiscogsStallTimeoutSec)
+		}
+
 		n, readErr := resp.Body.Read(buffer)
 		if n > 0 {
 			if _, writeErr := outFile.Write(buffer[:n]); writeErr != nil {
 				return log.Err("failed to write to file", writeErr, "targetFile", targetFile)
 			}
-			downloaded += int64(n)
 
-			// Log progress every 30 seconds or at completion
+			// Progress made - reset stall timer
+			downloaded += int64(n)
+			lastProgressTime = time.Now()
+
+			// Log progress every 30 seconds
 			now := time.Now()
 			if now.Sub(lastLogTime) >= 30*time.Second {
 				ds.logDownloadProgress(contentLength, downloaded, url)
 				lastLogTime = now
+				log.Debug("Progress detected, stall timer reset",
+					"downloaded", downloaded,
+					"stallTimeoutSec", DiscogsStallTimeoutSec)
 			}
 		}
 

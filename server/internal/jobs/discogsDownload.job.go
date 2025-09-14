@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
@@ -220,7 +221,7 @@ func (j *DiscogsDownloadJob) performDownload(
 		processingRecord.ProcessingStats = &models.ProcessingStats{}
 	}
 
-	downloadDir := fmt.Sprintf("/tmp/discogs-%s", yearMonth)
+	downloadDir := fmt.Sprintf("/app/discogs-data/%s", yearMonth)
 
 	// Step 1: Handle checksum file
 	if err := j.handleChecksumFile(ctx, processingRecord, yearMonth); err != nil {
@@ -281,7 +282,10 @@ func (j *DiscogsDownloadJob) handleChecksumFile(
 		}
 
 		// Parse the downloaded checksum file
-		checksumFile := filepath.Join(fmt.Sprintf("/tmp/discogs-%s", yearMonth), "CHECKSUM.txt")
+		checksumFile := filepath.Join(
+			fmt.Sprintf("/app/discogs-data/%s", yearMonth),
+			"CHECKSUM.txt",
+		)
 		checksums, err := j.download.ParseChecksumFile(checksumFile)
 		if err != nil {
 			return log.Err("failed to parse checksum file", err, "checksumFile", checksumFile)
@@ -324,7 +328,12 @@ func (j *DiscogsDownloadJob) handleFileDownloads(
 
 	checksums := processingRecord.FileChecksums
 	if checksums == nil {
-		return log.Err("checksums not available", fmt.Errorf("FileChecksums is nil"), "yearMonth", yearMonth)
+		return log.Err(
+			"checksums not available",
+			fmt.Errorf("FileChecksums is nil"),
+			"yearMonth",
+			yearMonth,
+		)
 	}
 
 	fileTypes := []struct {
@@ -333,20 +342,56 @@ func (j *DiscogsDownloadJob) handleFileDownloads(
 	}{
 		{"artists", checksums.ArtistsDump},
 		{"labels", checksums.LabelsDump},
-		// Add masters and releases when ready
-		// {"masters", checksums.MastersDump},
-		// {"releases", checksums.ReleasesDump},
+		{"masters", checksums.MastersDump},
+		{"releases", checksums.ReleasesDump},
 	}
 
+	// Use concurrent downloads with goroutines for better performance
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var downloadErrors []error
+
+	// Launch concurrent downloads for all files
 	for _, ft := range fileTypes {
 		if ft.checksum == "" {
 			log.Info("Skipping file (no checksum available)", "fileType", ft.name)
 			continue
 		}
 
-		if err := j.handleSingleFileDownload(ctx, processingRecord, yearMonth, downloadDir, ft.name, ft.checksum); err != nil {
-			return log.Err("failed to handle file download", err, "fileType", ft.name, "yearMonth", yearMonth)
-		}
+		wg.Add(1)
+		go func(fileType, checksum string) {
+			defer wg.Done()
+
+			if err := j.handleSingleFileDownload(ctx, processingRecord, yearMonth, downloadDir, fileType, checksum); err != nil {
+				mu.Lock()
+				downloadErrors = append(
+					downloadErrors,
+					fmt.Errorf("failed to handle file download for %s: %w", fileType, err),
+				)
+				mu.Unlock()
+				_ = log.Err(
+					"concurrent download failed",
+					err,
+					"fileType",
+					fileType,
+					"yearMonth",
+					yearMonth,
+				)
+			}
+		}(ft.name, ft.checksum)
+	}
+
+	// Wait for all downloads to complete
+	wg.Wait()
+
+	// Check if any downloads failed
+	if len(downloadErrors) > 0 {
+		return log.Err(
+			"one or more concurrent downloads failed",
+			fmt.Errorf("download failures: %v", downloadErrors),
+			"yearMonth",
+			yearMonth,
+		)
 	}
 
 	return nil
@@ -371,19 +416,40 @@ func (j *DiscogsDownloadJob) handleSingleFileDownload(
 
 	// Check if file already exists and is validated
 	if fileInfo.Status == models.FileDownloadStatusValidated {
-		log.Info("File already validated, skipping download", "fileType", fileType, "filePath", filePath)
+		log.Info(
+			"File already validated, skipping download",
+			"fileType",
+			fileType,
+			"filePath",
+			filePath,
+		)
 		return nil
 	}
 
 	// Check existing file status
 	currentStatus, err := j.download.GetFileStatus(filePath, expectedChecksum)
 	if err != nil {
-		return log.Err("failed to check file status", err, "fileType", fileType, "filePath", filePath)
+		return log.Err(
+			"failed to check file status",
+			err,
+			"fileType",
+			fileType,
+			"filePath",
+			filePath,
+		)
 	}
 
 	// If file exists and is validated, update our tracking and skip download
 	if currentStatus.Status == models.FileDownloadStatusValidated {
-		log.Info("Found existing validated file", "fileType", fileType, "filePath", filePath, "size", currentStatus.Size)
+		log.Info(
+			"Found existing validated file",
+			"fileType",
+			fileType,
+			"filePath",
+			filePath,
+			"size",
+			currentStatus.Size,
+		)
 		*fileInfo = *currentStatus
 		if err := j.repo.Update(ctx, processingRecord); err != nil {
 			log.Warn("failed to update processing record with existing file status", "error", err)
@@ -441,7 +507,14 @@ func (j *DiscogsDownloadJob) handleSingleFileDownload(
 			log.Warn("failed to remove invalid file", "error", removeErr, "file", filePath)
 		}
 
-		return log.Err("file checksum validation failed", err, "fileType", fileType, "yearMonth", yearMonth)
+		return log.Err(
+			"file checksum validation failed",
+			err,
+			"fileType",
+			fileType,
+			"yearMonth",
+			yearMonth,
+		)
 	}
 
 	// File downloaded and validated successfully
@@ -461,7 +534,15 @@ func (j *DiscogsDownloadJob) handleSingleFileDownload(
 		log.Warn("failed to update processing record with success status", "error", err)
 	}
 
-	log.Info("File downloaded and validated successfully", "fileType", fileType, "yearMonth", yearMonth, "size", fileInfo.Size)
+	log.Info(
+		"File downloaded and validated successfully",
+		"fileType",
+		fileType,
+		"yearMonth",
+		yearMonth,
+		"size",
+		fileInfo.Size,
+	)
 
 	return nil
 }

@@ -57,7 +57,7 @@ func NewSchedulerService() *SchedulerService {
 func (s *SchedulerService) executeJob(job Job, log logger.Logger) {
 	log.Info("Executing scheduled job", "job", job.Name())
 	if err := job.Execute(s.ctx); err != nil {
-		log.Err("Job execution failed", err, "job", job.Name())
+		_ = log.Err("Job execution failed", err, "job", job.Name())
 	} else {
 		log.Info("Job execution completed successfully", "job", job.Name())
 	}
@@ -109,6 +109,9 @@ func (s *SchedulerService) Start(ctx context.Context) error {
 		log.Info("No jobs registered, scheduler will not start")
 		return nil
 	}
+
+	log.Info("Delaying scheduler startup for 30 seconds to prevent immediate downloads during development")
+	time.Sleep(30 * time.Second)
 
 	log.Info("Starting scheduler", "jobCount", len(s.jobs))
 	s.scheduler.StartAsync()

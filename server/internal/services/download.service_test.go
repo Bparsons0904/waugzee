@@ -240,7 +240,7 @@ func TestDownloadXMLFile_InvalidFileType(t *testing.T) {
 		t.Fatal("expected error for invalid file type, got nil")
 	}
 
-	if !strings.Contains(err.Error(), "expected 'artists' or 'labels'") {
+	if !strings.Contains(err.Error(), "expected one of") || !strings.Contains(err.Error(), "invalid-type") {
 		t.Errorf("expected file type validation error, got: %v", err)
 	}
 }
