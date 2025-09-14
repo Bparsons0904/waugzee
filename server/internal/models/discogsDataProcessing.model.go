@@ -1,6 +1,9 @@
 package models
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"regexp"
 	"slices"
 	"time"
@@ -26,13 +29,119 @@ type FileChecksums struct {
 	ReleasesDump string `json:"releasesDump"`
 }
 
+type FileDownloadStatus string
+
+const (
+	FileDownloadStatusNotStarted  FileDownloadStatus = "not_started"
+	FileDownloadStatusDownloading FileDownloadStatus = "downloading"
+	FileDownloadStatusCompleted   FileDownloadStatus = "completed"
+	FileDownloadStatusValidated   FileDownloadStatus = "validated"
+	FileDownloadStatusFailed      FileDownloadStatus = "failed"
+)
+
+type FileDownloadInfo struct {
+	Status       FileDownloadStatus `json:"status"`
+	Downloaded   bool               `json:"downloaded"`
+	Validated    bool               `json:"validated"`
+	Size         int64              `json:"size,omitempty"`
+	DownloadedAt *time.Time         `json:"downloadedAt,omitempty"`
+	ValidatedAt  *time.Time         `json:"validatedAt,omitempty"`
+	ErrorMessage *string            `json:"errorMessage,omitempty"`
+}
+
 type ProcessingStats struct {
+	// File-level tracking for resumable downloads
+	ArtistsFile  *FileDownloadInfo `json:"artistsFile,omitempty"`
+	LabelsFile   *FileDownloadInfo `json:"labelsFile,omitempty"`
+	MastersFile  *FileDownloadInfo `json:"mastersFile,omitempty"`
+	ReleasesFile *FileDownloadInfo `json:"releasesFile,omitempty"`
+
+	// Processing counters (existing functionality)
 	ArtistsProcessed  int `json:"artistsProcessed"`
 	LabelsProcessed   int `json:"labelsProcessed"`
 	MastersProcessed  int `json:"mastersProcessed"`
 	ReleasesProcessed int `json:"releasesProcessed"`
 	TotalRecords      int `json:"totalRecords"`
 	FailedRecords     int `json:"failedRecords"`
+}
+
+// Scan implements the Scanner interface for GORM JSONB support
+func (ps *ProcessingStats) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("cannot scan non-byte value into ProcessingStats")
+	}
+
+	return json.Unmarshal(bytes, ps)
+}
+
+// Value implements the driver Valuer interface for GORM JSONB support
+func (ps ProcessingStats) Value() (driver.Value, error) {
+	if ps == (ProcessingStats{}) {
+		return nil, nil
+	}
+	return json.Marshal(ps)
+}
+
+// GetFileInfo returns the FileDownloadInfo for a specific file type
+func (ps *ProcessingStats) GetFileInfo(fileType string) *FileDownloadInfo {
+	if ps == nil {
+		return nil
+	}
+
+	switch fileType {
+	case "artists":
+		return ps.ArtistsFile
+	case "labels":
+		return ps.LabelsFile
+	case "masters":
+		return ps.MastersFile
+	case "releases":
+		return ps.ReleasesFile
+	default:
+		return nil
+	}
+}
+
+// SetFileInfo sets the FileDownloadInfo for a specific file type
+func (ps *ProcessingStats) SetFileInfo(fileType string, info *FileDownloadInfo) {
+	if ps == nil {
+		return
+	}
+
+	switch fileType {
+	case "artists":
+		ps.ArtistsFile = info
+	case "labels":
+		ps.LabelsFile = info
+	case "masters":
+		ps.MastersFile = info
+	case "releases":
+		ps.ReleasesFile = info
+	}
+}
+
+// InitializeFileInfo ensures a FileDownloadInfo exists for the given file type
+func (ps *ProcessingStats) InitializeFileInfo(fileType string) *FileDownloadInfo {
+	if ps == nil {
+		return nil
+	}
+
+	info := ps.GetFileInfo(fileType)
+	if info == nil {
+		info = &FileDownloadInfo{
+			Status:     FileDownloadStatusNotStarted,
+			Downloaded: false,
+			Validated:  false,
+		}
+		ps.SetFileInfo(fileType, info)
+	}
+
+	return info
 }
 
 type DiscogsDataProcessing struct {
@@ -122,3 +231,24 @@ func (ddp *DiscogsDataProcessing) UpdateStatus(newStatus ProcessingStatus) error
 	return nil
 }
 
+// Scan implements the Scanner interface for GORM JSONB support
+func (fc *FileChecksums) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("cannot scan non-byte value into FileChecksums")
+	}
+
+	return json.Unmarshal(bytes, fc)
+}
+
+// Value implements the driver Valuer interface for GORM JSONB support
+func (fc FileChecksums) Value() (driver.Value, error) {
+	if fc == (FileChecksums{}) {
+		return nil, nil
+	}
+	return json.Marshal(fc)
+}

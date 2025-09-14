@@ -30,10 +30,6 @@ type Config struct {
 	ZitadelKeyID         string `mapstructure:"ZITADEL_KEY_ID"`
 	ZitadelClientIDM2M   string `mapstructure:"ZITADEL_CLIENT_ID_M2M"`
 	SchedulerEnabled     bool   `mapstructure:"SCHEDULER_ENABLED"`
-	DiscogsBaseURL       string `mapstructure:"DISCOGS_BASE_URL"`
-	DiscogsDownloadDir   string `mapstructure:"DISCOGS_DOWNLOAD_DIR"`
-	DiscogsTimeoutSec    int    `mapstructure:"DISCOGS_TIMEOUT_SEC"`
-	DiscogsMaxRetries    int    `mapstructure:"DISCOGS_MAX_RETRIES"`
 }
 
 var ConfigInstance Config
@@ -52,7 +48,6 @@ func InitConfig() (Config, error) {
 		"CORS_ALLOW_ORIGINS", "SECURITY_SALT", "SECURITY_PEPPER", "SECURITY_JWT_SECRET",
 		"ZITADEL_CLIENT_ID", "ZITADEL_CLIENT_SECRET", "ZITADEL_INSTANCE_URL", "ZITADEL_PRIVATE_KEY", "ZITADEL_KEY_ID", "ZITADEL_CLIENT_ID_M2M",
 		"SCHEDULER_ENABLED",
-		"DISCOGS_BASE_URL", "DISCOGS_DOWNLOAD_DIR", "DISCOGS_TIMEOUT_SEC", "DISCOGS_MAX_RETRIES",
 	}
 
 	for _, env := range envVars {

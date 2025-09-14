@@ -13,8 +13,7 @@ import (
 
 func TestNewDownloadService(t *testing.T) {
 	cfg := config.Config{
-		DiscogsTimeoutSec: 30,
-		GeneralVersion:    "1.0.0",
+		GeneralVersion: "1.0.0",
 	}
 
 	service := NewDownloadService(cfg)
@@ -23,31 +22,28 @@ func TestNewDownloadService(t *testing.T) {
 		t.Fatal("expected service to be created, got nil")
 	}
 
-	if service.config.DiscogsTimeoutSec != 30 {
-		t.Errorf("expected timeout 30, got %d", service.config.DiscogsTimeoutSec)
-	}
-
 	if service.httpClient == nil {
 		t.Fatal("expected HTTP client to be created, got nil")
 	}
 
-	expectedTimeout := 30 * time.Second
+	// Should use the constant timeout value
+	expectedTimeout := time.Duration(DiscogsTimeoutSec) * time.Second
 	if service.httpClient.Timeout != expectedTimeout {
 		t.Errorf("expected HTTP client timeout %v, got %v", expectedTimeout, service.httpClient.Timeout)
 	}
 }
 
-func TestNewDownloadService_DefaultTimeout(t *testing.T) {
+func TestNewDownloadService_ConstantTimeout(t *testing.T) {
 	cfg := config.Config{
-		DiscogsTimeoutSec: 0, // Should use default
-		GeneralVersion:    "1.0.0",
+		GeneralVersion: "1.0.0",
 	}
 
 	service := NewDownloadService(cfg)
 
-	expectedTimeout := 30 * time.Second
+	// Should always use the constant timeout value
+	expectedTimeout := time.Duration(DiscogsTimeoutSec) * time.Second
 	if service.httpClient.Timeout != expectedTimeout {
-		t.Errorf("expected default HTTP client timeout %v, got %v", expectedTimeout, service.httpClient.Timeout)
+		t.Errorf("expected constant HTTP client timeout %v, got %v", expectedTimeout, service.httpClient.Timeout)
 	}
 }
 
@@ -214,5 +210,103 @@ func TestDownloadChecksum_InvalidYearMonth(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "expected YYYY-MM format") {
 		t.Errorf("expected 'expected YYYY-MM format' error, got: %v", err)
+	}
+}
+
+func TestDownloadXMLFile_InvalidYearMonth(t *testing.T) {
+	cfg := config.Config{GeneralVersion: "1.0.0"}
+	service := NewDownloadService(cfg)
+
+	ctx := context.Background()
+
+	err := service.DownloadXMLFile(ctx, "invalid-format", "artists")
+	if err == nil {
+		t.Fatal("expected error for invalid yearMonth format, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "expected YYYY-MM format") {
+		t.Errorf("expected 'expected YYYY-MM format' error, got: %v", err)
+	}
+}
+
+func TestDownloadXMLFile_InvalidFileType(t *testing.T) {
+	cfg := config.Config{GeneralVersion: "1.0.0"}
+	service := NewDownloadService(cfg)
+
+	ctx := context.Background()
+
+	err := service.DownloadXMLFile(ctx, "2024-01", "invalid-type")
+	if err == nil {
+		t.Fatal("expected error for invalid file type, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "expected 'artists' or 'labels'") {
+		t.Errorf("expected file type validation error, got: %v", err)
+	}
+}
+
+func TestValidateFileChecksum_NonExistentFile(t *testing.T) {
+	cfg := config.Config{GeneralVersion: "1.0.0"}
+	service := NewDownloadService(cfg)
+
+	err := service.ValidateFileChecksum("/nonexistent/path/file.txt", "abc123")
+	if err == nil {
+		t.Fatal("expected error for non-existent file, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "no such file or directory") {
+		t.Errorf("expected 'no such file or directory' error, got: %v", err)
+	}
+}
+
+func TestValidateFileChecksum_Success(t *testing.T) {
+	cfg := config.Config{GeneralVersion: "1.0.0"}
+	service := NewDownloadService(cfg)
+
+	// Create a temporary test file
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.txt")
+	testContent := []byte("Hello, World!")
+
+	err := os.WriteFile(testFile, testContent, 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	// Calculate expected SHA256 checksum for "Hello, World!"
+	expectedChecksum := "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
+
+	// Validate checksum
+	err = service.ValidateFileChecksum(testFile, expectedChecksum)
+	if err != nil {
+		t.Fatalf("checksum validation failed: %v", err)
+	}
+}
+
+func TestValidateFileChecksum_Mismatch(t *testing.T) {
+	cfg := config.Config{GeneralVersion: "1.0.0"}
+	service := NewDownloadService(cfg)
+
+	// Create a temporary test file
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.txt")
+	testContent := []byte("Hello, World!")
+
+	err := os.WriteFile(testFile, testContent, 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	// Use a wrong checksum
+	wrongChecksum := "wrongchecksum123"
+
+	// Validate checksum - should fail
+	err = service.ValidateFileChecksum(testFile, wrongChecksum)
+	if err == nil {
+		t.Fatal("expected checksum validation to fail, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "computed:") || !strings.Contains(err.Error(), "expected:") {
+		t.Errorf("expected checksum mismatch error with computed and expected values, got: %v", err)
 	}
 }

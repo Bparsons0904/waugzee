@@ -191,7 +191,9 @@ func (j *DiscogsDownloadJob) Execute(ctx context.Context) error {
 			// Update record with error information
 			errorMsg := err.Error()
 			processingRecord.ErrorMessage = &errorMsg
-			processingRecord.UpdateStatus(models.ProcessingStatusFailed)
+			if statusErr := processingRecord.UpdateStatus(models.ProcessingStatusFailed); statusErr != nil {
+				log.Warn("failed to update processing record status to failed", "error", statusErr)
+			}
 
 			if updateErr := j.repo.Update(txCtx, processingRecord); updateErr != nil {
 				log.Warn("failed to update processing record with error", "error", updateErr)
@@ -205,7 +207,7 @@ func (j *DiscogsDownloadJob) Execute(ctx context.Context) error {
 	})
 }
 
-// performDownload handles the actual download process
+// performDownload handles the actual download process with recovery support
 func (j *DiscogsDownloadJob) performDownload(
 	ctx context.Context,
 	processingRecord *models.DiscogsDataProcessing,
@@ -213,22 +215,25 @@ func (j *DiscogsDownloadJob) performDownload(
 ) error {
 	log := j.log.Function("performDownload")
 
-	log.Info("Starting checksum download", "yearMonth", yearMonth)
-
-	// Download the CHECKSUM.txt file using the download service
-	if err := j.download.DownloadChecksum(ctx, yearMonth); err != nil {
-		return log.Err("failed to download checksum file", err, "yearMonth", yearMonth)
+	// Initialize ProcessingStats if not present
+	if processingRecord.ProcessingStats == nil {
+		processingRecord.ProcessingStats = &models.ProcessingStats{}
 	}
 
-	// Parse the downloaded checksum file
-	checksumFile := filepath.Join(fmt.Sprintf("/tmp/discogs-%s", yearMonth), "CHECKSUM.txt")
-	checksums, err := j.download.ParseChecksumFile(checksumFile)
-	if err != nil {
-		return log.Err("failed to parse checksum file", err, "checksumFile", checksumFile)
+	downloadDir := fmt.Sprintf("/tmp/discogs-%s", yearMonth)
+
+	// Step 1: Handle checksum file
+	if err := j.handleChecksumFile(ctx, processingRecord, yearMonth); err != nil {
+		return err
 	}
 
-	// Update processing record with checksums and transition to ready_for_processing
-	processingRecord.FileChecksums = checksums
+	// Step 2: Check and recover existing files or download new ones
+	if err := j.handleFileDownloads(ctx, processingRecord, yearMonth, downloadDir); err != nil {
+		return err
+	}
+
+	// All downloads and validations completed successfully
+	// Transition to ready_for_processing status
 	if err := processingRecord.UpdateStatus(models.ProcessingStatusReadyForProcessing); err != nil {
 		return log.Err(
 			"failed to transition to ready_for_processing status",
@@ -251,18 +256,212 @@ func (j *DiscogsDownloadJob) performDownload(
 		)
 	}
 
-	// Clean up downloaded file to save space (we only need the parsed checksums)
-	if err := os.Remove(checksumFile); err != nil {
-		log.Warn("failed to clean up checksum file", "error", err, "file", checksumFile)
+	log.Info("All downloads completed successfully",
+		"yearMonth", yearMonth,
+		"status", processingRecord.Status)
+
+	return nil
+}
+
+// handleChecksumFile manages checksum file download and parsing
+func (j *DiscogsDownloadJob) handleChecksumFile(
+	ctx context.Context,
+	processingRecord *models.DiscogsDataProcessing,
+	yearMonth string,
+) error {
+	log := j.log.Function("handleChecksumFile")
+
+	// Only download checksum if we don't already have it
+	if processingRecord.FileChecksums == nil {
+		log.Info("Downloading checksum file", "yearMonth", yearMonth)
+
+		// Download the CHECKSUM.txt file using the download service
+		if err := j.download.DownloadChecksum(ctx, yearMonth); err != nil {
+			return log.Err("failed to download checksum file", err, "yearMonth", yearMonth)
+		}
+
+		// Parse the downloaded checksum file
+		checksumFile := filepath.Join(fmt.Sprintf("/tmp/discogs-%s", yearMonth), "CHECKSUM.txt")
+		checksums, err := j.download.ParseChecksumFile(checksumFile)
+		if err != nil {
+			return log.Err("failed to parse checksum file", err, "checksumFile", checksumFile)
+		}
+
+		// Update processing record with checksums
+		processingRecord.FileChecksums = checksums
+
+		// Save checksums to database
+		if err := j.repo.Update(ctx, processingRecord); err != nil {
+			return log.Err(
+				"failed to update processing record with checksums",
+				err,
+				"yearMonth",
+				yearMonth,
+			)
+		}
+
+		// Clean up downloaded checksum file to save space
+		if err := os.Remove(checksumFile); err != nil {
+			log.Warn("failed to clean up checksum file", "error", err, "file", checksumFile)
+		}
+
+		log.Info("Checksums parsed and saved successfully", "yearMonth", yearMonth)
+	} else {
+		log.Info("Using existing checksums from database", "yearMonth", yearMonth)
 	}
 
-	log.Info("Download completed successfully",
-		"yearMonth", yearMonth,
-		"status", processingRecord.Status,
-		"foundArtists", checksums.ArtistsDump != "",
-		"foundLabels", checksums.LabelsDump != "",
-		"foundMasters", checksums.MastersDump != "",
-		"foundReleases", checksums.ReleasesDump != "")
+	return nil
+}
+
+// handleFileDownloads manages individual file downloads with recovery support
+func (j *DiscogsDownloadJob) handleFileDownloads(
+	ctx context.Context,
+	processingRecord *models.DiscogsDataProcessing,
+	yearMonth string,
+	downloadDir string,
+) error {
+	log := j.log.Function("handleFileDownloads")
+
+	checksums := processingRecord.FileChecksums
+	if checksums == nil {
+		return log.Err("checksums not available", fmt.Errorf("FileChecksums is nil"), "yearMonth", yearMonth)
+	}
+
+	fileTypes := []struct {
+		name     string
+		checksum string
+	}{
+		{"artists", checksums.ArtistsDump},
+		{"labels", checksums.LabelsDump},
+		// Add masters and releases when ready
+		// {"masters", checksums.MastersDump},
+		// {"releases", checksums.ReleasesDump},
+	}
+
+	for _, ft := range fileTypes {
+		if ft.checksum == "" {
+			log.Info("Skipping file (no checksum available)", "fileType", ft.name)
+			continue
+		}
+
+		if err := j.handleSingleFileDownload(ctx, processingRecord, yearMonth, downloadDir, ft.name, ft.checksum); err != nil {
+			return log.Err("failed to handle file download", err, "fileType", ft.name, "yearMonth", yearMonth)
+		}
+	}
+
+	return nil
+}
+
+// handleSingleFileDownload handles download/recovery for a single file
+func (j *DiscogsDownloadJob) handleSingleFileDownload(
+	ctx context.Context,
+	processingRecord *models.DiscogsDataProcessing,
+	yearMonth string,
+	downloadDir string,
+	fileType string,
+	expectedChecksum string,
+) error {
+	log := j.log.Function("handleSingleFileDownload")
+
+	filePath := filepath.Join(downloadDir, fmt.Sprintf("%s.xml.gz", fileType))
+
+	// Initialize file tracking info
+	processingRecord.ProcessingStats.InitializeFileInfo(fileType)
+	fileInfo := processingRecord.ProcessingStats.GetFileInfo(fileType)
+
+	// Check if file already exists and is validated
+	if fileInfo.Status == models.FileDownloadStatusValidated {
+		log.Info("File already validated, skipping download", "fileType", fileType, "filePath", filePath)
+		return nil
+	}
+
+	// Check existing file status
+	currentStatus, err := j.download.GetFileStatus(filePath, expectedChecksum)
+	if err != nil {
+		return log.Err("failed to check file status", err, "fileType", fileType, "filePath", filePath)
+	}
+
+	// If file exists and is validated, update our tracking and skip download
+	if currentStatus.Status == models.FileDownloadStatusValidated {
+		log.Info("Found existing validated file", "fileType", fileType, "filePath", filePath, "size", currentStatus.Size)
+		*fileInfo = *currentStatus
+		if err := j.repo.Update(ctx, processingRecord); err != nil {
+			log.Warn("failed to update processing record with existing file status", "error", err)
+		}
+		return nil
+	}
+
+	// If file exists but is invalid, remove it
+	if currentStatus.Status == models.FileDownloadStatusFailed && currentStatus.Downloaded {
+		log.Warn("Removing invalid existing file", "fileType", fileType, "filePath", filePath)
+		if removeErr := os.Remove(filePath); removeErr != nil {
+			log.Warn("failed to remove invalid file", "error", removeErr, "file", filePath)
+		}
+	}
+
+	// Download the file
+	log.Info("Downloading file", "fileType", fileType, "yearMonth", yearMonth)
+
+	// Update status to downloading
+	now := time.Now().UTC()
+	fileInfo.Status = models.FileDownloadStatusDownloading
+	fileInfo.DownloadedAt = &now
+	fileInfo.ErrorMessage = nil
+
+	if err := j.repo.Update(ctx, processingRecord); err != nil {
+		log.Warn("failed to update processing record with downloading status", "error", err)
+	}
+
+	// Perform the actual download
+	if err := j.download.DownloadXMLFile(ctx, yearMonth, fileType); err != nil {
+		errorMsg := err.Error()
+		fileInfo.Status = models.FileDownloadStatusFailed
+		fileInfo.ErrorMessage = &errorMsg
+		if updateErr := j.repo.Update(ctx, processingRecord); updateErr != nil {
+			log.Warn("failed to update processing record with error", "error", updateErr)
+		}
+		return log.Err("failed to download file", err, "fileType", fileType, "yearMonth", yearMonth)
+	}
+
+	// Validate the downloaded file
+	if err := j.download.ValidateFileChecksum(filePath, expectedChecksum); err != nil {
+		// Mark as failed but don't remove the file immediately (for debugging)
+		errorMsg := "checksum validation failed"
+		fileInfo.Status = models.FileDownloadStatusFailed
+		fileInfo.Downloaded = true
+		fileInfo.Validated = false
+		fileInfo.ErrorMessage = &errorMsg
+
+		if updateErr := j.repo.Update(ctx, processingRecord); updateErr != nil {
+			log.Warn("failed to update processing record with validation error", "error", updateErr)
+		}
+
+		// Remove invalid file after updating status
+		if removeErr := os.Remove(filePath); removeErr != nil {
+			log.Warn("failed to remove invalid file", "error", removeErr, "file", filePath)
+		}
+
+		return log.Err("file checksum validation failed", err, "fileType", fileType, "yearMonth", yearMonth)
+	}
+
+	// File downloaded and validated successfully
+	validatedAt := time.Now().UTC()
+	fileInfo.Status = models.FileDownloadStatusValidated
+	fileInfo.Downloaded = true
+	fileInfo.Validated = true
+	fileInfo.ValidatedAt = &validatedAt
+	fileInfo.ErrorMessage = nil
+
+	// Get file size
+	if info, err := os.Stat(filePath); err == nil {
+		fileInfo.Size = info.Size()
+	}
+
+	if err := j.repo.Update(ctx, processingRecord); err != nil {
+		log.Warn("failed to update processing record with success status", "error", err)
+	}
+
+	log.Info("File downloaded and validated successfully", "fileType", fileType, "yearMonth", yearMonth, "size", fileInfo.Size)
 
 	return nil
 }

@@ -3,6 +3,8 @@ package services
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +15,14 @@ import (
 	"waugzee/config"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
+)
+
+// Discogs S3 configuration constants
+const (
+	DiscogsS3BaseURL = "https://discogs-data-dumps.s3-us-west-2.amazonaws.com/data"
+	DiscogsTimeoutSec = 300  // 5 minutes for large files
+	DiscogsUserAgent = "Waugzee/1.0 (Discogs Data Sync)"
+	DiscogsMaxRetries = 5
 )
 
 type DownloadService struct {
@@ -30,16 +40,13 @@ var retrySchedule = []time.Duration{
 	375 * time.Minute,    // 375 minutes (6.25 hours)
 }
 
-const maxRetries = 5
+const maxRetries = DiscogsMaxRetries
 
 func NewDownloadService(cfg config.Config) *DownloadService {
 	log := logger.New("downloadService")
 
-	// Create HTTP client with configurable timeout
-	timeout := time.Duration(cfg.DiscogsTimeoutSec) * time.Second
-	if timeout == 0 {
-		timeout = 30 * time.Second // Default timeout
-	}
+	// Create HTTP client with constant timeout
+	timeout := time.Duration(DiscogsTimeoutSec) * time.Second
 
 	httpClient := &http.Client{
 		Timeout: timeout,
@@ -75,7 +82,8 @@ func (ds *DownloadService) DownloadChecksum(ctx context.Context, yearMonth strin
 	
 	// Build S3 URL for CHECKSUM.txt
 	checksumURL := fmt.Sprintf(
-		"https://discogs-data-dumps.s3-us-west-2.amazonaws.com/data/%s/discogs_%s01_CHECKSUM.txt",
+		"%s/%s/discogs_%s01_CHECKSUM.txt",
+		DiscogsS3BaseURL,
 		year,
 		strings.ReplaceAll(currentYearMonth, "-", ""),
 	)
@@ -172,6 +180,107 @@ func (ds *DownloadService) ParseChecksumFile(filePath string) (*models.FileCheck
 	return checksums, nil
 }
 
+// DownloadXMLFile downloads a specific XML file (artists.xml.gz or labels.xml.gz) from Discogs S3
+func (ds *DownloadService) DownloadXMLFile(ctx context.Context, yearMonth, fileType string) error {
+	log := ds.log.Function("DownloadXMLFile")
+
+	// Validate inputs
+	if !isValidYearMonth(yearMonth) {
+		return log.Err("invalid yearMonth format", fmt.Errorf("expected YYYY-MM format, got: %s", yearMonth))
+	}
+
+	// Validate file type
+	if fileType != "artists" && fileType != "labels" {
+		return log.Err("invalid file type", fmt.Errorf("expected 'artists' or 'labels', got: %s", fileType))
+	}
+
+	// Use current year-month for URL construction (always download current month data)
+	currentYearMonth := time.Now().UTC().Format("2006-01")
+	year := strings.Split(currentYearMonth, "-")[0]
+
+	// Build S3 URL for XML file
+	xmlURL := fmt.Sprintf(
+		"%s/%s/discogs_%s01_%s.xml.gz",
+		DiscogsS3BaseURL,
+		year,
+		strings.ReplaceAll(currentYearMonth, "-", ""),
+		fileType,
+	)
+
+	// Create download directory
+	downloadDir := fmt.Sprintf("/tmp/discogs-%s", yearMonth)
+	if err := ds.ensureDirectory(downloadDir); err != nil {
+		return log.Err("failed to create download directory", err, "directory", downloadDir)
+	}
+
+	// Target file path
+	targetFile := filepath.Join(downloadDir, fmt.Sprintf("%s.xml.gz", fileType))
+
+	log.Info("Starting XML file download",
+		"fileType", fileType,
+		"url", xmlURL,
+		"targetFile", targetFile,
+		"yearMonth", yearMonth)
+
+	// Download with retry logic
+	return ds.downloadFileWithRetry(ctx, xmlURL, targetFile)
+}
+
+// ValidateFileChecksum validates an existing file against its expected SHA256 checksum
+func (ds *DownloadService) ValidateFileChecksum(filePath, expectedChecksum string) error {
+	log := ds.log.Function("ValidateFileChecksum")
+
+	// Open the file for reading
+	file, err := os.Open(filePath)
+	if err != nil {
+		return log.Err("failed to open file for checksum validation", err, "filePath", filePath)
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			log.Warn("failed to close file after checksum validation", "error", closeErr, "filePath", filePath)
+		}
+	}()
+
+	// Create SHA256 hash
+	hash := sha256.New()
+
+	// Copy file content to hash with buffered reading for large files
+	buffer := make([]byte, 32*1024) // 32KB buffer
+	for {
+		n, readErr := file.Read(buffer)
+		if n > 0 {
+			if _, writeErr := hash.Write(buffer[:n]); writeErr != nil {
+				return log.Err("failed to write to SHA256 hash", writeErr, "filePath", filePath)
+			}
+		}
+
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			return log.Err("failed to read file for checksum", readErr, "filePath", filePath)
+		}
+	}
+
+	// Get computed checksum
+	computedChecksum := hex.EncodeToString(hash.Sum(nil))
+
+	// Compare checksums (case insensitive)
+	if !strings.EqualFold(computedChecksum, expectedChecksum) {
+		return log.Err("checksum validation failed",
+			fmt.Errorf("computed: %s, expected: %s", computedChecksum, expectedChecksum),
+			"filePath", filePath,
+			"computed", computedChecksum,
+			"expected", expectedChecksum)
+	}
+
+	log.Info("Checksum validation successful",
+		"filePath", filePath,
+		"checksum", computedChecksum)
+
+	return nil
+}
+
 // downloadFileWithRetry downloads a file with exponential backoff retry logic
 func (ds *DownloadService) downloadFileWithRetry(ctx context.Context, url, targetFile string) error {
 	log := ds.log.Function("downloadFileWithRetry")
@@ -240,7 +349,7 @@ func (ds *DownloadService) downloadFile(ctx context.Context, url, targetFile str
 	}
 
 	// Set User-Agent header for Discogs S3
-	req.Header.Set("User-Agent", "Waugzee/"+ds.config.GeneralVersion+" (Discogs Data Sync)")
+	req.Header.Set("User-Agent", DiscogsUserAgent)
 
 	// Make HTTP request
 	resp, err := ds.httpClient.Do(req)
@@ -349,6 +458,78 @@ func (ds *DownloadService) ensureDirectory(dir string) error {
 		log.Info("Created download directory", "directory", dir)
 	}
 	return nil
+}
+
+// CheckExistingFile checks if a file exists and optionally validates its checksum
+func (ds *DownloadService) CheckExistingFile(filePath string, expectedChecksum string, validateChecksum bool) (exists bool, valid bool, size int64, err error) {
+	log := ds.log.Function("CheckExistingFile")
+
+	// Check if file exists
+	info, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		return false, false, 0, nil
+	}
+	if err != nil {
+		return false, false, 0, log.Err("failed to stat file", err, "filePath", filePath)
+	}
+
+	exists = true
+	size = info.Size()
+
+	// If checksum validation is not requested, return early
+	if !validateChecksum || expectedChecksum == "" {
+		return exists, true, size, nil // Assume valid if not validating checksum
+	}
+
+	// Validate checksum if requested
+	if err := ds.ValidateFileChecksum(filePath, expectedChecksum); err != nil {
+		log.Warn("Existing file failed checksum validation",
+			"filePath", filePath,
+			"expectedChecksum", expectedChecksum,
+			"error", err)
+		return exists, false, size, nil
+	}
+
+	log.Info("Existing file validated successfully",
+		"filePath", filePath,
+		"size", size)
+
+	return exists, true, size, nil
+}
+
+// GetFileStatus returns the current status of a file based on existence and checksum validation
+func (ds *DownloadService) GetFileStatus(filePath string, expectedChecksum string) (*models.FileDownloadInfo, error) {
+	log := ds.log.Function("GetFileStatus")
+
+	exists, valid, size, err := ds.CheckExistingFile(filePath, expectedChecksum, expectedChecksum != "")
+	if err != nil {
+		return nil, log.Err("failed to check existing file", err, "filePath", filePath)
+	}
+
+	info := &models.FileDownloadInfo{
+		Size: size,
+	}
+
+	if !exists {
+		info.Status = models.FileDownloadStatusNotStarted
+		info.Downloaded = false
+		info.Validated = false
+	} else if !valid {
+		info.Status = models.FileDownloadStatusFailed
+		info.Downloaded = true
+		info.Validated = false
+		errorMsg := "checksum validation failed"
+		info.ErrorMessage = &errorMsg
+	} else {
+		info.Status = models.FileDownloadStatusValidated
+		info.Downloaded = true
+		info.Validated = true
+		now := time.Now().UTC()
+		info.DownloadedAt = &now
+		info.ValidatedAt = &now
+	}
+
+	return info, nil
 }
 
 // isValidYearMonth validates YYYY-MM format

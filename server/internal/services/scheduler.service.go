@@ -57,7 +57,7 @@ func NewSchedulerService() *SchedulerService {
 func (s *SchedulerService) executeJob(job Job, log logger.Logger) {
 	log.Info("Executing scheduled job", "job", job.Name())
 	if err := job.Execute(s.ctx); err != nil {
-		log.Er("Job execution failed", err, "job", job.Name())
+		log.Err("Job execution failed", err, "job", job.Name())
 	} else {
 		log.Info("Job execution completed successfully", "job", job.Name())
 	}
