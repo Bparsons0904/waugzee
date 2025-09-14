@@ -1,10 +1,12 @@
 package app
 
 import (
+	"context"
 	"waugzee/config"
 	"waugzee/internal/database"
 	"waugzee/internal/events"
 	"waugzee/internal/handlers/middleware"
+	"waugzee/internal/jobs"
 	"waugzee/internal/logger"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
@@ -25,6 +27,8 @@ type App struct {
 	TransactionService *services.TransactionService
 	ZitadelService     *services.ZitadelService
 	DiscogsService     *services.DiscogsService
+	DownloadService    *services.DownloadService
+	SchedulerService   *services.SchedulerService
 
 	// Repositories
 	UserRepo                  repositories.UserRepository
@@ -57,6 +61,8 @@ func New() (*App, error) {
 		return &App{}, log.Err("failed to create Zitadel service", err)
 	}
 	discogsService := services.NewDiscogsService()
+	downloadService := services.NewDownloadService(config)
+	schedulerService := services.NewSchedulerService()
 
 	// Initialize repositories
 	userRepo := repositories.New(db)
@@ -71,6 +77,15 @@ func New() (*App, error) {
 	middleware := middleware.New(db, eventBus, config, userRepo)
 	authController := authController.New(zitadelService, userRepo, db)
 	userController := userController.New(userRepo, discogsService, config)
+	
+	// Register jobs with scheduler if enabled
+	if config.SchedulerEnabled {
+		discogsDownloadJob := jobs.NewDiscogsDownloadJob(discogsDataProcessingRepo, transactionService, downloadService)
+		if err := schedulerService.AddJob(discogsDownloadJob); err != nil {
+			return &App{}, log.Err("failed to register Discogs download job", err)
+		}
+		log.Info("Registered Discogs download job with scheduler")
+	}
 
 	app := &App{
 		Database:                  db,
@@ -79,6 +94,8 @@ func New() (*App, error) {
 		TransactionService:        transactionService,
 		ZitadelService:            zitadelService,
 		DiscogsService:            discogsService,
+		DownloadService:           downloadService,
+		SchedulerService:          schedulerService,
 		UserRepo:                  userRepo,
 		DiscogsDataProcessingRepo: discogsDataProcessingRepo,
 		AuthController:            authController,
@@ -110,6 +127,8 @@ func (a *App) validate() error {
 		a.TransactionService,
 		a.ZitadelService,
 		a.DiscogsService,
+		a.DownloadService,
+		a.SchedulerService,
 		a.AuthController,
 		a.UserController,
 		a.Middleware,
@@ -129,6 +148,12 @@ func (a *App) validate() error {
 func (a *App) Close() (err error) {
 	if a.EventBus != nil {
 		if closeErr := a.EventBus.Close(); closeErr != nil {
+			err = closeErr
+		}
+	}
+
+	if a.SchedulerService != nil {
+		if closeErr := a.SchedulerService.Stop(context.Background()); closeErr != nil {
 			err = closeErr
 		}
 	}
