@@ -25,7 +25,21 @@ const (
 
 var MODELS_TO_MIGRATE = []any{
 	&User{},
+	&Cartridge{},
+	&Stylus{},
+	&Genre{},
+	&Track{},
+	&Label{},
+	&Artist{},
+	&DiscogsSync{},
+	&MaintenanceRecord{},
 	&DiscogsDataProcessing{},
+	&Master{},
+	&Release{},
+	&UserCollection{},
+	&PlaySession{},
+	&Turntable{},
+	&UserPreferences{},
 }
 
 func main() {
@@ -144,12 +158,27 @@ func migrateSeed(db database.DB, config config.Config, log logger.Logger) error 
 func autoMigrate(db *gorm.DB, log logger.Logger) error {
 	log = log.Function("autoMigrate")
 
-	dbTables := MODELS_TO_MIGRATE
+	// Two-phase migration to handle circular dependencies
+	// Phase 1: Create all tables without foreign key constraints
+	log.Info("Phase 1: Creating tables without foreign key constraints")
+	db.Config.DisableForeignKeyConstraintWhenMigrating = true
+	for _, table := range MODELS_TO_MIGRATE {
+		if !db.Migrator().HasTable(table) {
+			log.Info("Creating table structure", "table", table)
+			err := db.Migrator().CreateTable(table)
+			if err != nil {
+				return log.Err("failed to create table structure", err)
+			}
+		}
+	}
 
-	log.Info("GORM auto-migrating tables", "tables", dbTables)
-	err := db.AutoMigrate(dbTables...)
+	// Phase 2: Add all constraints and relationships
+	// Re-enable foreign key constraint creation
+	db.Config.DisableForeignKeyConstraintWhenMigrating = false
+	log.Info("Phase 2: Adding foreign key constraints and relationships")
+	err := db.AutoMigrate(MODELS_TO_MIGRATE...)
 	if err != nil {
-		return log.Err("failed to auto migrate", err)
+		return log.Err("failed to add constraints", err)
 	}
 
 	return nil
@@ -194,7 +223,7 @@ func runMigrations(
 		return log.Err("failed to open database for migrations", err)
 	}
 	defer func() {
-		if err := db.Close(); err != nil {
+		if err = db.Close(); err != nil {
 			log.Er("failed to close database", err)
 		}
 	}()
