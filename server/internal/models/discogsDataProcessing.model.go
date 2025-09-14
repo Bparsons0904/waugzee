@@ -49,12 +49,13 @@ type DiscogsDataProcessing struct {
 	CompletedAt           *time.Time       `gorm:"type:timestamp"                                                                    json:"completedAt,omitempty"`
 }
 
+var yearMonthRegex = regexp.MustCompile(`^\d{4}-\d{2}$`)
+
 func (ddp *DiscogsDataProcessing) BeforeCreate(tx *gorm.DB) (err error) {
 	if ddp.YearMonth == "" {
 		return gorm.ErrInvalidValue
 	}
-	// Validate YYYY-MM format
-	if matched, _ := regexp.MatchString(`^\d{4}-\d{2}$`, ddp.YearMonth); !matched {
+	if !yearMonthRegex.MatchString(ddp.YearMonth) {
 		return gorm.ErrInvalidValue
 	}
 	if ddp.Status == "" {
@@ -67,8 +68,7 @@ func (ddp *DiscogsDataProcessing) BeforeUpdate(tx *gorm.DB) (err error) {
 	if ddp.YearMonth == "" {
 		return gorm.ErrInvalidValue
 	}
-	// Validate YYYY-MM format
-	if matched, _ := regexp.MatchString(`^\d{4}-\d{2}$`, ddp.YearMonth); !matched {
+	if !yearMonthRegex.MatchString(ddp.YearMonth) {
 		return gorm.ErrInvalidValue
 	}
 	return nil

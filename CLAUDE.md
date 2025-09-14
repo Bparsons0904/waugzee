@@ -327,3 +327,4 @@ This project is currently in **Phase 2: Authentication & User Management**. See 
 ---
 
 **Project Status**: 🚧 **Active Development** - Phase 2: Authentication & User Management
+- File names should be camelCase or PascalCase
