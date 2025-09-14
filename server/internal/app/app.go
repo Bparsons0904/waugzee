@@ -24,15 +24,17 @@ type App struct {
 	Config     config.Config
 
 	// Services
-	TransactionService *services.TransactionService
-	ZitadelService     *services.ZitadelService
-	DiscogsService     *services.DiscogsService
-	DownloadService    *services.DownloadService
-	SchedulerService   *services.SchedulerService
+	TransactionService   *services.TransactionService
+	ZitadelService       *services.ZitadelService
+	DiscogsService       *services.DiscogsService
+	DownloadService      *services.DownloadService
+	SchedulerService     *services.SchedulerService
+	XMLProcessingService *services.XMLProcessingService
 
 	// Repositories
 	UserRepo                  repositories.UserRepository
 	DiscogsDataProcessingRepo repositories.DiscogsDataProcessingRepository
+	LabelRepo                 repositories.LabelRepository
 
 	// Controllers
 	AuthController authController.AuthControllerInterface
@@ -60,13 +62,20 @@ func New() (*App, error) {
 	if err != nil {
 		return &App{}, log.Err("failed to create Zitadel service", err)
 	}
-	discogsService := services.NewDiscogsService()
-	downloadService := services.NewDownloadService(config)
-	schedulerService := services.NewSchedulerService()
-
 	// Initialize repositories
 	userRepo := repositories.New(db)
 	discogsDataProcessingRepo := repositories.NewDiscogsDataProcessingRepository(db)
+	labelRepo := repositories.NewLabelRepository(db)
+
+	// Initialize services
+	discogsService := services.NewDiscogsService()
+	downloadService := services.NewDownloadService(config)
+	schedulerService := services.NewSchedulerService()
+	xmlProcessingService := services.NewXMLProcessingService(
+		labelRepo,
+		discogsDataProcessingRepo,
+		transactionService,
+	)
 
 	websocket, err := websockets.New(db, eventBus, config, zitadelService, userRepo)
 	if err != nil {
@@ -80,16 +89,29 @@ func New() (*App, error) {
 
 	// Register jobs with scheduler if enabled
 	if config.SchedulerEnabled {
+		// Download job runs at 2:00 AM UTC daily
 		discogsDownloadJob := jobs.NewDiscogsDownloadJob(
 			discogsDataProcessingRepo,
 			transactionService,
 			downloadService,
-			services.Hourly,
+			services.Daily,
 		)
 		if err := schedulerService.AddJob(discogsDownloadJob); err != nil {
 			return &App{}, log.Err("failed to register Discogs download job", err)
 		}
 		log.Info("Registered Discogs download job with scheduler")
+
+		// Processing job runs at 3:00 AM UTC daily (1 hour after download)
+		discogsProcessingJob := jobs.NewDiscogsProcessingJob(
+			discogsDataProcessingRepo,
+			transactionService,
+			xmlProcessingService,
+			services.DailyProcessing,
+		)
+		if err := schedulerService.AddJob(discogsProcessingJob); err != nil {
+			return &App{}, log.Err("failed to register Discogs processing job", err)
+		}
+		log.Info("Registered Discogs processing job with scheduler")
 	}
 
 	app := &App{
@@ -101,8 +123,10 @@ func New() (*App, error) {
 		DiscogsService:            discogsService,
 		DownloadService:           downloadService,
 		SchedulerService:          schedulerService,
+		XMLProcessingService:      xmlProcessingService,
 		UserRepo:                  userRepo,
 		DiscogsDataProcessingRepo: discogsDataProcessingRepo,
+		LabelRepo:                 labelRepo,
 		AuthController:            authController,
 		UserController:            userController,
 		Websocket:                 websocket,
@@ -134,11 +158,13 @@ func (a *App) validate() error {
 		a.DiscogsService,
 		a.DownloadService,
 		a.SchedulerService,
+		a.XMLProcessingService,
 		a.AuthController,
 		a.UserController,
 		a.Middleware,
 		a.UserRepo,
 		a.DiscogsDataProcessingRepo,
+		a.LabelRepo,
 	}
 
 	for _, check := range nilChecks {

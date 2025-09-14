@@ -12,8 +12,9 @@ import (
 type Schedule int
 
 const (
-	Hourly Schedule = iota
-	Daily           // Start at 09:00 UTC every day / 03:00-04:00 CST
+	Hourly          Schedule = iota
+	Daily                    // Start at 02:00 UTC every day
+	DailyProcessing          // Start at 03:00 UTC every day (1 hour after download)
 )
 
 // Job represents a scheduled task that can be executed by the scheduler
@@ -76,6 +77,10 @@ func (s *SchedulerService) AddJob(job Job) error {
 		_, err = s.scheduler.Every(1).Day().At("02:00").Do(func() {
 			s.executeJob(job, log)
 		})
+	case DailyProcessing:
+		_, err = s.scheduler.Every(1).Day().At("03:00").Do(func() {
+			s.executeJob(job, log)
+		})
 	case Hourly:
 		_, err = s.scheduler.Every(1).Hour().Do(func() {
 			s.executeJob(job, log)
@@ -110,7 +115,9 @@ func (s *SchedulerService) Start(ctx context.Context) error {
 		return nil
 	}
 
-	log.Info("Delaying scheduler startup for 30 seconds to prevent immediate downloads during development")
+	log.Info(
+		"Delaying scheduler startup for 30 seconds to prevent immediate downloads during development",
+	)
 	time.Sleep(30 * time.Second)
 
 	log.Info("Starting scheduler", "jobCount", len(s.jobs))

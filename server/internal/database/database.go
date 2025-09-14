@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 	"waugzee/config"
 	logg "waugzee/internal/logger"
-	"time"
 
 	"github.com/valkey-io/valkey-go"
 	"gorm.io/driver/postgres"
@@ -71,7 +71,7 @@ func (s *DB) initializeDB(config config.Config) error {
 			LogLevel:                  logger.Info,
 			IgnoreRecordNotFoundError: true,
 			ParameterizedQueries:      false,
-			Colorful:                  false,
+			Colorful:                  true,
 		},
 	)
 
@@ -166,7 +166,7 @@ func (s *DB) Close() (err error) {
 		s.Cache.LoadTest.Close()
 	}
 
-	return
+	return err
 }
 
 func (s *DB) SQLWithContext(ctx context.Context) *gorm.DB {

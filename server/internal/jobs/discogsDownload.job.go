@@ -257,7 +257,11 @@ func (j *DiscogsDownloadJob) performDownload(
 		)
 	}
 
-	log.Info("All downloads completed successfully",
+	log.Info("Downloads completed successfully, ready for processing",
+		"yearMonth", yearMonth,
+		"status", processingRecord.Status)
+
+	log.Info("Download workflow completed successfully",
 		"yearMonth", yearMonth,
 		"status", processingRecord.Status)
 
@@ -346,12 +350,15 @@ func (j *DiscogsDownloadJob) handleFileDownloads(
 		{"releases", checksums.ReleasesDump},
 	}
 
-	// Use concurrent downloads with goroutines for better performance
+	// Use limited concurrent downloads with semaphore pattern
+	const maxConcurrentDownloads = 3
+	semaphore := make(chan struct{}, maxConcurrentDownloads)
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var downloadErrors []error
 
-	// Launch concurrent downloads for all files
+	// Launch concurrent downloads for all files with concurrency limit
 	for _, ft := range fileTypes {
 		if ft.checksum == "" {
 			log.Info("Skipping file (no checksum available)", "fileType", ft.name)
@@ -361,6 +368,10 @@ func (j *DiscogsDownloadJob) handleFileDownloads(
 		wg.Add(1)
 		go func(fileType, checksum string) {
 			defer wg.Done()
+
+			// Acquire semaphore slot
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }() // Release semaphore slot
 
 			if err := j.handleSingleFileDownload(ctx, processingRecord, yearMonth, downloadDir, fileType, checksum); err != nil {
 				mu.Lock()
@@ -546,6 +557,7 @@ func (j *DiscogsDownloadJob) handleSingleFileDownload(
 
 	return nil
 }
+
 
 func (j *DiscogsDownloadJob) Schedule() services.Schedule {
 	return j.schedule

@@ -20,6 +20,7 @@ type Release struct {
 	Title         string        `gorm:"type:text;not null;index:idx_releases_title" json:"title" validate:"required"`
 	DiscogsID     int64         `gorm:"type:bigint;not null;uniqueIndex:idx_releases_discogs_id" json:"discogsId" validate:"required"`
 	LabelID       *uuid.UUID    `gorm:"type:uuid;index:idx_releases_label" json:"labelId,omitempty"`
+	MasterID      *uuid.UUID    `gorm:"type:uuid;index:idx_releases_master" json:"masterId,omitempty"`
 	Year          *int          `gorm:"type:int;index:idx_releases_year" json:"year,omitempty"`
 	Country       *string       `gorm:"type:text" json:"country,omitempty"`
 	CatalogNumber *string       `gorm:"type:text" json:"catalogNumber,omitempty"`
@@ -29,6 +30,7 @@ type Release struct {
 
 	// Relationships
 	Label           *Label             `gorm:"foreignKey:LabelID" json:"label,omitempty"`
+	Master          *Master            `gorm:"foreignKey:MasterID" json:"master,omitempty"`
 	Artists         []Artist           `gorm:"many2many:release_artists;" json:"artists,omitempty"`
 	Genres          []Genre            `gorm:"many2many:release_genres;" json:"genres,omitempty"`
 	Tracks          []Track            `gorm:"foreignKey:ReleaseID" json:"tracks,omitempty"`

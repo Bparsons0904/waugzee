@@ -5,22 +5,19 @@ import (
 	"fmt"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
+	contextutil "waugzee/internal/context"
 
 	"gorm.io/gorm"
 )
 
-type contextKey string
-
-const TRANSACTION_KEY contextKey = "transaction"
-
-// Context utilities for transaction injection
-func WithTransaction(ctx context.Context, tx *gorm.DB) context.Context {
-	return context.WithValue(ctx, TRANSACTION_KEY, tx)
+// GetTransaction is provided for backward compatibility
+func GetTransaction(ctx context.Context) (*gorm.DB, bool) {
+	return contextutil.GetTransaction(ctx)
 }
 
-func GetTransaction(ctx context.Context) (*gorm.DB, bool) {
-	tx, ok := ctx.Value(TRANSACTION_KEY).(*gorm.DB)
-	return tx, ok
+// WithTransaction is provided for backward compatibility
+func WithTransaction(ctx context.Context, tx *gorm.DB) context.Context {
+	return contextutil.WithTransaction(ctx, tx)
 }
 
 // TransactionService handles database transactions using context injection
@@ -50,7 +47,7 @@ func (ts *TransactionService) Execute(ctx context.Context, fn func(context.Conte
 	}
 
 	// Create context with transaction
-	txCtx := WithTransaction(ctx, tx)
+	txCtx := contextutil.WithTransaction(ctx, tx)
 
 	// Handle panics with intelligent rollback
 	defer func() {
@@ -87,4 +84,9 @@ func (ts *TransactionService) Execute(ctx context.Context, fn func(context.Conte
 
 	log.Info("transaction completed successfully")
 	return nil
+}
+
+// ExecuteInTransaction is an alias for Execute for backward compatibility
+func (ts *TransactionService) ExecuteInTransaction(ctx context.Context, fn func(context.Context) error) error {
+	return ts.Execute(ctx, fn)
 }

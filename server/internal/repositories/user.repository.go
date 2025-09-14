@@ -6,7 +6,7 @@ import (
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
-	"waugzee/internal/services"
+	contextutil "waugzee/internal/context"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -39,7 +39,7 @@ func New(db database.DB) UserRepository {
 }
 
 func (r *userRepository) getDB(ctx context.Context) *gorm.DB {
-	if tx, ok := services.GetTransaction(ctx); ok {
+	if tx, ok := contextutil.GetTransaction(ctx); ok {
 		return tx
 	}
 	return r.db.SQLWithContext(ctx)
