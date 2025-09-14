@@ -20,18 +20,21 @@ type DiscogsDownloadJob struct {
 	transaction *services.TransactionService
 	download    *services.DownloadService
 	log         logger.Logger
+	schedule    services.Schedule
 }
 
 func NewDiscogsDownloadJob(
 	repo repositories.DiscogsDataProcessingRepository,
 	transaction *services.TransactionService,
 	download *services.DownloadService,
+	schedule services.Schedule,
 ) *DiscogsDownloadJob {
 	return &DiscogsDownloadJob{
 		repo:        repo,
 		transaction: transaction,
 		download:    download,
 		log:         logger.New("discogsDownloadJob"),
+		schedule:    schedule,
 	}
 }
 
@@ -140,15 +143,24 @@ func (j *DiscogsDownloadJob) Execute(ctx context.Context) error {
 		}
 
 		// Only proceed with download if status is not_started or failed
-		if processingRecord.Status != models.ProcessingStatusNotStarted && 
-		   processingRecord.Status != models.ProcessingStatusFailed {
-			log.Info("Processing record not in downloadable state", "status", processingRecord.Status)
+		if processingRecord.Status != models.ProcessingStatusNotStarted &&
+			processingRecord.Status != models.ProcessingStatusFailed {
+			log.Info(
+				"Processing record not in downloadable state",
+				"status",
+				processingRecord.Status,
+			)
 			return nil
 		}
 
 		// Transition to downloading status
 		if err := processingRecord.UpdateStatus(models.ProcessingStatusDownloading); err != nil {
-			return log.Err("failed to transition to downloading status", err, "yearMonth", yearMonth)
+			return log.Err(
+				"failed to transition to downloading status",
+				err,
+				"yearMonth",
+				yearMonth,
+			)
 		}
 
 		// Set started time if not already set
@@ -158,10 +170,21 @@ func (j *DiscogsDownloadJob) Execute(ctx context.Context) error {
 		}
 
 		if err := j.repo.Update(txCtx, processingRecord); err != nil {
-			return log.Err("failed to update processing record to downloading", err, "yearMonth", yearMonth)
+			return log.Err(
+				"failed to update processing record to downloading",
+				err,
+				"yearMonth",
+				yearMonth,
+			)
 		}
 
-		log.Info("Transitioned to downloading status", "yearMonth", yearMonth, "status", processingRecord.Status)
+		log.Info(
+			"Transitioned to downloading status",
+			"yearMonth",
+			yearMonth,
+			"status",
+			processingRecord.Status,
+		)
 
 		// Perform the actual download
 		if err := j.performDownload(txCtx, processingRecord, yearMonth); err != nil {
@@ -169,11 +192,11 @@ func (j *DiscogsDownloadJob) Execute(ctx context.Context) error {
 			errorMsg := err.Error()
 			processingRecord.ErrorMessage = &errorMsg
 			processingRecord.UpdateStatus(models.ProcessingStatusFailed)
-			
+
 			if updateErr := j.repo.Update(txCtx, processingRecord); updateErr != nil {
 				log.Warn("failed to update processing record with error", "error", updateErr)
 			}
-			
+
 			return log.Err("download failed", err, "yearMonth", yearMonth)
 		}
 
@@ -183,7 +206,11 @@ func (j *DiscogsDownloadJob) Execute(ctx context.Context) error {
 }
 
 // performDownload handles the actual download process
-func (j *DiscogsDownloadJob) performDownload(ctx context.Context, processingRecord *models.DiscogsDataProcessing, yearMonth string) error {
+func (j *DiscogsDownloadJob) performDownload(
+	ctx context.Context,
+	processingRecord *models.DiscogsDataProcessing,
+	yearMonth string,
+) error {
 	log := j.log.Function("performDownload")
 
 	log.Info("Starting checksum download", "yearMonth", yearMonth)
@@ -203,7 +230,12 @@ func (j *DiscogsDownloadJob) performDownload(ctx context.Context, processingReco
 	// Update processing record with checksums and transition to ready_for_processing
 	processingRecord.FileChecksums = checksums
 	if err := processingRecord.UpdateStatus(models.ProcessingStatusReadyForProcessing); err != nil {
-		return log.Err("failed to transition to ready_for_processing status", err, "yearMonth", yearMonth)
+		return log.Err(
+			"failed to transition to ready_for_processing status",
+			err,
+			"yearMonth",
+			yearMonth,
+		)
 	}
 
 	// Set download completed time
@@ -211,7 +243,12 @@ func (j *DiscogsDownloadJob) performDownload(ctx context.Context, processingReco
 	processingRecord.DownloadCompletedAt = &now
 
 	if err := j.repo.Update(ctx, processingRecord); err != nil {
-		return log.Err("failed to update processing record after download", err, "yearMonth", yearMonth)
+		return log.Err(
+			"failed to update processing record after download",
+			err,
+			"yearMonth",
+			yearMonth,
+		)
 	}
 
 	// Clean up downloaded file to save space (we only need the parsed checksums)
@@ -230,3 +267,6 @@ func (j *DiscogsDownloadJob) performDownload(ctx context.Context, processingReco
 	return nil
 }
 
+func (j *DiscogsDownloadJob) Schedule() services.Schedule {
+	return j.schedule
+}

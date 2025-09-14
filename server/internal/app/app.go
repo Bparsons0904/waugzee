@@ -77,10 +77,15 @@ func New() (*App, error) {
 	middleware := middleware.New(db, eventBus, config, userRepo)
 	authController := authController.New(zitadelService, userRepo, db)
 	userController := userController.New(userRepo, discogsService, config)
-	
+
 	// Register jobs with scheduler if enabled
 	if config.SchedulerEnabled {
-		discogsDownloadJob := jobs.NewDiscogsDownloadJob(discogsDataProcessingRepo, transactionService, downloadService)
+		discogsDownloadJob := jobs.NewDiscogsDownloadJob(
+			discogsDataProcessingRepo,
+			transactionService,
+			downloadService,
+			services.Hourly,
+		)
 		if err := schedulerService.AddJob(discogsDownloadJob); err != nil {
 			return &App{}, log.Err("failed to register Discogs download job", err)
 		}
@@ -170,4 +175,3 @@ func (a *App) Close() (err error) {
 
 	return err
 }
-

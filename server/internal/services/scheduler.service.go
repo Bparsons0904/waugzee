@@ -9,6 +9,13 @@ import (
 	"github.com/go-co-op/gocron"
 )
 
+type Schedule int
+
+const (
+	Hourly Schedule = iota
+	Daily           // Start at 09:00 UTC every day / 03:00-04:00 CST
+)
+
 // Job represents a scheduled task that can be executed by the scheduler
 type Job interface {
 	// Name returns a human-readable name for the job
@@ -17,6 +24,7 @@ type Job interface {
 	// Execute runs the job with the given context
 	// Context can be used for cancellation and timeout handling
 	Execute(ctx context.Context) error
+	Schedule() Schedule
 }
 
 type SchedulerService struct {
@@ -46,6 +54,15 @@ func NewSchedulerService() *SchedulerService {
 	}
 }
 
+func (s *SchedulerService) executeJob(job Job, log logger.Logger) {
+	log.Info("Executing scheduled job", "job", job.Name())
+	if err := job.Execute(s.ctx); err != nil {
+		log.Er("Job execution failed", err, "job", job.Name())
+	} else {
+		log.Info("Job execution completed successfully", "job", job.Name())
+	}
+}
+
 // AddJob registers a job with the scheduler
 func (s *SchedulerService) AddJob(job Job) error {
 	s.mu.Lock()
@@ -53,16 +70,18 @@ func (s *SchedulerService) AddJob(job Job) error {
 
 	log := s.log.Function("AddJob")
 
-	// Register the job with gocron
-	_, err := s.scheduler.Every(1).Day().At("02:00").Do(func() {
-		log.Info("Executing scheduled job", "job", job.Name())
+	var err error
+	switch job.Schedule() {
+	case Daily:
+		_, err = s.scheduler.Every(1).Day().At("02:00").Do(func() {
+			s.executeJob(job, log)
+		})
+	case Hourly:
+		_, err = s.scheduler.Every(1).Hour().Do(func() {
+			s.executeJob(job, log)
+		})
+	}
 
-		if err := job.Execute(s.ctx); err != nil {
-			log.Er("Job execution failed", err, "job", job.Name())
-		} else {
-			log.Info("Job execution completed successfully", "job", job.Name())
-		}
-	})
 	if err != nil {
 		return log.Err("failed to register job with scheduler", err, "job", job.Name())
 	}
@@ -156,4 +175,3 @@ func (s *SchedulerService) GetNextRunTime() *time.Time {
 	nextRun := s.scheduler.Jobs()[0].NextRun()
 	return &nextRun
 }
-
