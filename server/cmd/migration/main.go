@@ -25,6 +25,7 @@ const (
 
 var MODELS_TO_MIGRATE = []any{
 	&User{},
+	&DiscogsDataProcessing{},
 }
 
 func main() {

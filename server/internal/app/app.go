@@ -27,7 +27,8 @@ type App struct {
 	DiscogsService     *services.DiscogsService
 
 	// Repositories
-	UserRepo repositories.UserRepository
+	UserRepo                  repositories.UserRepository
+	DiscogsDataProcessingRepo repositories.DiscogsDataProcessingRepository
 
 	// Controllers
 	AuthController authController.AuthControllerInterface
@@ -59,6 +60,7 @@ func New() (*App, error) {
 
 	// Initialize repositories
 	userRepo := repositories.New(db)
+	discogsDataProcessingRepo := repositories.NewDiscogsDataProcessingRepository(db)
 
 	websocket, err := websockets.New(db, eventBus, config, zitadelService, userRepo)
 	if err != nil {
@@ -71,17 +73,18 @@ func New() (*App, error) {
 	userController := userController.New(userRepo, discogsService, config)
 
 	app := &App{
-		Database:           db,
-		Config:             config,
-		Middleware:         middleware,
-		TransactionService: transactionService,
-		ZitadelService:     zitadelService,
-		DiscogsService:     discogsService,
-		UserRepo:           userRepo,
-		AuthController:     authController,
-		UserController:     userController,
-		Websocket:          websocket,
-		EventBus:           eventBus,
+		Database:                  db,
+		Config:                    config,
+		Middleware:                middleware,
+		TransactionService:        transactionService,
+		ZitadelService:            zitadelService,
+		DiscogsService:            discogsService,
+		UserRepo:                  userRepo,
+		DiscogsDataProcessingRepo: discogsDataProcessingRepo,
+		AuthController:            authController,
+		UserController:            userController,
+		Websocket:                 websocket,
+		EventBus:                  eventBus,
 	}
 
 	if err := app.validate(); err != nil {
@@ -111,6 +114,7 @@ func (a *App) validate() error {
 		a.UserController,
 		a.Middleware,
 		a.UserRepo,
+		a.DiscogsDataProcessingRepo,
 	}
 
 	for _, check := range nilChecks {
@@ -141,3 +145,4 @@ func (a *App) Close() (err error) {
 
 	return err
 }
+
