@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	LABEL_BATCH_SIZE = 1000
+	LABEL_BATCH_SIZE = 5000
 )
 
 type LabelRepository interface {
@@ -144,72 +144,34 @@ func (r *labelRepository) UpsertBatch(ctx context.Context, labels []*Label) (int
 func (r *labelRepository) upsertSingleBatch(ctx context.Context, labels []*Label) (int, int, error) {
 	log := r.log.Function("upsertSingleBatch")
 
+	if len(labels) == 0 {
+		return 0, 0, nil
+	}
+
 	db := r.getDB(ctx)
 
-	// Extract Discogs IDs for existing labels lookup
-	discogsIDs := make([]int64, 0, len(labels))
-	for _, label := range labels {
-		if label.DiscogsID != nil {
-			discogsIDs = append(discogsIDs, *label.DiscogsID)
-		}
+	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
+	result := db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "discogs_id"}}, // Use unique index on discogs_id
+		DoUpdates: clause.AssignmentColumns([]string{
+			"name", "country", "founded_year", "website", "image_url", "updated_at",
+		}),
+	}).CreateInBatches(labels, LABEL_BATCH_SIZE)
+
+	if result.Error != nil {
+		return 0, 0, log.Err("failed to upsert label batch", result.Error, "count", len(labels))
 	}
 
-	// Get existing labels by Discogs ID
-	existingLabels, err := r.GetBatchByDiscogsIDs(ctx, discogsIDs)
-	if err != nil {
-		return 0, 0, log.Err("failed to get existing labels", err)
-	}
+	// PostgreSQL doesn't directly provide insert vs update counts from UPSERT
+	// For now, we'll approximate based on affected rows
+	affectedRows := int(result.RowsAffected)
 
-	var toInsert []*Label
-	var toUpdate []*Label
+	// Since we can't easily distinguish inserts from updates with GORM's ON CONFLICT,
+	// we'll return the total as "inserted" for simplicity. This is a trade-off for performance.
+	// In a production system, you might use raw SQL with RETURNING clauses to get exact counts.
 
-	// Separate into insert and update batches
-	for _, label := range labels {
-		if label.DiscogsID != nil {
-			if existing, exists := existingLabels[*label.DiscogsID]; exists {
-				// Update existing label
-				existing.Name = label.Name
-				existing.Country = label.Country
-				existing.FoundedYear = label.FoundedYear
-				existing.Website = label.Website
-				existing.ImageURL = label.ImageURL
-				toUpdate = append(toUpdate, existing)
-			} else {
-				// Insert new label
-				toInsert = append(toInsert, label)
-			}
-		} else {
-			// No Discogs ID, always insert (shouldn't happen in normal processing)
-			toInsert = append(toInsert, label)
-		}
-	}
-
-	var inserted, updated int
-
-	// Handle inserts
-	if len(toInsert) > 0 {
-		if err := db.CreateInBatches(toInsert, LABEL_BATCH_SIZE).Error; err != nil {
-			return 0, 0, log.Err("failed to insert label batch", err, "count", len(toInsert))
-		}
-		inserted = len(toInsert)
-		log.Info("Inserted labels", "count", inserted)
-	}
-
-	// Handle updates using GORM's Clauses for upsert
-	if len(toUpdate) > 0 {
-		if err := db.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{
-				"name", "country", "founded_year", "website", "image_url", "updated_at",
-			}),
-		}).CreateInBatches(toUpdate, LABEL_BATCH_SIZE).Error; err != nil {
-			return inserted, 0, log.Err("failed to update label batch", err, "count", len(toUpdate))
-		}
-		updated = len(toUpdate)
-		log.Info("Updated labels", "count", updated)
-	}
-
-	return inserted, updated, nil
+	log.Info("Upserted labels", "count", affectedRows)
+	return affectedRows, 0, nil
 }
 
 func (r *labelRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs []int64) (map[int64]*Label, error) {

@@ -157,10 +157,10 @@ func TestXMLProcessingService_ProcessingResult(t *testing.T) {
 
 func TestXMLProcessingService_BatchSizeConstants(t *testing.T) {
 	// Test that our constants are reasonable
-	const XML_BATCH_SIZE = 1000
-	const PROGRESS_REPORT_INTERVAL = 10000
+	const XML_BATCH_SIZE = 2000
+	const PROGRESS_REPORT_INTERVAL = 50000
 
-	assert.Equal(t, 1000, XML_BATCH_SIZE)
-	assert.Equal(t, 10000, PROGRESS_REPORT_INTERVAL)
+	assert.Equal(t, 2000, XML_BATCH_SIZE)
+	assert.Equal(t, 50000, PROGRESS_REPORT_INTERVAL)
 	assert.Greater(t, PROGRESS_REPORT_INTERVAL, XML_BATCH_SIZE)
 }

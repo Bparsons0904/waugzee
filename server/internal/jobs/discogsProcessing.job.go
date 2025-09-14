@@ -50,14 +50,14 @@ func (j *DiscogsProcessingJob) Execute(ctx context.Context) error {
 		return log.Err("failed to find records ready for processing", err)
 	}
 
-	// Step 2: Find stuck processing records (older than 2 hours) and reset them
-	stuckRecords, err := j.findAndResetStuckRecords(ctx)
+	// Step 2: Find processing records that can be resumed or need reset
+	resumableRecords, err := j.findAndHandleProcessingRecords(ctx)
 	if err != nil {
-		return log.Err("failed to handle stuck processing records", err)
+		return log.Err("failed to handle processing records", err)
 	}
 
-	// Combine ready and recovered records
-	allRecords := append(readyRecords, stuckRecords...)
+	// Combine ready and resumable records
+	allRecords := append(readyRecords, resumableRecords...)
 
 	if len(allRecords) == 0 {
 		log.Info("No records found ready for processing")
@@ -90,11 +90,11 @@ func (j *DiscogsProcessingJob) Execute(ctx context.Context) error {
 	return nil
 }
 
-// findAndResetStuckRecords finds records stuck in "processing" status for > 2 hours and resets them
-func (j *DiscogsProcessingJob) findAndResetStuckRecords(
+// findAndHandleProcessingRecords finds records in processing status and either resumes or resets them
+func (j *DiscogsProcessingJob) findAndHandleProcessingRecords(
 	ctx context.Context,
 ) ([]*models.DiscogsDataProcessing, error) {
-	log := j.log.Function("findAndResetStuckRecords")
+	log := j.log.Function("findAndHandleProcessingRecords")
 
 	// Find records in processing status
 	processingRecords, err := j.repo.GetByStatus(ctx, models.ProcessingStatusProcessing)
@@ -102,47 +102,118 @@ func (j *DiscogsProcessingJob) findAndResetStuckRecords(
 		return nil, log.Err("failed to find processing records", err)
 	}
 
-	var stuckRecords []*models.DiscogsDataProcessing
-	twoHoursAgo := time.Now().UTC().Add(-2 * time.Hour)
+	var handledRecords []*models.DiscogsDataProcessing
+	oneDayAgo := time.Now().UTC().Add(-24 * time.Hour)
 
 	for _, record := range processingRecords {
-		// Check if record has been processing for more than 2 hours
-		if record.StartedAt != nil && record.StartedAt.Before(twoHoursAgo) {
-			log.Warn("Found stuck processing record, resetting to ready_for_processing",
+		if record.StartedAt == nil {
+			continue // Skip records without start time
+		}
+
+		// Check if record has been processing for more than 24 hours - reset completely
+		if record.StartedAt.Before(oneDayAgo) {
+			log.Warn("Found critically stuck processing record (>24hrs), resetting to ready_for_processing",
 				"yearMonth", record.YearMonth,
 				"id", record.ID,
 				"stuckSince", record.StartedAt)
 
-			// Use atomic transaction for stuck record reset
 			updateErr := j.transaction.Execute(ctx, func(txCtx context.Context) error {
-				// Reset to ready_for_processing status
+				// Complete reset to ready_for_processing status
 				if err := record.UpdateStatus(models.ProcessingStatusReadyForProcessing); err != nil {
 					return err
 				}
 
-				// Clear error message for retry
+				// Clear error message and stats for complete retry
 				record.ErrorMessage = nil
+				record.ProcessingStats = &models.ProcessingStats{}
 
 				return j.repo.Update(txCtx, record)
 			})
 
 			if updateErr != nil {
-				log.Error("Failed to reset stuck record",
+				log.Error("Failed to reset critically stuck record",
 					"error", updateErr,
 					"yearMonth", record.YearMonth,
 					"id", record.ID)
 				continue
 			}
 
-			stuckRecords = append(stuckRecords, record)
+			handledRecords = append(handledRecords, record)
+		} else {
+			// Record is in processing but not critically stuck - check if we can resume
+			pendingFileTypes := j.checkPendingFileTypes(record)
+			if len(pendingFileTypes) > 0 {
+				log.Info("Found processing record with pending file types, will resume",
+					"yearMonth", record.YearMonth,
+					"id", record.ID,
+					"pendingTypes", pendingFileTypes,
+					"processingSince", record.StartedAt)
+
+				// Add to processing list to resume where left off
+				handledRecords = append(handledRecords, record)
+			} else {
+				// All files processed but not marked complete - complete it
+				log.Info("Found processing record with all files processed, marking complete",
+					"yearMonth", record.YearMonth,
+					"id", record.ID)
+
+				updateErr := j.transaction.Execute(ctx, func(txCtx context.Context) error {
+					return j.completeProcessing(ctx, record, record.YearMonth)
+				})
+
+				if updateErr != nil {
+					log.Error("Failed to complete processing record",
+						"error", updateErr,
+						"yearMonth", record.YearMonth,
+						"id", record.ID)
+				}
+			}
 		}
 	}
 
-	if len(stuckRecords) > 0 {
-		log.Info("Reset stuck records for retry", "count", len(stuckRecords))
+	if len(handledRecords) > 0 {
+		log.Info("Found processing records to handle", "count", len(handledRecords))
 	}
 
-	return stuckRecords, nil
+	return handledRecords, nil
+}
+
+// checkPendingFileTypes returns file types that still need processing
+func (j *DiscogsProcessingJob) checkPendingFileTypes(record *models.DiscogsDataProcessing) []string {
+	var pending []string
+
+	// Define all file types we should process
+	fileTypes := []string{"labels", "artists", "masters", "releases"}
+
+	for _, fileType := range fileTypes {
+		// Check if this file type has been processed based on stats
+		processed := false
+
+		if record.ProcessingStats != nil {
+			switch fileType {
+			case "labels":
+				processed = record.ProcessingStats.LabelsProcessed > 0
+			case "artists":
+				processed = record.ProcessingStats.ArtistsProcessed > 0
+			case "masters":
+				processed = record.ProcessingStats.MastersProcessed > 0
+			case "releases":
+				processed = record.ProcessingStats.ReleasesProcessed > 0
+			}
+		}
+
+		// If not processed, check if file exists and is validated
+		if !processed {
+			if record.ProcessingStats != nil {
+				fileInfo := record.ProcessingStats.GetFileInfo(fileType)
+				if fileInfo != nil && fileInfo.Status == models.FileDownloadStatusValidated {
+					pending = append(pending, fileType)
+				}
+			}
+		}
+	}
+
+	return pending
 }
 
 // processRecord handles the processing of a single record
@@ -220,89 +291,137 @@ func (j *DiscogsProcessingJob) performProcessing(
 
 	downloadDir := fmt.Sprintf("/app/discogs-data/%s", yearMonth)
 
-	// Process labels XML file (Phase 1: Labels only)
-	if err := j.processLabelsXML(ctx, processingRecord, yearMonth, downloadDir); err != nil {
-		return log.Err("labels XML processing failed", err, "yearMonth", yearMonth)
+	// Process all XML files in dependency order: Labels → Artists → Masters → Releases
+	if err := j.processAllXMLFiles(ctx, processingRecord, yearMonth, downloadDir); err != nil {
+		return log.Err("XML processing failed", err, "yearMonth", yearMonth)
 	}
 
 	log.Info("All XML processing completed successfully", "yearMonth", yearMonth)
 	return nil
 }
 
-// processLabelsXML handles the XML processing for labels file only (Phase 1)
-func (j *DiscogsProcessingJob) processLabelsXML(
+// processAllXMLFiles handles the XML processing for all file types in dependency order
+func (j *DiscogsProcessingJob) processAllXMLFiles(
 	ctx context.Context,
 	processingRecord *models.DiscogsDataProcessing,
 	yearMonth string,
 	downloadDir string,
 ) error {
-	log := j.log.Function("processLabelsXML")
+	log := j.log.Function("processAllXMLFiles")
 
-	labelsFilePath := filepath.Join(downloadDir, "labels.xml.gz")
+	// Define processing order and file types
+	fileTypes := []struct {
+		name   string
+		method func(context.Context, string, string) (*services.ProcessingResult, error)
+	}{
+		{"labels", j.xmlProcessing.ProcessLabelsFile},
+		{"artists", j.xmlProcessing.ProcessArtistsFile},
+		{"masters", j.xmlProcessing.ProcessMastersFile},
+		{"releases", j.xmlProcessing.ProcessReleasesFile},
+	}
 
-	// Check if labels file exists and is validated
-	if processingRecord.ProcessingStats != nil {
-		fileInfo := processingRecord.ProcessingStats.GetFileInfo("labels")
-		if fileInfo == nil || fileInfo.Status != models.FileDownloadStatusValidated {
-			log.Info("Labels file not available for processing, skipping", "yearMonth", yearMonth)
-			// This is not an error - some months might not have all file types
-			// Continue to completion status
-			if err := j.completeProcessing(ctx, processingRecord, yearMonth); err != nil {
-				return err
+	var totalProcessed int
+	var totalInserted int
+	var totalUpdated int
+	var totalErrors int
+
+	// Process each file type in dependency order
+	for _, fileType := range fileTypes {
+		filePath := filepath.Join(downloadDir, fmt.Sprintf("%s.xml.gz", fileType.name))
+
+		// Check if this file type has already been processed
+		alreadyProcessed := false
+		if processingRecord.ProcessingStats != nil {
+			switch fileType.name {
+			case "labels":
+				alreadyProcessed = processingRecord.ProcessingStats.LabelsProcessed > 0
+			case "artists":
+				alreadyProcessed = processingRecord.ProcessingStats.ArtistsProcessed > 0
+			case "masters":
+				alreadyProcessed = processingRecord.ProcessingStats.MastersProcessed > 0
+			case "releases":
+				alreadyProcessed = processingRecord.ProcessingStats.ReleasesProcessed > 0
 			}
-			return nil
 		}
-	}
 
-	// Check if file actually exists on disk
-	if _, err := os.Stat(labelsFilePath); os.IsNotExist(err) {
-		log.Info(
-			"Labels file not found on disk, skipping processing",
-			"yearMonth",
-			yearMonth,
-			"filePath",
-			labelsFilePath,
-		)
-		// Continue to completion status
-		if err := j.completeProcessing(ctx, processingRecord, yearMonth); err != nil {
-			return err
+		if alreadyProcessed {
+			log.Info("File type already processed, skipping",
+				"fileType", fileType.name,
+				"yearMonth", yearMonth)
+			continue
 		}
-		return nil
+
+		// Check if file exists and is validated
+		if processingRecord.ProcessingStats != nil {
+			fileInfo := processingRecord.ProcessingStats.GetFileInfo(fileType.name)
+			if fileInfo == nil || fileInfo.Status != models.FileDownloadStatusValidated {
+				log.Info("File not available for processing, skipping",
+					"fileType", fileType.name,
+					"yearMonth", yearMonth)
+				continue
+			}
+		}
+
+		// Check if file actually exists on disk
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			log.Info("File not found on disk, skipping processing",
+				"fileType", fileType.name,
+				"yearMonth", yearMonth,
+				"filePath", filePath)
+			continue
+		}
+
+		log.Info("Starting XML processing",
+			"fileType", fileType.name,
+			"yearMonth", yearMonth,
+			"filePath", filePath)
+
+		// Process the XML file
+		result, err := fileType.method(ctx, filePath, processingRecord.ID.String())
+		if err != nil {
+			return log.Err("failed to process XML file", err,
+				"fileType", fileType.name,
+				"filePath", filePath)
+		}
+
+		log.Info("XML processing completed",
+			"fileType", fileType.name,
+			"yearMonth", yearMonth,
+			"totalRecords", result.TotalRecords,
+			"processedRecords", result.ProcessedRecords,
+			"insertedRecords", result.InsertedRecords,
+			"updatedRecords", result.UpdatedRecords,
+			"erroredRecords", result.ErroredRecords)
+
+		// Accumulate totals
+		totalProcessed += result.ProcessedRecords
+		totalInserted += result.InsertedRecords
+		totalUpdated += result.UpdatedRecords
+		totalErrors += result.ErroredRecords
+
+		// TODO: Re-enable file cleanup after confirming everything works
+		// Clean up the processed file to save disk space
+		// if err := os.Remove(filePath); err != nil {
+		// 	log.Warn("failed to clean up file after processing",
+		// 		"error", err,
+		// 		"fileType", fileType.name,
+		// 		"filePath", filePath)
+		// } else {
+		// 	log.Info("Cleaned up file after processing",
+		// 		"fileType", fileType.name,
+		// 		"filePath", filePath)
+		// }
+		log.Info("File cleanup disabled during testing",
+			"fileType", fileType.name,
+			"filePath", filePath)
 	}
 
-	log.Info("Starting labels XML processing", "yearMonth", yearMonth, "filePath", labelsFilePath)
-
-	// Process the labels XML file
-	result, err := j.xmlProcessing.ProcessLabelsFile(
-		ctx,
-		labelsFilePath,
-		processingRecord.ID.String(),
-	)
-	if err != nil {
-		return log.Err("failed to process labels XML file", err, "filePath", labelsFilePath)
-	}
-
-	log.Info("Labels XML processing completed",
+	log.Info("All XML processing completed",
 		"yearMonth", yearMonth,
-		"totalRecords", result.TotalRecords,
-		"processedRecords", result.ProcessedRecords,
-		"insertedRecords", result.InsertedRecords,
-		"updatedRecords", result.UpdatedRecords,
-		"erroredRecords", result.ErroredRecords,
-	)
-
-	// Clean up the processed file to save disk space
-	if err := os.Remove(labelsFilePath); err != nil {
-		log.Warn(
-			"failed to clean up labels file after processing",
-			"error",
-			err,
-			"filePath",
-			labelsFilePath,
-		)
-	} else {
-		log.Info("Cleaned up labels file after processing", "filePath", labelsFilePath)
-	}
+		"totalProcessed", totalProcessed,
+		"totalInserted", totalInserted,
+		"totalUpdated", totalUpdated,
+		"totalErrors", totalErrors)
 
 	// Complete the processing workflow
 	if err := j.completeProcessing(ctx, processingRecord, yearMonth); err != nil {

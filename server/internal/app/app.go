@@ -35,6 +35,9 @@ type App struct {
 	UserRepo                  repositories.UserRepository
 	DiscogsDataProcessingRepo repositories.DiscogsDataProcessingRepository
 	LabelRepo                 repositories.LabelRepository
+	ArtistRepo                repositories.ArtistRepository
+	MasterRepo                repositories.MasterRepository
+	ReleaseRepo               repositories.ReleaseRepository
 
 	// Controllers
 	AuthController authController.AuthControllerInterface
@@ -66,6 +69,9 @@ func New() (*App, error) {
 	userRepo := repositories.New(db)
 	discogsDataProcessingRepo := repositories.NewDiscogsDataProcessingRepository(db)
 	labelRepo := repositories.NewLabelRepository(db)
+	artistRepo := repositories.NewArtistRepository(db)
+	masterRepo := repositories.NewMasterRepository(db)
+	releaseRepo := repositories.NewReleaseRepository(db)
 
 	// Initialize services
 	discogsService := services.NewDiscogsService()
@@ -73,6 +79,9 @@ func New() (*App, error) {
 	schedulerService := services.NewSchedulerService()
 	xmlProcessingService := services.NewXMLProcessingService(
 		labelRepo,
+		artistRepo,
+		masterRepo,
+		releaseRepo,
 		discogsDataProcessingRepo,
 		transactionService,
 	)
@@ -92,9 +101,8 @@ func New() (*App, error) {
 		// Download job runs at 2:00 AM UTC daily
 		discogsDownloadJob := jobs.NewDiscogsDownloadJob(
 			discogsDataProcessingRepo,
-			transactionService,
 			downloadService,
-			services.Daily,
+			services.Hourly, // TODO: CHange back to daily after testing, Claude do not revert
 		)
 		if err := schedulerService.AddJob(discogsDownloadJob); err != nil {
 			return &App{}, log.Err("failed to register Discogs download job", err)
@@ -106,7 +114,7 @@ func New() (*App, error) {
 			discogsDataProcessingRepo,
 			transactionService,
 			xmlProcessingService,
-			services.DailyProcessing,
+			services.Hourly, // TODO: CHange back to daily after testing, Claude do not revert
 		)
 		if err := schedulerService.AddJob(discogsProcessingJob); err != nil {
 			return &App{}, log.Err("failed to register Discogs processing job", err)
@@ -127,6 +135,9 @@ func New() (*App, error) {
 		UserRepo:                  userRepo,
 		DiscogsDataProcessingRepo: discogsDataProcessingRepo,
 		LabelRepo:                 labelRepo,
+		ArtistRepo:                artistRepo,
+		MasterRepo:                masterRepo,
+		ReleaseRepo:               releaseRepo,
 		AuthController:            authController,
 		UserController:            userController,
 		Websocket:                 websocket,
@@ -165,6 +176,9 @@ func (a *App) validate() error {
 		a.UserRepo,
 		a.DiscogsDataProcessingRepo,
 		a.LabelRepo,
+		a.ArtistRepo,
+		a.MasterRepo,
+		a.ReleaseRepo,
 	}
 
 	for _, check := range nilChecks {

@@ -75,7 +75,7 @@ When writing or fixing tests, follow these principles:
 
 - **Server tests**: `tilt trigger server-tests` or `go test -C ./server ./...`
 - **Server test coverage**: `go test -C ./server -coverprofile=coverage.out ./... && go tool cover -html=coverage.out -o coverage.html`
-- **Server linting**: `tilt trigger server-lint` or `golangci-lint run -C ./server`
+- **Server linting**: `tilt trigger server-lint` or `\cd server && golangci-lint run`
 - **Client linting**: `tilt trigger client-lint` or `npm run lint:check -C ./client`
 - **Client tests**: `tilt trigger client-tests` or `npm run test -C ./client`
 - **TypeScript check**: `npm run typecheck -C ./client`

@@ -57,9 +57,8 @@ func TXDefer(tx *gorm.DB, log logg.Logger) {
 		err := tx.Commit().Error
 		if err != nil {
 			log.Er("failed to commit transaction", err)
-		} else {
-			log.Info("committed transaction")
 		}
+		// Removed success logging to reduce log noise during bulk operations
 	}
 }
 
@@ -67,8 +66,8 @@ func (s *DB) initializeDB(config config.Config) error {
 	gormLogger := logger.New(
 		slog.NewLogLogger(slog.Default().Handler(), slog.LevelInfo),
 		logger.Config{
-			SlowThreshold:             2 * time.Second,
-			LogLevel:                  logger.Info,
+			SlowThreshold:             5 * time.Second,  // Only log queries slower than 5s
+			LogLevel:                  logger.Warn,      // Only log warnings and errors, not all queries
 			IgnoreRecordNotFoundError: true,
 			ParameterizedQueries:      false,
 			Colorful:                  true,

@@ -82,7 +82,7 @@ func (ts *TransactionService) Execute(ctx context.Context, fn func(context.Conte
 		return log.Err("failed to commit transaction", err)
 	}
 
-	log.Info("transaction completed successfully")
+	// Removed success logging to reduce log noise during bulk operations
 	return nil
 }
 
