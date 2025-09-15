@@ -7,7 +7,7 @@ import (
 
 // Core Discogs entities
 type Artist struct {
-	ID       int      `xml:"id"                  json:"id"              db:"id"`
+	ID       int      `xml:"id,attr"             json:"id"              db:"id"`
 	Name     string   `xml:"name"                json:"name"            db:"name"`
 	RealName string   `xml:"realname"            json:"real_name"       db:"real_name"`
 	Profile  string   `xml:"profile"             json:"profile"         db:"profile"`
@@ -19,7 +19,7 @@ type Artist struct {
 }
 
 type Label struct {
-	ID          int      `xml:"id"              json:"id"           db:"id"`
+	ID          int      `xml:"id,attr"         json:"id"           db:"id"`
 	Name        string   `xml:"name"            json:"name"         db:"name"`
 	ContactInfo string   `xml:"contactinfo"     json:"contact_info" db:"contact_info"`
 	Profile     string   `xml:"profile"         json:"profile"      db:"profile"`
@@ -29,8 +29,8 @@ type Label struct {
 }
 
 type Release struct {
-	ID          int      `xml:"id"              json:"id"           db:"id"`
-	Status      string   `xml:"status"          json:"status"       db:"status"`
+	ID          int      `xml:"id,attr"         json:"id"           db:"id"`
+	Status      string   `xml:"status,attr"     json:"status"       db:"status"`
 	Title       string   `xml:"title"           json:"title"        db:"title"`
 	Country     string   `xml:"country"         json:"country"      db:"country"`
 	Released    string   `xml:"released"        json:"released"     db:"released"`
@@ -47,17 +47,17 @@ type Release struct {
 
 // Supporting structs
 type Alias struct {
-	ID   int    `xml:"id"        json:"id"   db:"id"`
+	ID   int    `xml:"id,attr"   json:"id"   db:"id"`
 	Name string `xml:",chardata" json:"name" db:"name"`
 }
 
 type Member struct {
-	ID   int    `xml:"id"        json:"id"   db:"id"`
+	ID   int    `xml:"id,attr"   json:"id"   db:"id"`
 	Name string `xml:",chardata" json:"name" db:"name"`
 }
 
 type Group struct {
-	ID   int    `xml:"id"        json:"id"   db:"id"`
+	ID   int    `xml:"id,attr"   json:"id"   db:"id"`
 	Name string `xml:",chardata" json:"name" db:"name"`
 }
 
@@ -117,7 +117,7 @@ type DiscogsMasters struct {
 }
 
 type Master struct {
-	ID          int      `xml:"id"             json:"id"           db:"id"`
+	ID          int      `xml:"id,attr"        json:"id"           db:"id"`
 	MainRelease int      `xml:"main_release"   json:"main_release" db:"main_release"`
 	Title       string   `xml:"title"          json:"title"        db:"title"`
 	Year        int      `xml:"year"           json:"year"         db:"year"`

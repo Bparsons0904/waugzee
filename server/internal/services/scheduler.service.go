@@ -115,11 +115,6 @@ func (s *SchedulerService) Start(ctx context.Context) error {
 		return nil
 	}
 
-	log.Info(
-		"Delaying scheduler startup for 30 seconds to prevent immediate downloads during development",
-	)
-	time.Sleep(30 * time.Second)
-
 	log.Info("Starting scheduler", "jobCount", len(s.jobs))
 	s.scheduler.StartAsync()
 	s.started = true

@@ -8,6 +8,7 @@ export const API_PATHS = {
   AUTH: '/auth',
   USERS: '/users',
   HEALTH: '/health',
+  ADMIN: '/admin',
 } as const;
 
 // Authentication endpoints
@@ -30,6 +31,14 @@ export const HEALTH_ENDPOINTS = {
   CHECK: API_PATHS.HEALTH,
 } as const;
 
+// Admin endpoints
+export const ADMIN_ENDPOINTS = {
+  DISCOGS_PROCESS: `${API_PATHS.ADMIN}/discogs/process`,
+  DISCOGS_PROCESS_DIRECT: `${API_PATHS.ADMIN}/discogs/process-direct`,
+  DISCOGS_STATUS: (yearMonth?: string) =>
+    yearMonth ? `${API_PATHS.ADMIN}/discogs/status/${yearMonth}` : `${API_PATHS.ADMIN}/discogs/status`,
+} as const;
+
 // Frontend route constants (for consistency with backend auth routes)
 export const FRONTEND_ROUTES = {
   HOME: '/',
@@ -38,6 +47,7 @@ export const FRONTEND_ROUTES = {
   SILENT_CALLBACK: '/auth/silent-callback',
   DASHBOARD: '/dashboard',
   PROFILE: '/profile',
+  ADMIN: '/admin',
 } as const;
 
 // Error retry configuration
