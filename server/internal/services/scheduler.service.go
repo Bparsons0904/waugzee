@@ -9,12 +9,16 @@ import (
 	"github.com/go-co-op/gocron"
 )
 
-type Schedule int
+type Frequency int
+
+type Schedule struct {
+	Frequency Frequency
+	Time      *string
+}
 
 const (
-	Hourly          Schedule = iota
-	Daily                    // Start at 02:00 UTC every day
-	DailyProcessing          // Start at 03:00 UTC every day (1 hour after download)
+	Hourly Frequency = iota
+	Daily
 )
 
 // Job represents a scheduled task that can be executed by the scheduler
@@ -72,13 +76,13 @@ func (s *SchedulerService) AddJob(job Job) error {
 	log := s.log.Function("AddJob")
 
 	var err error
-	switch job.Schedule() {
+	switch job.Schedule().Frequency {
 	case Daily:
-		_, err = s.scheduler.Every(1).Day().At("02:00").Do(func() {
-			s.executeJob(job, log)
-		})
-	case DailyProcessing:
-		_, err = s.scheduler.Every(1).Day().At("03:00").Do(func() {
+		time := "02:00"
+		if (job.Schedule().Time != nil) && (*job.Schedule().Time != "") {
+			time = *job.Schedule().Time
+		}
+		_, err = s.scheduler.Every(1).Day().At(time).Do(func() {
 			s.executeJob(job, log)
 		})
 	case Hourly:
