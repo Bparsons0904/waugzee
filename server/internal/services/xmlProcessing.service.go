@@ -7,12 +7,21 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"waugzee/internal/imports"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
 	"waugzee/internal/repositories"
+
+	"github.com/google/uuid"
 )
+
+// ProcessingLimits represents limits for processing operations
+type ProcessingLimits struct {
+	MaxRecords   int `json:"maxRecords,omitempty"`   // Optional: limit total records parsed (0 = no limit)
+	MaxBatchSize int `json:"maxBatchSize,omitempty"` // Optional: batch size for processing (default: 2000)
+}
 
 const (
 	XML_BATCH_SIZE = 2000
@@ -24,6 +33,7 @@ type XMLProcessingService struct {
 	artistRepo                repositories.ArtistRepository
 	masterRepo                repositories.MasterRepository
 	releaseRepo               repositories.ReleaseRepository
+	trackRepo                 repositories.TrackRepository
 	discogsDataProcessingRepo repositories.DiscogsDataProcessingRepository
 	transactionService        *TransactionService
 	parserService             *DiscogsParserService
@@ -35,6 +45,7 @@ func NewXMLProcessingService(
 	artistRepo repositories.ArtistRepository,
 	masterRepo repositories.MasterRepository,
 	releaseRepo repositories.ReleaseRepository,
+	trackRepo repositories.TrackRepository,
 	discogsDataProcessingRepo repositories.DiscogsDataProcessingRepository,
 	transactionService *TransactionService,
 	parserService *DiscogsParserService,
@@ -44,6 +55,7 @@ func NewXMLProcessingService(
 		artistRepo:                artistRepo,
 		masterRepo:                masterRepo,
 		releaseRepo:               releaseRepo,
+		trackRepo:                 trackRepo,
 		discogsDataProcessingRepo: discogsDataProcessingRepo,
 		transactionService:        transactionService,
 		parserService:             parserService,
@@ -58,6 +70,211 @@ type ProcessingResult struct {
 	UpdatedRecords   int
 	ErroredRecords   int
 	Errors           []string
+}
+
+// ReleaseWithTracks holds a release and its associated track data during processing
+type ReleaseWithTracks struct {
+	Release *models.Release
+	Tracks  []imports.Track
+}
+
+// convertDiscogsTracks converts Discogs track data to our Track models
+func (s *XMLProcessingService) convertDiscogsTracks(discogsTracks []imports.Track, releaseID string) []*models.Track {
+	if len(discogsTracks) == 0 {
+		return nil
+	}
+
+	releaseUUID, err := uuid.Parse(releaseID)
+	if err != nil {
+		s.log.Error("Failed to parse release UUID for tracks", "releaseID", releaseID, "error", err)
+		return nil
+	}
+
+	tracks := make([]*models.Track, 0, len(discogsTracks))
+
+	for _, discogsTrack := range discogsTracks {
+		// Skip tracks with no title
+		title := strings.TrimSpace(discogsTrack.Title)
+		if len(title) == 0 {
+			continue
+		}
+
+		// Skip tracks with no position
+		position := strings.TrimSpace(discogsTrack.Position)
+		if len(position) == 0 {
+			continue
+		}
+
+		track := &models.Track{
+			ReleaseID: releaseUUID,
+			Position:  position,
+			Title:     title,
+		}
+
+		// Parse duration if present (format examples: "3:45", "2:30", "10:15")
+		if len(discogsTrack.Duration) > 0 {
+			duration := s.parseDuration(discogsTrack.Duration)
+			if duration > 0 {
+				track.Duration = &duration
+			}
+		}
+
+		tracks = append(tracks, track)
+	}
+
+	return tracks
+}
+
+// parseDuration converts a duration string like "3:45" to seconds
+func (s *XMLProcessingService) parseDuration(durationStr string) int {
+	durationStr = strings.TrimSpace(durationStr)
+	if len(durationStr) == 0 {
+		return 0
+	}
+
+	// Handle formats like "3:45", "12:30", "1:23:45" (hours:minutes:seconds)
+	parts := strings.Split(durationStr, ":")
+	if len(parts) < 2 {
+		return 0
+	}
+
+	var totalSeconds int
+
+	if len(parts) == 2 {
+		// MM:SS format
+		minutes, err := strconv.Atoi(parts[0])
+		if err != nil {
+			return 0
+		}
+		seconds, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return 0
+		}
+		totalSeconds = minutes*60 + seconds
+	} else if len(parts) == 3 {
+		// HH:MM:SS format
+		hours, err := strconv.Atoi(parts[0])
+		if err != nil {
+			return 0
+		}
+		minutes, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return 0
+		}
+		seconds, err := strconv.Atoi(parts[2])
+		if err != nil {
+			return 0
+		}
+		totalSeconds = hours*3600 + minutes*60 + seconds
+	}
+
+	return totalSeconds
+}
+
+// processTracksForRelease creates and saves tracks for a specific release
+func (s *XMLProcessingService) processTracksForRelease(ctx context.Context, discogsTracks []imports.Track, releaseID string) error {
+	if len(discogsTracks) == 0 {
+		return nil
+	}
+
+	tracks := s.convertDiscogsTracks(discogsTracks, releaseID)
+	if len(tracks) == 0 {
+		return nil
+	}
+
+	// Delete existing tracks for this release first (in case of re-processing)
+	if err := s.trackRepo.DeleteByReleaseID(ctx, releaseID); err != nil {
+		return fmt.Errorf("failed to delete existing tracks for release %s: %w", releaseID, err)
+	}
+
+	// Create new tracks
+	if err := s.trackRepo.CreateBatch(ctx, tracks); err != nil {
+		return fmt.Errorf("failed to create tracks for release %s: %w", releaseID, err)
+	}
+
+	return nil
+}
+
+// processReleaseBatchWithTracks processes releases and their associated tracks
+func (s *XMLProcessingService) processReleaseBatchWithTracks(ctx context.Context, releasesWithTracks []ReleaseWithTracks, result *ProcessingResult) error {
+	log := s.log.Function("processReleaseBatchWithTracks")
+
+	if len(releasesWithTracks) == 0 {
+		return nil
+	}
+
+	// Extract just the releases for batch upsertion
+	releases := make([]*models.Release, len(releasesWithTracks))
+	for i, rwt := range releasesWithTracks {
+		releases[i] = rwt.Release
+	}
+
+	// First, upsert all releases
+	inserted, updated, err := s.releaseRepo.UpsertBatch(ctx, releases)
+	if err != nil {
+		errorMsg := fmt.Sprintf("Failed to upsert release batch: %v", err)
+		result.Errors = append(result.Errors, errorMsg)
+		result.ErroredRecords += len(releases)
+		return err
+	}
+
+	result.ProcessedRecords += len(releases)
+	result.InsertedRecords += inserted
+	result.UpdatedRecords += updated
+
+	// Now process tracks for each release
+	var trackErrors []string
+	for _, rwt := range releasesWithTracks {
+		if len(rwt.Tracks) > 0 {
+			if err := s.processTracksForRelease(ctx, rwt.Tracks, rwt.Release.ID.String()); err != nil {
+				errorMsg := fmt.Sprintf("Failed to process tracks for release %s: %v", rwt.Release.ID, err)
+				trackErrors = append(trackErrors, errorMsg)
+				log.Warn("Track processing failed", "releaseID", rwt.Release.ID, "error", err)
+			}
+		}
+	}
+
+	// Add track errors to results
+	if len(trackErrors) > 0 {
+		result.Errors = append(result.Errors, trackErrors...)
+		log.Info("Track processing completed with errors",
+			"totalReleases", len(releasesWithTracks),
+			"trackErrors", len(trackErrors))
+	} else {
+		log.Info("Track processing completed successfully",
+			"totalReleases", len(releasesWithTracks))
+	}
+
+	return nil
+}
+
+// Wrapper methods that accept limits
+
+// ProcessLabelsFileWithLimits wraps ProcessLabelsFile with support for processing limits
+func (s *XMLProcessingService) ProcessLabelsFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+	// ProcessLabelsFile already uses the parser service which supports limits
+	// We need to pass the limits to the parser service through the existing method
+	return s.processLabelsFileWithLimits(ctx, filePath, processingID, limits)
+}
+
+// ProcessArtistsFileWithLimits wraps ProcessArtistsFile with support for processing limits
+func (s *XMLProcessingService) ProcessArtistsFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+	return s.processArtistsFileWithLimits(ctx, filePath, processingID, limits)
+}
+
+// ProcessMastersFileWithLimits wraps ProcessMastersFile with support for processing limits
+func (s *XMLProcessingService) ProcessMastersFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+	return s.processMastersFileWithLimits(ctx, filePath, processingID, limits)
+}
+
+// ProcessReleasesFileWithLimits wraps ProcessReleasesFile with support for processing limits
+func (s *XMLProcessingService) ProcessReleasesFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+	return s.processReleasesFileWithLimits(ctx, filePath, processingID, limits)
+}
+
+// ProcessReleasesFileWithTracksAndLimits wraps ProcessReleasesFileWithTracks with support for processing limits
+func (s *XMLProcessingService) ProcessReleasesFileWithTracksAndLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+	return s.processReleasesFileWithTracksAndLimits(ctx, filePath, processingID, limits)
 }
 
 func (s *XMLProcessingService) ProcessLabelsFile(ctx context.Context, filePath string, processingID string) (*ProcessingResult, error) {
@@ -142,6 +359,519 @@ func (s *XMLProcessingService) ProcessLabelsFile(ctx context.Context, filePath s
 	}
 
 	log.Info("Labels file processing completed",
+		"total", result.TotalRecords,
+		"processed", result.ProcessedRecords,
+		"inserted", result.InsertedRecords,
+		"updated", result.UpdatedRecords,
+		"errors", result.ErroredRecords,
+	)
+
+	return result, nil
+}
+
+// Implementation methods with limits support
+
+func (s *XMLProcessingService) processLabelsFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+	log := s.log.Function("processLabelsFileWithLimits")
+
+	log.Info("Starting labels file processing with limits", "filePath", filePath, "processingID", processingID, "limits", limits)
+
+	// Update processing status to "processing"
+	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
+		log.Warn("failed to update processing status", "error", err, "processingID", processingID)
+	}
+
+	result := &ProcessingResult{
+		Errors: make([]string, 0),
+	}
+
+	// Use the parser service with a progress callback
+	progressFunc := func(processed, total, errors int) {
+		// Report progress every PROGRESS_REPORT_INTERVAL records
+		if processed%PROGRESS_REPORT_INTERVAL == 0 {
+			stats := &models.ProcessingStats{
+				TotalRecords:    total,
+				LabelsProcessed: processed,
+				FailedRecords:   errors,
+			}
+			if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
+				log.Warn("failed to update processing stats", "error", err, "recordCount", processed)
+			}
+			log.Info("Processing progress", "processed", processed, "total", total, "errors", errors)
+		}
+	}
+
+	// Configure parsing options with limits
+	options := ParseOptions{
+		FilePath:     filePath,
+		FileType:     "labels",
+		BatchSize:    XML_BATCH_SIZE,
+		ProgressFunc: progressFunc,
+	}
+
+	// Apply limits if provided
+	if limits != nil {
+		if limits.MaxRecords > 0 {
+			options.MaxRecords = limits.MaxRecords
+		}
+		if limits.MaxBatchSize > 0 {
+			options.BatchSize = limits.MaxBatchSize
+		}
+	}
+
+	// Use parser service to parse the file
+	parseResult, err := s.parserService.ParseFile(ctx, options)
+	if err != nil {
+		return nil, log.Err("parsing failed", err, "filePath", filePath)
+	}
+
+	// Process labels in batches for database operations
+	labels := parseResult.ParsedLabels
+	batchSize := XML_BATCH_SIZE
+	if limits != nil && limits.MaxBatchSize > 0 {
+		batchSize = limits.MaxBatchSize
+	}
+	totalBatches := (len(labels) + batchSize - 1) / batchSize
+
+	for i := 0; i < len(labels); i += batchSize {
+		end := i + batchSize
+		if end > len(labels) {
+			end = len(labels)
+		}
+
+		batch := labels[i:end]
+		if err := s.processBatch(ctx, batch, result); err != nil {
+			log.Err("failed to process label batch", err, "batchSize", len(batch))
+			return result, err
+		}
+
+		log.Info("Processed batch", "batch", (i/batchSize)+1, "totalBatches", totalBatches, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords)
+	}
+
+	// Update totals from parse result
+	result.TotalRecords = parseResult.TotalRecords
+	result.ErroredRecords = parseResult.ErroredRecords
+	result.Errors = append(result.Errors, parseResult.Errors...)
+
+	// Update final processing status
+	finalStats := &models.ProcessingStats{
+		TotalRecords:    result.TotalRecords,
+		LabelsProcessed: result.ProcessedRecords,
+		FailedRecords:   result.ErroredRecords,
+	}
+
+	status := models.ProcessingStatusCompleted
+
+	if err := s.updateProcessingStatus(ctx, processingID, status, finalStats); err != nil {
+		log.Warn("failed to update final processing status", "error", err)
+	}
+
+	log.Info("Labels file processing completed",
+		"total", result.TotalRecords,
+		"processed", result.ProcessedRecords,
+		"inserted", result.InsertedRecords,
+		"updated", result.UpdatedRecords,
+		"errors", result.ErroredRecords,
+	)
+
+	return result, nil
+}
+
+func (s *XMLProcessingService) processArtistsFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+	log := s.log.Function("processArtistsFileWithLimits")
+
+	log.Info("Starting artists file processing with limits", "filePath", filePath, "processingID", processingID, "limits", limits)
+
+	// Configure parsing options with limits
+	options := ParseOptions{
+		FilePath: filePath,
+		FileType: "artists",
+		BatchSize: XML_BATCH_SIZE,
+	}
+
+	// Apply limits if provided
+	if limits != nil {
+		if limits.MaxRecords > 0 {
+			options.MaxRecords = limits.MaxRecords
+		}
+		if limits.MaxBatchSize > 0 {
+			options.BatchSize = limits.MaxBatchSize
+		}
+	}
+
+	// Use parser service to parse the file
+	parseResult, err := s.parserService.ParseFile(ctx, options)
+	if err != nil {
+		return nil, log.Err("parsing failed", err, "filePath", filePath)
+	}
+
+	result := &ProcessingResult{
+		Errors: make([]string, 0),
+		TotalRecords: parseResult.TotalRecords,
+		ErroredRecords: parseResult.ErroredRecords,
+	}
+	result.Errors = append(result.Errors, parseResult.Errors...)
+
+	// Update processing status to "processing"
+	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
+		log.Warn("failed to update processing status", "error", err, "processingID", processingID)
+	}
+
+	// Process artists in batches for database operations
+	artists := parseResult.ParsedArtists
+	batchSize := XML_BATCH_SIZE
+	if limits != nil && limits.MaxBatchSize > 0 {
+		batchSize = limits.MaxBatchSize
+	}
+	totalBatches := (len(artists) + batchSize - 1) / batchSize
+
+	for i := 0; i < len(artists); i += batchSize {
+		end := i + batchSize
+		if end > len(artists) {
+			end = len(artists)
+		}
+
+		batch := artists[i:end]
+		if err := s.processArtistBatch(ctx, batch, result); err != nil {
+			log.Err("failed to process artist batch", err, "batchSize", len(batch))
+			return result, err
+		}
+
+		log.Info("Processed batch", "batch", (i/batchSize)+1, "totalBatches", totalBatches, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords)
+	}
+
+	// Update final processing status
+	finalStats := &models.ProcessingStats{
+		TotalRecords:     result.TotalRecords,
+		ArtistsProcessed: result.ProcessedRecords,
+		FailedRecords:    result.ErroredRecords,
+	}
+
+	status := models.ProcessingStatusCompleted
+
+	if err := s.updateProcessingStatus(ctx, processingID, status, finalStats); err != nil {
+		log.Warn("failed to update final processing status", "error", err)
+	}
+
+	log.Info("Artists file processing completed",
+		"total", result.TotalRecords,
+		"processed", result.ProcessedRecords,
+		"inserted", result.InsertedRecords,
+		"updated", result.UpdatedRecords,
+		"errors", result.ErroredRecords,
+	)
+
+	return result, nil
+}
+
+func (s *XMLProcessingService) processMastersFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+	log := s.log.Function("processMastersFileWithLimits")
+
+	log.Info("Starting masters file processing with limits", "filePath", filePath, "processingID", processingID, "limits", limits)
+
+	// Configure parsing options with limits
+	options := ParseOptions{
+		FilePath: filePath,
+		FileType: "masters",
+		BatchSize: XML_BATCH_SIZE,
+	}
+
+	// Apply limits if provided
+	if limits != nil {
+		if limits.MaxRecords > 0 {
+			options.MaxRecords = limits.MaxRecords
+		}
+		if limits.MaxBatchSize > 0 {
+			options.BatchSize = limits.MaxBatchSize
+		}
+	}
+
+	// Use parser service to parse the file
+	parseResult, err := s.parserService.ParseFile(ctx, options)
+	if err != nil {
+		return nil, log.Err("parsing failed", err, "filePath", filePath)
+	}
+
+	result := &ProcessingResult{
+		Errors: make([]string, 0),
+		TotalRecords: parseResult.TotalRecords,
+		ErroredRecords: parseResult.ErroredRecords,
+	}
+	result.Errors = append(result.Errors, parseResult.Errors...)
+
+	// Update processing status to "processing"
+	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
+		log.Warn("failed to update processing status", "error", err, "processingID", processingID)
+	}
+
+	// Process masters in batches for database operations
+	masters := parseResult.ParsedMasters
+	batchSize := XML_BATCH_SIZE
+	if limits != nil && limits.MaxBatchSize > 0 {
+		batchSize = limits.MaxBatchSize
+	}
+	totalBatches := (len(masters) + batchSize - 1) / batchSize
+
+	for i := 0; i < len(masters); i += batchSize {
+		end := i + batchSize
+		if end > len(masters) {
+			end = len(masters)
+		}
+
+		batch := masters[i:end]
+		if err := s.processMasterBatch(ctx, batch, result); err != nil {
+			log.Err("failed to process master batch", err, "batchSize", len(batch))
+			return result, err
+		}
+
+		log.Info("Processed batch", "batch", (i/batchSize)+1, "totalBatches", totalBatches, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords)
+	}
+
+	// Update final processing status
+	finalStats := &models.ProcessingStats{
+		TotalRecords:     result.TotalRecords,
+		MastersProcessed: result.ProcessedRecords,
+		FailedRecords:    result.ErroredRecords,
+	}
+
+	status := models.ProcessingStatusCompleted
+
+	if err := s.updateProcessingStatus(ctx, processingID, status, finalStats); err != nil {
+		log.Warn("failed to update final processing status", "error", err)
+	}
+
+	log.Info("Masters file processing completed",
+		"total", result.TotalRecords,
+		"processed", result.ProcessedRecords,
+		"inserted", result.InsertedRecords,
+		"updated", result.UpdatedRecords,
+		"errors", result.ErroredRecords,
+	)
+
+	return result, nil
+}
+
+func (s *XMLProcessingService) processReleasesFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+	log := s.log.Function("processReleasesFileWithLimits")
+
+	log.Info("Starting releases file processing with limits", "filePath", filePath, "processingID", processingID, "limits", limits)
+
+	// Configure parsing options with limits
+	options := ParseOptions{
+		FilePath: filePath,
+		FileType: "releases",
+		BatchSize: XML_BATCH_SIZE,
+	}
+
+	// Apply limits if provided
+	if limits != nil {
+		if limits.MaxRecords > 0 {
+			options.MaxRecords = limits.MaxRecords
+		}
+		if limits.MaxBatchSize > 0 {
+			options.BatchSize = limits.MaxBatchSize
+		}
+	}
+
+	// Use parser service to parse the file
+	parseResult, err := s.parserService.ParseFile(ctx, options)
+	if err != nil {
+		return nil, log.Err("parsing failed", err, "filePath", filePath)
+	}
+
+	result := &ProcessingResult{
+		Errors: make([]string, 0),
+		TotalRecords: parseResult.TotalRecords,
+		ErroredRecords: parseResult.ErroredRecords,
+	}
+	result.Errors = append(result.Errors, parseResult.Errors...)
+
+	// Update processing status to "processing"
+	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
+		log.Warn("failed to update processing status", "error", err, "processingID", processingID)
+	}
+
+	// Process releases in batches for database operations
+	releases := parseResult.ParsedReleases
+	batchSize := XML_BATCH_SIZE
+	if limits != nil && limits.MaxBatchSize > 0 {
+		batchSize = limits.MaxBatchSize
+	}
+	totalBatches := (len(releases) + batchSize - 1) / batchSize
+
+	for i := 0; i < len(releases); i += batchSize {
+		end := i + batchSize
+		if end > len(releases) {
+			end = len(releases)
+		}
+
+		batch := releases[i:end]
+		if err := s.processReleaseBatch(ctx, batch, result); err != nil {
+			log.Err("failed to process release batch", err, "batchSize", len(batch))
+			return result, err
+		}
+
+		log.Info("Processed batch", "batch", (i/batchSize)+1, "totalBatches", totalBatches, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords)
+	}
+
+	// Update final processing status
+	finalStats := &models.ProcessingStats{
+		TotalRecords:      result.TotalRecords,
+		ReleasesProcessed: result.ProcessedRecords,
+		FailedRecords:     result.ErroredRecords,
+	}
+
+	status := models.ProcessingStatusCompleted
+
+	if err := s.updateProcessingStatus(ctx, processingID, status, finalStats); err != nil {
+		log.Warn("failed to update final processing status", "error", err)
+	}
+
+	log.Info("Releases file processing completed",
+		"total", result.TotalRecords,
+		"processed", result.ProcessedRecords,
+		"inserted", result.InsertedRecords,
+		"updated", result.UpdatedRecords,
+		"errors", result.ErroredRecords,
+	)
+
+	return result, nil
+}
+
+func (s *XMLProcessingService) processReleasesFileWithTracksAndLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+	log := s.log.Function("processReleasesFileWithTracksAndLimits")
+
+	log.Info("Starting releases file processing with tracks and limits", "filePath", filePath, "processingID", processingID, "limits", limits)
+
+	// For releases with tracks, we need to use a different approach since the parser service doesn't handle tracks
+	// We'll modify the existing ProcessReleasesFileWithTracks to respect limits
+	
+	// Open and decompress the gzipped XML file
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, log.Err("failed to open releases file", err, "filePath", filePath)
+	}
+	defer file.Close()
+
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		return nil, log.Err("failed to create gzip reader", err, "filePath", filePath)
+	}
+	defer gzipReader.Close()
+
+	// Create XML decoder for streaming
+	decoder := xml.NewDecoder(gzipReader)
+
+	result := &ProcessingResult{
+		Errors: make([]string, 0),
+	}
+
+	// Update processing status to "processing"
+	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
+		log.Warn("failed to update processing status", "error", err, "processingID", processingID)
+	}
+
+	var releaseWithTracksBatch []ReleaseWithTracks
+	var recordCount int
+	batchSize := XML_BATCH_SIZE
+	if limits != nil && limits.MaxBatchSize > 0 {
+		batchSize = limits.MaxBatchSize
+	}
+
+	// Stream through the XML file
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("XML parsing error: %v", err))
+			result.ErroredRecords++
+			continue
+		}
+
+		// Look for release start elements
+		if startElement, ok := token.(xml.StartElement); ok && startElement.Name.Local == "release" {
+			result.TotalRecords++
+
+			// Check max records limit before processing
+			if limits != nil && limits.MaxRecords > 0 && result.TotalRecords > limits.MaxRecords {
+				log.Info("Reached max records limit - stopping early",
+					"maxRecords", limits.MaxRecords,
+					"totalAttempted", result.TotalRecords-1)
+				result.TotalRecords-- // Adjust count since we're not processing this record
+				break
+			}
+
+			var discogsRelease imports.Release
+			if err := decoder.DecodeElement(&discogsRelease, &startElement); err != nil {
+				errorMsg := fmt.Sprintf("Failed to decode release element: %v", err)
+				result.Errors = append(result.Errors, errorMsg)
+				result.ErroredRecords++
+				log.Warn("Failed to decode release", "error", err)
+				continue
+			}
+
+			// Convert Discogs release to our release model
+			release := s.convertDiscogsRelease(&discogsRelease)
+			if release == nil {
+				result.ErroredRecords++
+				continue
+			}
+
+			// Create ReleaseWithTracks including track data
+			releaseWithTracks := ReleaseWithTracks{
+				Release: release,
+				Tracks:  discogsRelease.Tracklist,
+			}
+
+			releaseWithTracksBatch = append(releaseWithTracksBatch, releaseWithTracks)
+			recordCount++
+
+			// Process batch when it reaches the limit
+			if len(releaseWithTracksBatch) >= batchSize {
+				if err := s.processReleaseBatchWithTracks(ctx, releaseWithTracksBatch, result); err != nil {
+					log.Err("failed to process release batch with tracks", err, "batchSize", len(releaseWithTracksBatch))
+					return result, err
+				}
+				releaseWithTracksBatch = releaseWithTracksBatch[:0] // Reset batch
+			}
+
+			// Report progress every PROGRESS_REPORT_INTERVAL records
+			if recordCount%PROGRESS_REPORT_INTERVAL == 0 {
+				stats := &models.ProcessingStats{
+					TotalRecords:      result.TotalRecords,
+					ReleasesProcessed: result.ProcessedRecords,
+					FailedRecords:     result.ErroredRecords,
+				}
+				if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
+					log.Warn("failed to update processing stats", "error", err, "recordCount", recordCount)
+				}
+				log.Info("Processing progress", "processed", recordCount, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords, "errors", result.ErroredRecords)
+			}
+		}
+	}
+
+	// Process remaining batch
+	if len(releaseWithTracksBatch) > 0 {
+		if err := s.processReleaseBatchWithTracks(ctx, releaseWithTracksBatch, result); err != nil {
+			log.Err("failed to process final release batch with tracks", err, "batchSize", len(releaseWithTracksBatch))
+			return result, err
+		}
+	}
+
+	// Update final processing status
+	finalStats := &models.ProcessingStats{
+		TotalRecords:      result.TotalRecords,
+		ReleasesProcessed: result.ProcessedRecords,
+		FailedRecords:     result.ErroredRecords,
+	}
+	status := models.ProcessingStatusCompleted
+	if err := s.updateProcessingStatus(ctx, processingID, status, finalStats); err != nil {
+		log.Warn("failed to update final processing status", "error", err)
+	}
+
+	log.Info("Releases file processing with tracks and limits completed",
 		"total", result.TotalRecords,
 		"processed", result.ProcessedRecords,
 		"inserted", result.InsertedRecords,
@@ -777,4 +1507,131 @@ func (s *XMLProcessingService) convertDiscogsRelease(discogsRelease *imports.Rel
 	}
 
 	return release
+}
+
+// ProcessReleasesFileWithTracks processes releases file including track data
+func (s *XMLProcessingService) ProcessReleasesFileWithTracks(ctx context.Context, filePath string, processingID string) (*ProcessingResult, error) {
+	log := s.log.Function("ProcessReleasesFileWithTracks")
+	log.Info("Starting releases file processing with tracks", "filePath", filePath, "processingID", processingID)
+
+	// Open and decompress the gzipped XML file
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, log.Err("failed to open releases file", err, "filePath", filePath)
+	}
+	defer file.Close()
+
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		return nil, log.Err("failed to create gzip reader", err, "filePath", filePath)
+	}
+	defer gzipReader.Close()
+
+	// Create XML decoder for streaming
+	decoder := xml.NewDecoder(gzipReader)
+
+	result := &ProcessingResult{
+		Errors: make([]string, 0),
+	}
+
+	// Update processing status to "processing"
+	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
+		log.Warn("failed to update processing status", "error", err, "processingID", processingID)
+	}
+
+	var releaseWithTracksBatch []ReleaseWithTracks
+	var recordCount int
+
+	// Stream through the XML file
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("XML parsing error: %v", err))
+			result.ErroredRecords++
+			continue
+		}
+
+		// Look for release start elements
+		if startElement, ok := token.(xml.StartElement); ok && startElement.Name.Local == "release" {
+			var discogsRelease imports.Release
+			if err := decoder.DecodeElement(&discogsRelease, &startElement); err != nil {
+				errorMsg := fmt.Sprintf("Failed to decode release element: %v", err)
+				result.Errors = append(result.Errors, errorMsg)
+				result.ErroredRecords++
+				log.Warn("Failed to decode release", "error", err)
+				continue
+			}
+
+			// Convert Discogs release to our release model
+			release := s.convertDiscogsRelease(&discogsRelease)
+			if release == nil {
+				result.ErroredRecords++
+				continue
+			}
+
+			// Create ReleaseWithTracks including track data
+			releaseWithTracks := ReleaseWithTracks{
+				Release: release,
+				Tracks:  discogsRelease.Tracklist,
+			}
+
+			releaseWithTracksBatch = append(releaseWithTracksBatch, releaseWithTracks)
+			recordCount++
+			result.TotalRecords++
+
+			// Process batch when it reaches the limit
+			if len(releaseWithTracksBatch) >= XML_BATCH_SIZE {
+				if err := s.processReleaseBatchWithTracks(ctx, releaseWithTracksBatch, result); err != nil {
+					log.Err("failed to process release batch with tracks", err, "batchSize", len(releaseWithTracksBatch))
+					return result, err
+				}
+				releaseWithTracksBatch = releaseWithTracksBatch[:0] // Reset batch
+			}
+
+			// Report progress every PROGRESS_REPORT_INTERVAL records
+			if recordCount%PROGRESS_REPORT_INTERVAL == 0 {
+				stats := &models.ProcessingStats{
+					TotalRecords:      result.TotalRecords,
+					ReleasesProcessed: result.ProcessedRecords,
+					FailedRecords:     result.ErroredRecords,
+				}
+				if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
+					log.Warn("failed to update processing stats", "error", err, "recordCount", recordCount)
+				}
+				log.Info("Processing progress", "processed", recordCount, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords, "errors", result.ErroredRecords)
+			}
+		}
+	}
+
+	// Process remaining batch
+	if len(releaseWithTracksBatch) > 0 {
+		if err := s.processReleaseBatchWithTracks(ctx, releaseWithTracksBatch, result); err != nil {
+			log.Err("failed to process final release batch with tracks", err, "batchSize", len(releaseWithTracksBatch))
+			return result, err
+		}
+	}
+
+	// Update final processing status
+	finalStats := &models.ProcessingStats{
+		TotalRecords:      result.TotalRecords,
+		ReleasesProcessed: result.ProcessedRecords,
+		FailedRecords:     result.ErroredRecords,
+	}
+	status := models.ProcessingStatusCompleted
+	if err := s.updateProcessingStatus(ctx, processingID, status, finalStats); err != nil {
+		log.Warn("failed to update final processing status", "error", err)
+	}
+
+	log.Info("Releases file processing with tracks completed",
+		"total", result.TotalRecords,
+		"processed", result.ProcessedRecords,
+		"inserted", result.InsertedRecords,
+		"updated", result.UpdatedRecords,
+		"errors", result.ErroredRecords,
+	)
+
+	return result, nil
 }
