@@ -204,6 +204,21 @@ func (s *DiscogsParserService) parseLabelsFile(ctx context.Context, reader io.Re
 				continue
 			}
 
+			// Log detailed XML structure for first few records to debug parsing issues
+			if result.TotalRecords <= 2 {
+				log.Info("Detailed XML structure for debugging",
+					"recordNumber", result.TotalRecords,
+					"parsedID", discogsLabel.ID,
+					"parsedName", discogsLabel.Name,
+					"parsedContactInfo", discogsLabel.ContactInfo,
+					"parsedProfile", discogsLabel.Profile,
+					"parsedParentLabel", discogsLabel.ParentLabel,
+					"parsedURLs", discogsLabel.URLs,
+					"parsedSubLabels", discogsLabel.SubLabels,
+					"elementName", startElement.Name.Local,
+					"elementAttrs", s.formatAttributes(startElement.Attr))
+			}
+
 			// Convert Discogs label to our label model
 			label := s.convertDiscogsLabel(&discogsLabel)
 			if label == nil {
@@ -807,6 +822,18 @@ func (s *DiscogsParserService) convertDiscogsLabel(discogsLabel *imports.Label) 
 	// Set Discogs ID (avoid pointer allocation for primitive)
 	discogsID := int64(discogsLabel.ID)
 	label.DiscogsID = &discogsID
+
+	// Set profile if available
+	if profile := strings.TrimSpace(discogsLabel.Profile); len(profile) > 0 {
+		label.Profile = &profile
+	}
+
+	// Set website from first URL if available
+	if len(discogsLabel.URLs) > 0 {
+		if firstURL := strings.TrimSpace(discogsLabel.URLs[0]); len(firstURL) > 0 {
+			label.Website = &firstURL
+		}
+	}
 
 	return label
 }

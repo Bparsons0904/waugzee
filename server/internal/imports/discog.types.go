@@ -19,7 +19,7 @@ type Artist struct {
 }
 
 type Label struct {
-	ID          int      `xml:"id,attr"         json:"id"           db:"id"`
+	ID          int      `xml:"id"              json:"id"           db:"id"`
 	Name        string   `xml:"name"            json:"name"         db:"name"`
 	ContactInfo string   `xml:"contactinfo"     json:"contact_info" db:"contact_info"`
 	Profile     string   `xml:"profile"         json:"profile"      db:"profile"`

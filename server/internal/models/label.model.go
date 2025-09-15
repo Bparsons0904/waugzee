@@ -8,6 +8,7 @@ type Label struct {
 	BaseUUIDModel
 	Name        string  `gorm:"type:text;not null;index:idx_labels_name" json:"name" validate:"required"`
 	DiscogsID   *int64  `gorm:"type:bigint;uniqueIndex:idx_labels_discogs_id" json:"discogsId,omitempty"`
+	Profile     *string `gorm:"type:text" json:"profile,omitempty"`
 	Country     *string `gorm:"type:text" json:"country,omitempty"`
 	FoundedYear *int    `gorm:"type:int" json:"foundedYear,omitempty"`
 	Website     *string `gorm:"type:text" json:"website,omitempty"`
