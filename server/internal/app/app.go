@@ -12,6 +12,7 @@ import (
 	"waugzee/internal/services"
 	"waugzee/internal/websockets"
 
+	adminController "waugzee/internal/controllers/admin"
 	authController "waugzee/internal/controllers/auth"
 	userController "waugzee/internal/controllers/users"
 )
@@ -24,12 +25,13 @@ type App struct {
 	Config     config.Config
 
 	// Services
-	TransactionService   *services.TransactionService
-	ZitadelService       *services.ZitadelService
-	DiscogsService       *services.DiscogsService
-	DownloadService      *services.DownloadService
-	SchedulerService     *services.SchedulerService
-	XMLProcessingService *services.XMLProcessingService
+	TransactionService    *services.TransactionService
+	ZitadelService        *services.ZitadelService
+	DiscogsService        *services.DiscogsService
+	DiscogsParserService  *services.DiscogsParserService
+	DownloadService       *services.DownloadService
+	SchedulerService      *services.SchedulerService
+	XMLProcessingService  *services.XMLProcessingService
 
 	// Repositories
 	UserRepo                  repositories.UserRepository
@@ -40,8 +42,9 @@ type App struct {
 	ReleaseRepo               repositories.ReleaseRepository
 
 	// Controllers
-	AuthController authController.AuthControllerInterface
-	UserController *userController.UserController
+	AdminController *adminController.AdminController
+	AuthController  authController.AuthControllerInterface
+	UserController  *userController.UserController
 }
 
 func New() (*App, error) {
@@ -75,6 +78,7 @@ func New() (*App, error) {
 
 	// Initialize services
 	discogsService := services.NewDiscogsService()
+	discogsParserService := services.NewDiscogsParserService()
 	downloadService := services.NewDownloadService(config)
 	schedulerService := services.NewSchedulerService()
 	xmlProcessingService := services.NewXMLProcessingService(
@@ -84,6 +88,7 @@ func New() (*App, error) {
 		releaseRepo,
 		discogsDataProcessingRepo,
 		transactionService,
+		discogsParserService,
 	)
 
 	websocket, err := websockets.New(db, eventBus, config, zitadelService, userRepo)
@@ -95,6 +100,12 @@ func New() (*App, error) {
 	middleware := middleware.New(db, eventBus, config, userRepo)
 	authController := authController.New(zitadelService, userRepo, db)
 	userController := userController.New(userRepo, discogsService, config)
+	adminController := adminController.New(
+		discogsParserService,
+		xmlProcessingService,
+		discogsDataProcessingRepo,
+		transactionService,
+	)
 
 	// Register jobs with scheduler if enabled
 	if config.SchedulerEnabled {
@@ -129,6 +140,7 @@ func New() (*App, error) {
 		TransactionService:        transactionService,
 		ZitadelService:            zitadelService,
 		DiscogsService:            discogsService,
+		DiscogsParserService:      discogsParserService,
 		DownloadService:           downloadService,
 		SchedulerService:          schedulerService,
 		XMLProcessingService:      xmlProcessingService,
@@ -138,6 +150,7 @@ func New() (*App, error) {
 		ArtistRepo:                artistRepo,
 		MasterRepo:                masterRepo,
 		ReleaseRepo:               releaseRepo,
+		AdminController:           adminController,
 		AuthController:            authController,
 		UserController:            userController,
 		Websocket:                 websocket,
@@ -167,9 +180,11 @@ func (a *App) validate() error {
 		a.TransactionService,
 		a.ZitadelService,
 		a.DiscogsService,
+		a.DiscogsParserService,
 		a.DownloadService,
 		a.SchedulerService,
 		a.XMLProcessingService,
+		a.AdminController,
 		a.AuthController,
 		a.UserController,
 		a.Middleware,

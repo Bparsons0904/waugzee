@@ -34,7 +34,7 @@ export const HEALTH_ENDPOINTS = {
 // Admin endpoints
 export const ADMIN_ENDPOINTS = {
   DISCOGS_PROCESS: `${API_PATHS.ADMIN}/discogs/process`,
-  DISCOGS_PROCESS_DIRECT: `${API_PATHS.ADMIN}/discogs/process-direct`,
+  DISCOGS_PARSE: `${API_PATHS.ADMIN}/discogs/parse`,
   DISCOGS_STATUS: (yearMonth?: string) =>
     yearMonth ? `${API_PATHS.ADMIN}/discogs/status/${yearMonth}` : `${API_PATHS.ADMIN}/discogs/status`,
 } as const;

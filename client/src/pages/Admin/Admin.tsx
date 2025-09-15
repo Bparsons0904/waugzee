@@ -11,53 +11,25 @@ import { api } from "@services/api";
 interface ProcessingLimits {
   maxRecords?: number;
   maxBatchSize?: number;
-  progressInterval?: number;
-  enableDebugLogging?: boolean;
 }
 
 interface ProcessingRequest {
-  yearMonth: string;
   fileTypes: string[];
   limits?: ProcessingLimits;
-}
-
-interface ProcessingStatusResponse {
-  yearMonth: string;
-  status: string;
-  stats?: {
-    totalRecords: number;
-    labelsProcessed: number;
-    artistsProcessed: number;
-    mastersProcessed: number;
-    releasesProcessed: number;
-    failedRecords: number;
-  };
-  error?: string;
-  startedAt?: string;
 }
 
 const Admin: Component = () => {
   const { user } = useAuth();
 
   // Form state
-  const [yearMonth, setYearMonth] = createSignal(
-    new Date().toISOString().slice(0, 7),
-  ); // YYYY-MM format
   const [selectedFileTypes, setSelectedFileTypes] = createSignal<string[]>([
     "labels",
   ]);
-  const [maxRecords, setMaxRecords] = createSignal<string>("");
+  const [maxRecords, setMaxRecords] = createSignal<string>("10");
   const [maxBatchSize, setMaxBatchSize] = createSignal<string>("2000");
-  const [progressInterval, setProgressInterval] = createSignal<string>("1000");
-  const [enableDebugLogging, setEnableDebugLogging] =
-    createSignal<boolean>(true);
 
   // State
   const [isProcessing, setIsProcessing] = createSignal(false);
-  const [processingStatuses, setProcessingStatuses] = createSignal<
-    ProcessingStatusResponse[]
-  >([]);
-  const [isLoading, setIsLoading] = createSignal(true);
   const [error, setError] = createSignal<string>("");
 
   const fileTypes = [
@@ -78,25 +50,6 @@ const Admin: Component = () => {
       description: "Individual release data",
     },
   ];
-
-  onMount(async () => {
-    await loadProcessingStatuses();
-  });
-
-  const loadProcessingStatuses = async () => {
-    try {
-      setIsLoading(true);
-      const response = await api.get<ProcessingStatusResponse[]>(
-        ADMIN_ENDPOINTS.DISCOGS_STATUS(),
-      );
-      setProcessingStatuses(response);
-    } catch (err) {
-      setError("Failed to load processing statuses");
-      console.error("Error loading processing statuses:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleFileTypeToggle = (fileType: string) => {
     const current = selectedFileTypes();
@@ -124,19 +77,7 @@ const Admin: Component = () => {
       }
     }
 
-    if (progressInterval()) {
-      const parsed = parseInt(progressInterval(), 10);
-      if (!isNaN(parsed) && parsed > 0) {
-        limits.progressInterval = parsed;
-      }
-    }
-
-    if (enableDebugLogging()) {
-      limits.enableDebugLogging = true;
-    }
-
     return {
-      yearMonth: yearMonth(),
       fileTypes: selectedFileTypes(),
       limits: Object.keys(limits).length > 0 ? limits : undefined,
     };
@@ -155,8 +96,7 @@ const Admin: Component = () => {
       const request = buildProcessingRequest();
       await api.post(ADMIN_ENDPOINTS.DISCOGS_PROCESS, request);
 
-      // Refresh statuses after starting processing
-      setTimeout(() => loadProcessingStatuses(), 1000);
+      setError("Processing started successfully!");
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to start processing");
       console.error("Error starting processing:", err);
@@ -165,9 +105,9 @@ const Admin: Component = () => {
     }
   };
 
-  const handleStartDirectProcessing = async () => {
+  const handleParseOnly = async () => {
     if (selectedFileTypes().length === 0) {
-      setError("Please select at least one file type to process");
+      setError("Please select at least one file type to parse");
       return;
     }
 
@@ -176,30 +116,14 @@ const Admin: Component = () => {
       setError("");
 
       const request = buildProcessingRequest();
-      await api.post(ADMIN_ENDPOINTS.DISCOGS_PROCESS_DIRECT, request);
+      await api.post(ADMIN_ENDPOINTS.DISCOGS_PARSE, request);
 
-      // Refresh statuses after starting processing
-      setTimeout(() => loadProcessingStatuses(), 1000);
+      setError("Parse completed successfully!");
     } catch (err: any) {
-      setError(
-        err.response?.data?.error || "Failed to start direct processing",
-      );
-      console.error("Error starting direct processing:", err);
+      setError(err.response?.data?.error || "Failed to parse files");
+      console.error("Error parsing files:", err);
     } finally {
       setIsProcessing(false);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "success";
-      case "processing":
-        return "warning";
-      case "failed":
-        return "danger";
-      default:
-        return "info";
     }
   };
 
@@ -218,16 +142,6 @@ const Admin: Component = () => {
           {/* Processing Controls */}
           <Card class={styles.processingCard}>
             <h2>Manual Processing Control</h2>
-
-            <div class={styles.formSection}>
-              <label class={styles.label}>Year-Month (YYYY-MM)</label>
-              <TextInput
-                value={yearMonth()}
-                onInput={(value) => setYearMonth(value)}
-                placeholder="2024-01"
-                pattern="[0-9]{4}-[0-9]{2}"
-              />
-            </div>
 
             <div class={styles.formSection}>
               <label class={styles.label}>File Types to Process</label>
@@ -265,26 +179,7 @@ const Admin: Component = () => {
                   onInput={(value) => setMaxBatchSize(value)}
                   placeholder="2000"
                 />
-                <TextInput
-                  label="Progress Interval"
-                  value={progressInterval()}
-                  onInput={(value) => setProgressInterval(value)}
-                  placeholder="1000"
-                />
               </div>
-            </div>
-
-            <div class={styles.formSection}>
-              <Checkbox
-                name="enableDebugLogging"
-                checked={enableDebugLogging()}
-                onChange={(checked) => setEnableDebugLogging(checked)}
-                label="Enable Enhanced Debug Logging"
-              />
-              <span class={styles.description}>
-                Log detailed XML data and conversion info for debugging (first
-                record from each batch)
-              </span>
             </div>
 
             <Show when={error()}>
@@ -298,118 +193,17 @@ const Admin: Component = () => {
                 variant="primary"
                 class={styles.startButton}
               >
-                {isProcessing() ? "Starting..." : "Start Processing"}
+                {isProcessing() ? "Starting..." : "Full Process"}
               </Button>
-
               <Button
-                onClick={handleStartDirectProcessing}
+                onClick={handleParseOnly}
                 disabled={isProcessing() || selectedFileTypes().length === 0}
                 variant="secondary"
-                class={styles.directButton}
+                class={styles.parseButton}
               >
-                {isProcessing()
-                  ? "Starting..."
-                  : "Direct Process (Skip Checks)"}
+                {isProcessing() ? "Parsing..." : "Parse Only"}
               </Button>
             </div>
-          </Card>
-
-          {/* Processing Status */}
-          <Card class={styles.statusCard}>
-            <div class={styles.statusHeader}>
-              <h2>Processing Status</h2>
-              <Button
-                onClick={loadProcessingStatuses}
-                disabled={isLoading()}
-                variant="secondary"
-                size="sm"
-              >
-                {isLoading() ? "Loading..." : "Refresh"}
-              </Button>
-            </div>
-
-            <Show when={isLoading()}>
-              <div class={styles.loading}>Loading processing statuses...</div>
-            </Show>
-
-            <Show when={!isLoading() && processingStatuses().length === 0}>
-              <div class={styles.empty}>No processing records found.</div>
-            </Show>
-
-            <Show when={!isLoading() && processingStatuses().length > 0}>
-              <div class={styles.statusList}>
-                <For each={processingStatuses()}>
-                  {(status) => (
-                    <div
-                      class={`${styles.statusItem} ${styles[getStatusColor(status.status)]}`}
-                    >
-                      <div class={styles.statusItemHeader}>
-                        <h3>{status.yearMonth}</h3>
-                        <span
-                          class={`${styles.statusBadge} ${styles[getStatusColor(status.status)]}`}
-                        >
-                          {status.status}
-                        </span>
-                      </div>
-
-                      <Show when={status.stats}>
-                        <div class={styles.stats}>
-                          <div class={styles.statItem}>
-                            <span>Total:</span>
-                            <span>
-                              {status.stats!.totalRecords.toLocaleString()}
-                            </span>
-                          </div>
-                          <div class={styles.statItem}>
-                            <span>Labels:</span>
-                            <span>
-                              {status.stats!.labelsProcessed.toLocaleString()}
-                            </span>
-                          </div>
-                          <div class={styles.statItem}>
-                            <span>Artists:</span>
-                            <span>
-                              {status.stats!.artistsProcessed.toLocaleString()}
-                            </span>
-                          </div>
-                          <div class={styles.statItem}>
-                            <span>Masters:</span>
-                            <span>
-                              {status.stats!.mastersProcessed.toLocaleString()}
-                            </span>
-                          </div>
-                          <div class={styles.statItem}>
-                            <span>Releases:</span>
-                            <span>
-                              {status.stats!.releasesProcessed.toLocaleString()}
-                            </span>
-                          </div>
-                          <Show when={status.stats!.failedRecords > 0}>
-                            <div class={styles.statItem}>
-                              <span>Failed:</span>
-                              <span class={styles.errorText}>
-                                {status.stats!.failedRecords.toLocaleString()}
-                              </span>
-                            </div>
-                          </Show>
-                        </div>
-                      </Show>
-
-                      <Show when={status.error}>
-                        <div class={styles.errorMessage}>{status.error}</div>
-                      </Show>
-
-                      <Show when={status.startedAt}>
-                        <div class={styles.timestamp}>
-                          Started:{" "}
-                          {new Date(status.startedAt!).toLocaleString()}
-                        </div>
-                      </Show>
-                    </div>
-                  )}
-                </For>
-              </div>
-            </Show>
           </Card>
         </div>
       </div>

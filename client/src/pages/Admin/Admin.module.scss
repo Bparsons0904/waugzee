@@ -43,6 +43,10 @@
   min-height: 400px;
 }
 
+.resultsCard {
+  height: fit-content;
+}
+
 .formSection {
   margin-bottom: $spacing-lg;
 
@@ -94,7 +98,7 @@
 }
 
 .startButton,
-.directButton {
+.parseButton {
   flex: 1;
 }
 
@@ -235,6 +239,59 @@
   color: $text-muted;
   font-size: $font-size-xs;
   text-align: right;
+}
+
+.resultsList {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.resultItem {
+  border: 1px solid $border-default;
+  border-radius: $border-radius-md;
+  padding: $spacing-md;
+  background-color: $bg-subtle;
+}
+
+.resultHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-sm;
+
+  h3 {
+    margin: 0;
+    color: $text-default;
+    text-transform: capitalize;
+  }
+}
+
+.duration {
+  color: $text-muted;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+}
+
+.resultStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: $spacing-sm;
+  margin-bottom: $spacing-sm;
+}
+
+.errorCount {
+  color: $text-error !important;
+}
+
+.errorList {
+  margin-top: $spacing-sm;
+
+  h4 {
+    color: $text-error;
+    font-size: $font-size-sm;
+    margin: 0 0 $spacing-xs 0;
+  }
 }
 
 // Mobile responsiveness

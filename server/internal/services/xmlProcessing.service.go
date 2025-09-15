@@ -26,6 +26,7 @@ type XMLProcessingService struct {
 	releaseRepo               repositories.ReleaseRepository
 	discogsDataProcessingRepo repositories.DiscogsDataProcessingRepository
 	transactionService        *TransactionService
+	parserService             *DiscogsParserService
 	log                       logger.Logger
 }
 
@@ -36,6 +37,7 @@ func NewXMLProcessingService(
 	releaseRepo repositories.ReleaseRepository,
 	discogsDataProcessingRepo repositories.DiscogsDataProcessingRepository,
 	transactionService *TransactionService,
+	parserService *DiscogsParserService,
 ) *XMLProcessingService {
 	return &XMLProcessingService{
 		labelRepo:                 labelRepo,
@@ -44,6 +46,7 @@ func NewXMLProcessingService(
 		releaseRepo:               releaseRepo,
 		discogsDataProcessingRepo: discogsDataProcessingRepo,
 		transactionService:        transactionService,
+		parserService:             parserService,
 		log:                       logger.New("xmlProcessingService"),
 	}
 }
@@ -62,99 +65,68 @@ func (s *XMLProcessingService) ProcessLabelsFile(ctx context.Context, filePath s
 
 	log.Info("Starting labels file processing", "filePath", filePath, "processingID", processingID)
 
-	// Open and decompress the gzipped XML file
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, log.Err("failed to open labels file", err, "filePath", filePath)
-	}
-	defer file.Close()
-
-	gzipReader, err := gzip.NewReader(file)
-	if err != nil {
-		return nil, log.Err("failed to create gzip reader", err, "filePath", filePath)
-	}
-	defer gzipReader.Close()
-
-	// Create XML decoder for streaming
-	decoder := xml.NewDecoder(gzipReader)
-
-	result := &ProcessingResult{
-		Errors: make([]string, 0),
-	}
-
 	// Update processing status to "processing"
 	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
 		log.Warn("failed to update processing status", "error", err, "processingID", processingID)
 	}
 
-	var labelBatch []*models.Label
-	var recordCount int
+	result := &ProcessingResult{
+		Errors: make([]string, 0),
+	}
 
-	// Stream through the XML file
-	for {
-		token, err := decoder.Token()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("XML parsing error: %v", err))
-			result.ErroredRecords++
-			continue
-		}
-
-		// Look for label start elements
-		if startElement, ok := token.(xml.StartElement); ok && startElement.Name.Local == "label" {
-			var discogsLabel imports.Label
-			if err := decoder.DecodeElement(&discogsLabel, &startElement); err != nil {
-				errorMsg := fmt.Sprintf("Failed to decode label element: %v", err)
-				result.Errors = append(result.Errors, errorMsg)
-				result.ErroredRecords++
-				log.Warn("Failed to decode label", "error", err)
-				continue
+	// Use the parser service with a progress callback
+	progressFunc := func(processed, total, errors int) {
+		// Report progress every PROGRESS_REPORT_INTERVAL records
+		if processed%PROGRESS_REPORT_INTERVAL == 0 {
+			stats := &models.ProcessingStats{
+				TotalRecords:    total,
+				LabelsProcessed: processed,
+				FailedRecords:   errors,
 			}
-
-			// Convert Discogs label to our label model
-			label := s.convertDiscogsLabel(&discogsLabel)
-			if label == nil {
-				result.ErroredRecords++
-				continue
+			if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
+				log.Warn("failed to update processing stats", "error", err, "recordCount", processed)
 			}
-
-			labelBatch = append(labelBatch, label)
-			recordCount++
-			result.TotalRecords++
-
-			// Process batch when it reaches the limit
-			if len(labelBatch) >= XML_BATCH_SIZE {
-				if err := s.processBatch(ctx, labelBatch, result); err != nil {
-					log.Err("failed to process label batch", err, "batchSize", len(labelBatch))
-					return result, err
-				}
-				labelBatch = labelBatch[:0] // Reset batch
-			}
-
-			// Report progress every PROGRESS_REPORT_INTERVAL records
-			if recordCount%PROGRESS_REPORT_INTERVAL == 0 {
-				stats := &models.ProcessingStats{
-					TotalRecords:    result.TotalRecords,
-					LabelsProcessed: result.ProcessedRecords,
-					FailedRecords:   result.ErroredRecords,
-				}
-				if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
-					log.Warn("failed to update processing stats", "error", err, "recordCount", recordCount)
-				}
-				log.Info("Processing progress", "processed", recordCount, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords, "errors", result.ErroredRecords)
-			}
+			log.Info("Processing progress", "processed", processed, "total", total, "errors", errors)
 		}
 	}
 
-	// Process remaining batch
-	if len(labelBatch) > 0 {
-		if err := s.processBatch(ctx, labelBatch, result); err != nil {
-			log.Err("failed to process final label batch", err, "batchSize", len(labelBatch))
+	// Configure parsing options
+	options := ParseOptions{
+		FilePath:     filePath,
+		FileType:     "labels",
+		BatchSize:    XML_BATCH_SIZE,
+		ProgressFunc: progressFunc,
+	}
+
+	// Use parser service to parse the file
+	parseResult, err := s.parserService.ParseFile(ctx, options)
+	if err != nil {
+		return nil, log.Err("parsing failed", err, "filePath", filePath)
+	}
+
+	// Process labels in batches for database operations
+	labels := parseResult.ParsedLabels
+	totalBatches := (len(labels) + XML_BATCH_SIZE - 1) / XML_BATCH_SIZE
+
+	for i := 0; i < len(labels); i += XML_BATCH_SIZE {
+		end := i + XML_BATCH_SIZE
+		if end > len(labels) {
+			end = len(labels)
+		}
+
+		batch := labels[i:end]
+		if err := s.processBatch(ctx, batch, result); err != nil {
+			log.Err("failed to process label batch", err, "batchSize", len(batch))
 			return result, err
 		}
+
+		log.Info("Processed batch", "batch", (i/XML_BATCH_SIZE)+1, "totalBatches", totalBatches, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords)
 	}
+
+	// Update totals from parse result
+	result.TotalRecords = parseResult.TotalRecords
+	result.ErroredRecords = parseResult.ErroredRecords
+	result.Errors = append(result.Errors, parseResult.Errors...)
 
 	// Update final processing status
 	finalStats := &models.ProcessingStats{
