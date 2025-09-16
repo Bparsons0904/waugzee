@@ -30,7 +30,8 @@ type App struct {
 	DiscogsParserService  *services.DiscogsParserService
 	DownloadService       *services.DownloadService
 	SchedulerService      *services.SchedulerService
-	XMLProcessingService  *services.XMLProcessingService
+	XMLProcessingService           *services.XMLProcessingService
+	SimplifiedXMLProcessingService *services.SimplifiedXMLProcessingService
 
 	// Repositories
 	UserRepo                  repositories.UserRepository
@@ -93,6 +94,10 @@ func New() (*App, error) {
 		discogsDataProcessingRepo,
 		discogsParserService,
 	)
+	simplifiedXMLProcessingService := services.NewSimplifiedXMLProcessingService(
+		discogsDataProcessingRepo,
+		discogsParserService,
+	)
 
 	websocket, err := websockets.New(db, eventBus, config, zitadelService, userRepo)
 	if err != nil {
@@ -121,6 +126,7 @@ func New() (*App, error) {
 		discogsProcessingJob := jobs.NewDiscogsProcessingJob(
 			discogsDataProcessingRepo,
 			xmlProcessingService,
+			simplifiedXMLProcessingService,
 			services.Hourly, // TODO: CHange back to daily after testing, Claude do not revert
 		)
 		if err := schedulerService.AddJob(discogsProcessingJob); err != nil {
@@ -139,7 +145,8 @@ func New() (*App, error) {
 		DiscogsParserService:      discogsParserService,
 		DownloadService:           downloadService,
 		SchedulerService:          schedulerService,
-		XMLProcessingService:      xmlProcessingService,
+		XMLProcessingService:           xmlProcessingService,
+		SimplifiedXMLProcessingService: simplifiedXMLProcessingService,
 		UserRepo:                  userRepo,
 		DiscogsDataProcessingRepo: discogsDataProcessingRepo,
 		LabelRepo:                 labelRepo,
@@ -181,6 +188,7 @@ func (a *App) validate() error {
 		a.DownloadService,
 		a.SchedulerService,
 		a.XMLProcessingService,
+		a.SimplifiedXMLProcessingService,
 		a.AuthController,
 		a.UserController,
 		a.Middleware,

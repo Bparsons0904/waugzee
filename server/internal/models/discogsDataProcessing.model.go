@@ -39,6 +39,15 @@ const (
 	FileDownloadStatusFailed      FileDownloadStatus = "failed"
 )
 
+type FileProcessingStatus string
+
+const (
+	FileProcessingStatusNotStarted FileProcessingStatus = "not_started"
+	FileProcessingStatusProcessing FileProcessingStatus = "processing"
+	FileProcessingStatusCompleted  FileProcessingStatus = "completed"
+	FileProcessingStatusFailed     FileProcessingStatus = "failed"
+)
+
 type FileDownloadInfo struct {
 	Status       FileDownloadStatus `json:"status"`
 	Downloaded   bool               `json:"downloaded"`
@@ -55,6 +64,12 @@ type ProcessingStats struct {
 	LabelsFile   *FileDownloadInfo `json:"labelsFile,omitempty"`
 	MastersFile  *FileDownloadInfo `json:"mastersFile,omitempty"`
 	ReleasesFile *FileDownloadInfo `json:"releasesFile,omitempty"`
+
+	// File-level processing status tracking
+	ArtistsProcessingStatus  FileProcessingStatus `json:"artistsProcessingStatus"`
+	LabelsProcessingStatus   FileProcessingStatus `json:"labelsProcessingStatus"`
+	MastersProcessingStatus  FileProcessingStatus `json:"mastersProcessingStatus"`
+	ReleasesProcessingStatus FileProcessingStatus `json:"releasesProcessingStatus"`
 
 	// Processing counters (existing functionality)
 	ArtistsProcessed  int `json:"artistsProcessed"`
@@ -142,6 +157,49 @@ func (ps *ProcessingStats) InitializeFileInfo(fileType string) *FileDownloadInfo
 	}
 
 	return info
+}
+
+// GetFileProcessingStatus returns the processing status for a specific file type
+func (ps *ProcessingStats) GetFileProcessingStatus(fileType string) FileProcessingStatus {
+	if ps == nil {
+		return FileProcessingStatusNotStarted
+	}
+
+	switch fileType {
+	case "artists":
+		return ps.ArtistsProcessingStatus
+	case "labels":
+		return ps.LabelsProcessingStatus
+	case "masters":
+		return ps.MastersProcessingStatus
+	case "releases":
+		return ps.ReleasesProcessingStatus
+	default:
+		return FileProcessingStatusNotStarted
+	}
+}
+
+// SetFileProcessingStatus sets the processing status for a specific file type
+func (ps *ProcessingStats) SetFileProcessingStatus(fileType string, status FileProcessingStatus) {
+	if ps == nil {
+		return
+	}
+
+	switch fileType {
+	case "artists":
+		ps.ArtistsProcessingStatus = status
+	case "labels":
+		ps.LabelsProcessingStatus = status
+	case "masters":
+		ps.MastersProcessingStatus = status
+	case "releases":
+		ps.ReleasesProcessingStatus = status
+	}
+}
+
+// IsFileProcessingCompleted returns true if the file has been successfully processed
+func (ps *ProcessingStats) IsFileProcessingCompleted(fileType string) bool {
+	return ps.GetFileProcessingStatus(fileType) == FileProcessingStatusCompleted
 }
 
 type DiscogsDataProcessing struct {

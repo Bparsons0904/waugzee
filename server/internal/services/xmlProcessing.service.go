@@ -14,6 +14,7 @@ const (
 	PROGRESS_REPORT_INTERVAL = 50000
 )
 
+
 type XMLProcessingService struct {
 	labelRepo                 repositories.LabelRepository
 	artistRepo                repositories.ArtistRepository
@@ -66,14 +67,6 @@ type ProcessingResult struct {
 
 
 
-func (s *XMLProcessingService) ProcessLabelsFile(
-	ctx context.Context,
-	filePath string,
-	processingID string,
-) (*ProcessingResult, error) {
-	return s.processFile(ctx, filePath, processingID, "labels")
-}
-
 // Generic file processing method that handles all entity types using the parser service
 func (s *XMLProcessingService) processFile(
 	ctx context.Context,
@@ -102,38 +95,10 @@ func (s *XMLProcessingService) processFile(
 		Errors: make([]string, 0),
 	}
 
-	// Use the parser service with a progress callback
-	progressFunc := func(processed, total, errors int) {
-		// Report progress every PROGRESS_REPORT_INTERVAL records
-		if processed%PROGRESS_REPORT_INTERVAL == 0 {
-			stats := s.createProcessingStats(fileType, total, processed, errors)
-			if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
-				log.Warn(
-					"failed to update processing stats",
-					"error",
-					err,
-					"recordCount",
-					processed,
-				)
-			}
-			log.Info(
-				"Processing progress",
-				"processed",
-				processed,
-				"total",
-				total,
-				"errors",
-				errors,
-			)
-		}
-	}
-
 	// Configure parsing options
 	options := ParseOptions{
-		FilePath:     filePath,
-		FileType:     fileType,
-		BatchSize:    XML_BATCH_SIZE,
-		ProgressFunc: progressFunc,
+		FilePath: filePath,
+		FileType: fileType,
 	}
 
 	// Use parser service to parse the file
@@ -369,13 +334,6 @@ func (s *XMLProcessingService) updateProcessingStats(
 	return s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, stats)
 }
 
-func (s *XMLProcessingService) ProcessArtistsFile(
-	ctx context.Context,
-	filePath string,
-	processingID string,
-) (*ProcessingResult, error) {
-	return s.processFile(ctx, filePath, processingID, "artists")
-}
 
 func (s *XMLProcessingService) processArtistBatch(
 	ctx context.Context,
@@ -397,13 +355,6 @@ func (s *XMLProcessingService) processArtistBatch(
 	return nil
 }
 
-func (s *XMLProcessingService) ProcessMastersFile(
-	ctx context.Context,
-	filePath string,
-	processingID string,
-) (*ProcessingResult, error) {
-	return s.processFile(ctx, filePath, processingID, "masters")
-}
 
 func (s *XMLProcessingService) processMasterBatch(
 	ctx context.Context,
@@ -425,14 +376,6 @@ func (s *XMLProcessingService) processMasterBatch(
 	return nil
 }
 
-func (s *XMLProcessingService) ProcessReleasesFile(
-	ctx context.Context,
-	filePath string,
-	processingID string,
-) (*ProcessingResult, error) {
-	// Use the generic parser service - it already handles tracks automatically
-	return s.processFile(ctx, filePath, processingID, "releases")
-}
 
 func (s *XMLProcessingService) processReleaseBatch(
 	ctx context.Context,
@@ -453,8 +396,6 @@ func (s *XMLProcessingService) processReleaseBatch(
 
 	return nil
 }
-
-
 
 // findOrCreateGenre finds an existing genre by name or creates a new one (with caching)
 func (s *XMLProcessingService) findOrCreateGenre(ctx context.Context, name string) *models.Genre {

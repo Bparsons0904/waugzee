@@ -127,9 +127,7 @@ func (r *discogsDataProcessingRepository) GetByStatus(
 	log := r.log.Function("GetByStatus")
 
 	var processing []*DiscogsDataProcessing
-	// Claude we should be using the structs when possible, note the implementation below. This should be our standard
 	if err := r.getDB(ctx).Find(&processing, &DiscogsDataProcessing{Status: status}).Error; err != nil {
-		// if err := r.getDB(ctx).Find(&processing, "status = ?", status).Error; err != nil {
 		return nil, log.Err("failed to get processing by status", err, "status", status)
 	}
 
@@ -184,4 +182,3 @@ func (r *discogsDataProcessingRepository) UpdateStatus(
 
 	return nil
 }
-
