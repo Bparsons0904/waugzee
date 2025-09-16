@@ -112,10 +112,15 @@ func (j *DiscogsProcessingJob) findAndHandleProcessingRecords(
 
 		// Check if record has been processing for more than 24 hours - reset completely
 		if record.StartedAt.Before(oneDayAgo) {
-			log.Warn("Found critically stuck processing record (>24hrs), resetting to ready_for_processing",
-				"yearMonth", record.YearMonth,
-				"id", record.ID,
-				"stuckSince", record.StartedAt)
+			log.Warn(
+				"Found critically stuck processing record (>24hrs), resetting to ready_for_processing",
+				"yearMonth",
+				record.YearMonth,
+				"id",
+				record.ID,
+				"stuckSince",
+				record.StartedAt,
+			)
 
 			updateErr := j.transaction.Execute(ctx, func(txCtx context.Context) error {
 				// Complete reset to ready_for_processing status
@@ -179,7 +184,9 @@ func (j *DiscogsProcessingJob) findAndHandleProcessingRecords(
 }
 
 // checkPendingFileTypes returns file types that still need processing
-func (j *DiscogsProcessingJob) checkPendingFileTypes(record *models.DiscogsDataProcessing) []string {
+func (j *DiscogsProcessingJob) checkPendingFileTypes(
+	record *models.DiscogsDataProcessing,
+) []string {
 	var pending []string
 
 	// Define all file types we should process
@@ -475,4 +482,3 @@ func (j *DiscogsProcessingJob) completeProcessing(
 func (j *DiscogsProcessingJob) Schedule() services.Schedule {
 	return j.schedule
 }
-

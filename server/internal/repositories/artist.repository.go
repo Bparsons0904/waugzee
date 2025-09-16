@@ -24,6 +24,7 @@ type ArtistRepository interface {
 	Delete(ctx context.Context, id string) error
 	UpsertBatch(ctx context.Context, artists []*Artist) (int, int, error)
 	GetBatchByDiscogsIDs(ctx context.Context, discogsIDs []int64) (map[int64]*Artist, error)
+	FindOrCreateByDiscogsID(ctx context.Context, discogsID int64, name string) (*Artist, error)
 }
 
 type artistRepository struct {
@@ -189,4 +190,37 @@ func (r *artistRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs 
 
 	log.Info("Retrieved artists by Discogs IDs", "requested", len(discogsIDs), "found", len(result))
 	return result, nil
+}
+
+func (r *artistRepository) FindOrCreateByDiscogsID(ctx context.Context, discogsID int64, name string) (*Artist, error) {
+	log := r.log.Function("FindOrCreateByDiscogsID")
+
+	if discogsID == 0 || name == "" {
+		return nil, log.Err("artist discogsID and name cannot be empty", nil, "discogsID", discogsID, "name", name)
+	}
+
+	// First, try to find existing artist by Discogs ID
+	artist, err := r.GetByDiscogsID(ctx, discogsID)
+	if err != nil {
+		return nil, log.Err("failed to get artist by Discogs ID", err, "discogsID", discogsID)
+	}
+
+	if artist != nil {
+		return artist, nil
+	}
+
+	// If not found, create new artist
+	newArtist := &Artist{
+		Name:      name,
+		DiscogsID: &discogsID,
+		IsActive:  true, // Default to active
+	}
+
+	createdArtist, err := r.Create(ctx, newArtist)
+	if err != nil {
+		return nil, log.Err("failed to create new artist", err, "name", name, "discogsID", discogsID)
+	}
+
+	log.Info("Created new artist", "name", name, "discogsID", discogsID, "id", createdArtist.ID)
+	return createdArtist, nil
 }

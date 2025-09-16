@@ -34,10 +34,15 @@ type XMLProcessingService struct {
 	masterRepo                repositories.MasterRepository
 	releaseRepo               repositories.ReleaseRepository
 	trackRepo                 repositories.TrackRepository
+	genreRepo                 repositories.GenreRepository
 	discogsDataProcessingRepo repositories.DiscogsDataProcessingRepository
 	transactionService        *TransactionService
 	parserService             *DiscogsParserService
 	log                       logger.Logger
+
+	// Performance caches
+	genreCache  map[string]*models.Genre // Cache genres by name to avoid repeated DB lookups
+	artistCache map[int64]*models.Artist // Cache artists by Discogs ID to avoid repeated DB lookups
 }
 
 func NewXMLProcessingService(
@@ -46,6 +51,7 @@ func NewXMLProcessingService(
 	masterRepo repositories.MasterRepository,
 	releaseRepo repositories.ReleaseRepository,
 	trackRepo repositories.TrackRepository,
+	genreRepo repositories.GenreRepository,
 	discogsDataProcessingRepo repositories.DiscogsDataProcessingRepository,
 	transactionService *TransactionService,
 	parserService *DiscogsParserService,
@@ -56,10 +62,13 @@ func NewXMLProcessingService(
 		masterRepo:                masterRepo,
 		releaseRepo:               releaseRepo,
 		trackRepo:                 trackRepo,
+		genreRepo:                 genreRepo,
 		discogsDataProcessingRepo: discogsDataProcessingRepo,
 		transactionService:        transactionService,
 		parserService:             parserService,
 		log:                       logger.New("xmlProcessingService"),
+		genreCache:                make(map[string]*models.Genre),
+		artistCache:               make(map[int64]*models.Artist),
 	}
 }
 
@@ -813,7 +822,7 @@ func (s *XMLProcessingService) processReleasesFileWithTracksAndLimits(ctx contex
 			}
 
 			// Convert Discogs release to our release model
-			release := s.convertDiscogsRelease(&discogsRelease)
+			release := s.convertDiscogsRelease(ctx, &discogsRelease)
 			if release == nil {
 				result.ErroredRecords++
 				continue
@@ -1000,7 +1009,7 @@ func (s *XMLProcessingService) ProcessArtistsFile(ctx context.Context, filePath 
 			}
 
 			// Convert Discogs artist to our artist model
-			artist := s.convertDiscogsArtist(&discogsArtist)
+			artist := s.convertDiscogsArtist(ctx, &discogsArtist)
 			if artist == nil {
 				result.ErroredRecords++
 				continue
@@ -1082,7 +1091,7 @@ func (s *XMLProcessingService) processArtistBatch(ctx context.Context, artists [
 	return nil
 }
 
-func (s *XMLProcessingService) convertDiscogsArtist(discogsArtist *imports.Artist) *models.Artist {
+func (s *XMLProcessingService) convertDiscogsArtist(ctx context.Context, discogsArtist *imports.Artist) *models.Artist {
 	// Skip artists with invalid data (avoid string ops on invalid data)
 	if discogsArtist.ID == 0 || len(discogsArtist.Name) == 0 {
 		return nil
@@ -1094,14 +1103,12 @@ func (s *XMLProcessingService) convertDiscogsArtist(discogsArtist *imports.Artis
 		return nil
 	}
 
-	artist := &models.Artist{
-		Name:     name,
-		IsActive: true, // Default to active
-	}
-
-	// Set Discogs ID
+	// Use findOrCreateArtist to get existing artist or create new one
 	discogsID := int64(discogsArtist.ID)
-	artist.DiscogsID = &discogsID
+	artist := s.findOrCreateArtist(ctx, discogsID, name)
+	if artist == nil {
+		return nil
+	}
 
 	// Only process biography if we have real name or profile data
 	if len(discogsArtist.RealName) > 0 {
@@ -1121,13 +1128,67 @@ func (s *XMLProcessingService) convertDiscogsArtist(discogsArtist *imports.Artis
 		}
 	}
 
+	// Process images if available (even if currently empty in XML dumps)
+	// This sets up infrastructure for future API integration or XML dump improvements
+	if len(discogsArtist.Images) > 0 {
+		for _, discogsImage := range discogsArtist.Images {
+			if image := s.convertDiscogsImage(&discogsImage, artist.ID.String(), models.ImageableTypeArtist); image != nil {
+				artist.Images = append(artist.Images, *image)
+			}
+		}
+	}
+
 	return artist
+}
+
+func (s *XMLProcessingService) convertDiscogsImage(discogsImage *imports.DiscogsImage, imageableID, imageableType string) *models.Image {
+	// Skip images with no URI (common in current XML dumps)
+	if len(discogsImage.URI) == 0 {
+		return nil
+	}
+
+	// Determine image type based on Discogs type
+	imageType := models.ImageTypePrimary
+	if discogsImage.Type == "secondary" {
+		imageType = models.ImageTypeSecondary
+	}
+
+	image := &models.Image{
+		URL:           discogsImage.URI,
+		ImageableID:   imageableID,
+		ImageableType: imageableType,
+		ImageType:     imageType,
+	}
+
+	// Set optional fields if available
+	if discogsImage.Width > 0 {
+		image.Width = &discogsImage.Width
+	}
+	if discogsImage.Height > 0 {
+		image.Height = &discogsImage.Height
+	}
+	if len(discogsImage.URI150) > 0 {
+		image.DiscogsURI150 = &discogsImage.URI150
+	}
+	if len(discogsImage.Type) > 0 {
+		image.DiscogsType = &discogsImage.Type
+	}
+
+	// Store original Discogs URI for reference
+	image.DiscogsURI = &discogsImage.URI
+
+	return image
 }
 
 func (s *XMLProcessingService) ProcessMastersFile(ctx context.Context, filePath string, processingID string) (*ProcessingResult, error) {
 	log := s.log.Function("ProcessMastersFile")
 
 	log.Info("Starting masters file processing", "filePath", filePath, "processingID", processingID)
+
+	// Preload entity caches for performance
+	if err := s.preloadEntityCaches(ctx); err != nil {
+		log.Warn("Failed to preload entity caches, continuing without cache", "error", err)
+	}
 
 	// Open and decompress the gzipped XML file
 	file, err := os.Open(filePath)
@@ -1181,7 +1242,7 @@ func (s *XMLProcessingService) ProcessMastersFile(ctx context.Context, filePath 
 			}
 
 			// Convert Discogs master to our master model
-			master := s.convertDiscogsMaster(&discogsMaster)
+			master := s.convertDiscogsMaster(ctx, &discogsMaster)
 			if master == nil {
 				result.ErroredRecords++
 				continue
@@ -1263,7 +1324,7 @@ func (s *XMLProcessingService) processMasterBatch(ctx context.Context, masters [
 	return nil
 }
 
-func (s *XMLProcessingService) convertDiscogsMaster(discogsMaster *imports.Master) *models.Master {
+func (s *XMLProcessingService) convertDiscogsMaster(ctx context.Context, discogsMaster *imports.Master) *models.Master {
 	// Skip masters with invalid data (avoid string ops on invalid data)
 	if discogsMaster.ID == 0 || len(discogsMaster.Title) == 0 {
 		return nil
@@ -1300,6 +1361,27 @@ func (s *XMLProcessingService) convertDiscogsMaster(discogsMaster *imports.Maste
 	if len(discogsMaster.DataQuality) > 0 {
 		if dataQuality := strings.TrimSpace(discogsMaster.DataQuality); len(dataQuality) > 0 {
 			master.DataQuality = &dataQuality
+		}
+	}
+
+	// Convert genres
+	for _, genreName := range discogsMaster.Genres {
+		if genre := s.findOrCreateGenre(ctx, genreName); genre != nil {
+			master.Genres = append(master.Genres, *genre)
+		}
+	}
+
+	// Convert styles as genres (Discogs treats them as sub-genres)
+	for _, styleName := range discogsMaster.Styles {
+		if genre := s.findOrCreateGenre(ctx, styleName); genre != nil {
+			master.Genres = append(master.Genres, *genre)
+		}
+	}
+
+	// Convert artists
+	for _, discogsArtist := range discogsMaster.Artists {
+		if artist := s.convertDiscogsArtist(ctx, &discogsArtist); artist != nil {
+			master.Artists = append(master.Artists, *artist)
 		}
 	}
 
@@ -1363,7 +1445,7 @@ func (s *XMLProcessingService) ProcessReleasesFile(ctx context.Context, filePath
 			}
 
 			// Convert Discogs release to our release model
-			release := s.convertDiscogsRelease(&discogsRelease)
+			release := s.convertDiscogsRelease(ctx, &discogsRelease)
 			if release == nil {
 				result.ErroredRecords++
 				continue
@@ -1445,7 +1527,7 @@ func (s *XMLProcessingService) processReleaseBatch(ctx context.Context, releases
 	return nil
 }
 
-func (s *XMLProcessingService) convertDiscogsRelease(discogsRelease *imports.Release) *models.Release {
+func (s *XMLProcessingService) convertDiscogsRelease(ctx context.Context, discogsRelease *imports.Release) *models.Release {
 	// Skip releases with invalid data (avoid string ops on invalid data)
 	if discogsRelease.ID == 0 || len(discogsRelease.Title) == 0 {
 		return nil
@@ -1504,6 +1586,27 @@ func (s *XMLProcessingService) convertDiscogsRelease(discogsRelease *imports.Rel
 	// Handle track count (simple length check)
 	if trackCount := len(discogsRelease.Tracklist); trackCount > 0 {
 		release.TrackCount = &trackCount
+	}
+
+	// Convert genres (combining genres and styles like DiscogsParserService)
+	for _, genreName := range discogsRelease.Genres {
+		if genre := s.findOrCreateGenre(ctx, genreName); genre != nil {
+			release.Genres = append(release.Genres, *genre)
+		}
+	}
+
+	// Convert styles as genres (Discogs treats them as sub-genres)
+	for _, styleName := range discogsRelease.Styles {
+		if genre := s.findOrCreateGenre(ctx, styleName); genre != nil {
+			release.Genres = append(release.Genres, *genre)
+		}
+	}
+
+	// Convert artists
+	for _, discogsArtist := range discogsRelease.Artists {
+		if artist := s.findOrCreateArtist(ctx, int64(discogsArtist.ID), strings.TrimSpace(discogsArtist.Name)); artist != nil {
+			release.Artists = append(release.Artists, *artist)
+		}
 	}
 
 	return release
@@ -1566,7 +1669,7 @@ func (s *XMLProcessingService) ProcessReleasesFileWithTracks(ctx context.Context
 			}
 
 			// Convert Discogs release to our release model
-			release := s.convertDiscogsRelease(&discogsRelease)
+			release := s.convertDiscogsRelease(ctx, &discogsRelease)
 			if release == nil {
 				result.ErroredRecords++
 				continue
@@ -1634,4 +1737,78 @@ func (s *XMLProcessingService) ProcessReleasesFileWithTracks(ctx context.Context
 	)
 
 	return result, nil
+}
+
+// findOrCreateGenre finds an existing genre by name or creates a new one (with caching)
+func (s *XMLProcessingService) findOrCreateGenre(ctx context.Context, name string) *models.Genre {
+	if name == "" {
+		return nil
+	}
+
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return nil
+	}
+
+	// Check cache first
+	if cachedGenre, exists := s.genreCache[trimmedName]; exists {
+		return cachedGenre
+	}
+
+	// Use the genre repository to find or create the genre
+	genre, err := s.genreRepo.FindOrCreate(ctx, trimmedName)
+	if err != nil {
+		s.log.Warn("Failed to find or create genre", "name", trimmedName, "error", err)
+		return nil
+	}
+
+	// Cache the result for future lookups
+	s.genreCache[trimmedName] = genre
+	return genre
+}
+
+// findOrCreateArtist finds an existing artist by Discogs ID or creates a new one (with caching)
+func (s *XMLProcessingService) findOrCreateArtist(ctx context.Context, discogsID int64, name string) *models.Artist {
+	if discogsID == 0 || name == "" {
+		return nil
+	}
+
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return nil
+	}
+
+	// Check cache first
+	if cachedArtist, exists := s.artistCache[discogsID]; exists {
+		return cachedArtist
+	}
+
+	// Use the artist repository to find or create the artist
+	artist, err := s.artistRepo.FindOrCreateByDiscogsID(ctx, discogsID, trimmedName)
+	if err != nil {
+		s.log.Warn("Failed to find or create artist", "discogsID", discogsID, "name", trimmedName, "error", err)
+		return nil
+	}
+
+	// Cache the result for future lookups
+	s.artistCache[discogsID] = artist
+	return artist
+}
+
+// preloadEntityCaches loads existing genres and artists into memory caches for faster lookup
+func (s *XMLProcessingService) preloadEntityCaches(ctx context.Context) error {
+	log := s.log.Function("preloadEntityCaches")
+
+	// Preload all genres
+	genres, err := s.genreRepo.GetAll(ctx)
+	if err != nil {
+		return log.Err("failed to preload genres", err)
+	}
+
+	for _, genre := range genres {
+		s.genreCache[genre.Name] = genre
+	}
+
+	log.Info("Preloaded entity caches", "genres", len(genres))
+	return nil
 }

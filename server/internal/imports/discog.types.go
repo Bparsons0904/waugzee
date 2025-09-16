@@ -7,15 +7,16 @@ import (
 
 // Core Discogs entities
 type Artist struct {
-	ID       int      `xml:"id,attr"             json:"id"              db:"id"`
-	Name     string   `xml:"name"                json:"name"            db:"name"`
-	RealName string   `xml:"realname"            json:"real_name"       db:"real_name"`
-	Profile  string   `xml:"profile"             json:"profile"         db:"profile"`
-	URLs     []string `xml:"urls>url"            json:"urls"            db:"urls"`
-	NameVars []string `xml:"namevariations>name" json:"name_variations" db:"name_variations"`
-	Aliases  []Alias  `xml:"aliases>name"        json:"aliases"         db:"aliases"`
-	Members  []Member `xml:"members>name"        json:"members"         db:"members"`
-	Groups   []Group  `xml:"groups>name"         json:"groups"          db:"groups"`
+	ID       int           `xml:"id"                  json:"id"              db:"id"`
+	Name     string        `xml:"name"                json:"name"            db:"name"`
+	RealName string        `xml:"realname"            json:"real_name"       db:"real_name"`
+	Profile  string        `xml:"profile"             json:"profile"         db:"profile"`
+	URLs     []string      `xml:"urls>url"            json:"urls"            db:"urls"`
+	NameVars []string      `xml:"namevariations>name" json:"name_variations" db:"name_variations"`
+	Aliases  []Alias       `xml:"aliases>name"        json:"aliases"         db:"aliases"`
+	Members  []Member      `xml:"members>name"        json:"members"         db:"members"`
+	Groups   []Group       `xml:"groups>name"         json:"groups"          db:"groups"`
+	Images   []DiscogsImage `xml:"images>image"        json:"images"          db:"images"`
 }
 
 type Label struct {
@@ -28,21 +29,29 @@ type Label struct {
 	URLs        []string `xml:"urls>url"        json:"urls"         db:"urls"`
 }
 
+// ReleaseLabel represents a label as it appears within a release (with attributes)
+type ReleaseLabel struct {
+	ID        int    `xml:"id,attr"    json:"id"         db:"id"`
+	Name      string `xml:"name,attr"  json:"name"       db:"name"`
+	CatalogNo string `xml:"catno,attr" json:"catalog_no" db:"catalog_no"`
+}
+
 type Release struct {
-	ID          int      `xml:"id,attr"         json:"id"           db:"id"`
-	Status      string   `xml:"status,attr"     json:"status"       db:"status"`
-	Title       string   `xml:"title"           json:"title"        db:"title"`
-	Country     string   `xml:"country"         json:"country"      db:"country"`
-	Released    string   `xml:"released"        json:"released"     db:"released"`
-	Notes       string   `xml:"notes"           json:"notes"        db:"notes"`
-	DataQuality string   `xml:"data_quality"    json:"data_quality" db:"data_quality"`
-	MasterID    int      `xml:"master_id"       json:"master_id"    db:"master_id"`
-	Artists     []Artist `xml:"artists>artist"  json:"artists"      db:"artists"`
-	Labels      []Label  `xml:"labels>label"    json:"labels"       db:"labels"`
-	Formats     []Format `xml:"formats>format"  json:"formats"      db:"formats"`
-	Genres      []string `xml:"genres>genre"    json:"genres"       db:"genres"`
-	Styles      []string `xml:"styles>style"    json:"styles"       db:"styles"`
-	Tracklist   []Track  `xml:"tracklist>track" json:"tracklist"    db:"tracklist"`
+	ID          int           `xml:"id,attr"         json:"id"           db:"id"`
+	Status      string        `xml:"status,attr"     json:"status"       db:"status"`
+	Title       string        `xml:"title"           json:"title"        db:"title"`
+	Country     string        `xml:"country"         json:"country"      db:"country"`
+	Released    string        `xml:"released"        json:"released"     db:"released"`
+	Notes       string        `xml:"notes"           json:"notes"        db:"notes"`
+	DataQuality string        `xml:"data_quality"    json:"data_quality" db:"data_quality"`
+	MasterID    int           `xml:"master_id"       json:"master_id"    db:"master_id"`
+	Artists     []Artist      `xml:"artists>artist"  json:"artists"      db:"artists"`
+	Labels      []ReleaseLabel `xml:"labels>label"    json:"labels"       db:"labels"`
+	Formats     []Format      `xml:"formats>format"  json:"formats"      db:"formats"`
+	Genres      []string      `xml:"genres>genre"    json:"genres"       db:"genres"`
+	Styles      []string      `xml:"styles>style"    json:"styles"       db:"styles"`
+	Tracklist   []Track       `xml:"tracklist>track" json:"tracklist"    db:"tracklist"`
+	Images      []DiscogsImage `xml:"images>image"    json:"images"       db:"images"`
 }
 
 // Supporting structs
@@ -117,16 +126,17 @@ type DiscogsMasters struct {
 }
 
 type Master struct {
-	ID          int      `xml:"id,attr"        json:"id"           db:"id"`
-	MainRelease int      `xml:"main_release"   json:"main_release" db:"main_release"`
-	Title       string   `xml:"title"          json:"title"        db:"title"`
-	Year        int      `xml:"year"           json:"year"         db:"year"`
-	Notes       string   `xml:"notes"          json:"notes"        db:"notes"`
-	DataQuality string   `xml:"data_quality"   json:"data_quality" db:"data_quality"`
-	Artists     []Artist `xml:"artists>artist" json:"artists"      db:"artists"`
-	Genres      []string `xml:"genres>genre"   json:"genres"       db:"genres"`
-	Styles      []string `xml:"styles>style"   json:"styles"       db:"styles"`
-	Videos      []Video  `xml:"videos>video"   json:"videos"       db:"videos"`
+	ID          int           `xml:"id,attr"        json:"id"           db:"id"`
+	MainRelease int           `xml:"main_release"   json:"main_release" db:"main_release"`
+	Title       string        `xml:"title"          json:"title"        db:"title"`
+	Year        int           `xml:"year"           json:"year"         db:"year"`
+	Notes       string        `xml:"notes"          json:"notes"        db:"notes"`
+	DataQuality string        `xml:"data_quality"   json:"data_quality" db:"data_quality"`
+	Artists     []Artist      `xml:"artists>artist" json:"artists"      db:"artists"`
+	Genres      []string      `xml:"genres>genre"   json:"genres"       db:"genres"`
+	Styles      []string      `xml:"styles>style"   json:"styles"       db:"styles"`
+	Videos      []Video       `xml:"videos>video"   json:"videos"       db:"videos"`
+	Images      []DiscogsImage `xml:"images>image"   json:"images"       db:"images"`
 }
 
 type Video struct {
@@ -136,4 +146,12 @@ type Video struct {
 	Title       string `xml:"title"         json:"title"       db:"title"`
 	Description string `xml:"description"   json:"description" db:"description"`
 	URI         string `xml:"uri"           json:"uri"         db:"uri"`
+}
+
+type DiscogsImage struct {
+	Type   string `xml:"type,attr"   json:"type"    db:"type"`
+	Width  int    `xml:"width,attr"  json:"width"   db:"width"`
+	Height int    `xml:"height,attr" json:"height"  db:"height"`
+	URI    string `xml:"uri,attr"    json:"uri"     db:"uri"`
+	URI150 string `xml:"uri150,attr" json:"uri150"  db:"uri150"`
 }

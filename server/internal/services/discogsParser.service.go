@@ -15,6 +15,8 @@ import (
 	"waugzee/internal/imports"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
+
+	"github.com/google/uuid"
 )
 
 // ParseResult represents the result of parsing a Discogs XML file
@@ -383,6 +385,23 @@ func (s *DiscogsParserService) parseArtistsFile(ctx context.Context, reader io.R
 				continue
 			}
 
+			// Log detailed XML structure for first few records to debug parsing issues
+			if result.TotalRecords <= 2 {
+				log.Info("Detailed XML structure for debugging",
+					"recordNumber", result.TotalRecords,
+					"parsedID", discogsArtist.ID,
+					"parsedName", discogsArtist.Name,
+					"parsedRealName", discogsArtist.RealName,
+					"parsedProfile", discogsArtist.Profile,
+					"parsedURLs", discogsArtist.URLs,
+					"parsedNameVars", discogsArtist.NameVars,
+					"parsedAliases", discogsArtist.Aliases,
+					"parsedMembers", discogsArtist.Members,
+					"parsedGroups", discogsArtist.Groups,
+					"elementName", startElement.Name.Local,
+					"elementAttrs", s.formatAttributes(startElement.Attr))
+			}
+
 			// Convert Discogs artist to our artist model
 			artist := s.convertDiscogsArtist(&discogsArtist)
 			if artist == nil {
@@ -547,6 +566,24 @@ func (s *DiscogsParserService) parseMastersFile(ctx context.Context, reader io.R
 				continue
 			}
 
+			// Log detailed XML structure for first few records to debug parsing issues
+			if result.TotalRecords <= 2 {
+				log.Info("Detailed XML structure for debugging",
+					"recordNumber", result.TotalRecords,
+					"parsedID", discogsMaster.ID,
+					"parsedMainRelease", discogsMaster.MainRelease,
+					"parsedTitle", discogsMaster.Title,
+					"parsedYear", discogsMaster.Year,
+					"parsedNotes", discogsMaster.Notes,
+					"parsedDataQuality", discogsMaster.DataQuality,
+					"parsedArtists", discogsMaster.Artists,
+					"parsedGenres", discogsMaster.Genres,
+					"parsedStyles", discogsMaster.Styles,
+					"parsedVideos", discogsMaster.Videos,
+					"elementName", startElement.Name.Local,
+					"elementAttrs", s.formatAttributes(startElement.Attr))
+			}
+
 			// Convert Discogs master to our master model
 			master := s.convertDiscogsMaster(&discogsMaster)
 			if master == nil {
@@ -709,6 +746,28 @@ func (s *DiscogsParserService) parseReleasesFile(ctx context.Context, reader io.
 				result.Errors = append(result.Errors, errorMsg)
 				result.ErroredRecords++
 				continue
+			}
+
+			// Log detailed XML structure for first few records to debug parsing issues
+			if result.TotalRecords <= 2 {
+				log.Info("Detailed XML structure for debugging",
+					"recordNumber", result.TotalRecords,
+					"parsedID", discogsRelease.ID,
+					"parsedStatus", discogsRelease.Status,
+					"parsedTitle", discogsRelease.Title,
+					"parsedCountry", discogsRelease.Country,
+					"parsedReleased", discogsRelease.Released,
+					"parsedNotes", discogsRelease.Notes,
+					"parsedDataQuality", discogsRelease.DataQuality,
+					"parsedMasterID", discogsRelease.MasterID,
+					"parsedArtists", discogsRelease.Artists,
+					"parsedLabels", discogsRelease.Labels,
+					"parsedFormats", discogsRelease.Formats,
+					"parsedGenres", discogsRelease.Genres,
+					"parsedStyles", discogsRelease.Styles,
+					"parsedTracklist", discogsRelease.Tracklist,
+					"elementName", startElement.Name.Local,
+					"elementAttrs", s.formatAttributes(startElement.Attr))
 			}
 
 			// Convert Discogs release to our release model
@@ -877,7 +936,56 @@ func (s *DiscogsParserService) convertDiscogsArtist(discogsArtist *imports.Artis
 		}
 	}
 
+	// Process images if available (even if currently empty in XML dumps)
+	// This sets up infrastructure for future API integration or XML dump improvements
+	if len(discogsArtist.Images) > 0 {
+		for _, discogsImage := range discogsArtist.Images {
+			if image := s.convertDiscogsImage(&discogsImage, artist.ID.String(), models.ImageableTypeArtist); image != nil {
+				artist.Images = append(artist.Images, *image)
+			}
+		}
+	}
+
 	return artist
+}
+
+func (s *DiscogsParserService) convertDiscogsImage(discogsImage *imports.DiscogsImage, imageableID, imageableType string) *models.Image {
+	// Skip images with no URI (common in current XML dumps)
+	if len(discogsImage.URI) == 0 {
+		return nil
+	}
+
+	// Determine image type based on Discogs type
+	imageType := models.ImageTypePrimary
+	if discogsImage.Type == "secondary" {
+		imageType = models.ImageTypeSecondary
+	}
+
+	image := &models.Image{
+		URL:           discogsImage.URI,
+		ImageableID:   imageableID,
+		ImageableType: imageableType,
+		ImageType:     imageType,
+	}
+
+	// Set optional fields if available
+	if discogsImage.Width > 0 {
+		image.Width = &discogsImage.Width
+	}
+	if discogsImage.Height > 0 {
+		image.Height = &discogsImage.Height
+	}
+	if len(discogsImage.URI150) > 0 {
+		image.DiscogsURI150 = &discogsImage.URI150
+	}
+	if len(discogsImage.Type) > 0 {
+		image.DiscogsType = &discogsImage.Type
+	}
+
+	// Store original Discogs URI for reference
+	image.DiscogsURI = &discogsImage.URI
+
+	return image
 }
 
 func (s *DiscogsParserService) convertDiscogsMaster(discogsMaster *imports.Master) *models.Master {
@@ -920,16 +1028,36 @@ func (s *DiscogsParserService) convertDiscogsMaster(discogsMaster *imports.Maste
 		}
 	}
 
+	// Convert genres
+	for _, genreName := range discogsMaster.Genres {
+		if genre := s.findOrCreateGenre(genreName); genre != nil {
+			master.Genres = append(master.Genres, *genre)
+		}
+	}
+
+	// Convert styles as genres (Discogs treats them as sub-genres)
+	for _, styleName := range discogsMaster.Styles {
+		if genre := s.findOrCreateGenre(styleName); genre != nil {
+			master.Genres = append(master.Genres, *genre)
+		}
+	}
+
+	// Convert artists
+	for _, discogsArtist := range discogsMaster.Artists {
+		if artist := s.convertDiscogsArtist(&discogsArtist); artist != nil {
+			master.Artists = append(master.Artists, *artist)
+		}
+	}
+
 	return master
 }
 
 func (s *DiscogsParserService) convertDiscogsRelease(discogsRelease *imports.Release) *models.Release {
-	// Skip releases with invalid data (avoid string ops on invalid data)
+	// Skip releases with invalid data
 	if discogsRelease.ID == 0 || len(discogsRelease.Title) == 0 {
 		return nil
 	}
 
-	// Single trim operation with length check
 	title := strings.TrimSpace(discogsRelease.Title)
 	if len(title) == 0 {
 		return nil
@@ -941,14 +1069,14 @@ func (s *DiscogsParserService) convertDiscogsRelease(discogsRelease *imports.Rel
 		Format:    models.FormatVinyl, // Default format
 	}
 
-	// Set optional fields only if they have values
+	// Basic fields
 	if len(discogsRelease.Country) > 0 {
 		if country := strings.TrimSpace(discogsRelease.Country); len(country) > 0 {
 			release.Country = &country
 		}
 	}
 
-	// Optimized year parsing - avoid string allocation if possible
+	// Year parsing
 	if len(discogsRelease.Released) >= 4 {
 		yearStr := discogsRelease.Released[:4]
 		if len(yearStr) == 4 {
@@ -959,7 +1087,7 @@ func (s *DiscogsParserService) convertDiscogsRelease(discogsRelease *imports.Rel
 		}
 	}
 
-	// Handle formats - map to our format enum (optimized string processing)
+	// Format mapping
 	if len(discogsRelease.Formats) > 0 {
 		firstFormat := discogsRelease.Formats[0]
 		if len(firstFormat.Name) > 0 {
@@ -979,10 +1107,38 @@ func (s *DiscogsParserService) convertDiscogsRelease(discogsRelease *imports.Rel
 		}
 	}
 
-	// Handle track count (simple length check)
+	// Track count
 	if trackCount := len(discogsRelease.Tracklist); trackCount > 0 {
 		release.TrackCount = &trackCount
 	}
+
+	// Catalog number from first label
+	if len(discogsRelease.Labels) > 0 && len(discogsRelease.Labels[0].CatalogNo) > 0 {
+		catalogNo := strings.TrimSpace(discogsRelease.Labels[0].CatalogNo)
+		if len(catalogNo) > 0 {
+			release.CatalogNumber = &catalogNo
+		}
+	}
+
+	// Convert Artists
+	release.Artists = s.convertDiscogsArtists(discogsRelease.Artists)
+
+	// Convert Genres (combining genres and styles)
+	release.Genres = s.convertDiscogsGenres(discogsRelease.Genres, discogsRelease.Styles)
+
+	// Convert Tracks
+	release.Tracks = s.convertDiscogsTracks(discogsRelease.Tracklist, release.ID)
+
+	// Set primary image URL from first image if available
+	if len(discogsRelease.Images) > 0 && discogsRelease.Images[0].URI != "" {
+		imageURL := strings.TrimSpace(discogsRelease.Images[0].URI)
+		if imageURL != "" {
+			release.ImageURL = &imageURL
+		}
+	}
+
+	// Note: Detailed images are handled separately via the polymorphic system
+	// They will be stored as separate Image models linked to this release
 
 	return release
 }
@@ -1090,4 +1246,218 @@ func (s *DiscogsParserService) logSuccessfulRecord(recordType string, discogsRec
 		"recordNumber", recordNumber,
 		"discogsRecord", string(discogsJSON),
 		"convertedRecord", string(convertedJSON))
+}
+
+// findOrCreateGenre finds an existing genre by name or creates a new one
+func (s *DiscogsParserService) findOrCreateGenre(name string) *models.Genre {
+	if name == "" {
+		return nil
+	}
+
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return nil
+	}
+
+	// For now, just create a new genre object without database interaction
+	// The database layer will handle deduplication through unique constraints
+	return &models.Genre{
+		Name: trimmedName,
+	}
+}
+
+// convertDiscogsArtists converts Discogs artist data to our Artist models
+func (s *DiscogsParserService) convertDiscogsArtists(discogsArtists []imports.Artist) []models.Artist {
+	if len(discogsArtists) == 0 {
+		return nil
+	}
+
+	var artists []models.Artist
+	for _, discogsArtist := range discogsArtists {
+		if discogsArtist.Name == "" {
+			continue
+		}
+
+		name := strings.TrimSpace(discogsArtist.Name)
+		if name == "" {
+			continue
+		}
+
+		artist := models.Artist{
+			Name:      name,
+			IsActive:  true,
+		}
+
+		// Set Discogs ID if available
+		if discogsArtist.ID > 0 {
+			discogsID := int64(discogsArtist.ID)
+			artist.DiscogsID = &discogsID
+		}
+
+		// Set biography from profile if available
+		if len(discogsArtist.Profile) > 0 {
+			profile := strings.TrimSpace(discogsArtist.Profile)
+			if len(profile) > 0 {
+				artist.Biography = &profile
+			}
+		}
+
+		artists = append(artists, artist)
+	}
+
+	return artists
+}
+
+// convertDiscogsGenres converts Discogs genres and styles to our Genre models
+func (s *DiscogsParserService) convertDiscogsGenres(genres []string, styles []string) []models.Genre {
+	var result []models.Genre
+	genreMap := make(map[string]bool) // Track duplicates
+
+	// Add genres
+	for _, genre := range genres {
+		if genre == "" {
+			continue
+		}
+		name := strings.TrimSpace(genre)
+		if name == "" || genreMap[name] {
+			continue
+		}
+		genreMap[name] = true
+		result = append(result, models.Genre{Name: name})
+	}
+
+	// Add styles (as sub-genres)
+	for _, style := range styles {
+		if style == "" {
+			continue
+		}
+		name := strings.TrimSpace(style)
+		if name == "" || genreMap[name] {
+			continue
+		}
+		genreMap[name] = true
+		result = append(result, models.Genre{Name: name})
+	}
+
+	return result
+}
+
+// convertDiscogsTracks converts Discogs track data to our Track models
+func (s *DiscogsParserService) convertDiscogsTracks(discogsTracks []imports.Track, releaseID uuid.UUID) []models.Track {
+	if len(discogsTracks) == 0 {
+		return nil
+	}
+
+	var tracks []models.Track
+	for _, discogsTrack := range discogsTracks {
+		if discogsTrack.Title == "" || discogsTrack.Position == "" {
+			continue
+		}
+
+		title := strings.TrimSpace(discogsTrack.Title)
+		position := strings.TrimSpace(discogsTrack.Position)
+		if title == "" || position == "" {
+			continue
+		}
+
+		track := models.Track{
+			ReleaseID: releaseID,
+			Position:  position,
+			Title:     title,
+		}
+
+		// Parse duration if available (format: "4:45")
+		if len(discogsTrack.Duration) > 0 {
+			duration := strings.TrimSpace(discogsTrack.Duration)
+			if len(duration) > 0 {
+				if seconds := s.parseDuration(duration); seconds > 0 {
+					track.Duration = &seconds
+				}
+			}
+		}
+
+		tracks = append(tracks, track)
+	}
+
+	return tracks
+}
+
+// convertDiscogsImages converts Discogs image data to our polymorphic Image models
+func (s *DiscogsParserService) convertDiscogsImages(discogsImages []imports.DiscogsImage, entityID, entityType string) []models.Image {
+	if len(discogsImages) == 0 {
+		return nil
+	}
+
+	var images []models.Image
+	for i, discogsImage := range discogsImages {
+		if discogsImage.URI == "" {
+			continue
+		}
+
+		uri := strings.TrimSpace(discogsImage.URI)
+		if uri == "" {
+			continue
+		}
+
+		image := models.Image{
+			URL:           uri,
+			ImageableID:   entityID,
+			ImageableType: entityType,
+			ImageType:     models.ImageTypePrimary, // Default
+		}
+
+		// Set image type based on position (first image is primary)
+		if i == 0 {
+			image.ImageType = models.ImageTypePrimary
+		} else {
+			image.ImageType = models.ImageTypeGallery
+		}
+
+		// Set dimensions if available
+		if discogsImage.Width > 0 {
+			image.Width = &discogsImage.Width
+		}
+		if discogsImage.Height > 0 {
+			image.Height = &discogsImage.Height
+		}
+
+		// Set Discogs-specific fields
+		if len(discogsImage.Type) > 0 {
+			discogsType := strings.TrimSpace(discogsImage.Type)
+			image.DiscogsType = &discogsType
+		}
+		if len(discogsImage.URI150) > 0 {
+			uri150 := strings.TrimSpace(discogsImage.URI150)
+			image.DiscogsURI150 = &uri150
+		}
+
+		sortOrder := i
+		image.SortOrder = &sortOrder
+
+		images = append(images, image)
+	}
+
+	return images
+}
+
+// parseDuration converts duration string (e.g., "4:45") to seconds
+func (s *DiscogsParserService) parseDuration(duration string) int {
+	parts := strings.Split(duration, ":")
+	if len(parts) != 2 {
+		return 0
+	}
+
+	var minutes, seconds int
+	if _, err := fmt.Sscanf(parts[0], "%d", &minutes); err != nil {
+		return 0
+	}
+	if _, err := fmt.Sscanf(parts[1], "%d", &seconds); err != nil {
+		return 0
+	}
+
+	if minutes < 0 || seconds < 0 || seconds >= 60 {
+		return 0
+	}
+
+	return minutes*60 + seconds
 }

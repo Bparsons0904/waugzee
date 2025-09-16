@@ -31,6 +31,7 @@ var MODELS_TO_MIGRATE = []any{
 	&Track{},
 	&Label{},
 	&Artist{},
+	&Image{},
 	&DiscogsSync{},
 	&MaintenanceRecord{},
 	&DiscogsDataProcessing{},

@@ -15,6 +15,8 @@ type Master struct {
 
 	// Relationships
 	Releases []Release `gorm:"foreignKey:MasterID" json:"releases,omitempty"`
+	Genres   []Genre   `gorm:"many2many:master_genres;" json:"genres,omitempty"`
+	Artists  []Artist  `gorm:"many2many:master_artists;" json:"artists,omitempty"`
 }
 
 func (m *Master) BeforeCreate(tx *gorm.DB) (err error) {

@@ -41,6 +41,7 @@ type App struct {
 	MasterRepo                repositories.MasterRepository
 	ReleaseRepo               repositories.ReleaseRepository
 	TrackRepo                 repositories.TrackRepository
+	GenreRepo                 repositories.GenreRepository
 
 	// Controllers
 	AdminController *adminController.AdminController
@@ -77,6 +78,7 @@ func New() (*App, error) {
 	masterRepo := repositories.NewMasterRepository(db)
 	releaseRepo := repositories.NewReleaseRepository(db)
 	trackRepo := repositories.NewTrackRepository(db)
+	genreRepo := repositories.NewGenreRepository(db)
 
 	// Initialize services
 	discogsService := services.NewDiscogsService()
@@ -89,6 +91,7 @@ func New() (*App, error) {
 		masterRepo,
 		releaseRepo,
 		trackRepo,
+		genreRepo,
 		discogsDataProcessingRepo,
 		transactionService,
 		discogsParserService,
@@ -154,6 +157,7 @@ func New() (*App, error) {
 		MasterRepo:                masterRepo,
 		ReleaseRepo:               releaseRepo,
 		TrackRepo:                 trackRepo,
+		GenreRepo:                 genreRepo,
 		AdminController:           adminController,
 		AuthController:            authController,
 		UserController:            userController,
