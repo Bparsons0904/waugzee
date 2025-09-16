@@ -21,23 +21,139 @@ import (
 
 // ParseResult represents the result of parsing a Discogs XML file
 type ParseResult struct {
-	TotalRecords    int
+	TotalRecords     int
 	ProcessedRecords int
-	ErroredRecords  int
-	Errors          []string
-	ParsedLabels    []*models.Label
-	ParsedArtists   []*models.Artist
-	ParsedMasters   []*models.Master
-	ParsedReleases  []*models.Release
+	ErroredRecords   int
+	Errors           []string
+	ParsedLabels     []*models.Label
+	ParsedArtists    []*models.Artist
+	ParsedMasters    []*models.Master
+	ParsedReleases   []*models.Release
 }
 
 // ParseOptions configures parsing behavior
 type ParseOptions struct {
-	FilePath      string
-	FileType      string // "labels", "artists", "masters", "releases"
-	BatchSize     int    // Optional: batch size for processing (default: 2000)
-	MaxRecords    int    // Optional: limit total records parsed (0 = no limit)
-	ProgressFunc  func(processed, total, errors int) // Optional: progress callback
+	FilePath     string
+	FileType     string                             // "labels", "artists", "masters", "releases"
+	BatchSize    int                                // Optional: batch size for processing (default: 2000)
+	MaxRecords   int                                // Optional: limit total records parsed (0 = no limit)
+	ProgressFunc func(processed, total, errors int) // Optional: progress callback
+}
+
+// EntityConfig defines the configuration for parsing different entity types
+type EntityConfig struct {
+	ElementName     string
+	ConvertFunc     func(interface{}) interface{}
+	SetResultFunc   func(*ParseResult, interface{})
+	DebugLogFields  func(interface{}) map[string]interface{}
+}
+
+// Entity configurations for each supported file type
+var entityConfigs = map[string]EntityConfig{
+	"labels": {
+		ElementName: "label",
+		ConvertFunc: func(raw interface{}) interface{} {
+			return raw.(*imports.Label)
+		},
+		SetResultFunc: func(result *ParseResult, converted interface{}) {
+			if label, ok := converted.(*models.Label); ok && label != nil {
+				result.ParsedLabels = append(result.ParsedLabels, label)
+			}
+		},
+		DebugLogFields: func(raw interface{}) map[string]interface{} {
+			label := raw.(*imports.Label)
+			return map[string]interface{}{
+				"parsedID":          label.ID,
+				"parsedName":        label.Name,
+				"parsedContactInfo": label.ContactInfo,
+				"parsedProfile":     label.Profile,
+				"parsedParentLabel": label.ParentLabel,
+				"parsedURLs":        label.URLs,
+				"parsedSubLabels":   label.SubLabels,
+			}
+		},
+	},
+	"artists": {
+		ElementName: "artist",
+		ConvertFunc: func(raw interface{}) interface{} {
+			return raw.(*imports.Artist)
+		},
+		SetResultFunc: func(result *ParseResult, converted interface{}) {
+			if artist, ok := converted.(*models.Artist); ok && artist != nil {
+				result.ParsedArtists = append(result.ParsedArtists, artist)
+			}
+		},
+		DebugLogFields: func(raw interface{}) map[string]interface{} {
+			artist := raw.(*imports.Artist)
+			return map[string]interface{}{
+				"parsedID":       artist.ID,
+				"parsedName":     artist.Name,
+				"parsedRealName": artist.RealName,
+				"parsedProfile":  artist.Profile,
+				"parsedURLs":     artist.URLs,
+				"parsedNameVars": artist.NameVars,
+				"parsedAliases":  artist.Aliases,
+				"parsedMembers":  artist.Members,
+				"parsedGroups":   artist.Groups,
+			}
+		},
+	},
+	"masters": {
+		ElementName: "master",
+		ConvertFunc: func(raw interface{}) interface{} {
+			return raw.(*imports.Master)
+		},
+		SetResultFunc: func(result *ParseResult, converted interface{}) {
+			if master, ok := converted.(*models.Master); ok && master != nil {
+				result.ParsedMasters = append(result.ParsedMasters, master)
+			}
+		},
+		DebugLogFields: func(raw interface{}) map[string]interface{} {
+			master := raw.(*imports.Master)
+			return map[string]interface{}{
+				"parsedID":          master.ID,
+				"parsedMainRelease": master.MainRelease,
+				"parsedTitle":       master.Title,
+				"parsedYear":        master.Year,
+				"parsedNotes":       master.Notes,
+				"parsedDataQuality": master.DataQuality,
+				"parsedArtists":     master.Artists,
+				"parsedGenres":      master.Genres,
+				"parsedStyles":      master.Styles,
+				"parsedVideos":      master.Videos,
+			}
+		},
+	},
+	"releases": {
+		ElementName: "release",
+		ConvertFunc: func(raw interface{}) interface{} {
+			return raw.(*imports.Release)
+		},
+		SetResultFunc: func(result *ParseResult, converted interface{}) {
+			if release, ok := converted.(*models.Release); ok && release != nil {
+				result.ParsedReleases = append(result.ParsedReleases, release)
+			}
+		},
+		DebugLogFields: func(raw interface{}) map[string]interface{} {
+			release := raw.(*imports.Release)
+			return map[string]interface{}{
+				"parsedID":          release.ID,
+				"parsedStatus":      release.Status,
+				"parsedTitle":       release.Title,
+				"parsedCountry":     release.Country,
+				"parsedReleased":    release.Released,
+				"parsedNotes":       release.Notes,
+				"parsedDataQuality": release.DataQuality,
+				"parsedMasterID":    release.MasterID,
+				"parsedArtists":     release.Artists,
+				"parsedLabels":      release.Labels,
+				"parsedFormats":     release.Formats,
+				"parsedGenres":      release.Genres,
+				"parsedStyles":      release.Styles,
+				"parsedTracklist":   release.TrackList,
+			}
+		},
+	},
 }
 
 // DiscogsParserService provides pure XML parsing functionality without database operations
@@ -53,7 +169,10 @@ func NewDiscogsParserService() *DiscogsParserService {
 }
 
 // ParseFile parses a Discogs XML file and returns parsed models without database operations
-func (s *DiscogsParserService) ParseFile(ctx context.Context, options ParseOptions) (*ParseResult, error) {
+func (s *DiscogsParserService) ParseFile(
+	ctx context.Context,
+	options ParseOptions,
+) (*ParseResult, error) {
 	log := s.log.Function("ParseFile")
 
 	if options.FilePath == "" {
@@ -62,6 +181,12 @@ func (s *DiscogsParserService) ParseFile(ctx context.Context, options ParseOptio
 
 	if options.FileType == "" {
 		return nil, log.Err("file type is required", nil)
+	}
+
+	// Get entity configuration
+	config, exists := entityConfigs[options.FileType]
+	if !exists {
+		return nil, log.Err("unsupported file type", nil, "fileType", options.FileType)
 	}
 
 	// Set default batch size
@@ -96,7 +221,12 @@ func (s *DiscogsParserService) ParseFile(ctx context.Context, options ParseOptio
 
 	gzipReader, err := gzip.NewReader(file)
 	if err != nil {
-		return nil, log.Err("failed to create gzip reader - file may not be gzipped", err, "filePath", options.FilePath)
+		return nil, log.Err(
+			"failed to create gzip reader - file may not be gzipped",
+			err,
+			"filePath",
+			options.FilePath,
+		)
 	}
 	defer gzipReader.Close()
 
@@ -115,577 +245,37 @@ func (s *DiscogsParserService) ParseFile(ctx context.Context, options ParseOptio
 
 	gzipReader, err = gzip.NewReader(file)
 	if err != nil {
-		return nil, log.Err("failed to recreate gzip reader for parsing", err, "filePath", options.FilePath)
+		return nil, log.Err(
+			"failed to recreate gzip reader for parsing",
+			err,
+			"filePath",
+			options.FilePath,
+		)
 	}
 	defer gzipReader.Close()
 
-	// Route to appropriate parser based on file type
-	switch options.FileType {
-	case "labels":
-		return s.parseLabelsFile(ctx, gzipReader, options, log)
-	case "artists":
-		return s.parseArtistsFile(ctx, gzipReader, options, log)
-	case "masters":
-		return s.parseMastersFile(ctx, gzipReader, options, log)
-	case "releases":
-		return s.parseReleasesFile(ctx, gzipReader, options, log)
-	default:
-		return nil, log.Err("unsupported file type", nil, "fileType", options.FileType)
-	}
+	// Use generic parser with entity-specific configuration
+	return s.parseEntityFile(ctx, gzipReader, options, config, log)
 }
 
-// parseLabelsFile handles parsing of labels XML files
-func (s *DiscogsParserService) parseLabelsFile(ctx context.Context, reader io.Reader, options ParseOptions, log logger.Logger) (*ParseResult, error) {
-	decoder := xml.NewDecoder(reader)
-
-	result := &ParseResult{
-		Errors:       make([]string, 0),
-		ParsedLabels: make([]*models.Label, 0),
-	}
-
-	var batch []*models.Label
-	batchSize := options.BatchSize
-	if batchSize <= 0 {
-		batchSize = XML_BATCH_SIZE
-	}
-
-	// Performance tracking
-	startTime := time.Now()
-	lastProgressTime := startTime
-	progressInterval := 1000 // Log every 1000 records
-	successfulSamples := 0
-	maxSamplesToLog := 3
-
-	log.Info("Starting labels parsing",
-		"batchSize", batchSize,
-		"progressInterval", progressInterval)
-
-	// Stream through the XML file
-	for {
-		// Check context cancellation
-		select {
-		case <-ctx.Done():
-			return result, ctx.Err()
-		default:
-		}
-
-		token, err := decoder.Token()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("XML parsing error: %v", err))
-			result.ErroredRecords++
-			continue
-		}
-
-		// Look for label start elements
-		if startElement, ok := token.(xml.StartElement); ok && startElement.Name.Local == "label" {
-			// Increment total record count for each record we attempt to process
-			result.TotalRecords++
-
-			// Check max records limit before processing - count all attempted records
-			if options.MaxRecords > 0 && result.TotalRecords > options.MaxRecords {
-				log.Info("Reached max records limit - stopping early",
-					"maxRecords", options.MaxRecords,
-					"totalAttempted", result.TotalRecords-1) // -1 because we haven't processed this one
-				result.TotalRecords-- // Adjust count since we're not processing this record
-				break
-			}
-
-			var discogsLabel imports.Label
-			if err := decoder.DecodeElement(&discogsLabel, &startElement); err != nil {
-				errorMsg := fmt.Sprintf("Failed to decode label element at record %d: %v", result.TotalRecords, err)
-				log.Error("XML decode error",
-					"error", err,
-					"recordNumber", result.TotalRecords,
-					"elementName", startElement.Name.Local,
-					"elementAttrs", s.formatAttributes(startElement.Attr))
-				result.Errors = append(result.Errors, errorMsg)
-				result.ErroredRecords++
-				continue
-			}
-
-			// Log detailed XML structure for first few records to debug parsing issues
-			if result.TotalRecords <= 2 {
-				log.Info("Detailed XML structure for debugging",
-					"recordNumber", result.TotalRecords,
-					"parsedID", discogsLabel.ID,
-					"parsedName", discogsLabel.Name,
-					"parsedContactInfo", discogsLabel.ContactInfo,
-					"parsedProfile", discogsLabel.Profile,
-					"parsedParentLabel", discogsLabel.ParentLabel,
-					"parsedURLs", discogsLabel.URLs,
-					"parsedSubLabels", discogsLabel.SubLabels,
-					"elementName", startElement.Name.Local,
-					"elementAttrs", s.formatAttributes(startElement.Attr))
-			}
-
-			// Convert Discogs label to our label model
-			label := s.convertDiscogsLabel(&discogsLabel)
-			if label == nil {
-				log.Warn("Failed to convert Discogs label",
-					"discogsID", discogsLabel.ID,
-					"name", discogsLabel.Name,
-					"recordNumber", result.TotalRecords)
-				result.ErroredRecords++
-				continue
-			}
-
-			// Log successful parse samples
-			if successfulSamples < maxSamplesToLog {
-				s.logSuccessfulRecord("label", &discogsLabel, label, result.TotalRecords, log)
-				successfulSamples++
-			}
-
-			batch = append(batch, label)
-
-			// Process batch when it reaches the limit
-			if len(batch) >= batchSize {
-				result.ParsedLabels = append(result.ParsedLabels, batch...)
-				result.ProcessedRecords += len(batch)
-
-				// Call progress callback if provided
-				if options.ProgressFunc != nil {
-					options.ProgressFunc(result.ProcessedRecords, result.TotalRecords, result.ErroredRecords)
-				}
-
-				batch = batch[:0] // Reset batch
-			}
-
-			// Log progress every N records (based on total attempted, not just successful)
-			if result.TotalRecords%progressInterval == 0 {
-				currentTime := time.Now()
-				elapsed := currentTime.Sub(lastProgressTime)
-				recordsPerSecond := float64(progressInterval) / elapsed.Seconds()
-				totalElapsed := currentTime.Sub(startTime)
-
-				var memStats runtime.MemStats
-				runtime.ReadMemStats(&memStats)
-
-				successfulRecords := result.TotalRecords - result.ErroredRecords
-				log.Info("Parsing progress",
-					"totalRecords", result.TotalRecords,
-					"processedRecords", result.ProcessedRecords,
-					"erroredRecords", result.ErroredRecords,
-					"successfulRecords", successfulRecords,
-					"recordsPerSecond", fmt.Sprintf("%.1f", recordsPerSecond),
-					"totalElapsedMs", totalElapsed.Milliseconds(),
-					"memoryUsageMB", memStats.Alloc/1024/1024,
-					"successRate", fmt.Sprintf("%.2f%%", float64(successfulRecords)/float64(result.TotalRecords)*100))
-
-				lastProgressTime = currentTime
-			}
-		}
-	}
-
-	// Process remaining batch
-	if len(batch) > 0 {
-		result.ParsedLabels = append(result.ParsedLabels, batch...)
-		result.ProcessedRecords += len(batch)
-	}
-
-	totalElapsed := time.Since(startTime)
-	overallRecordsPerSecond := float64(result.TotalRecords) / totalElapsed.Seconds()
-	successfulRecords := result.TotalRecords - result.ErroredRecords
-
-	log.Info("Labels file parsing completed",
-		"total", result.TotalRecords,
-		"processed", result.ProcessedRecords,
-		"errors", result.ErroredRecords,
-		"successful", successfulRecords,
-		"totalElapsedMs", totalElapsed.Milliseconds(),
-		"overallRecordsPerSecond", fmt.Sprintf("%.1f", overallRecordsPerSecond),
-		"successRate", fmt.Sprintf("%.2f%%", float64(successfulRecords)/float64(result.TotalRecords)*100),
-		"errorSampleCount", len(result.Errors))
-
-	// Log first few errors for debugging
-	if len(result.Errors) > 0 {
-		maxErrorsToLog := 5
-		if len(result.Errors) < maxErrorsToLog {
-			maxErrorsToLog = len(result.Errors)
-		}
-		log.Error("Sample parsing errors",
-			"sampleErrors", result.Errors[:maxErrorsToLog],
-			"totalErrors", len(result.Errors))
-	}
-
-	return result, nil
-}
-
-// parseArtistsFile handles parsing of artists XML files
-func (s *DiscogsParserService) parseArtistsFile(ctx context.Context, reader io.Reader, options ParseOptions, log logger.Logger) (*ParseResult, error) {
-	decoder := xml.NewDecoder(reader)
-
-	result := &ParseResult{
-		Errors:        make([]string, 0),
-		ParsedArtists: make([]*models.Artist, 0),
-	}
-
-	var batch []*models.Artist
-	batchSize := options.BatchSize
-	if batchSize <= 0 {
-		batchSize = XML_BATCH_SIZE
-	}
-
-	// Performance tracking
-	startTime := time.Now()
-	lastProgressTime := startTime
-	progressInterval := 1000 // Log every 1000 records
-	successfulSamples := 0
-	maxSamplesToLog := 3
-
-	log.Info("Starting artists parsing",
-		"batchSize", batchSize,
-		"progressInterval", progressInterval)
-
-	// Stream through the XML file
-	for {
-		// Check context cancellation
-		select {
-		case <-ctx.Done():
-			return result, ctx.Err()
-		default:
-		}
-
-		token, err := decoder.Token()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("XML parsing error: %v", err))
-			result.ErroredRecords++
-			continue
-		}
-
-		// Look for artist start elements
-		if startElement, ok := token.(xml.StartElement); ok && startElement.Name.Local == "artist" {
-			// Increment total record count for each record we attempt to process
-			result.TotalRecords++
-
-			// Check max records limit before processing - count all attempted records
-			if options.MaxRecords > 0 && result.TotalRecords > options.MaxRecords {
-				log.Info("Reached max records limit - stopping early",
-					"maxRecords", options.MaxRecords,
-					"totalAttempted", result.TotalRecords-1) // -1 because we haven't processed this one
-				result.TotalRecords-- // Adjust count since we're not processing this record
-				break
-			}
-
-			var discogsArtist imports.Artist
-			if err := decoder.DecodeElement(&discogsArtist, &startElement); err != nil {
-				errorMsg := fmt.Sprintf("Failed to decode artist element at record %d: %v", result.TotalRecords, err)
-				log.Error("XML decode error",
-					"error", err,
-					"recordNumber", result.TotalRecords,
-					"elementName", startElement.Name.Local,
-					"elementAttrs", s.formatAttributes(startElement.Attr))
-				result.Errors = append(result.Errors, errorMsg)
-				result.ErroredRecords++
-				continue
-			}
-
-			// Log detailed XML structure for first few records to debug parsing issues
-			if result.TotalRecords <= 2 {
-				log.Info("Detailed XML structure for debugging",
-					"recordNumber", result.TotalRecords,
-					"parsedID", discogsArtist.ID,
-					"parsedName", discogsArtist.Name,
-					"parsedRealName", discogsArtist.RealName,
-					"parsedProfile", discogsArtist.Profile,
-					"parsedURLs", discogsArtist.URLs,
-					"parsedNameVars", discogsArtist.NameVars,
-					"parsedAliases", discogsArtist.Aliases,
-					"parsedMembers", discogsArtist.Members,
-					"parsedGroups", discogsArtist.Groups,
-					"elementName", startElement.Name.Local,
-					"elementAttrs", s.formatAttributes(startElement.Attr))
-			}
-
-			// Convert Discogs artist to our artist model
-			artist := s.convertDiscogsArtist(&discogsArtist)
-			if artist == nil {
-				log.Warn("Failed to convert Discogs artist",
-					"discogsID", discogsArtist.ID,
-					"name", discogsArtist.Name,
-					"recordNumber", result.TotalRecords)
-				result.ErroredRecords++
-				continue
-			}
-
-			// Log successful parse samples
-			if successfulSamples < maxSamplesToLog {
-				s.logSuccessfulRecord("artist", &discogsArtist, artist, result.TotalRecords, log)
-				successfulSamples++
-			}
-
-			batch = append(batch, artist)
-
-			// Process batch when it reaches the limit
-			if len(batch) >= batchSize {
-				result.ParsedArtists = append(result.ParsedArtists, batch...)
-				result.ProcessedRecords += len(batch)
-
-				// Call progress callback if provided
-				if options.ProgressFunc != nil {
-					options.ProgressFunc(result.ProcessedRecords, result.TotalRecords, result.ErroredRecords)
-				}
-
-				batch = batch[:0] // Reset batch
-			}
-
-			// Log progress every N records (based on total attempted, not just successful)
-			if result.TotalRecords%progressInterval == 0 {
-				currentTime := time.Now()
-				elapsed := currentTime.Sub(lastProgressTime)
-				recordsPerSecond := float64(progressInterval) / elapsed.Seconds()
-				totalElapsed := currentTime.Sub(startTime)
-
-				var memStats runtime.MemStats
-				runtime.ReadMemStats(&memStats)
-
-				successfulRecords := result.TotalRecords - result.ErroredRecords
-				log.Info("Parsing progress",
-					"totalRecords", result.TotalRecords,
-					"processedRecords", result.ProcessedRecords,
-					"erroredRecords", result.ErroredRecords,
-					"successfulRecords", successfulRecords,
-					"recordsPerSecond", fmt.Sprintf("%.1f", recordsPerSecond),
-					"totalElapsedMs", totalElapsed.Milliseconds(),
-					"memoryUsageMB", memStats.Alloc/1024/1024,
-					"successRate", fmt.Sprintf("%.2f%%", float64(successfulRecords)/float64(result.TotalRecords)*100))
-
-				lastProgressTime = currentTime
-			}
-		}
-	}
-
-	// Process remaining batch
-	if len(batch) > 0 {
-		result.ParsedArtists = append(result.ParsedArtists, batch...)
-		result.ProcessedRecords += len(batch)
-	}
-
-	totalElapsed := time.Since(startTime)
-	overallRecordsPerSecond := float64(result.TotalRecords) / totalElapsed.Seconds()
-	successfulRecords := result.TotalRecords - result.ErroredRecords
-
-	log.Info("Artists file parsing completed",
-		"total", result.TotalRecords,
-		"processed", result.ProcessedRecords,
-		"errors", result.ErroredRecords,
-		"successful", successfulRecords,
-		"totalElapsedMs", totalElapsed.Milliseconds(),
-		"overallRecordsPerSecond", fmt.Sprintf("%.1f", overallRecordsPerSecond),
-		"successRate", fmt.Sprintf("%.2f%%", float64(successfulRecords)/float64(result.TotalRecords)*100),
-		"errorSampleCount", len(result.Errors))
-
-	// Log first few errors for debugging
-	if len(result.Errors) > 0 {
-		maxErrorsToLog := 5
-		if len(result.Errors) < maxErrorsToLog {
-			maxErrorsToLog = len(result.Errors)
-		}
-		log.Error("Sample parsing errors",
-			"sampleErrors", result.Errors[:maxErrorsToLog],
-			"totalErrors", len(result.Errors))
-	}
-
-	return result, nil
-}
-
-// parseMastersFile handles parsing of masters XML files
-func (s *DiscogsParserService) parseMastersFile(ctx context.Context, reader io.Reader, options ParseOptions, log logger.Logger) (*ParseResult, error) {
-	decoder := xml.NewDecoder(reader)
-
-	result := &ParseResult{
-		Errors:        make([]string, 0),
-		ParsedMasters: make([]*models.Master, 0),
-	}
-
-	var batch []*models.Master
-	batchSize := options.BatchSize
-	if batchSize <= 0 {
-		batchSize = XML_BATCH_SIZE
-	}
-
-	// Performance tracking
-	startTime := time.Now()
-	lastProgressTime := startTime
-	progressInterval := 1000
-	successfulSamples := 0
-	maxSamplesToLog := 3
-
-	log.Info("Starting masters parsing",
-		"batchSize", batchSize,
-		"progressInterval", progressInterval)
-
-	// Stream through the XML file
-	for {
-		// Check context cancellation
-		select {
-		case <-ctx.Done():
-			return result, ctx.Err()
-		default:
-		}
-
-		token, err := decoder.Token()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("XML parsing error: %v", err))
-			result.ErroredRecords++
-			continue
-		}
-
-		// Look for master start elements
-		if startElement, ok := token.(xml.StartElement); ok && startElement.Name.Local == "master" {
-			// Increment total record count for each record we attempt to process
-			result.TotalRecords++
-
-			// Check max records limit before processing - count all attempted records
-			if options.MaxRecords > 0 && result.TotalRecords > options.MaxRecords {
-				log.Info("Reached max records limit - stopping early",
-					"maxRecords", options.MaxRecords,
-					"totalAttempted", result.TotalRecords-1) // -1 because we haven't processed this one
-				result.TotalRecords-- // Adjust count since we're not processing this record
-				break
-			}
-
-			var discogsMaster imports.Master
-			if err := decoder.DecodeElement(&discogsMaster, &startElement); err != nil {
-				errorMsg := fmt.Sprintf("Failed to decode master element at record %d: %v", result.TotalRecords, err)
-				log.Error("XML decode error",
-					"error", err,
-					"recordNumber", result.TotalRecords,
-					"elementName", startElement.Name.Local,
-					"elementAttrs", s.formatAttributes(startElement.Attr))
-				result.Errors = append(result.Errors, errorMsg)
-				result.ErroredRecords++
-				continue
-			}
-
-			// Log detailed XML structure for first few records to debug parsing issues
-			if result.TotalRecords <= 2 {
-				log.Info("Detailed XML structure for debugging",
-					"recordNumber", result.TotalRecords,
-					"parsedID", discogsMaster.ID,
-					"parsedMainRelease", discogsMaster.MainRelease,
-					"parsedTitle", discogsMaster.Title,
-					"parsedYear", discogsMaster.Year,
-					"parsedNotes", discogsMaster.Notes,
-					"parsedDataQuality", discogsMaster.DataQuality,
-					"parsedArtists", discogsMaster.Artists,
-					"parsedGenres", discogsMaster.Genres,
-					"parsedStyles", discogsMaster.Styles,
-					"parsedVideos", discogsMaster.Videos,
-					"elementName", startElement.Name.Local,
-					"elementAttrs", s.formatAttributes(startElement.Attr))
-			}
-
-			// Convert Discogs master to our master model
-			master := s.convertDiscogsMaster(&discogsMaster)
-			if master == nil {
-				log.Warn("Failed to convert Discogs master",
-					"discogsID", discogsMaster.ID,
-					"title", discogsMaster.Title,
-					"recordNumber", result.TotalRecords)
-				result.ErroredRecords++
-				continue
-			}
-
-			// Log successful parse samples
-			if successfulSamples < maxSamplesToLog {
-				s.logSuccessfulRecord("master", &discogsMaster, master, result.TotalRecords, log)
-				successfulSamples++
-			}
-
-			batch = append(batch, master)
-
-			// Process batch when it reaches the limit
-			if len(batch) >= batchSize {
-				result.ParsedMasters = append(result.ParsedMasters, batch...)
-				result.ProcessedRecords += len(batch)
-
-				// Call progress callback if provided
-				if options.ProgressFunc != nil {
-					options.ProgressFunc(result.ProcessedRecords, result.TotalRecords, result.ErroredRecords)
-				}
-
-				batch = batch[:0] // Reset batch
-			}
-
-			// Log progress every N records (based on total attempted, not just successful)
-			if result.TotalRecords%progressInterval == 0 {
-				currentTime := time.Now()
-				elapsed := currentTime.Sub(lastProgressTime)
-				recordsPerSecond := float64(progressInterval) / elapsed.Seconds()
-				totalElapsed := currentTime.Sub(startTime)
-
-				var memStats runtime.MemStats
-				runtime.ReadMemStats(&memStats)
-
-				successfulRecords := result.TotalRecords - result.ErroredRecords
-				log.Info("Parsing progress",
-					"totalRecords", result.TotalRecords,
-					"processedRecords", result.ProcessedRecords,
-					"erroredRecords", result.ErroredRecords,
-					"successfulRecords", successfulRecords,
-					"recordsPerSecond", fmt.Sprintf("%.1f", recordsPerSecond),
-					"totalElapsedMs", totalElapsed.Milliseconds(),
-					"memoryUsageMB", memStats.Alloc/1024/1024,
-					"successRate", fmt.Sprintf("%.2f%%", float64(successfulRecords)/float64(result.TotalRecords)*100))
-
-				lastProgressTime = currentTime
-			}
-		}
-	}
-
-	// Process remaining batch
-	if len(batch) > 0 {
-		result.ParsedMasters = append(result.ParsedMasters, batch...)
-		result.ProcessedRecords += len(batch)
-	}
-
-	totalElapsed := time.Since(startTime)
-	overallRecordsPerSecond := float64(result.TotalRecords) / totalElapsed.Seconds()
-	successfulRecords := result.TotalRecords - result.ErroredRecords
-
-	log.Info("Masters file parsing completed",
-		"total", result.TotalRecords,
-		"processed", result.ProcessedRecords,
-		"errors", result.ErroredRecords,
-		"successful", successfulRecords,
-		"totalElapsedMs", totalElapsed.Milliseconds(),
-		"overallRecordsPerSecond", fmt.Sprintf("%.1f", overallRecordsPerSecond),
-		"successRate", fmt.Sprintf("%.2f%%", float64(successfulRecords)/float64(result.TotalRecords)*100),
-		"errorSampleCount", len(result.Errors))
-
-	// Log first few errors for debugging
-	if len(result.Errors) > 0 {
-		maxErrorsToLog := 5
-		if len(result.Errors) < maxErrorsToLog {
-			maxErrorsToLog = len(result.Errors)
-		}
-		log.Error("Sample parsing errors",
-			"sampleErrors", result.Errors[:maxErrorsToLog],
-			"totalErrors", len(result.Errors))
-	}
-
-	return result, nil
-}
-
-// parseReleasesFile handles parsing of releases XML files
-func (s *DiscogsParserService) parseReleasesFile(ctx context.Context, reader io.Reader, options ParseOptions, log logger.Logger) (*ParseResult, error) {
+// parseEntityFile handles parsing of any entity type using the provided configuration
+func (s *DiscogsParserService) parseEntityFile(
+	ctx context.Context,
+	reader io.Reader,
+	options ParseOptions,
+	config EntityConfig,
+	log logger.Logger,
+) (*ParseResult, error) {
 	decoder := xml.NewDecoder(reader)
 
 	result := &ParseResult{
 		Errors:         make([]string, 0),
+		ParsedLabels:   make([]*models.Label, 0),
+		ParsedArtists:  make([]*models.Artist, 0),
+		ParsedMasters:  make([]*models.Master, 0),
 		ParsedReleases: make([]*models.Release, 0),
 	}
 
-	var batch []*models.Release
 	batchSize := options.BatchSize
 	if batchSize <= 0 {
 		batchSize = XML_BATCH_SIZE
@@ -698,7 +288,8 @@ func (s *DiscogsParserService) parseReleasesFile(ctx context.Context, reader io.
 	successfulSamples := 0
 	maxSamplesToLog := 3
 
-	log.Info("Starting releases parsing",
+	log.Info("Starting entity parsing",
+		"entityType", config.ElementName,
 		"batchSize", batchSize,
 		"progressInterval", progressInterval)
 
@@ -721,61 +312,76 @@ func (s *DiscogsParserService) parseReleasesFile(ctx context.Context, reader io.
 			continue
 		}
 
-		// Look for release start elements
-		if startElement, ok := token.(xml.StartElement); ok && startElement.Name.Local == "release" {
+		// Look for entity start elements
+		if startElement, ok := token.(xml.StartElement); ok && startElement.Name.Local == config.ElementName {
 			// Increment total record count for each record we attempt to process
 			result.TotalRecords++
 
 			// Check max records limit before processing - count all attempted records
 			if options.MaxRecords > 0 && result.TotalRecords > options.MaxRecords {
-				log.Info("Reached max records limit - stopping early",
-					"maxRecords", options.MaxRecords,
-					"totalAttempted", result.TotalRecords-1) // -1 because we haven't processed this one
+				log.Info(
+					"Reached max records limit - stopping early",
+					"maxRecords",
+					options.MaxRecords,
+					"totalAttempted",
+					result.TotalRecords-1,
+				)
 				result.TotalRecords-- // Adjust count since we're not processing this record
 				break
 			}
 
-			var discogsRelease imports.Release
-			if err := decoder.DecodeElement(&discogsRelease, &startElement); err != nil {
-				errorMsg := fmt.Sprintf("Failed to decode release element at record %d: %v", result.TotalRecords, err)
-				log.Error("XML decode error",
-					"error", err,
-					"recordNumber", result.TotalRecords,
-					"elementName", startElement.Name.Local,
-					"elementAttrs", s.formatAttributes(startElement.Attr))
-				result.Errors = append(result.Errors, errorMsg)
-				result.ErroredRecords++
-				continue
+			// Decode the element based on entity type
+			var discogsEntity interface{}
+			var converted interface{}
+
+			switch config.ElementName {
+			case "label":
+				var label imports.Label
+				if err := decoder.DecodeElement(&label, &startElement); err != nil {
+					s.handleDecodeError(result, err, startElement, log)
+					continue
+				}
+				discogsEntity = &label
+				converted = s.convertDiscogsLabel(&label)
+			case "artist":
+				var artist imports.Artist
+				if err := decoder.DecodeElement(&artist, &startElement); err != nil {
+					s.handleDecodeError(result, err, startElement, log)
+					continue
+				}
+				discogsEntity = &artist
+				converted = s.convertDiscogsArtist(&artist)
+			case "master":
+				var master imports.Master
+				if err := decoder.DecodeElement(&master, &startElement); err != nil {
+					s.handleDecodeError(result, err, startElement, log)
+					continue
+				}
+				discogsEntity = &master
+				converted = s.convertDiscogsMaster(&master)
+			case "release":
+				var release imports.Release
+				if err := decoder.DecodeElement(&release, &startElement); err != nil {
+					s.handleDecodeError(result, err, startElement, log)
+					continue
+				}
+				discogsEntity = &release
+				converted = s.convertDiscogsRelease(&release)
 			}
 
 			// Log detailed XML structure for first few records to debug parsing issues
 			if result.TotalRecords <= 2 {
-				log.Info("Detailed XML structure for debugging",
-					"recordNumber", result.TotalRecords,
-					"parsedID", discogsRelease.ID,
-					"parsedStatus", discogsRelease.Status,
-					"parsedTitle", discogsRelease.Title,
-					"parsedCountry", discogsRelease.Country,
-					"parsedReleased", discogsRelease.Released,
-					"parsedNotes", discogsRelease.Notes,
-					"parsedDataQuality", discogsRelease.DataQuality,
-					"parsedMasterID", discogsRelease.MasterID,
-					"parsedArtists", discogsRelease.Artists,
-					"parsedLabels", discogsRelease.Labels,
-					"parsedFormats", discogsRelease.Formats,
-					"parsedGenres", discogsRelease.Genres,
-					"parsedStyles", discogsRelease.Styles,
-					"parsedTracklist", discogsRelease.Tracklist,
-					"elementName", startElement.Name.Local,
-					"elementAttrs", s.formatAttributes(startElement.Attr))
+				debugFields := config.DebugLogFields(discogsEntity)
+				debugFields["recordNumber"] = result.TotalRecords
+				debugFields["elementName"] = startElement.Name.Local
+				debugFields["elementAttrs"] = s.formatAttributes(startElement.Attr)
+				log.Info("Detailed XML structure for debugging", debugFields)
 			}
 
-			// Convert Discogs release to our release model
-			release := s.convertDiscogsRelease(&discogsRelease)
-			if release == nil {
-				log.Warn("Failed to convert Discogs release",
-					"discogsID", discogsRelease.ID,
-					"title", discogsRelease.Title,
+			// Check if conversion was successful
+			if converted == nil {
+				log.Warn("Failed to convert Discogs entity",
+					"entityType", config.ElementName,
 					"recordNumber", result.TotalRecords)
 				result.ErroredRecords++
 				continue
@@ -783,70 +389,131 @@ func (s *DiscogsParserService) parseReleasesFile(ctx context.Context, reader io.
 
 			// Log successful parse samples
 			if successfulSamples < maxSamplesToLog {
-				s.logSuccessfulRecord("release", &discogsRelease, release, result.TotalRecords, log)
+				s.logSuccessfulRecord(config.ElementName, discogsEntity, converted, result.TotalRecords, log)
 				successfulSamples++
 			}
 
-			batch = append(batch, release)
+			// Add to appropriate result collection
+			config.SetResultFunc(result, converted)
+			result.ProcessedRecords++
 
-			// Process batch when it reaches the limit
-			if len(batch) >= batchSize {
-				result.ParsedReleases = append(result.ParsedReleases, batch...)
-				result.ProcessedRecords += len(batch)
-
-				// Call progress callback if provided
-				if options.ProgressFunc != nil {
-					options.ProgressFunc(result.ProcessedRecords, result.TotalRecords, result.ErroredRecords)
-				}
-
-				batch = batch[:0] // Reset batch
+			// Call progress callback if provided
+			if options.ProgressFunc != nil && result.ProcessedRecords%batchSize == 0 {
+				options.ProgressFunc(
+					result.ProcessedRecords,
+					result.TotalRecords,
+					result.ErroredRecords,
+				)
 			}
 
-			// Log progress every N records (based on total attempted, not just successful)
+			// Log progress every N records
 			if result.TotalRecords%progressInterval == 0 {
-				currentTime := time.Now()
-				elapsed := currentTime.Sub(lastProgressTime)
-				recordsPerSecond := float64(progressInterval) / elapsed.Seconds()
-				totalElapsed := currentTime.Sub(startTime)
-
-				var memStats runtime.MemStats
-				runtime.ReadMemStats(&memStats)
-
-				successfulRecords := result.TotalRecords - result.ErroredRecords
-				log.Info("Parsing progress",
-					"totalRecords", result.TotalRecords,
-					"processedRecords", result.ProcessedRecords,
-					"erroredRecords", result.ErroredRecords,
-					"successfulRecords", successfulRecords,
-					"recordsPerSecond", fmt.Sprintf("%.1f", recordsPerSecond),
-					"totalElapsedMs", totalElapsed.Milliseconds(),
-					"memoryUsageMB", memStats.Alloc/1024/1024,
-					"successRate", fmt.Sprintf("%.2f%%", float64(successfulRecords)/float64(result.TotalRecords)*100))
-
-				lastProgressTime = currentTime
+				s.logProgress(result, progressInterval, startTime, &lastProgressTime, log)
 			}
 		}
 	}
 
-	// Process remaining batch
-	if len(batch) > 0 {
-		result.ParsedReleases = append(result.ParsedReleases, batch...)
-		result.ProcessedRecords += len(batch)
-	}
+	// Final progress and summary
+	s.logFinalSummary(result, config.ElementName, startTime, log)
 
+	return result, nil
+}
+
+// handleDecodeError handles XML decode errors consistently
+func (s *DiscogsParserService) handleDecodeError(
+	result *ParseResult,
+	err error,
+	startElement xml.StartElement,
+	log logger.Logger,
+) {
+	errorMsg := fmt.Sprintf(
+		"Failed to decode %s element at record %d: %v",
+		startElement.Name.Local,
+		result.TotalRecords,
+		err,
+	)
+	log.Error("XML decode error",
+		"error", err,
+		"recordNumber", result.TotalRecords,
+		"elementName", startElement.Name.Local,
+		"elementAttrs", s.formatAttributes(startElement.Attr))
+	result.Errors = append(result.Errors, errorMsg)
+	result.ErroredRecords++
+}
+
+// logProgress logs parsing progress with performance metrics
+func (s *DiscogsParserService) logProgress(
+	result *ParseResult,
+	progressInterval int,
+	startTime time.Time,
+	lastProgressTime *time.Time,
+	log logger.Logger,
+) {
+	currentTime := time.Now()
+	elapsed := currentTime.Sub(*lastProgressTime)
+	recordsPerSecond := float64(progressInterval) / elapsed.Seconds()
+	totalElapsed := currentTime.Sub(startTime)
+
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	successfulRecords := result.TotalRecords - result.ErroredRecords
+	log.Info(
+		"Parsing progress",
+		"totalRecords",
+		result.TotalRecords,
+		"processedRecords",
+		result.ProcessedRecords,
+		"erroredRecords",
+		result.ErroredRecords,
+		"successfulRecords",
+		successfulRecords,
+		"recordsPerSecond",
+		fmt.Sprintf("%.1f", recordsPerSecond),
+		"totalElapsedMs",
+		totalElapsed.Milliseconds(),
+		"memoryUsageMB",
+		memStats.Alloc/1024/1024,
+		"successRate",
+		fmt.Sprintf(
+			"%.2f%%",
+			float64(successfulRecords)/float64(result.TotalRecords)*100,
+		),
+	)
+
+	*lastProgressTime = currentTime
+}
+
+// logFinalSummary logs final parsing results and errors
+func (s *DiscogsParserService) logFinalSummary(
+	result *ParseResult,
+	entityType string,
+	startTime time.Time,
+	log logger.Logger,
+) {
 	totalElapsed := time.Since(startTime)
 	overallRecordsPerSecond := float64(result.TotalRecords) / totalElapsed.Seconds()
 	successfulRecords := result.TotalRecords - result.ErroredRecords
 
-	log.Info("Releases file parsing completed",
-		"total", result.TotalRecords,
-		"processed", result.ProcessedRecords,
-		"errors", result.ErroredRecords,
-		"successful", successfulRecords,
-		"totalElapsedMs", totalElapsed.Milliseconds(),
-		"overallRecordsPerSecond", fmt.Sprintf("%.1f", overallRecordsPerSecond),
-		"successRate", fmt.Sprintf("%.2f%%", float64(successfulRecords)/float64(result.TotalRecords)*100),
-		"errorSampleCount", len(result.Errors))
+	log.Info(
+		fmt.Sprintf("%s file parsing completed", strings.ToUpper(string(entityType[0]))+entityType[1:]),
+		"total",
+		result.TotalRecords,
+		"processed",
+		result.ProcessedRecords,
+		"errors",
+		result.ErroredRecords,
+		"successful",
+		successfulRecords,
+		"totalElapsedMs",
+		totalElapsed.Milliseconds(),
+		"overallRecordsPerSecond",
+		fmt.Sprintf("%.1f", overallRecordsPerSecond),
+		"successRate",
+		fmt.Sprintf("%.2f%%", float64(successfulRecords)/float64(result.TotalRecords)*100),
+		"errorSampleCount",
+		len(result.Errors),
+	)
 
 	// Log first few errors for debugging
 	if len(result.Errors) > 0 {
@@ -858,9 +525,12 @@ func (s *DiscogsParserService) parseReleasesFile(ctx context.Context, reader io.
 			"sampleErrors", result.Errors[:maxErrorsToLog],
 			"totalErrors", len(result.Errors))
 	}
-
-	return result, nil
 }
+
+// NOTE: The following duplicate parsing methods (parseLabelsFile, parseArtistsFile,
+// parseMastersFile, parseReleasesFile) have been replaced by the generic
+// parseEntityFile method above. This eliminates ~800 lines of duplicated code.
+
 
 // Conversion methods - extracted from XMLProcessingService for reuse
 
@@ -949,7 +619,10 @@ func (s *DiscogsParserService) convertDiscogsArtist(discogsArtist *imports.Artis
 	return artist
 }
 
-func (s *DiscogsParserService) convertDiscogsImage(discogsImage *imports.DiscogsImage, imageableID, imageableType string) *models.Image {
+func (s *DiscogsParserService) convertDiscogsImage(
+	discogsImage *imports.DiscogsImage,
+	imageableID, imageableType string,
+) *models.Image {
 	// Skip images with no URI (common in current XML dumps)
 	if len(discogsImage.URI) == 0 {
 		return nil
@@ -1052,7 +725,9 @@ func (s *DiscogsParserService) convertDiscogsMaster(discogsMaster *imports.Maste
 	return master
 }
 
-func (s *DiscogsParserService) convertDiscogsRelease(discogsRelease *imports.Release) *models.Release {
+func (s *DiscogsParserService) convertDiscogsRelease(
+	discogsRelease *imports.Release,
+) *models.Release {
 	// Skip releases with invalid data
 	if discogsRelease.ID == 0 || len(discogsRelease.Title) == 0 {
 		return nil
@@ -1081,7 +756,8 @@ func (s *DiscogsParserService) convertDiscogsRelease(discogsRelease *imports.Rel
 		yearStr := discogsRelease.Released[:4]
 		if len(yearStr) == 4 {
 			var year int
-			if _, err := fmt.Sscanf(yearStr, "%d", &year); err == nil && year > 1800 && year < 3000 {
+			if _, err := fmt.Sscanf(yearStr, "%d", &year); err == nil && year > 1800 &&
+				year < 3000 {
 				release.Year = &year
 			}
 		}
@@ -1108,7 +784,7 @@ func (s *DiscogsParserService) convertDiscogsRelease(discogsRelease *imports.Rel
 	}
 
 	// Track count
-	if trackCount := len(discogsRelease.Tracklist); trackCount > 0 {
+	if trackCount := len(discogsRelease.TrackList); trackCount > 0 {
 		release.TrackCount = &trackCount
 	}
 
@@ -1127,7 +803,7 @@ func (s *DiscogsParserService) convertDiscogsRelease(discogsRelease *imports.Rel
 	release.Genres = s.convertDiscogsGenres(discogsRelease.Genres, discogsRelease.Styles)
 
 	// Convert Tracks
-	release.Tracks = s.convertDiscogsTracks(discogsRelease.Tracklist, release.ID)
+	release.Tracks = s.convertDiscogsTracks(discogsRelease.TrackList, release.ID)
 
 	// Set primary image URL from first image if available
 	if len(discogsRelease.Images) > 0 && discogsRelease.Images[0].URI != "" {
@@ -1144,7 +820,11 @@ func (s *DiscogsParserService) convertDiscogsRelease(discogsRelease *imports.Rel
 }
 
 // validateAndLogXMLStructure reads and validates the beginning of the XML file
-func (s *DiscogsParserService) validateAndLogXMLStructure(reader io.Reader, fileType string, log logger.Logger) error {
+func (s *DiscogsParserService) validateAndLogXMLStructure(
+	reader io.Reader,
+	fileType string,
+	log logger.Logger,
+) error {
 	// Create a buffered reader to peek at content
 	bufReader := bufio.NewReader(reader)
 
@@ -1191,7 +871,12 @@ func (s *DiscogsParserService) validateAndLogXMLStructure(reader io.Reader, file
 		"sampleContent", s.getSampleContent(headerContent, 200))
 
 	if !hasRoot && !hasElement {
-		return fmt.Errorf("XML does not contain expected structure for %s: missing %s or %s", fileType, expectedRoot, expectedElement)
+		return fmt.Errorf(
+			"XML does not contain expected structure for %s: missing %s or %s",
+			fileType,
+			expectedRoot,
+			expectedElement,
+		)
 	}
 
 	return nil
@@ -1236,7 +921,13 @@ func (s *DiscogsParserService) formatAttributes(attrs []xml.Attr) string {
 }
 
 // logSuccessfulRecord logs details of successfully parsed records for debugging
-func (s *DiscogsParserService) logSuccessfulRecord(recordType string, discogsRecord interface{}, convertedRecord interface{}, recordNumber int, log logger.Logger) {
+func (s *DiscogsParserService) logSuccessfulRecord(
+	recordType string,
+	discogsRecord interface{},
+	convertedRecord interface{},
+	recordNumber int,
+	log logger.Logger,
+) {
 	// Convert to JSON for readable logging
 	discogsJSON, _ := json.Marshal(discogsRecord)
 	convertedJSON, _ := json.Marshal(convertedRecord)
@@ -1267,7 +958,9 @@ func (s *DiscogsParserService) findOrCreateGenre(name string) *models.Genre {
 }
 
 // convertDiscogsArtists converts Discogs artist data to our Artist models
-func (s *DiscogsParserService) convertDiscogsArtists(discogsArtists []imports.Artist) []models.Artist {
+func (s *DiscogsParserService) convertDiscogsArtists(
+	discogsArtists []imports.Artist,
+) []models.Artist {
 	if len(discogsArtists) == 0 {
 		return nil
 	}
@@ -1284,8 +977,8 @@ func (s *DiscogsParserService) convertDiscogsArtists(discogsArtists []imports.Ar
 		}
 
 		artist := models.Artist{
-			Name:      name,
-			IsActive:  true,
+			Name:     name,
+			IsActive: true,
 		}
 
 		// Set Discogs ID if available
@@ -1309,7 +1002,10 @@ func (s *DiscogsParserService) convertDiscogsArtists(discogsArtists []imports.Ar
 }
 
 // convertDiscogsGenres converts Discogs genres and styles to our Genre models
-func (s *DiscogsParserService) convertDiscogsGenres(genres []string, styles []string) []models.Genre {
+func (s *DiscogsParserService) convertDiscogsGenres(
+	genres []string,
+	styles []string,
+) []models.Genre {
 	var result []models.Genre
 	genreMap := make(map[string]bool) // Track duplicates
 
@@ -1343,7 +1039,10 @@ func (s *DiscogsParserService) convertDiscogsGenres(genres []string, styles []st
 }
 
 // convertDiscogsTracks converts Discogs track data to our Track models
-func (s *DiscogsParserService) convertDiscogsTracks(discogsTracks []imports.Track, releaseID uuid.UUID) []models.Track {
+func (s *DiscogsParserService) convertDiscogsTracks(
+	discogsTracks []imports.Track,
+	releaseID uuid.UUID,
+) []models.Track {
 	if len(discogsTracks) == 0 {
 		return nil
 	}
@@ -1382,63 +1081,6 @@ func (s *DiscogsParserService) convertDiscogsTracks(discogsTracks []imports.Trac
 	return tracks
 }
 
-// convertDiscogsImages converts Discogs image data to our polymorphic Image models
-func (s *DiscogsParserService) convertDiscogsImages(discogsImages []imports.DiscogsImage, entityID, entityType string) []models.Image {
-	if len(discogsImages) == 0 {
-		return nil
-	}
-
-	var images []models.Image
-	for i, discogsImage := range discogsImages {
-		if discogsImage.URI == "" {
-			continue
-		}
-
-		uri := strings.TrimSpace(discogsImage.URI)
-		if uri == "" {
-			continue
-		}
-
-		image := models.Image{
-			URL:           uri,
-			ImageableID:   entityID,
-			ImageableType: entityType,
-			ImageType:     models.ImageTypePrimary, // Default
-		}
-
-		// Set image type based on position (first image is primary)
-		if i == 0 {
-			image.ImageType = models.ImageTypePrimary
-		} else {
-			image.ImageType = models.ImageTypeGallery
-		}
-
-		// Set dimensions if available
-		if discogsImage.Width > 0 {
-			image.Width = &discogsImage.Width
-		}
-		if discogsImage.Height > 0 {
-			image.Height = &discogsImage.Height
-		}
-
-		// Set Discogs-specific fields
-		if len(discogsImage.Type) > 0 {
-			discogsType := strings.TrimSpace(discogsImage.Type)
-			image.DiscogsType = &discogsType
-		}
-		if len(discogsImage.URI150) > 0 {
-			uri150 := strings.TrimSpace(discogsImage.URI150)
-			image.DiscogsURI150 = &uri150
-		}
-
-		sortOrder := i
-		image.SortOrder = &sortOrder
-
-		images = append(images, image)
-	}
-
-	return images
-}
 
 // parseDuration converts duration string (e.g., "4:45") to seconds
 func (s *DiscogsParserService) parseDuration(duration string) int {
@@ -1461,3 +1103,4 @@ func (s *DiscogsParserService) parseDuration(duration string) int {
 
 	return minutes*60 + seconds
 }
+

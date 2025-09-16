@@ -15,7 +15,6 @@ import (
 
 type DiscogsProcessingJob struct {
 	repo          repositories.DiscogsDataProcessingRepository
-	transaction   *services.TransactionService
 	xmlProcessing *services.XMLProcessingService
 	log           logger.Logger
 	schedule      services.Schedule
@@ -23,13 +22,11 @@ type DiscogsProcessingJob struct {
 
 func NewDiscogsProcessingJob(
 	repo repositories.DiscogsDataProcessingRepository,
-	transaction *services.TransactionService,
 	xmlProcessing *services.XMLProcessingService,
 	schedule services.Schedule,
 ) *DiscogsProcessingJob {
 	return &DiscogsProcessingJob{
 		repo:          repo,
-		transaction:   transaction,
 		xmlProcessing: xmlProcessing,
 		log:           logger.New("discogsProcessingJob"),
 		schedule:      schedule,
@@ -53,7 +50,6 @@ func (j *DiscogsProcessingJob) Execute(ctx context.Context) error {
 
 	slog.Info("Found records ready for processing", "count", len(readyRecords), "ids", readyRecords)
 
-	return nil
 	// Step 2: Find processing records that can be resumed or need reset
 	resumableRecords, err := j.findAndHandleProcessingRecords(ctx)
 	if err != nil {
@@ -130,18 +126,20 @@ func (j *DiscogsProcessingJob) findAndHandleProcessingRecords(
 				record.StartedAt,
 			)
 
-			updateErr := j.transaction.Execute(ctx, func(txCtx context.Context) error {
-				// Complete reset to ready_for_processing status
-				if err := record.UpdateStatus(models.ProcessingStatusReadyForProcessing); err != nil {
-					return err
-				}
+			// Complete reset to ready_for_processing status
+			if err := record.UpdateStatus(models.ProcessingStatusReadyForProcessing); err != nil {
+				log.Error("Failed to reset critically stuck record - status update failed",
+					"error", err,
+					"yearMonth", record.YearMonth,
+					"id", record.ID)
+				continue
+			}
 
-				// Clear error message and stats for complete retry
-				record.ErrorMessage = nil
-				record.ProcessingStats = &models.ProcessingStats{}
+			// Clear error message and stats for complete retry
+			record.ErrorMessage = nil
+			record.ProcessingStats = &models.ProcessingStats{}
 
-				return j.repo.Update(txCtx, record)
-			})
+			updateErr := j.repo.Update(ctx, record)
 
 			if updateErr != nil {
 				log.Error("Failed to reset critically stuck record",
@@ -170,9 +168,7 @@ func (j *DiscogsProcessingJob) findAndHandleProcessingRecords(
 					"yearMonth", record.YearMonth,
 					"id", record.ID)
 
-				updateErr := j.transaction.Execute(ctx, func(txCtx context.Context) error {
-					return j.completeProcessing(ctx, record, record.YearMonth)
-				})
+				updateErr := j.completeProcessing(ctx, record, record.YearMonth)
 
 				if updateErr != nil {
 					log.Error("Failed to complete processing record",
@@ -241,54 +237,37 @@ func (j *DiscogsProcessingJob) processRecord(
 	yearMonth := record.YearMonth
 	log.Info("Starting processing for record", "yearMonth", yearMonth, "id", record.ID)
 
-	// Use atomic transaction for status updates only
-	// Claude we are creating unnecessary transactions and DB pressure, just update the record
-	err := j.transaction.Execute(ctx, func(txCtx context.Context) error {
-		// Transition to processing status
-		if err := record.UpdateStatus(models.ProcessingStatusProcessing); err != nil {
-			return log.Err("failed to transition to processing status", err, "yearMonth", yearMonth)
-		}
+	// Transition to processing status
+	if err := record.UpdateStatus(models.ProcessingStatusProcessing); err != nil {
+		return log.Err("failed to transition to processing status", err, "yearMonth", yearMonth)
+	}
 
-		// Set processing start time
-		now := time.Now().UTC()
-		record.StartedAt = &now
+	// Set processing start time
+	now := time.Now().UTC()
+	record.StartedAt = &now
 
-		if err := j.repo.Update(txCtx, record); err != nil {
-			return log.Err(
-				"failed to update processing record to processing",
-				err,
-				"yearMonth",
-				yearMonth,
-			)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
+	if err := j.repo.Update(ctx, record); err != nil {
+		return log.Err(
+			"failed to update processing record to processing",
+			err,
+			"yearMonth",
+			yearMonth,
+		)
 	}
 
 	log.Info("Transitioned to processing status", "yearMonth", yearMonth, "status", record.Status)
 
 	// Perform the actual processing (outside of transaction)
 	if err := j.performProcessing(ctx, record, yearMonth); err != nil {
-		// Use atomic transaction for error handling
-		// Claude we do not need to transactions for anything here
-		updateErr := j.transaction.Execute(ctx, func(txCtx context.Context) error {
-			errorMsg := err.Error()
-			record.ErrorMessage = &errorMsg
-			if statusErr := record.UpdateStatus(models.ProcessingStatusFailed); statusErr != nil {
-				log.Warn("failed to update processing record status to failed", "error", statusErr)
-				return statusErr
-			}
+		// Update record with error state
+		errorMsg := err.Error()
+		record.ErrorMessage = &errorMsg
+		if statusErr := record.UpdateStatus(models.ProcessingStatusFailed); statusErr != nil {
+			log.Warn("failed to update processing record status to failed", "error", statusErr)
+		}
 
-			if updateErr := j.repo.Update(txCtx, record); updateErr != nil {
-				log.Warn("failed to update processing record with error", "error", updateErr)
-				return updateErr
-			}
-			return nil
-		})
-		if updateErr != nil {
-			log.Error("failed to update record with error state", "error", updateErr)
+		if updateErr := j.repo.Update(ctx, record); updateErr != nil {
+			log.Warn("failed to update processing record with error", "error", updateErr)
 		}
 
 		return log.Err("processing failed", err, "yearMonth", yearMonth)
@@ -332,9 +311,9 @@ func (j *DiscogsProcessingJob) processAllXMLFiles(
 		method func(context.Context, string, string) (*services.ProcessingResult, error)
 	}{
 		{"labels", j.xmlProcessing.ProcessLabelsFile},
-		// {"artists", j.xmlProcessing.ProcessArtistsFile},
-		// {"masters", j.xmlProcessing.ProcessMastersFile},
-		// {"releases", j.xmlProcessing.ProcessReleasesFile},
+		{"artists", j.xmlProcessing.ProcessArtistsFile},
+		{"masters", j.xmlProcessing.ProcessMastersFile},
+		{"releases", j.xmlProcessing.ProcessReleasesFile},
 	}
 
 	var totalProcessed int
@@ -456,37 +435,34 @@ func (j *DiscogsProcessingJob) completeProcessing(
 ) error {
 	log := j.log.Function("completeProcessing")
 
-	// Use atomic transaction for completion status update
-	return j.transaction.Execute(ctx, func(txCtx context.Context) error {
-		// Transition to completed status
-		if err := processingRecord.UpdateStatus(models.ProcessingStatusCompleted); err != nil {
-			return log.Err(
-				"failed to transition to completed status",
-				err,
-				"yearMonth",
-				yearMonth,
-			)
-		}
+	// Transition to completed status
+	if err := processingRecord.UpdateStatus(models.ProcessingStatusCompleted); err != nil {
+		return log.Err(
+			"failed to transition to completed status",
+			err,
+			"yearMonth",
+			yearMonth,
+		)
+	}
 
-		// Set completion time
-		now := time.Now().UTC()
-		processingRecord.ProcessingCompletedAt = &now
+	// Set completion time
+	now := time.Now().UTC()
+	processingRecord.ProcessingCompletedAt = &now
 
-		if err := j.repo.Update(txCtx, processingRecord); err != nil {
-			return log.Err(
-				"failed to update processing record to completed",
-				err,
-				"yearMonth",
-				yearMonth,
-			)
-		}
+	if err := j.repo.Update(ctx, processingRecord); err != nil {
+		return log.Err(
+			"failed to update processing record to completed",
+			err,
+			"yearMonth",
+			yearMonth,
+		)
+	}
 
-		log.Info("Processing workflow completed successfully",
-			"yearMonth", yearMonth,
-			"status", processingRecord.Status)
+	log.Info("Processing workflow completed successfully",
+		"yearMonth", yearMonth,
+		"status", processingRecord.Status)
 
-		return nil
-	})
+	return nil
 }
 
 func (j *DiscogsProcessingJob) Schedule() services.Schedule {

@@ -91,7 +91,6 @@ func New() (*App, error) {
 		trackRepo,
 		genreRepo,
 		discogsDataProcessingRepo,
-		transactionService,
 		discogsParserService,
 	)
 
@@ -121,7 +120,6 @@ func New() (*App, error) {
 		// Processing job runs at 3:00 AM UTC daily (1 hour after download)
 		discogsProcessingJob := jobs.NewDiscogsProcessingJob(
 			discogsDataProcessingRepo,
-			transactionService,
 			xmlProcessingService,
 			services.Hourly, // TODO: CHange back to daily after testing, Claude do not revert
 		)

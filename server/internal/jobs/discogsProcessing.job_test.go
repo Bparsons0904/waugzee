@@ -73,18 +73,6 @@ func (m *MockDiscogsDataProcessingRepository) UpdateStatus(ctx context.Context, 
 	return args.Error(0)
 }
 
-type MockTransactionService struct {
-	mock.Mock
-}
-
-func (m *MockTransactionService) Execute(ctx context.Context, fn func(context.Context) error) error {
-	args := m.Called(ctx, fn)
-	if args.Get(0) != nil {
-		return args.Error(0)
-	}
-	// Execute the function directly for testing
-	return fn(ctx)
-}
 
 type MockXMLProcessingService struct {
 	mock.Mock
@@ -106,48 +94,42 @@ func TestDiscogsProcessingJob_Name(t *testing.T) {
 
 func TestDiscogsProcessingJob_Schedule(t *testing.T) {
 	schedule := services.DailyProcessing
-	job := NewDiscogsProcessingJob(nil, nil, nil, schedule)
+	job := NewDiscogsProcessingJob(nil, nil, schedule)
 	assert.Equal(t, schedule, job.Schedule())
 }
 
 func TestDiscogsProcessingJob_Execute_NoRecordsToProcess(t *testing.T) {
 	// Setup mocks
 	repo := &MockDiscogsDataProcessingRepository{}
-	transaction := &MockTransactionService{}
 	xmlProcessing := &MockXMLProcessingService{}
 
 	// Mock no records ready for processing
 	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusReadyForProcessing).Return([]*models.DiscogsDataProcessing{}, nil)
 	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusProcessing).Return([]*models.DiscogsDataProcessing{}, nil)
 
-	// Mock transaction execution
-	transaction.On("Execute", mock.Anything, mock.AnythingOfType("func(context.Context) error")).Return(nil)
-
-	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, services.DailyProcessing)
+	job := NewDiscogsProcessingJob(repo, xmlProcessing, services.DailyProcessing)
 
 	err := job.Execute(context.Background())
 	assert.NoError(t, err)
 
 	repo.AssertExpectations(t)
-	transaction.AssertExpectations(t)
 }
 
-func TestDiscogsProcessingJob_FindAndResetStuckRecords(t *testing.T) {
+func TestDiscogsProcessingJob_FindAndHandleProcessingRecords(t *testing.T) {
 	// Setup mocks
 	repo := &MockDiscogsDataProcessingRepository{}
-	transaction := &MockTransactionService{}
 	xmlProcessing := &MockXMLProcessingService{}
 
-	// Create test data - stuck record (processing for > 2 hours)
-	threeHoursAgo := time.Now().UTC().Add(-3 * time.Hour)
+	// Create test data - stuck record (processing for > 24 hours)
+	twentyFiveHoursAgo := time.Now().UTC().Add(-25 * time.Hour)
 	stuckRecord := &models.DiscogsDataProcessing{
 		ID:        uuid.New(),
 		YearMonth: "2025-01",
 		Status:    models.ProcessingStatusProcessing,
-		StartedAt: &threeHoursAgo,
+		StartedAt: &twentyFiveHoursAgo,
 	}
 
-	// Create test data - recent processing record (< 2 hours)
+	// Create test data - recent processing record (< 24 hours)
 	oneHourAgo := time.Now().UTC().Add(-1 * time.Hour)
 	recentRecord := &models.DiscogsDataProcessing{
 		ID:        uuid.New(),
@@ -160,13 +142,13 @@ func TestDiscogsProcessingJob_FindAndResetStuckRecords(t *testing.T) {
 	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusProcessing).Return([]*models.DiscogsDataProcessing{stuckRecord, recentRecord}, nil)
 	repo.On("Update", mock.Anything, stuckRecord).Return(nil)
 
-	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, services.DailyProcessing)
+	job := NewDiscogsProcessingJob(repo, xmlProcessing, services.DailyProcessing)
 
-	stuckRecords, err := job.findAndResetStuckRecords(context.Background())
+	handledRecords, err := job.findAndHandleProcessingRecords(context.Background())
 	assert.NoError(t, err)
-	assert.Len(t, stuckRecords, 1)
-	assert.Equal(t, stuckRecord.ID, stuckRecords[0].ID)
-	assert.Equal(t, models.ProcessingStatusReadyForProcessing, stuckRecords[0].Status)
+	assert.Len(t, handledRecords, 1)
+	assert.Equal(t, stuckRecord.ID, handledRecords[0].ID)
+	assert.Equal(t, models.ProcessingStatusReadyForProcessing, handledRecords[0].Status)
 
 	repo.AssertExpectations(t)
 }
@@ -174,7 +156,6 @@ func TestDiscogsProcessingJob_FindAndResetStuckRecords(t *testing.T) {
 func TestDiscogsProcessingJob_Execute_WithMixedRecords(t *testing.T) {
 	// Setup mocks
 	repo := &MockDiscogsDataProcessingRepository{}
-	transaction := &MockTransactionService{}
 	xmlProcessing := &MockXMLProcessingService{}
 
 	// Create test data - one ready record and one stuck record
@@ -193,12 +174,12 @@ func TestDiscogsProcessingJob_Execute_WithMixedRecords(t *testing.T) {
 		},
 	}
 
-	threeHoursAgo := time.Now().UTC().Add(-3 * time.Hour)
+	twentyFiveHoursAgo := time.Now().UTC().Add(-25 * time.Hour)
 	stuckRecord := &models.DiscogsDataProcessing{
 		ID:        uuid.New(),
 		YearMonth: "2025-02",
 		Status:    models.ProcessingStatusProcessing,
-		StartedAt: &threeHoursAgo,
+		StartedAt: &twentyFiveHoursAgo,
 		ProcessingStats: &models.ProcessingStats{
 			Files: map[string]*models.FileStatus{
 				"labels": {
@@ -215,46 +196,36 @@ func TestDiscogsProcessingJob_Execute_WithMixedRecords(t *testing.T) {
 	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusProcessing).Return([]*models.DiscogsDataProcessing{stuckRecord}, nil)
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*models.DiscogsDataProcessing")).Return(nil)
 
-	// Mock transaction execution
-	transaction.On("Execute", mock.Anything, mock.AnythingOfType("func(context.Context) error")).Return(nil)
-
-	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, services.DailyProcessing)
+	job := NewDiscogsProcessingJob(repo, xmlProcessing, services.DailyProcessing)
 
 	err := job.Execute(context.Background())
 	assert.NoError(t, err)
 
 	// Both records should have been processed (even if they complete without processing files)
 	repo.AssertExpectations(t)
-	transaction.AssertExpectations(t)
 }
 
 func TestDiscogsProcessingJob_Execute_ErrorHandling(t *testing.T) {
 	// Setup mocks
 	repo := &MockDiscogsDataProcessingRepository{}
-	transaction := &MockTransactionService{}
 	xmlProcessing := &MockXMLProcessingService{}
 
 	// Mock repository error
 	repoError := errors.New("database connection failed")
 	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusReadyForProcessing).Return(nil, repoError)
 
-	// Mock transaction execution with error
-	transaction.On("Execute", mock.Anything, mock.AnythingOfType("func(context.Context) error")).Return(repoError)
-
-	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, services.DailyProcessing)
+	job := NewDiscogsProcessingJob(repo, xmlProcessing, services.DailyProcessing)
 
 	err := job.Execute(context.Background())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "database connection failed")
 
 	repo.AssertExpectations(t)
-	transaction.AssertExpectations(t)
 }
 
 func TestDiscogsProcessingJob_ProcessRecord_RepositoryError(t *testing.T) {
 	// Setup mocks
 	repo := &MockDiscogsDataProcessingRepository{}
-	transaction := &MockTransactionService{}
 	xmlProcessing := &MockXMLProcessingService{}
 
 	record := &models.DiscogsDataProcessing{
@@ -267,7 +238,7 @@ func TestDiscogsProcessingJob_ProcessRecord_RepositoryError(t *testing.T) {
 	updateError := errors.New("database update failed")
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*models.DiscogsDataProcessing")).Return(updateError)
 
-	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, services.DailyProcessing)
+	job := NewDiscogsProcessingJob(repo, xmlProcessing, services.DailyProcessing)
 
 	err := job.processRecord(context.Background(), record)
 	assert.Error(t, err)
@@ -279,7 +250,6 @@ func TestDiscogsProcessingJob_ProcessRecord_RepositoryError(t *testing.T) {
 func TestDiscogsProcessingJob_CompleteProcessing(t *testing.T) {
 	// Setup mocks
 	repo := &MockDiscogsDataProcessingRepository{}
-	transaction := &MockTransactionService{}
 	xmlProcessing := &MockXMLProcessingService{}
 
 	record := &models.DiscogsDataProcessing{
@@ -291,7 +261,7 @@ func TestDiscogsProcessingJob_CompleteProcessing(t *testing.T) {
 	// Mock repository calls
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*models.DiscogsDataProcessing")).Return(nil)
 
-	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, services.DailyProcessing)
+	job := NewDiscogsProcessingJob(repo, xmlProcessing, services.DailyProcessing)
 
 	err := job.completeProcessing(context.Background(), record, "2025-01")
 	assert.NoError(t, err)
@@ -303,15 +273,13 @@ func TestDiscogsProcessingJob_CompleteProcessing(t *testing.T) {
 
 func TestDiscogsProcessingJob_Constructor(t *testing.T) {
 	repo := &MockDiscogsDataProcessingRepository{}
-	transaction := &MockTransactionService{}
 	xmlProcessing := &MockXMLProcessingService{}
 	schedule := services.DailyProcessing
 
-	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, schedule)
+	job := NewDiscogsProcessingJob(repo, xmlProcessing, schedule)
 
 	assert.NotNil(t, job)
 	assert.Equal(t, repo, job.repo)
-	assert.Equal(t, transaction, job.transaction)
 	assert.Equal(t, xmlProcessing, job.xmlProcessing)
 	assert.Equal(t, schedule, job.schedule)
 	assert.Equal(t, "DiscogsDailyProcessingCheck", job.Name())
