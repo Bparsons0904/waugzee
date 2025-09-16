@@ -18,7 +18,10 @@ type MockDiscogsDataProcessingRepository struct {
 	mock.Mock
 }
 
-func (m *MockDiscogsDataProcessingRepository) GetByYearMonth(ctx context.Context, yearMonth string) (*models.DiscogsDataProcessing, error) {
+func (m *MockDiscogsDataProcessingRepository) GetByYearMonth(
+	ctx context.Context,
+	yearMonth string,
+) (*models.DiscogsDataProcessing, error) {
 	args := m.Called(ctx, yearMonth)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -26,7 +29,10 @@ func (m *MockDiscogsDataProcessingRepository) GetByYearMonth(ctx context.Context
 	return args.Get(0).(*models.DiscogsDataProcessing), args.Error(1)
 }
 
-func (m *MockDiscogsDataProcessingRepository) GetByID(ctx context.Context, id string) (*models.DiscogsDataProcessing, error) {
+func (m *MockDiscogsDataProcessingRepository) GetByID(
+	ctx context.Context,
+	id string,
+) (*models.DiscogsDataProcessing, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -34,7 +40,10 @@ func (m *MockDiscogsDataProcessingRepository) GetByID(ctx context.Context, id st
 	return args.Get(0).(*models.DiscogsDataProcessing), args.Error(1)
 }
 
-func (m *MockDiscogsDataProcessingRepository) Create(ctx context.Context, processing *models.DiscogsDataProcessing) (*models.DiscogsDataProcessing, error) {
+func (m *MockDiscogsDataProcessingRepository) Create(
+	ctx context.Context,
+	processing *models.DiscogsDataProcessing,
+) (*models.DiscogsDataProcessing, error) {
 	args := m.Called(ctx, processing)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -42,7 +51,10 @@ func (m *MockDiscogsDataProcessingRepository) Create(ctx context.Context, proces
 	return args.Get(0).(*models.DiscogsDataProcessing), args.Error(1)
 }
 
-func (m *MockDiscogsDataProcessingRepository) Update(ctx context.Context, processing *models.DiscogsDataProcessing) error {
+func (m *MockDiscogsDataProcessingRepository) Update(
+	ctx context.Context,
+	processing *models.DiscogsDataProcessing,
+) error {
 	args := m.Called(ctx, processing)
 	return args.Error(0)
 }
@@ -52,7 +64,10 @@ func (m *MockDiscogsDataProcessingRepository) Delete(ctx context.Context, id str
 	return args.Error(0)
 }
 
-func (m *MockDiscogsDataProcessingRepository) GetByStatus(ctx context.Context, status models.ProcessingStatus) ([]*models.DiscogsDataProcessing, error) {
+func (m *MockDiscogsDataProcessingRepository) GetByStatus(
+	ctx context.Context,
+	status models.ProcessingStatus,
+) ([]*models.DiscogsDataProcessing, error) {
 	args := m.Called(ctx, status)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -60,7 +75,9 @@ func (m *MockDiscogsDataProcessingRepository) GetByStatus(ctx context.Context, s
 	return args.Get(0).([]*models.DiscogsDataProcessing), args.Error(1)
 }
 
-func (m *MockDiscogsDataProcessingRepository) GetCurrentProcessing(ctx context.Context) (*models.DiscogsDataProcessing, error) {
+func (m *MockDiscogsDataProcessingRepository) GetCurrentProcessing(
+	ctx context.Context,
+) (*models.DiscogsDataProcessing, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -68,16 +85,19 @@ func (m *MockDiscogsDataProcessingRepository) GetCurrentProcessing(ctx context.C
 	return args.Get(0).(*models.DiscogsDataProcessing), args.Error(1)
 }
 
-func (m *MockDiscogsDataProcessingRepository) UpdateStatus(ctx context.Context, id string, status models.ProcessingStatus, errorMessage *string) error {
-	args := m.Called(ctx, id, status, errorMessage)
-	return args.Error(0)
-}
+// func (m *MockDiscogsDataProcessingRepository) UpdateStatus(ctx context.Context, id string, status models.ProcessingStatus, errorMessage *string) error {
+// 	args := m.Called(ctx, id, status, errorMessage)
+// 	return args.Error(0)
+// }
 
 type MockTransactionService struct {
 	mock.Mock
 }
 
-func (m *MockTransactionService) Execute(ctx context.Context, fn func(context.Context) error) error {
+func (m *MockTransactionService) Execute(
+	ctx context.Context,
+	fn func(context.Context) error,
+) error {
 	args := m.Called(ctx, fn)
 	if args.Get(0) != nil {
 		return args.Error(0)
@@ -90,7 +110,11 @@ type MockXMLProcessingService struct {
 	mock.Mock
 }
 
-func (m *MockXMLProcessingService) ProcessLabelsFile(ctx context.Context, filePath string, processingID string) (*services.ProcessingResult, error) {
+func (m *MockXMLProcessingService) ProcessLabelsFile(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+) (*services.ProcessingResult, error) {
 	args := m.Called(ctx, filePath, processingID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -117,11 +141,14 @@ func TestDiscogsProcessingJob_Execute_NoRecordsToProcess(t *testing.T) {
 	xmlProcessing := &MockXMLProcessingService{}
 
 	// Mock no records ready for processing
-	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusReadyForProcessing).Return([]*models.DiscogsDataProcessing{}, nil)
-	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusProcessing).Return([]*models.DiscogsDataProcessing{}, nil)
+	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusReadyForProcessing).
+		Return([]*models.DiscogsDataProcessing{}, nil)
+	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusProcessing).
+		Return([]*models.DiscogsDataProcessing{}, nil)
 
 	// Mock transaction execution
-	transaction.On("Execute", mock.Anything, mock.AnythingOfType("func(context.Context) error")).Return(nil)
+	transaction.On("Execute", mock.Anything, mock.AnythingOfType("func(context.Context) error")).
+		Return(nil)
 
 	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, services.DailyProcessing)
 
@@ -157,7 +184,8 @@ func TestDiscogsProcessingJob_FindAndResetStuckRecords(t *testing.T) {
 	}
 
 	// Mock repository calls
-	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusProcessing).Return([]*models.DiscogsDataProcessing{stuckRecord, recentRecord}, nil)
+	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusProcessing).
+		Return([]*models.DiscogsDataProcessing{stuckRecord, recentRecord}, nil)
 	repo.On("Update", mock.Anything, stuckRecord).Return(nil)
 
 	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, services.DailyProcessing)
@@ -185,9 +213,9 @@ func TestDiscogsProcessingJob_Execute_WithMixedRecords(t *testing.T) {
 		ProcessingStats: &models.ProcessingStats{
 			Files: map[string]*models.FileStatus{
 				"labels": {
-					Status:    models.FileDownloadStatusFailed, // No validated file
+					Status:     models.FileDownloadStatusFailed, // No validated file
 					Downloaded: false,
-					Validated: false,
+					Validated:  false,
 				},
 			},
 		},
@@ -202,21 +230,25 @@ func TestDiscogsProcessingJob_Execute_WithMixedRecords(t *testing.T) {
 		ProcessingStats: &models.ProcessingStats{
 			Files: map[string]*models.FileStatus{
 				"labels": {
-					Status:    models.FileDownloadStatusFailed, // No validated file
+					Status:     models.FileDownloadStatusFailed, // No validated file
 					Downloaded: false,
-					Validated: false,
+					Validated:  false,
 				},
 			},
 		},
 	}
 
 	// Mock repository calls
-	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusReadyForProcessing).Return([]*models.DiscogsDataProcessing{readyRecord}, nil)
-	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusProcessing).Return([]*models.DiscogsDataProcessing{stuckRecord}, nil)
-	repo.On("Update", mock.Anything, mock.AnythingOfType("*models.DiscogsDataProcessing")).Return(nil)
+	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusReadyForProcessing).
+		Return([]*models.DiscogsDataProcessing{readyRecord}, nil)
+	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusProcessing).
+		Return([]*models.DiscogsDataProcessing{stuckRecord}, nil)
+	repo.On("Update", mock.Anything, mock.AnythingOfType("*models.DiscogsDataProcessing")).
+		Return(nil)
 
 	// Mock transaction execution
-	transaction.On("Execute", mock.Anything, mock.AnythingOfType("func(context.Context) error")).Return(nil)
+	transaction.On("Execute", mock.Anything, mock.AnythingOfType("func(context.Context) error")).
+		Return(nil)
 
 	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, services.DailyProcessing)
 
@@ -236,10 +268,12 @@ func TestDiscogsProcessingJob_Execute_ErrorHandling(t *testing.T) {
 
 	// Mock repository error
 	repoError := errors.New("database connection failed")
-	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusReadyForProcessing).Return(nil, repoError)
+	repo.On("GetByStatus", mock.Anything, models.ProcessingStatusReadyForProcessing).
+		Return(nil, repoError)
 
 	// Mock transaction execution with error
-	transaction.On("Execute", mock.Anything, mock.AnythingOfType("func(context.Context) error")).Return(repoError)
+	transaction.On("Execute", mock.Anything, mock.AnythingOfType("func(context.Context) error")).
+		Return(repoError)
 
 	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, services.DailyProcessing)
 
@@ -265,7 +299,8 @@ func TestDiscogsProcessingJob_ProcessRecord_RepositoryError(t *testing.T) {
 
 	// Mock repository update error
 	updateError := errors.New("database update failed")
-	repo.On("Update", mock.Anything, mock.AnythingOfType("*models.DiscogsDataProcessing")).Return(updateError)
+	repo.On("Update", mock.Anything, mock.AnythingOfType("*models.DiscogsDataProcessing")).
+		Return(updateError)
 
 	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, services.DailyProcessing)
 
@@ -289,7 +324,8 @@ func TestDiscogsProcessingJob_CompleteProcessing(t *testing.T) {
 	}
 
 	// Mock repository calls
-	repo.On("Update", mock.Anything, mock.AnythingOfType("*models.DiscogsDataProcessing")).Return(nil)
+	repo.On("Update", mock.Anything, mock.AnythingOfType("*models.DiscogsDataProcessing")).
+		Return(nil)
 
 	job := NewDiscogsProcessingJob(repo, transaction, xmlProcessing, services.DailyProcessing)
 
@@ -316,3 +352,4 @@ func TestDiscogsProcessingJob_Constructor(t *testing.T) {
 	assert.Equal(t, schedule, job.schedule)
 	assert.Equal(t, "DiscogsDailyProcessingCheck", job.Name())
 }
+

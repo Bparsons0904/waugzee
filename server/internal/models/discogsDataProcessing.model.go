@@ -183,6 +183,7 @@ func (ddp *DiscogsDataProcessing) BeforeUpdate(tx *gorm.DB) (err error) {
 	return nil
 }
 
+// Claude why do we have business logic in the model?
 // CanTransitionTo validates if the current status can transition to the new status
 func (ddp *DiscogsDataProcessing) CanTransitionTo(newStatus ProcessingStatus) bool {
 	validTransitions := map[ProcessingStatus][]ProcessingStatus{
@@ -222,6 +223,7 @@ func (ddp *DiscogsDataProcessing) CanTransitionTo(newStatus ProcessingStatus) bo
 	return slices.Contains(allowedStates, newStatus)
 }
 
+// Claude why do we have business logic in the model?
 // UpdateStatus safely updates the status if the transition is valid
 func (ddp *DiscogsDataProcessing) UpdateStatus(newStatus ProcessingStatus) error {
 	if !ddp.CanTransitionTo(newStatus) {

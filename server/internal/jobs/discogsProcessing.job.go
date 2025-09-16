@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
 	"waugzee/internal/repositories"
@@ -41,22 +42,20 @@ func (j *DiscogsProcessingJob) Name() string {
 
 func (j *DiscogsProcessingJob) Execute(ctx context.Context) error {
 	log := j.log.Function("Execute")
-
 	log.Info("Starting Discogs data processing check")
 
-	// Step 1: Find records ready for processing
+	// Find records ready for processing
 	readyRecords, err := j.repo.GetByStatus(ctx, models.ProcessingStatusReadyForProcessing)
 	if err != nil {
 		return log.Err("failed to find records ready for processing", err)
 	}
 
-	// Step 2: Find processing records that can be resumed or need reset
+	// Find processing records that can be resumed or need reset
 	resumableRecords, err := j.findAndHandleProcessingRecords(ctx)
 	if err != nil {
 		return log.Err("failed to handle processing records", err)
 	}
 
-	// Combine ready and resumable records
 	allRecords := append(readyRecords, resumableRecords...)
 
 	if len(allRecords) == 0 {
@@ -66,7 +65,6 @@ func (j *DiscogsProcessingJob) Execute(ctx context.Context) error {
 
 	log.Info("Found records to process", "count", len(allRecords))
 
-	// Step 3: Process each record
 	successCount := 0
 	failureCount := 0
 
@@ -97,6 +95,7 @@ func (j *DiscogsProcessingJob) findAndHandleProcessingRecords(
 	log := j.log.Function("findAndHandleProcessingRecords")
 
 	// Find records in processing status
+	// Claude why are we doing another query here?
 	processingRecords, err := j.repo.GetByStatus(ctx, models.ProcessingStatusProcessing)
 	if err != nil {
 		return nil, log.Err("failed to find processing records", err)
@@ -112,10 +111,15 @@ func (j *DiscogsProcessingJob) findAndHandleProcessingRecords(
 
 		// Check if record has been processing for more than 24 hours - reset completely
 		if record.StartedAt.Before(oneDayAgo) {
-			log.Warn("Found critically stuck processing record (>24hrs), resetting to ready_for_processing",
-				"yearMonth", record.YearMonth,
-				"id", record.ID,
-				"stuckSince", record.StartedAt)
+			log.Warn(
+				"Found critically stuck processing record (>24hrs), resetting to ready_for_processing",
+				"yearMonth",
+				record.YearMonth,
+				"id",
+				record.ID,
+				"stuckSince",
+				record.StartedAt,
+			)
 
 			updateErr := j.transaction.Execute(ctx, func(txCtx context.Context) error {
 				// Complete reset to ready_for_processing status
@@ -179,7 +183,9 @@ func (j *DiscogsProcessingJob) findAndHandleProcessingRecords(
 }
 
 // checkPendingFileTypes returns file types that still need processing
-func (j *DiscogsProcessingJob) checkPendingFileTypes(record *models.DiscogsDataProcessing) []string {
+func (j *DiscogsProcessingJob) checkPendingFileTypes(
+	record *models.DiscogsDataProcessing,
+) []string {
 	var pending []string
 
 	// Define all file types we should process
@@ -475,4 +481,3 @@ func (j *DiscogsProcessingJob) completeProcessing(
 func (j *DiscogsProcessingJob) Schedule() services.Schedule {
 	return j.schedule
 }
-
