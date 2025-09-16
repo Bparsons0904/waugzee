@@ -65,7 +65,7 @@ func (r *releaseRepository) GetByDiscogsID(ctx context.Context, discogsID int64)
 	log := r.log.Function("GetByDiscogsID")
 
 	var release Release
-	if err := r.getDB(ctx).Preload("Label").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "discogs_id = ?", discogsID).Error; err != nil {
+	if err := r.getDB(ctx).Preload("Label").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -152,9 +152,9 @@ func (r *releaseRepository) upsertSingleBatch(ctx context.Context, releases []*R
 
 	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
 	result := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "discogs_id"}}, // Use unique index on discogs_id
+		Columns: []clause.Column{{Name: "id"}}, // Use primary key (ID as DiscogsID)
 		DoUpdates: clause.AssignmentColumns([]string{
-			"title", "year", "country", "catalog_number", "format", "image_url", "track_count", "label_id", "master_id", "updated_at",
+			"title", "year", "country", "format", "image_url", "track_count", "label_id", "master_id", "updated_at",
 		}),
 	}).CreateInBatches(releases, RELEASE_BATCH_SIZE)
 
@@ -175,14 +175,14 @@ func (r *releaseRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs
 	}
 
 	var releases []*Release
-	if err := r.getDB(ctx).Where("discogs_id IN ?", discogsIDs).Find(&releases).Error; err != nil {
+	if err := r.getDB(ctx).Where("id IN ?", discogsIDs).Find(&releases).Error; err != nil {
 		return nil, log.Err("failed to get releases by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
 	// Convert to map for O(1) lookup
 	result := make(map[int64]*Release, len(releases))
 	for _, release := range releases {
-		result[release.DiscogsID] = release
+		result[int64(release.ID)] = release
 	}
 
 	log.Info("Retrieved releases by Discogs IDs", "requested", len(discogsIDs), "found", len(result))

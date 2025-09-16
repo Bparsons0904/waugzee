@@ -162,11 +162,7 @@ func (r *genreRepository) UpsertBatch(ctx context.Context, genres []*Genre) (int
 			inserted++
 		} else {
 			// Genre exists, update if needed
-			if existingGenre.Description != genre.Description ||
-			   existingGenre.Color != genre.Color ||
-			   existingGenre.ParentGenreID != genre.ParentGenreID {
-				existingGenre.Description = genre.Description
-				existingGenre.Color = genre.Color
+			if existingGenre.ParentGenreID != genre.ParentGenreID {
 				existingGenre.ParentGenreID = genre.ParentGenreID
 
 				if err := r.Update(ctx, existingGenre); err != nil {

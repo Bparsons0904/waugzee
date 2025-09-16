@@ -65,7 +65,7 @@ func (r *masterRepository) GetByDiscogsID(ctx context.Context, discogsID int64) 
 	log := r.log.Function("GetByDiscogsID")
 
 	var master Master
-	if err := r.getDB(ctx).First(&master, "discogs_id = ?", discogsID).Error; err != nil {
+	if err := r.getDB(ctx).First(&master, "id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -152,9 +152,9 @@ func (r *masterRepository) upsertSingleBatch(ctx context.Context, masters []*Mas
 
 	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
 	result := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "discogs_id"}}, // Use unique index on discogs_id
+		Columns: []clause.Column{{Name: "id"}}, // Use primary key (ID as DiscogsID)
 		DoUpdates: clause.AssignmentColumns([]string{
-			"title", "main_release", "year", "notes", "data_quality", "updated_at",
+			"title", "main_release", "year", "updated_at",
 		}),
 	}).CreateInBatches(masters, MASTER_BATCH_SIZE)
 
@@ -175,16 +175,14 @@ func (r *masterRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs 
 	}
 
 	var masters []*Master
-	if err := r.getDB(ctx).Where("discogs_id IN ?", discogsIDs).Find(&masters).Error; err != nil {
+	if err := r.getDB(ctx).Where("id IN ?", discogsIDs).Find(&masters).Error; err != nil {
 		return nil, log.Err("failed to get masters by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
 	// Convert to map for O(1) lookup
 	result := make(map[int64]*Master, len(masters))
 	for _, master := range masters {
-		if master.DiscogsID != nil {
-			result[*master.DiscogsID] = master
-		}
+		result[int64(master.ID)] = master
 	}
 
 	log.Info("Retrieved masters by Discogs IDs", "requested", len(discogsIDs), "found", len(result))

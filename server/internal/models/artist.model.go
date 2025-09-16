@@ -2,25 +2,32 @@ package models
 
 import (
 	"gorm.io/gorm"
+	"waugzee/internal/utils"
 )
 
 type Artist struct {
-	BaseUUIDModel
-	Name        string  `gorm:"type:text;not null;index:idx_artists_name" json:"name" validate:"required"`
-	DiscogsID   *int64  `gorm:"type:bigint;uniqueIndex:idx_artists_discogs_id" json:"discogsId,omitempty"`
-	Biography   *string `gorm:"type:text" json:"biography,omitempty"`
-	IsActive    bool    `gorm:"type:bool;default:true;not null" json:"isActive"`
+	BaseModel
+	Name        string `gorm:"type:text;not null;index:idx_artists_name" json:"name" validate:"required"`
+	IsActive    bool   `gorm:"type:bool;default:true;not null" json:"isActive"`
+	ContentHash string `gorm:"type:varchar(64);not null;index:idx_artists_content_hash" json:"contentHash"`
 
 	// Relationships
-	Releases     []Release     `gorm:"many2many:release_artists;" json:"releases,omitempty"`
-	Tracks       []Track       `gorm:"foreignKey:ArtistID" json:"tracks,omitempty"`
-	Images       []Image       `gorm:"polymorphic:Imageable;" json:"images,omitempty"`
+	Releases []Release `gorm:"many2many:release_artists;" json:"releases,omitempty"`
+	Images   []Image   `gorm:"polymorphic:Imageable;" json:"images,omitempty"`
 }
 
 func (a *Artist) BeforeCreate(tx *gorm.DB) (err error) {
 	if a.Name == "" {
 		return gorm.ErrInvalidValue
 	}
+
+	// Generate content hash
+	hash, err := utils.GenerateEntityHash(a)
+	if err != nil {
+		return err
+	}
+	a.ContentHash = hash
+
 	return nil
 }
 
@@ -28,6 +35,14 @@ func (a *Artist) BeforeUpdate(tx *gorm.DB) (err error) {
 	if a.Name == "" {
 		return gorm.ErrInvalidValue
 	}
+
+	// Regenerate content hash
+	hash, err := utils.GenerateEntityHash(a)
+	if err != nil {
+		return err
+	}
+	a.ContentHash = hash
+
 	return nil
 }
 
@@ -58,5 +73,21 @@ func (a *Artist) GetImageByType(imageType string) *Image {
 		}
 	}
 	return nil
+}
+
+// Hashable interface implementation
+func (a *Artist) GetHashableFields() map[string]interface{} {
+	return map[string]interface{}{
+		"Name":     a.Name,
+		"IsActive": a.IsActive,
+	}
+}
+
+func (a *Artist) SetContentHash(hash string) {
+	a.ContentHash = hash
+}
+
+func (a *Artist) GetContentHash() string {
+	return a.ContentHash
 }
 

@@ -14,11 +14,11 @@ import (
 )
 
 type DiscogsProcessingJob struct {
-	repo                           repositories.DiscogsDataProcessingRepository
-	xmlProcessing                  *services.XMLProcessingService
-	simplifiedXMLProcessing        *services.SimplifiedXMLProcessingService
-	log                            logger.Logger
-	schedule                       services.Schedule
+	repo                    repositories.DiscogsDataProcessingRepository
+	xmlProcessing           *services.XMLProcessingService
+	simplifiedXMLProcessing *services.SimplifiedXMLProcessingService
+	log                     logger.Logger
+	schedule                services.Schedule
 }
 
 func NewDiscogsProcessingJob(
@@ -119,9 +119,9 @@ func (j *DiscogsProcessingJob) processRecord(
 		method func(context.Context, string, string) (*services.ProcessingResult, error)
 	}{
 		{"labels", j.simplifiedXMLProcessing.ProcessLabelsFile},
-		// {"artists", j.xmlProcessing.ProcessArtistsFile},
-		// {"masters", j.xmlProcessing.ProcessMastersFile},
-		// {"releases", j.xmlProcessing.ProcessReleasesFile},
+		{"artists", j.simplifiedXMLProcessing.ProcessArtistsFile},
+		{"masters", j.simplifiedXMLProcessing.ProcessMastersFile},
+		{"releases", j.simplifiedXMLProcessing.ProcessReleasesFile},
 	}
 
 	var totalProcessed int

@@ -16,7 +16,7 @@ import (
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
 
-	"github.com/google/uuid"
+
 )
 
 // ParseResult represents the result of parsing a Discogs XML file
@@ -329,7 +329,7 @@ func (s *DiscogsParserService) logFinalSummary(
 // Conversion methods - extracted from XMLProcessingService for reuse
 
 func (s *DiscogsParserService) convertDiscogsLabel(discogsLabel *imports.Label) *models.Label {
-	// Skip labels with invalid data (avoid string ops on invalid data)
+	// Skip labels with invalid data
 	if discogsLabel.ID == 0 || len(discogsLabel.Name) == 0 {
 		return nil
 	}
@@ -342,27 +342,25 @@ func (s *DiscogsParserService) convertDiscogsLabel(discogsLabel *imports.Label) 
 
 	label := &models.Label{Name: name}
 
-	// Set Discogs ID (avoid pointer allocation for primitive)
-	discogsID := int64(discogsLabel.ID)
-	label.DiscogsID = &discogsID
+	// Set ID directly from Discogs ID
+	label.BaseModel.ID = int(discogsLabel.ID)
 
-	// Set profile if available
-	if profile := strings.TrimSpace(discogsLabel.Profile); len(profile) > 0 {
-		label.Profile = &profile
-	}
-
-	// Set website from first URL if available
-	if len(discogsLabel.URLs) > 0 {
-		if firstURL := strings.TrimSpace(discogsLabel.URLs[0]); len(firstURL) > 0 {
-			label.Website = &firstURL
-		}
-	}
+	// MEMORY OPTIMIZATION: Skip profile and website for now
+	// These can be populated later via API calls when actually needed
+	// if profile := strings.TrimSpace(discogsLabel.Profile); len(profile) > 0 {
+	// 	label.Profile = &profile
+	// }
+	// if len(discogsLabel.URLs) > 0 {
+	// 	if firstURL := strings.TrimSpace(discogsLabel.URLs[0]); len(firstURL) > 0 {
+	// 		label.Website = &firstURL
+	// 	}
+	// }
 
 	return label
 }
 
 func (s *DiscogsParserService) convertDiscogsArtist(discogsArtist *imports.Artist) *models.Artist {
-	// Skip artists with invalid data (avoid string ops on invalid data)
+	// Skip artists with invalid data
 	if discogsArtist.ID == 0 || len(discogsArtist.Name) == 0 {
 		return nil
 	}
@@ -378,38 +376,14 @@ func (s *DiscogsParserService) convertDiscogsArtist(discogsArtist *imports.Artis
 		IsActive: true, // Default to active
 	}
 
-	// Set Discogs ID
-	discogsID := int64(discogsArtist.ID)
-	artist.DiscogsID = &discogsID
+	// Set ID directly from Discogs ID
+	artist.BaseModel.ID = int(discogsArtist.ID)
 
-	// Only process biography if we have real name or profile data
-	if len(discogsArtist.RealName) > 0 {
-		realName := strings.TrimSpace(discogsArtist.RealName)
-		if len(realName) > 0 {
-			biography := "Real name: " + realName
-			if len(discogsArtist.Profile) > 0 {
-				if profile := strings.TrimSpace(discogsArtist.Profile); len(profile) > 0 {
-					biography += "\n\n" + profile
-				}
-			}
-			artist.Biography = &biography
-		}
-	} else if len(discogsArtist.Profile) > 0 {
-		if profile := strings.TrimSpace(discogsArtist.Profile); len(profile) > 0 {
-			artist.Biography = &profile
-		}
-	}
-
-	// Process images if available (even if currently empty in XML dumps)
-	// This sets up infrastructure for future API integration or XML dump improvements
-	if len(discogsArtist.Images) > 0 {
-		for _, discogsImage := range discogsArtist.Images {
-			if image := s.convertDiscogsImage(&discogsImage, artist.ID.String(), models.ImageableTypeArtist); image != nil {
-				artist.Images = append(artist.Images, *image)
-			}
-		}
-	}
-
+	// MEMORY OPTIMIZATION: Skip biography and images for now
+	// These can be populated later via API calls when actually needed
+	// This significantly reduces memory usage as biographies can be very large
+	// and images are typically empty in current XML dumps anyway
+	
 	return artist
 }
 
@@ -456,7 +430,7 @@ func (s *DiscogsParserService) convertDiscogsImage(
 }
 
 func (s *DiscogsParserService) convertDiscogsMaster(discogsMaster *imports.Master) *models.Master {
-	// Skip masters with invalid data (avoid string ops on invalid data)
+	// Skip masters with invalid data
 	if discogsMaster.ID == 0 || len(discogsMaster.Title) == 0 {
 		return nil
 	}
@@ -469,13 +443,12 @@ func (s *DiscogsParserService) convertDiscogsMaster(discogsMaster *imports.Maste
 
 	master := &models.Master{Title: title}
 
-	// Set Discogs ID
-	discogsID := int64(discogsMaster.ID)
-	master.DiscogsID = &discogsID
+	// Set ID directly from Discogs ID
+	master.BaseModel.ID = int(discogsMaster.ID)
 
-	// Set optional fields only if they have values
+	// Set essential fields only
 	if discogsMaster.MainRelease != 0 {
-		mainRelease := int64(discogsMaster.MainRelease)
+		mainRelease := int(discogsMaster.MainRelease)
 		master.MainRelease = &mainRelease
 	}
 
@@ -483,39 +456,12 @@ func (s *DiscogsParserService) convertDiscogsMaster(discogsMaster *imports.Maste
 		master.Year = &discogsMaster.Year
 	}
 
-	if len(discogsMaster.Notes) > 0 {
-		if notes := strings.TrimSpace(discogsMaster.Notes); len(notes) > 0 {
-			master.Notes = &notes
-		}
-	}
-
-	if len(discogsMaster.DataQuality) > 0 {
-		if dataQuality := strings.TrimSpace(discogsMaster.DataQuality); len(dataQuality) > 0 {
-			master.DataQuality = &dataQuality
-		}
-	}
-
-	// Convert genres
-	for _, genreName := range discogsMaster.Genres {
-		if genre := s.findOrCreateGenre(genreName); genre != nil {
-			master.Genres = append(master.Genres, *genre)
-		}
-	}
-
-	// Convert styles as genres (Discogs treats them as sub-genres)
-	for _, styleName := range discogsMaster.Styles {
-		if genre := s.findOrCreateGenre(styleName); genre != nil {
-			master.Genres = append(master.Genres, *genre)
-		}
-	}
-
-	// Convert artists
-	for _, discogsArtist := range discogsMaster.Artists {
-		if artist := s.convertDiscogsArtist(&discogsArtist); artist != nil {
-			master.Artists = append(master.Artists, *artist)
-		}
-	}
-
+	// MEMORY OPTIMIZATION: Skip heavy fields for now
+	// Notes can be very large text blocks - skip for now
+	// Data quality is not immediately essential - skip for now
+	// Genres and Artists create many relationships - skip for initial import
+	// These can be populated later via API calls when actually needed
+	
 	return master
 }
 
@@ -533,8 +479,8 @@ func (s *DiscogsParserService) convertDiscogsRelease(
 	}
 
 	release := &models.Release{
+		BaseModel: models.BaseModel{ID: int(discogsRelease.ID)},
 		Title:     title,
-		DiscogsID: int64(discogsRelease.ID),
 		Format:    models.FormatVinyl, // Default format
 	}
 
@@ -582,23 +528,19 @@ func (s *DiscogsParserService) convertDiscogsRelease(
 		release.TrackCount = &trackCount
 	}
 
-	// Catalog number from first label
-	if len(discogsRelease.Labels) > 0 && len(discogsRelease.Labels[0].CatalogNo) > 0 {
-		catalogNo := strings.TrimSpace(discogsRelease.Labels[0].CatalogNo)
-		if len(catalogNo) > 0 {
-			release.CatalogNumber = &catalogNo
-		}
-	}
+	// Note: CatalogNumber field not available in current Release model
+	// if len(discogsRelease.Labels) > 0 && len(discogsRelease.Labels[0].CatalogNo) > 0 {
+	//	catalogNo := strings.TrimSpace(discogsRelease.Labels[0].CatalogNo)
+	//	if len(catalogNo) > 0 {
+	//		release.CatalogNumber = &catalogNo
+	//	}
+	// }
 
-	// Convert Artists
-	release.Artists = s.convertDiscogsArtists(discogsRelease.Artists)
-
-	// Convert Genres (combining genres and styles)
-	release.Genres = s.convertDiscogsGenres(discogsRelease.Genres, discogsRelease.Styles)
-
-	// Convert Tracks
-	release.Tracks = s.convertDiscogsTracks(discogsRelease.TrackList, release.ID)
-
+	// MEMORY OPTIMIZATION: Skip heavy collections for now
+	// Artists, Genres, and Tracks create many relationships and take significant memory
+	// These can be populated later via API calls when actually needed
+	// Only keep essential image URL for basic functionality
+	
 	// Set primary image URL from first image if available
 	if len(discogsRelease.Images) > 0 && discogsRelease.Images[0].URI != "" {
 		imageURL := strings.TrimSpace(discogsRelease.Images[0].URI)
@@ -606,9 +548,6 @@ func (s *DiscogsParserService) convertDiscogsRelease(
 			release.ImageURL = &imageURL
 		}
 	}
-
-	// Note: Detailed images are handled separately via the polymorphic system
-	// They will be stored as separate Image models linked to this release
 
 	return release
 }
@@ -775,19 +714,18 @@ func (s *DiscogsParserService) convertDiscogsArtists(
 			IsActive: true,
 		}
 
-		// Set Discogs ID if available
+		// Set ID from Discogs ID if available
 		if discogsArtist.ID > 0 {
-			discogsID := int64(discogsArtist.ID)
-			artist.DiscogsID = &discogsID
+			artist.BaseModel.ID = int(discogsArtist.ID)
 		}
 
-		// Set biography from profile if available
-		if len(discogsArtist.Profile) > 0 {
-			profile := strings.TrimSpace(discogsArtist.Profile)
-			if len(profile) > 0 {
-				artist.Biography = &profile
-			}
-		}
+		// Note: Biography field not available in current Artist model
+		// if len(discogsArtist.Profile) > 0 {
+		//	profile := strings.TrimSpace(discogsArtist.Profile)
+		//	if len(profile) > 0 {
+		//		artist.Biography = &profile
+		//	}
+		// }
 
 		artists = append(artists, artist)
 	}
@@ -835,7 +773,7 @@ func (s *DiscogsParserService) convertDiscogsGenres(
 // convertDiscogsTracks converts Discogs track data to our Track models
 func (s *DiscogsParserService) convertDiscogsTracks(
 	discogsTracks []imports.Track,
-	releaseID uuid.UUID,
+	releaseID int,
 ) []models.Track {
 	if len(discogsTracks) == 0 {
 		return nil

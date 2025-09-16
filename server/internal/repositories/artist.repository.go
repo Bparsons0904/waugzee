@@ -66,7 +66,7 @@ func (r *artistRepository) GetByDiscogsID(ctx context.Context, discogsID int64) 
 	log := r.log.Function("GetByDiscogsID")
 
 	var artist Artist
-	if err := r.getDB(ctx).First(&artist, "discogs_id = ?", discogsID).Error; err != nil {
+	if err := r.getDB(ctx).First(&artist, "id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -153,9 +153,9 @@ func (r *artistRepository) upsertSingleBatch(ctx context.Context, artists []*Art
 
 	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
 	result := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "discogs_id"}}, // Use unique index on discogs_id
+		Columns: []clause.Column{{Name: "id"}}, // Use primary key (ID as DiscogsID)
 		DoUpdates: clause.AssignmentColumns([]string{
-			"name", "biography", "image_url", "is_active", "updated_at",
+			"name", "is_active", "updated_at",
 		}),
 	}).CreateInBatches(artists, ARTIST_BATCH_SIZE)
 
@@ -176,16 +176,14 @@ func (r *artistRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs 
 	}
 
 	var artists []*Artist
-	if err := r.getDB(ctx).Where("discogs_id IN ?", discogsIDs).Find(&artists).Error; err != nil {
+	if err := r.getDB(ctx).Where("id IN ?", discogsIDs).Find(&artists).Error; err != nil {
 		return nil, log.Err("failed to get artists by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
 	// Convert to map for O(1) lookup
 	result := make(map[int64]*Artist, len(artists))
 	for _, artist := range artists {
-		if artist.DiscogsID != nil {
-			result[*artist.DiscogsID] = artist
-		}
+		result[int64(artist.ID)] = artist
 	}
 
 	log.Info("Retrieved artists by Discogs IDs", "requested", len(discogsIDs), "found", len(result))
@@ -209,10 +207,10 @@ func (r *artistRepository) FindOrCreateByDiscogsID(ctx context.Context, discogsI
 		return artist, nil
 	}
 
-	// If not found, create new artist
+	// If not found, create new artist with the DiscogsID as the primary ID
 	newArtist := &Artist{
+		BaseModel: BaseModel{ID: int(discogsID)},
 		Name:      name,
-		DiscogsID: &discogsID,
 		IsActive:  true, // Default to active
 	}
 

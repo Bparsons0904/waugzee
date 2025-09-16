@@ -84,29 +84,29 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 	switch fileType {
 	case "labels":
 		for _, label := range parseResult.ParsedLabels {
-			if label != nil && label.DiscogsID != nil {
-				result.Labels[*label.DiscogsID] = label
+			if label != nil && label.ID != 0 {
+				result.Labels[int64(label.ID)] = label
 				result.ParsedRecords++
 			}
 		}
 	case "artists":
 		for _, artist := range parseResult.ParsedArtists {
-			if artist != nil && artist.DiscogsID != nil {
-				result.Artists[*artist.DiscogsID] = artist
+			if artist != nil && artist.ID != 0 {
+				result.Artists[int64(artist.ID)] = artist
 				result.ParsedRecords++
 			}
 		}
 	case "masters":
 		for _, master := range parseResult.ParsedMasters {
-			if master != nil && master.DiscogsID != nil {
-				result.Masters[*master.DiscogsID] = master
+			if master != nil && master.ID != 0 {
+				result.Masters[int64(master.ID)] = master
 				result.ParsedRecords++
 			}
 		}
 	case "releases":
 		for _, release := range parseResult.ParsedReleases {
-			if release != nil {
-				result.Releases[release.DiscogsID] = release
+			if release != nil && release.ID != 0 {
+				result.Releases[int64(release.ID)] = release
 				result.ParsedRecords++
 			}
 		}
