@@ -57,15 +57,6 @@ export const NavBar: Component = () => {
                       Profile
                     </A>
                   </li>
-                  <li class={styles.navbarItem}>
-                    <A
-                      href={FRONTEND_ROUTES.ADMIN}
-                      class={styles.navbarLink}
-                      activeClass={styles.active}
-                    >
-                      Admin
-                    </A>
-                  </li>
                   {/* <li class={styles.navbarItem}> */}
                   {/*   <A */}
                   {/*     href="/story/1" */}

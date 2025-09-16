@@ -24,7 +24,7 @@ type ProcessingLimits struct {
 }
 
 const (
-	XML_BATCH_SIZE = 2000
+	XML_BATCH_SIZE           = 2000
 	PROGRESS_REPORT_INTERVAL = 50000
 )
 
@@ -88,7 +88,10 @@ type ReleaseWithTracks struct {
 }
 
 // convertDiscogsTracks converts Discogs track data to our Track models
-func (s *XMLProcessingService) convertDiscogsTracks(discogsTracks []imports.Track, releaseID string) []*models.Track {
+func (s *XMLProcessingService) convertDiscogsTracks(
+	discogsTracks []imports.Track,
+	releaseID string,
+) []*models.Track {
 	if len(discogsTracks) == 0 {
 		return nil
 	}
@@ -181,7 +184,11 @@ func (s *XMLProcessingService) parseDuration(durationStr string) int {
 }
 
 // processTracksForRelease creates and saves tracks for a specific release
-func (s *XMLProcessingService) processTracksForRelease(ctx context.Context, discogsTracks []imports.Track, releaseID string) error {
+func (s *XMLProcessingService) processTracksForRelease(
+	ctx context.Context,
+	discogsTracks []imports.Track,
+	releaseID string,
+) error {
 	if len(discogsTracks) == 0 {
 		return nil
 	}
@@ -205,7 +212,11 @@ func (s *XMLProcessingService) processTracksForRelease(ctx context.Context, disc
 }
 
 // processReleaseBatchWithTracks processes releases and their associated tracks
-func (s *XMLProcessingService) processReleaseBatchWithTracks(ctx context.Context, releasesWithTracks []ReleaseWithTracks, result *ProcessingResult) error {
+func (s *XMLProcessingService) processReleaseBatchWithTracks(
+	ctx context.Context,
+	releasesWithTracks []ReleaseWithTracks,
+	result *ProcessingResult,
+) error {
 	log := s.log.Function("processReleaseBatchWithTracks")
 
 	if len(releasesWithTracks) == 0 {
@@ -236,7 +247,11 @@ func (s *XMLProcessingService) processReleaseBatchWithTracks(ctx context.Context
 	for _, rwt := range releasesWithTracks {
 		if len(rwt.Tracks) > 0 {
 			if err := s.processTracksForRelease(ctx, rwt.Tracks, rwt.Release.ID.String()); err != nil {
-				errorMsg := fmt.Sprintf("Failed to process tracks for release %s: %v", rwt.Release.ID, err)
+				errorMsg := fmt.Sprintf(
+					"Failed to process tracks for release %s: %v",
+					rwt.Release.ID,
+					err,
+				)
 				trackErrors = append(trackErrors, errorMsg)
 				log.Warn("Track processing failed", "releaseID", rwt.Release.ID, "error", err)
 			}
@@ -260,33 +275,62 @@ func (s *XMLProcessingService) processReleaseBatchWithTracks(ctx context.Context
 // Wrapper methods that accept limits
 
 // ProcessLabelsFileWithLimits wraps ProcessLabelsFile with support for processing limits
-func (s *XMLProcessingService) ProcessLabelsFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+func (s *XMLProcessingService) ProcessLabelsFileWithLimits(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+	limits *ProcessingLimits,
+) (*ProcessingResult, error) {
 	// ProcessLabelsFile already uses the parser service which supports limits
 	// We need to pass the limits to the parser service through the existing method
 	return s.processLabelsFileWithLimits(ctx, filePath, processingID, limits)
 }
 
 // ProcessArtistsFileWithLimits wraps ProcessArtistsFile with support for processing limits
-func (s *XMLProcessingService) ProcessArtistsFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+func (s *XMLProcessingService) ProcessArtistsFileWithLimits(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+	limits *ProcessingLimits,
+) (*ProcessingResult, error) {
 	return s.processArtistsFileWithLimits(ctx, filePath, processingID, limits)
 }
 
 // ProcessMastersFileWithLimits wraps ProcessMastersFile with support for processing limits
-func (s *XMLProcessingService) ProcessMastersFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+func (s *XMLProcessingService) ProcessMastersFileWithLimits(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+	limits *ProcessingLimits,
+) (*ProcessingResult, error) {
 	return s.processMastersFileWithLimits(ctx, filePath, processingID, limits)
 }
 
 // ProcessReleasesFileWithLimits wraps ProcessReleasesFile with support for processing limits
-func (s *XMLProcessingService) ProcessReleasesFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+func (s *XMLProcessingService) ProcessReleasesFileWithLimits(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+	limits *ProcessingLimits,
+) (*ProcessingResult, error) {
 	return s.processReleasesFileWithLimits(ctx, filePath, processingID, limits)
 }
 
 // ProcessReleasesFileWithTracksAndLimits wraps ProcessReleasesFileWithTracks with support for processing limits
-func (s *XMLProcessingService) ProcessReleasesFileWithTracksAndLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+func (s *XMLProcessingService) ProcessReleasesFileWithTracksAndLimits(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+	limits *ProcessingLimits,
+) (*ProcessingResult, error) {
 	return s.processReleasesFileWithTracksAndLimits(ctx, filePath, processingID, limits)
 }
 
-func (s *XMLProcessingService) ProcessLabelsFile(ctx context.Context, filePath string, processingID string) (*ProcessingResult, error) {
+func (s *XMLProcessingService) ProcessLabelsFile(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+) (*ProcessingResult, error) {
 	log := s.log.Function("ProcessLabelsFile")
 
 	log.Info("Starting labels file processing", "filePath", filePath, "processingID", processingID)
@@ -310,9 +354,23 @@ func (s *XMLProcessingService) ProcessLabelsFile(ctx context.Context, filePath s
 				FailedRecords:   errors,
 			}
 			if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
-				log.Warn("failed to update processing stats", "error", err, "recordCount", processed)
+				log.Warn(
+					"failed to update processing stats",
+					"error",
+					err,
+					"recordCount",
+					processed,
+				)
 			}
-			log.Info("Processing progress", "processed", processed, "total", total, "errors", errors)
+			log.Info(
+				"Processing progress",
+				"processed",
+				processed,
+				"total",
+				total,
+				"errors",
+				errors,
+			)
 		}
 	}
 
@@ -335,10 +393,7 @@ func (s *XMLProcessingService) ProcessLabelsFile(ctx context.Context, filePath s
 	totalBatches := (len(labels) + XML_BATCH_SIZE - 1) / XML_BATCH_SIZE
 
 	for i := 0; i < len(labels); i += XML_BATCH_SIZE {
-		end := i + XML_BATCH_SIZE
-		if end > len(labels) {
-			end = len(labels)
-		}
+		end := min(i+XML_BATCH_SIZE, len(labels))
 
 		batch := labels[i:end]
 		if err := s.processBatch(ctx, batch, result); err != nil {
@@ -346,7 +401,17 @@ func (s *XMLProcessingService) ProcessLabelsFile(ctx context.Context, filePath s
 			return result, err
 		}
 
-		log.Info("Processed batch", "batch", (i/XML_BATCH_SIZE)+1, "totalBatches", totalBatches, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords)
+		log.Info(
+			"Processed batch",
+			"batch",
+			(i/XML_BATCH_SIZE)+1,
+			"totalBatches",
+			totalBatches,
+			"inserted",
+			result.InsertedRecords,
+			"updated",
+			result.UpdatedRecords,
+		)
 	}
 
 	// Update totals from parse result
@@ -380,10 +445,23 @@ func (s *XMLProcessingService) ProcessLabelsFile(ctx context.Context, filePath s
 
 // Implementation methods with limits support
 
-func (s *XMLProcessingService) processLabelsFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+func (s *XMLProcessingService) processLabelsFileWithLimits(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+	limits *ProcessingLimits,
+) (*ProcessingResult, error) {
 	log := s.log.Function("processLabelsFileWithLimits")
 
-	log.Info("Starting labels file processing with limits", "filePath", filePath, "processingID", processingID, "limits", limits)
+	log.Info(
+		"Starting labels file processing with limits",
+		"filePath",
+		filePath,
+		"processingID",
+		processingID,
+		"limits",
+		limits,
+	)
 
 	// Update processing status to "processing"
 	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
@@ -404,9 +482,23 @@ func (s *XMLProcessingService) processLabelsFileWithLimits(ctx context.Context, 
 				FailedRecords:   errors,
 			}
 			if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
-				log.Warn("failed to update processing stats", "error", err, "recordCount", processed)
+				log.Warn(
+					"failed to update processing stats",
+					"error",
+					err,
+					"recordCount",
+					processed,
+				)
 			}
-			log.Info("Processing progress", "processed", processed, "total", total, "errors", errors)
+			log.Info(
+				"Processing progress",
+				"processed",
+				processed,
+				"total",
+				total,
+				"errors",
+				errors,
+			)
 		}
 	}
 
@@ -443,10 +535,7 @@ func (s *XMLProcessingService) processLabelsFileWithLimits(ctx context.Context, 
 	totalBatches := (len(labels) + batchSize - 1) / batchSize
 
 	for i := 0; i < len(labels); i += batchSize {
-		end := i + batchSize
-		if end > len(labels) {
-			end = len(labels)
-		}
+		end := min(i+batchSize, len(labels))
 
 		batch := labels[i:end]
 		if err := s.processBatch(ctx, batch, result); err != nil {
@@ -454,7 +543,17 @@ func (s *XMLProcessingService) processLabelsFileWithLimits(ctx context.Context, 
 			return result, err
 		}
 
-		log.Info("Processed batch", "batch", (i/batchSize)+1, "totalBatches", totalBatches, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords)
+		log.Info(
+			"Processed batch",
+			"batch",
+			(i/batchSize)+1,
+			"totalBatches",
+			totalBatches,
+			"inserted",
+			result.InsertedRecords,
+			"updated",
+			result.UpdatedRecords,
+		)
 	}
 
 	// Update totals from parse result
@@ -486,15 +585,28 @@ func (s *XMLProcessingService) processLabelsFileWithLimits(ctx context.Context, 
 	return result, nil
 }
 
-func (s *XMLProcessingService) processArtistsFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+func (s *XMLProcessingService) processArtistsFileWithLimits(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+	limits *ProcessingLimits,
+) (*ProcessingResult, error) {
 	log := s.log.Function("processArtistsFileWithLimits")
 
-	log.Info("Starting artists file processing with limits", "filePath", filePath, "processingID", processingID, "limits", limits)
+	log.Info(
+		"Starting artists file processing with limits",
+		"filePath",
+		filePath,
+		"processingID",
+		processingID,
+		"limits",
+		limits,
+	)
 
 	// Configure parsing options with limits
 	options := ParseOptions{
-		FilePath: filePath,
-		FileType: "artists",
+		FilePath:  filePath,
+		FileType:  "artists",
 		BatchSize: XML_BATCH_SIZE,
 	}
 
@@ -515,8 +627,8 @@ func (s *XMLProcessingService) processArtistsFileWithLimits(ctx context.Context,
 	}
 
 	result := &ProcessingResult{
-		Errors: make([]string, 0),
-		TotalRecords: parseResult.TotalRecords,
+		Errors:         make([]string, 0),
+		TotalRecords:   parseResult.TotalRecords,
 		ErroredRecords: parseResult.ErroredRecords,
 	}
 	result.Errors = append(result.Errors, parseResult.Errors...)
@@ -546,7 +658,17 @@ func (s *XMLProcessingService) processArtistsFileWithLimits(ctx context.Context,
 			return result, err
 		}
 
-		log.Info("Processed batch", "batch", (i/batchSize)+1, "totalBatches", totalBatches, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords)
+		log.Info(
+			"Processed batch",
+			"batch",
+			(i/batchSize)+1,
+			"totalBatches",
+			totalBatches,
+			"inserted",
+			result.InsertedRecords,
+			"updated",
+			result.UpdatedRecords,
+		)
 	}
 
 	// Update final processing status
@@ -573,15 +695,28 @@ func (s *XMLProcessingService) processArtistsFileWithLimits(ctx context.Context,
 	return result, nil
 }
 
-func (s *XMLProcessingService) processMastersFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+func (s *XMLProcessingService) processMastersFileWithLimits(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+	limits *ProcessingLimits,
+) (*ProcessingResult, error) {
 	log := s.log.Function("processMastersFileWithLimits")
 
-	log.Info("Starting masters file processing with limits", "filePath", filePath, "processingID", processingID, "limits", limits)
+	log.Info(
+		"Starting masters file processing with limits",
+		"filePath",
+		filePath,
+		"processingID",
+		processingID,
+		"limits",
+		limits,
+	)
 
 	// Configure parsing options with limits
 	options := ParseOptions{
-		FilePath: filePath,
-		FileType: "masters",
+		FilePath:  filePath,
+		FileType:  "masters",
 		BatchSize: XML_BATCH_SIZE,
 	}
 
@@ -602,8 +737,8 @@ func (s *XMLProcessingService) processMastersFileWithLimits(ctx context.Context,
 	}
 
 	result := &ProcessingResult{
-		Errors: make([]string, 0),
-		TotalRecords: parseResult.TotalRecords,
+		Errors:         make([]string, 0),
+		TotalRecords:   parseResult.TotalRecords,
 		ErroredRecords: parseResult.ErroredRecords,
 	}
 	result.Errors = append(result.Errors, parseResult.Errors...)
@@ -633,7 +768,17 @@ func (s *XMLProcessingService) processMastersFileWithLimits(ctx context.Context,
 			return result, err
 		}
 
-		log.Info("Processed batch", "batch", (i/batchSize)+1, "totalBatches", totalBatches, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords)
+		log.Info(
+			"Processed batch",
+			"batch",
+			(i/batchSize)+1,
+			"totalBatches",
+			totalBatches,
+			"inserted",
+			result.InsertedRecords,
+			"updated",
+			result.UpdatedRecords,
+		)
 	}
 
 	// Update final processing status
@@ -660,15 +805,28 @@ func (s *XMLProcessingService) processMastersFileWithLimits(ctx context.Context,
 	return result, nil
 }
 
-func (s *XMLProcessingService) processReleasesFileWithLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+func (s *XMLProcessingService) processReleasesFileWithLimits(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+	limits *ProcessingLimits,
+) (*ProcessingResult, error) {
 	log := s.log.Function("processReleasesFileWithLimits")
 
-	log.Info("Starting releases file processing with limits", "filePath", filePath, "processingID", processingID, "limits", limits)
+	log.Info(
+		"Starting releases file processing with limits",
+		"filePath",
+		filePath,
+		"processingID",
+		processingID,
+		"limits",
+		limits,
+	)
 
 	// Configure parsing options with limits
 	options := ParseOptions{
-		FilePath: filePath,
-		FileType: "releases",
+		FilePath:  filePath,
+		FileType:  "releases",
 		BatchSize: XML_BATCH_SIZE,
 	}
 
@@ -689,8 +847,8 @@ func (s *XMLProcessingService) processReleasesFileWithLimits(ctx context.Context
 	}
 
 	result := &ProcessingResult{
-		Errors: make([]string, 0),
-		TotalRecords: parseResult.TotalRecords,
+		Errors:         make([]string, 0),
+		TotalRecords:   parseResult.TotalRecords,
 		ErroredRecords: parseResult.ErroredRecords,
 	}
 	result.Errors = append(result.Errors, parseResult.Errors...)
@@ -720,7 +878,17 @@ func (s *XMLProcessingService) processReleasesFileWithLimits(ctx context.Context
 			return result, err
 		}
 
-		log.Info("Processed batch", "batch", (i/batchSize)+1, "totalBatches", totalBatches, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords)
+		log.Info(
+			"Processed batch",
+			"batch",
+			(i/batchSize)+1,
+			"totalBatches",
+			totalBatches,
+			"inserted",
+			result.InsertedRecords,
+			"updated",
+			result.UpdatedRecords,
+		)
 	}
 
 	// Update final processing status
@@ -747,14 +915,27 @@ func (s *XMLProcessingService) processReleasesFileWithLimits(ctx context.Context
 	return result, nil
 }
 
-func (s *XMLProcessingService) processReleasesFileWithTracksAndLimits(ctx context.Context, filePath string, processingID string, limits *ProcessingLimits) (*ProcessingResult, error) {
+func (s *XMLProcessingService) processReleasesFileWithTracksAndLimits(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+	limits *ProcessingLimits,
+) (*ProcessingResult, error) {
 	log := s.log.Function("processReleasesFileWithTracksAndLimits")
 
-	log.Info("Starting releases file processing with tracks and limits", "filePath", filePath, "processingID", processingID, "limits", limits)
+	log.Info(
+		"Starting releases file processing with tracks and limits",
+		"filePath",
+		filePath,
+		"processingID",
+		processingID,
+		"limits",
+		limits,
+	)
 
 	// For releases with tracks, we need to use a different approach since the parser service doesn't handle tracks
 	// We'll modify the existing ProcessReleasesFileWithTracks to respect limits
-	
+
 	// Open and decompress the gzipped XML file
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -800,7 +981,8 @@ func (s *XMLProcessingService) processReleasesFileWithTracksAndLimits(ctx contex
 		}
 
 		// Look for release start elements
-		if startElement, ok := token.(xml.StartElement); ok && startElement.Name.Local == "release" {
+		if startElement, ok := token.(xml.StartElement); ok &&
+			startElement.Name.Local == "release" {
 			result.TotalRecords++
 
 			// Check max records limit before processing
@@ -840,7 +1022,12 @@ func (s *XMLProcessingService) processReleasesFileWithTracksAndLimits(ctx contex
 			// Process batch when it reaches the limit
 			if len(releaseWithTracksBatch) >= batchSize {
 				if err := s.processReleaseBatchWithTracks(ctx, releaseWithTracksBatch, result); err != nil {
-					log.Err("failed to process release batch with tracks", err, "batchSize", len(releaseWithTracksBatch))
+					log.Err(
+						"failed to process release batch with tracks",
+						err,
+						"batchSize",
+						len(releaseWithTracksBatch),
+					)
 					return result, err
 				}
 				releaseWithTracksBatch = releaseWithTracksBatch[:0] // Reset batch
@@ -854,9 +1041,25 @@ func (s *XMLProcessingService) processReleasesFileWithTracksAndLimits(ctx contex
 					FailedRecords:     result.ErroredRecords,
 				}
 				if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
-					log.Warn("failed to update processing stats", "error", err, "recordCount", recordCount)
+					log.Warn(
+						"failed to update processing stats",
+						"error",
+						err,
+						"recordCount",
+						recordCount,
+					)
 				}
-				log.Info("Processing progress", "processed", recordCount, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords, "errors", result.ErroredRecords)
+				log.Info(
+					"Processing progress",
+					"processed",
+					recordCount,
+					"inserted",
+					result.InsertedRecords,
+					"updated",
+					result.UpdatedRecords,
+					"errors",
+					result.ErroredRecords,
+				)
 			}
 		}
 	}
@@ -864,7 +1067,12 @@ func (s *XMLProcessingService) processReleasesFileWithTracksAndLimits(ctx contex
 	// Process remaining batch
 	if len(releaseWithTracksBatch) > 0 {
 		if err := s.processReleaseBatchWithTracks(ctx, releaseWithTracksBatch, result); err != nil {
-			log.Err("failed to process final release batch with tracks", err, "batchSize", len(releaseWithTracksBatch))
+			log.Err(
+				"failed to process final release batch with tracks",
+				err,
+				"batchSize",
+				len(releaseWithTracksBatch),
+			)
 			return result, err
 		}
 	}
@@ -891,7 +1099,11 @@ func (s *XMLProcessingService) processReleasesFileWithTracksAndLimits(ctx contex
 	return result, nil
 }
 
-func (s *XMLProcessingService) processBatch(ctx context.Context, labels []*models.Label, result *ProcessingResult) error {
+func (s *XMLProcessingService) processBatch(
+	ctx context.Context,
+	labels []*models.Label,
+	result *ProcessingResult,
+) error {
 	inserted, updated, err := s.labelRepo.UpsertBatch(ctx, labels)
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to upsert label batch: %v", err)
@@ -931,7 +1143,12 @@ func (s *XMLProcessingService) convertDiscogsLabel(discogsLabel *imports.Label) 
 	return label
 }
 
-func (s *XMLProcessingService) updateProcessingStatus(ctx context.Context, processingID string, status models.ProcessingStatus, stats *models.ProcessingStats) error {
+func (s *XMLProcessingService) updateProcessingStatus(
+	ctx context.Context,
+	processingID string,
+	status models.ProcessingStatus,
+	stats *models.ProcessingStats,
+) error {
 	return s.transactionService.ExecuteInTransaction(ctx, func(txCtx context.Context) error {
 		processing, err := s.discogsDataProcessingRepo.GetByID(txCtx, processingID)
 		if err != nil {
@@ -948,11 +1165,19 @@ func (s *XMLProcessingService) updateProcessingStatus(ctx context.Context, proce
 	})
 }
 
-func (s *XMLProcessingService) updateProcessingStats(ctx context.Context, processingID string, stats *models.ProcessingStats) error {
+func (s *XMLProcessingService) updateProcessingStats(
+	ctx context.Context,
+	processingID string,
+	stats *models.ProcessingStats,
+) error {
 	return s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, stats)
 }
 
-func (s *XMLProcessingService) ProcessArtistsFile(ctx context.Context, filePath string, processingID string) (*ProcessingResult, error) {
+func (s *XMLProcessingService) ProcessArtistsFile(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+) (*ProcessingResult, error) {
 	log := s.log.Function("ProcessArtistsFile")
 
 	log.Info("Starting artists file processing", "filePath", filePath, "processingID", processingID)
@@ -1036,9 +1261,25 @@ func (s *XMLProcessingService) ProcessArtistsFile(ctx context.Context, filePath 
 					FailedRecords:    result.ErroredRecords,
 				}
 				if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
-					log.Warn("failed to update processing stats", "error", err, "recordCount", recordCount)
+					log.Warn(
+						"failed to update processing stats",
+						"error",
+						err,
+						"recordCount",
+						recordCount,
+					)
 				}
-				log.Info("Processing progress", "processed", recordCount, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords, "errors", result.ErroredRecords)
+				log.Info(
+					"Processing progress",
+					"processed",
+					recordCount,
+					"inserted",
+					result.InsertedRecords,
+					"updated",
+					result.UpdatedRecords,
+					"errors",
+					result.ErroredRecords,
+				)
 			}
 		}
 	}
@@ -1075,7 +1316,11 @@ func (s *XMLProcessingService) ProcessArtistsFile(ctx context.Context, filePath 
 	return result, nil
 }
 
-func (s *XMLProcessingService) processArtistBatch(ctx context.Context, artists []*models.Artist, result *ProcessingResult) error {
+func (s *XMLProcessingService) processArtistBatch(
+	ctx context.Context,
+	artists []*models.Artist,
+	result *ProcessingResult,
+) error {
 	inserted, updated, err := s.artistRepo.UpsertBatch(ctx, artists)
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to upsert artist batch: %v", err)
@@ -1091,7 +1336,10 @@ func (s *XMLProcessingService) processArtistBatch(ctx context.Context, artists [
 	return nil
 }
 
-func (s *XMLProcessingService) convertDiscogsArtist(ctx context.Context, discogsArtist *imports.Artist) *models.Artist {
+func (s *XMLProcessingService) convertDiscogsArtist(
+	ctx context.Context,
+	discogsArtist *imports.Artist,
+) *models.Artist {
 	// Skip artists with invalid data (avoid string ops on invalid data)
 	if discogsArtist.ID == 0 || len(discogsArtist.Name) == 0 {
 		return nil
@@ -1141,7 +1389,10 @@ func (s *XMLProcessingService) convertDiscogsArtist(ctx context.Context, discogs
 	return artist
 }
 
-func (s *XMLProcessingService) convertDiscogsImage(discogsImage *imports.DiscogsImage, imageableID, imageableType string) *models.Image {
+func (s *XMLProcessingService) convertDiscogsImage(
+	discogsImage *imports.DiscogsImage,
+	imageableID, imageableType string,
+) *models.Image {
 	// Skip images with no URI (common in current XML dumps)
 	if len(discogsImage.URI) == 0 {
 		return nil
@@ -1180,7 +1431,11 @@ func (s *XMLProcessingService) convertDiscogsImage(discogsImage *imports.Discogs
 	return image
 }
 
-func (s *XMLProcessingService) ProcessMastersFile(ctx context.Context, filePath string, processingID string) (*ProcessingResult, error) {
+func (s *XMLProcessingService) ProcessMastersFile(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+) (*ProcessingResult, error) {
 	log := s.log.Function("ProcessMastersFile")
 
 	log.Info("Starting masters file processing", "filePath", filePath, "processingID", processingID)
@@ -1269,9 +1524,25 @@ func (s *XMLProcessingService) ProcessMastersFile(ctx context.Context, filePath 
 					FailedRecords:    result.ErroredRecords,
 				}
 				if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
-					log.Warn("failed to update processing stats", "error", err, "recordCount", recordCount)
+					log.Warn(
+						"failed to update processing stats",
+						"error",
+						err,
+						"recordCount",
+						recordCount,
+					)
 				}
-				log.Info("Processing progress", "processed", recordCount, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords, "errors", result.ErroredRecords)
+				log.Info(
+					"Processing progress",
+					"processed",
+					recordCount,
+					"inserted",
+					result.InsertedRecords,
+					"updated",
+					result.UpdatedRecords,
+					"errors",
+					result.ErroredRecords,
+				)
 			}
 		}
 	}
@@ -1308,7 +1579,11 @@ func (s *XMLProcessingService) ProcessMastersFile(ctx context.Context, filePath 
 	return result, nil
 }
 
-func (s *XMLProcessingService) processMasterBatch(ctx context.Context, masters []*models.Master, result *ProcessingResult) error {
+func (s *XMLProcessingService) processMasterBatch(
+	ctx context.Context,
+	masters []*models.Master,
+	result *ProcessingResult,
+) error {
 	inserted, updated, err := s.masterRepo.UpsertBatch(ctx, masters)
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to upsert master batch: %v", err)
@@ -1324,7 +1599,10 @@ func (s *XMLProcessingService) processMasterBatch(ctx context.Context, masters [
 	return nil
 }
 
-func (s *XMLProcessingService) convertDiscogsMaster(ctx context.Context, discogsMaster *imports.Master) *models.Master {
+func (s *XMLProcessingService) convertDiscogsMaster(
+	ctx context.Context,
+	discogsMaster *imports.Master,
+) *models.Master {
 	// Skip masters with invalid data (avoid string ops on invalid data)
 	if discogsMaster.ID == 0 || len(discogsMaster.Title) == 0 {
 		return nil
@@ -1388,10 +1666,20 @@ func (s *XMLProcessingService) convertDiscogsMaster(ctx context.Context, discogs
 	return master
 }
 
-func (s *XMLProcessingService) ProcessReleasesFile(ctx context.Context, filePath string, processingID string) (*ProcessingResult, error) {
+func (s *XMLProcessingService) ProcessReleasesFile(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+) (*ProcessingResult, error) {
 	log := s.log.Function("ProcessReleasesFile")
 
-	log.Info("Starting releases file processing", "filePath", filePath, "processingID", processingID)
+	log.Info(
+		"Starting releases file processing",
+		"filePath",
+		filePath,
+		"processingID",
+		processingID,
+	)
 
 	// Open and decompress the gzipped XML file
 	file, err := os.Open(filePath)
@@ -1434,7 +1722,8 @@ func (s *XMLProcessingService) ProcessReleasesFile(ctx context.Context, filePath
 		}
 
 		// Look for release start elements
-		if startElement, ok := token.(xml.StartElement); ok && startElement.Name.Local == "release" {
+		if startElement, ok := token.(xml.StartElement); ok &&
+			startElement.Name.Local == "release" {
 			var discogsRelease imports.Release
 			if err := decoder.DecodeElement(&discogsRelease, &startElement); err != nil {
 				errorMsg := fmt.Sprintf("Failed to decode release element: %v", err)
@@ -1472,9 +1761,25 @@ func (s *XMLProcessingService) ProcessReleasesFile(ctx context.Context, filePath
 					FailedRecords:     result.ErroredRecords,
 				}
 				if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
-					log.Warn("failed to update processing stats", "error", err, "recordCount", recordCount)
+					log.Warn(
+						"failed to update processing stats",
+						"error",
+						err,
+						"recordCount",
+						recordCount,
+					)
 				}
-				log.Info("Processing progress", "processed", recordCount, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords, "errors", result.ErroredRecords)
+				log.Info(
+					"Processing progress",
+					"processed",
+					recordCount,
+					"inserted",
+					result.InsertedRecords,
+					"updated",
+					result.UpdatedRecords,
+					"errors",
+					result.ErroredRecords,
+				)
 			}
 		}
 	}
@@ -1511,7 +1816,11 @@ func (s *XMLProcessingService) ProcessReleasesFile(ctx context.Context, filePath
 	return result, nil
 }
 
-func (s *XMLProcessingService) processReleaseBatch(ctx context.Context, releases []*models.Release, result *ProcessingResult) error {
+func (s *XMLProcessingService) processReleaseBatch(
+	ctx context.Context,
+	releases []*models.Release,
+	result *ProcessingResult,
+) error {
 	inserted, updated, err := s.releaseRepo.UpsertBatch(ctx, releases)
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to upsert release batch: %v", err)
@@ -1527,7 +1836,10 @@ func (s *XMLProcessingService) processReleaseBatch(ctx context.Context, releases
 	return nil
 }
 
-func (s *XMLProcessingService) convertDiscogsRelease(ctx context.Context, discogsRelease *imports.Release) *models.Release {
+func (s *XMLProcessingService) convertDiscogsRelease(
+	ctx context.Context,
+	discogsRelease *imports.Release,
+) *models.Release {
 	// Skip releases with invalid data (avoid string ops on invalid data)
 	if discogsRelease.ID == 0 || len(discogsRelease.Title) == 0 {
 		return nil
@@ -1557,7 +1869,8 @@ func (s *XMLProcessingService) convertDiscogsRelease(ctx context.Context, discog
 		yearStr := discogsRelease.Released[:4]
 		if len(yearStr) == 4 {
 			var year int
-			if _, err := fmt.Sscanf(yearStr, "%d", &year); err == nil && year > 1800 && year < 3000 {
+			if _, err := fmt.Sscanf(yearStr, "%d", &year); err == nil && year > 1800 &&
+				year < 3000 {
 				release.Year = &year
 			}
 		}
@@ -1613,9 +1926,19 @@ func (s *XMLProcessingService) convertDiscogsRelease(ctx context.Context, discog
 }
 
 // ProcessReleasesFileWithTracks processes releases file including track data
-func (s *XMLProcessingService) ProcessReleasesFileWithTracks(ctx context.Context, filePath string, processingID string) (*ProcessingResult, error) {
+func (s *XMLProcessingService) ProcessReleasesFileWithTracks(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+) (*ProcessingResult, error) {
 	log := s.log.Function("ProcessReleasesFileWithTracks")
-	log.Info("Starting releases file processing with tracks", "filePath", filePath, "processingID", processingID)
+	log.Info(
+		"Starting releases file processing with tracks",
+		"filePath",
+		filePath,
+		"processingID",
+		processingID,
+	)
 
 	// Open and decompress the gzipped XML file
 	file, err := os.Open(filePath)
@@ -1658,7 +1981,8 @@ func (s *XMLProcessingService) ProcessReleasesFileWithTracks(ctx context.Context
 		}
 
 		// Look for release start elements
-		if startElement, ok := token.(xml.StartElement); ok && startElement.Name.Local == "release" {
+		if startElement, ok := token.(xml.StartElement); ok &&
+			startElement.Name.Local == "release" {
 			var discogsRelease imports.Release
 			if err := decoder.DecodeElement(&discogsRelease, &startElement); err != nil {
 				errorMsg := fmt.Sprintf("Failed to decode release element: %v", err)
@@ -1688,7 +2012,12 @@ func (s *XMLProcessingService) ProcessReleasesFileWithTracks(ctx context.Context
 			// Process batch when it reaches the limit
 			if len(releaseWithTracksBatch) >= XML_BATCH_SIZE {
 				if err := s.processReleaseBatchWithTracks(ctx, releaseWithTracksBatch, result); err != nil {
-					log.Err("failed to process release batch with tracks", err, "batchSize", len(releaseWithTracksBatch))
+					log.Err(
+						"failed to process release batch with tracks",
+						err,
+						"batchSize",
+						len(releaseWithTracksBatch),
+					)
 					return result, err
 				}
 				releaseWithTracksBatch = releaseWithTracksBatch[:0] // Reset batch
@@ -1702,9 +2031,25 @@ func (s *XMLProcessingService) ProcessReleasesFileWithTracks(ctx context.Context
 					FailedRecords:     result.ErroredRecords,
 				}
 				if err := s.updateProcessingStats(ctx, processingID, stats); err != nil {
-					log.Warn("failed to update processing stats", "error", err, "recordCount", recordCount)
+					log.Warn(
+						"failed to update processing stats",
+						"error",
+						err,
+						"recordCount",
+						recordCount,
+					)
 				}
-				log.Info("Processing progress", "processed", recordCount, "inserted", result.InsertedRecords, "updated", result.UpdatedRecords, "errors", result.ErroredRecords)
+				log.Info(
+					"Processing progress",
+					"processed",
+					recordCount,
+					"inserted",
+					result.InsertedRecords,
+					"updated",
+					result.UpdatedRecords,
+					"errors",
+					result.ErroredRecords,
+				)
 			}
 		}
 	}
@@ -1712,7 +2057,12 @@ func (s *XMLProcessingService) ProcessReleasesFileWithTracks(ctx context.Context
 	// Process remaining batch
 	if len(releaseWithTracksBatch) > 0 {
 		if err := s.processReleaseBatchWithTracks(ctx, releaseWithTracksBatch, result); err != nil {
-			log.Err("failed to process final release batch with tracks", err, "batchSize", len(releaseWithTracksBatch))
+			log.Err(
+				"failed to process final release batch with tracks",
+				err,
+				"batchSize",
+				len(releaseWithTracksBatch),
+			)
 			return result, err
 		}
 	}
@@ -1768,7 +2118,11 @@ func (s *XMLProcessingService) findOrCreateGenre(ctx context.Context, name strin
 }
 
 // findOrCreateArtist finds an existing artist by Discogs ID or creates a new one (with caching)
-func (s *XMLProcessingService) findOrCreateArtist(ctx context.Context, discogsID int64, name string) *models.Artist {
+func (s *XMLProcessingService) findOrCreateArtist(
+	ctx context.Context,
+	discogsID int64,
+	name string,
+) *models.Artist {
 	if discogsID == 0 || name == "" {
 		return nil
 	}
@@ -1786,7 +2140,15 @@ func (s *XMLProcessingService) findOrCreateArtist(ctx context.Context, discogsID
 	// Use the artist repository to find or create the artist
 	artist, err := s.artistRepo.FindOrCreateByDiscogsID(ctx, discogsID, trimmedName)
 	if err != nil {
-		s.log.Warn("Failed to find or create artist", "discogsID", discogsID, "name", trimmedName, "error", err)
+		s.log.Warn(
+			"Failed to find or create artist",
+			"discogsID",
+			discogsID,
+			"name",
+			trimmedName,
+			"error",
+			err,
+		)
 		return nil
 	}
 
@@ -1812,3 +2174,4 @@ func (s *XMLProcessingService) preloadEntityCaches(ctx context.Context) error {
 	log.Info("Preloaded entity caches", "genres", len(genres))
 	return nil
 }
+

@@ -2,10 +2,10 @@ package repositories
 
 import (
 	"context"
+	contextUtil "waugzee/internal/context"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
-	contextutil "waugzee/internal/context"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -19,7 +19,12 @@ type DiscogsDataProcessingRepository interface {
 	Delete(ctx context.Context, id string) error
 	GetByStatus(ctx context.Context, status ProcessingStatus) ([]*DiscogsDataProcessing, error)
 	GetCurrentProcessing(ctx context.Context) (*DiscogsDataProcessing, error)
-	UpdateStatus(ctx context.Context, id string, status ProcessingStatus, errorMessage *string) error
+	UpdateStatus(
+		ctx context.Context,
+		id string,
+		status ProcessingStatus,
+		errorMessage *string,
+	) error
 }
 
 type discogsDataProcessingRepository struct {
@@ -35,13 +40,16 @@ func NewDiscogsDataProcessingRepository(db database.DB) DiscogsDataProcessingRep
 }
 
 func (r *discogsDataProcessingRepository) getDB(ctx context.Context) *gorm.DB {
-	if tx, ok := contextutil.GetTransaction(ctx); ok {
+	if tx, ok := contextUtil.GetTransaction(ctx); ok {
 		return tx
 	}
 	return r.db.SQLWithContext(ctx)
 }
 
-func (r *discogsDataProcessingRepository) GetByYearMonth(ctx context.Context, yearMonth string) (*DiscogsDataProcessing, error) {
+func (r *discogsDataProcessingRepository) GetByYearMonth(
+	ctx context.Context,
+	yearMonth string,
+) (*DiscogsDataProcessing, error) {
 	log := r.log.Function("GetByYearMonth")
 
 	var processing DiscogsDataProcessing
@@ -52,7 +60,10 @@ func (r *discogsDataProcessingRepository) GetByYearMonth(ctx context.Context, ye
 	return &processing, nil
 }
 
-func (r *discogsDataProcessingRepository) GetByID(ctx context.Context, id string) (*DiscogsDataProcessing, error) {
+func (r *discogsDataProcessingRepository) GetByID(
+	ctx context.Context,
+	id string,
+) (*DiscogsDataProcessing, error) {
 	log := r.log.Function("GetByID")
 
 	parsedID, err := uuid.Parse(id)
@@ -68,7 +79,10 @@ func (r *discogsDataProcessingRepository) GetByID(ctx context.Context, id string
 	return &processing, nil
 }
 
-func (r *discogsDataProcessingRepository) Create(ctx context.Context, processing *DiscogsDataProcessing) (*DiscogsDataProcessing, error) {
+func (r *discogsDataProcessingRepository) Create(
+	ctx context.Context,
+	processing *DiscogsDataProcessing,
+) (*DiscogsDataProcessing, error) {
 	log := r.log.Function("Create")
 
 	if err := r.getDB(ctx).Create(processing).Error; err != nil {
@@ -78,7 +92,10 @@ func (r *discogsDataProcessingRepository) Create(ctx context.Context, processing
 	return processing, nil
 }
 
-func (r *discogsDataProcessingRepository) Update(ctx context.Context, processing *DiscogsDataProcessing) error {
+func (r *discogsDataProcessingRepository) Update(
+	ctx context.Context,
+	processing *DiscogsDataProcessing,
+) error {
 	log := r.log.Function("Update")
 
 	if err := r.getDB(ctx).Save(processing).Error; err != nil {
@@ -103,18 +120,25 @@ func (r *discogsDataProcessingRepository) Delete(ctx context.Context, id string)
 	return nil
 }
 
-func (r *discogsDataProcessingRepository) GetByStatus(ctx context.Context, status ProcessingStatus) ([]*DiscogsDataProcessing, error) {
+func (r *discogsDataProcessingRepository) GetByStatus(
+	ctx context.Context,
+	status ProcessingStatus,
+) ([]*DiscogsDataProcessing, error) {
 	log := r.log.Function("GetByStatus")
 
-	var processings []*DiscogsDataProcessing
-	if err := r.getDB(ctx).Find(&processings, "status = ?", status).Error; err != nil {
+	var processing []*DiscogsDataProcessing
+	// Claude we should be using the structs when possible, note the implementation below. This should be our standard
+	if err := r.getDB(ctx).Find(&processing, &DiscogsDataProcessing{Status: status}).Error; err != nil {
+		// if err := r.getDB(ctx).Find(&processing, "status = ?", status).Error; err != nil {
 		return nil, log.Err("failed to get processing by status", err, "status", status)
 	}
 
-	return processings, nil
+	return processing, nil
 }
 
-func (r *discogsDataProcessingRepository) GetCurrentProcessing(ctx context.Context) (*DiscogsDataProcessing, error) {
+func (r *discogsDataProcessingRepository) GetCurrentProcessing(
+	ctx context.Context,
+) (*DiscogsDataProcessing, error) {
 	log := r.log.Function("GetCurrentProcessing")
 
 	var processing DiscogsDataProcessing
@@ -132,7 +156,13 @@ func (r *discogsDataProcessingRepository) GetCurrentProcessing(ctx context.Conte
 	return &processing, nil
 }
 
-func (r *discogsDataProcessingRepository) UpdateStatus(ctx context.Context, id string, status ProcessingStatus, errorMessage *string) error {
+// Claude is this even used? I have found multiple versions of the same thing
+func (r *discogsDataProcessingRepository) UpdateStatus(
+	ctx context.Context,
+	id string,
+	status ProcessingStatus,
+	errorMessage *string,
+) error {
 	log := r.log.Function("UpdateStatus")
 
 	parsedID, err := uuid.Parse(id)
@@ -154,3 +184,4 @@ func (r *discogsDataProcessingRepository) UpdateStatus(ctx context.Context, id s
 
 	return nil
 }
+

@@ -12,7 +12,6 @@ import (
 	"waugzee/internal/services"
 	"waugzee/internal/websockets"
 
-	adminController "waugzee/internal/controllers/admin"
 	authController "waugzee/internal/controllers/auth"
 	userController "waugzee/internal/controllers/users"
 )
@@ -44,9 +43,8 @@ type App struct {
 	GenreRepo                 repositories.GenreRepository
 
 	// Controllers
-	AdminController *adminController.AdminController
-	AuthController  authController.AuthControllerInterface
-	UserController  *userController.UserController
+	AuthController authController.AuthControllerInterface
+	UserController *userController.UserController
 }
 
 func New() (*App, error) {
@@ -106,12 +104,6 @@ func New() (*App, error) {
 	middleware := middleware.New(db, eventBus, config, userRepo)
 	authController := authController.New(zitadelService, userRepo, db)
 	userController := userController.New(userRepo, discogsService, config)
-	adminController := adminController.New(
-		discogsParserService,
-		xmlProcessingService,
-		discogsDataProcessingRepo,
-		transactionService,
-	)
 
 	// Register jobs with scheduler if enabled
 	if config.SchedulerEnabled {
@@ -158,9 +150,8 @@ func New() (*App, error) {
 		ReleaseRepo:               releaseRepo,
 		TrackRepo:                 trackRepo,
 		GenreRepo:                 genreRepo,
-		AdminController:           adminController,
-		AuthController:            authController,
-		UserController:            userController,
+		AuthController: authController,
+		UserController: userController,
 		Websocket:                 websocket,
 		EventBus:                  eventBus,
 	}
@@ -192,7 +183,6 @@ func (a *App) validate() error {
 		a.DownloadService,
 		a.SchedulerService,
 		a.XMLProcessingService,
-		a.AdminController,
 		a.AuthController,
 		a.UserController,
 		a.Middleware,

@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -50,6 +51,9 @@ func (j *DiscogsProcessingJob) Execute(ctx context.Context) error {
 		return log.Err("failed to find records ready for processing", err)
 	}
 
+	slog.Info("Found records ready for processing", "count", len(readyRecords), "ids", readyRecords)
+
+	return nil
 	// Step 2: Find processing records that can be resumed or need reset
 	resumableRecords, err := j.findAndHandleProcessingRecords(ctx)
 	if err != nil {
@@ -96,15 +100,19 @@ func (j *DiscogsProcessingJob) findAndHandleProcessingRecords(
 ) ([]*models.DiscogsDataProcessing, error) {
 	log := j.log.Function("findAndHandleProcessingRecords")
 
+	// // Step 1: Find records ready for processing
+	// readyRecords, err := j.repo.GetByStatus(ctx, models.ProcessingStatusReadyForProcessing)
 	// Find records in processing status
 	processingRecords, err := j.repo.GetByStatus(ctx, models.ProcessingStatusProcessing)
 	if err != nil {
 		return nil, log.Err("failed to find processing records", err)
 	}
 
+	// Claude Why do we care about this? The schedule only runs once a day, we know its been a day
 	var handledRecords []*models.DiscogsDataProcessing
 	oneDayAgo := time.Now().UTC().Add(-24 * time.Hour)
 
+	// Claude Why don't we just rerun?
 	for _, record := range processingRecords {
 		if record.StartedAt == nil {
 			continue // Skip records without start time
@@ -234,6 +242,7 @@ func (j *DiscogsProcessingJob) processRecord(
 	log.Info("Starting processing for record", "yearMonth", yearMonth, "id", record.ID)
 
 	// Use atomic transaction for status updates only
+	// Claude we are creating unnecessary transactions and DB pressure, just update the record
 	err := j.transaction.Execute(ctx, func(txCtx context.Context) error {
 		// Transition to processing status
 		if err := record.UpdateStatus(models.ProcessingStatusProcessing); err != nil {
@@ -263,6 +272,7 @@ func (j *DiscogsProcessingJob) processRecord(
 	// Perform the actual processing (outside of transaction)
 	if err := j.performProcessing(ctx, record, yearMonth); err != nil {
 		// Use atomic transaction for error handling
+		// Claude we do not need to transactions for anything here
 		updateErr := j.transaction.Execute(ctx, func(txCtx context.Context) error {
 			errorMsg := err.Error()
 			record.ErrorMessage = &errorMsg
@@ -322,9 +332,9 @@ func (j *DiscogsProcessingJob) processAllXMLFiles(
 		method func(context.Context, string, string) (*services.ProcessingResult, error)
 	}{
 		{"labels", j.xmlProcessing.ProcessLabelsFile},
-		{"artists", j.xmlProcessing.ProcessArtistsFile},
-		{"masters", j.xmlProcessing.ProcessMastersFile},
-		{"releases", j.xmlProcessing.ProcessReleasesFile},
+		// {"artists", j.xmlProcessing.ProcessArtistsFile},
+		// {"masters", j.xmlProcessing.ProcessMastersFile},
+		// {"releases", j.xmlProcessing.ProcessReleasesFile},
 	}
 
 	var totalProcessed int

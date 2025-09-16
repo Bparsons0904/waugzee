@@ -11,7 +11,6 @@ const OidcCallbackPage = lazy(() => import("@pages/Auth/OidcCallback"));
 const SilentCallbackPage = lazy(() => import("@pages/Auth/SilentCallback"));
 const ProfilePage = lazy(() => import("@pages/Profile/Profile"));
 const DashboardPage = lazy(() => import("@pages/Dashboard/Dashboard"));
-const AdminPage = lazy(() => import("@pages/Admin/Admin"));
 // const WorkstationComponent = lazy(() => import("@pages/Workstation/Workstation"));
 // const LoadTestPage = lazy(() => import("@pages/LoadTest/LoadTest"));
 
@@ -52,10 +51,6 @@ export const Routes: Component = () => {
       <Route
         path={FRONTEND_ROUTES.PROFILE}
         component={ProtectedRoute(ProfilePage)}
-      />
-      <Route
-        path={FRONTEND_ROUTES.ADMIN}
-        component={ProtectedRoute(AdminPage)}
       />
       {/* <Route path="/workstation" component={ProtectedRoute(WorkstationPage)} /> */}
       {/* <Route path="/loadtest" component={ProtectedRoute(LoadTestPage)} /> */}
