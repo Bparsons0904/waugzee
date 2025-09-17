@@ -59,8 +59,14 @@ type GenreBuffer struct {
 }
 
 type TrackBuffer struct {
-	Channel  chan *imports.Track
+	Channel  chan *ContextualTrack
 	Capacity int
+}
+
+// ContextualTrack wraps a track with its release context
+type ContextualTrack struct {
+	*imports.Track
+	ReleaseDiscogsID int64 // The release this track belongs to
 }
 
 type ArtistBuffer struct {
@@ -83,15 +89,62 @@ type ReleaseBuffer struct {
 	Capacity int
 }
 
+// Association buffer structures for many-to-many relationships
+type ReleaseArtistAssociationBuffer struct {
+	Channel  chan *ReleaseArtistAssociation
+	Capacity int
+}
+
+type ReleaseGenreAssociationBuffer struct {
+	Channel  chan *ReleaseGenreAssociation
+	Capacity int
+}
+
+type MasterArtistAssociationBuffer struct {
+	Channel  chan *MasterArtistAssociation
+	Capacity int
+}
+
+type MasterGenreAssociationBuffer struct {
+	Channel  chan *MasterGenreAssociation
+	Capacity int
+}
+
+// Association data structures for bulk operations
+type ReleaseArtistAssociation struct {
+	ReleaseDiscogsID int64
+	ArtistDiscogsID  int64
+}
+
+type ReleaseGenreAssociation struct {
+	ReleaseDiscogsID int64
+	GenreName        string
+}
+
+type MasterArtistAssociation struct {
+	MasterDiscogsID int64
+	ArtistDiscogsID int64
+}
+
+type MasterGenreAssociation struct {
+	MasterDiscogsID int64
+	GenreName       string
+}
+
 // ProcessingBuffers contains all the buffered channels for related entity processing
 type ProcessingBuffers struct {
-	Images   *ImageBuffer
-	Genres   *GenreBuffer
-	Tracks   *TrackBuffer
-	Artists  *ArtistBuffer
-	Labels   *LabelBuffer
-	Masters  *MasterBuffer
-	Releases *ReleaseBuffer
+	Images              *ImageBuffer
+	Genres              *GenreBuffer
+	Tracks              *TrackBuffer
+	Artists             *ArtistBuffer
+	Labels              *LabelBuffer
+	Masters             *MasterBuffer
+	Releases            *ReleaseBuffer
+	// Association buffers
+	ReleaseArtists      *ReleaseArtistAssociationBuffer
+	ReleaseGenres       *ReleaseGenreAssociationBuffer
+	MasterArtists       *MasterArtistAssociationBuffer
+	MasterGenres        *MasterGenreAssociationBuffer
 }
 
 type SimplifiedXMLProcessingService struct {
@@ -162,7 +215,7 @@ func (s *SimplifiedXMLProcessingService) createProcessingBuffers() *ProcessingBu
 			Capacity: 5000,
 		},
 		Tracks: &TrackBuffer{
-			Channel:  make(chan *imports.Track, 5000),
+			Channel:  make(chan *ContextualTrack, 5000),
 			Capacity: 5000,
 		},
 		Artists: &ArtistBuffer{
@@ -181,6 +234,23 @@ func (s *SimplifiedXMLProcessingService) createProcessingBuffers() *ProcessingBu
 			Channel:  make(chan *models.Release, 5000),
 			Capacity: 5000,
 		},
+		// Association buffers
+		ReleaseArtists: &ReleaseArtistAssociationBuffer{
+			Channel:  make(chan *ReleaseArtistAssociation, 5000),
+			Capacity: 5000,
+		},
+		ReleaseGenres: &ReleaseGenreAssociationBuffer{
+			Channel:  make(chan *ReleaseGenreAssociation, 5000),
+			Capacity: 5000,
+		},
+		MasterArtists: &MasterArtistAssociationBuffer{
+			Channel:  make(chan *MasterArtistAssociation, 5000),
+			Capacity: 5000,
+		},
+		MasterGenres: &MasterGenreAssociationBuffer{
+			Channel:  make(chan *MasterGenreAssociation, 5000),
+			Capacity: 5000,
+		},
 	}
 }
 
@@ -193,6 +263,11 @@ func (s *SimplifiedXMLProcessingService) closeProcessingBuffers(buffers *Process
 	close(buffers.Labels.Channel)
 	close(buffers.Masters.Channel)
 	close(buffers.Releases.Channel)
+	// Close association buffers
+	close(buffers.ReleaseArtists.Channel)
+	close(buffers.ReleaseGenres.Channel)
+	close(buffers.MasterArtists.Channel)
+	close(buffers.MasterGenres.Channel)
 	s.log.Info("All processing buffer channels closed")
 }
 
@@ -245,7 +320,7 @@ func (s *SimplifiedXMLProcessingService) processArtist(rawArtist *imports.Artist
 	return nil
 }
 
-// processMaster extracts Master data + Images[] + Genres[] and sends to appropriate buffers
+// processMaster extracts Master data + Images[] + Genres[] + Artists[] and sends to appropriate buffers
 func (s *SimplifiedXMLProcessingService) processMaster(rawMaster *imports.Master, processingID string, buffers *ProcessingBuffers) error {
 	if rawMaster == nil || rawMaster.ID <= 0 {
 		return s.log.Err("invalid master data", nil, "processingID", processingID)
@@ -256,6 +331,7 @@ func (s *SimplifiedXMLProcessingService) processMaster(rawMaster *imports.Master
 		"title", rawMaster.Title,
 		"imageCount", len(rawMaster.Images),
 		"genreCount", len(rawMaster.Genres),
+		"artistCount", len(rawMaster.Artists),
 		"processingID", processingID)
 
 	// Extract and send Images to image buffer with context
@@ -272,6 +348,34 @@ func (s *SimplifiedXMLProcessingService) processMaster(rawMaster *imports.Master
 	for _, genre := range rawMaster.Genres {
 		if genre != "" {
 			buffers.Genres.Channel <- genre
+		}
+	}
+
+	// Extract and send Artists to artist buffer
+	for i := range rawMaster.Artists {
+		artist := &rawMaster.Artists[i]
+		buffers.Artists.Channel <- artist
+	}
+
+	// Extract and send Master-Genre associations
+	for _, genre := range rawMaster.Genres {
+		if genre != "" {
+			association := &MasterGenreAssociation{
+				MasterDiscogsID: int64(rawMaster.ID),
+				GenreName:       genre,
+			}
+			buffers.MasterGenres.Channel <- association
+		}
+	}
+
+	// Extract and send Master-Artist associations
+	for _, artist := range rawMaster.Artists {
+		if artist.ID > 0 {
+			association := &MasterArtistAssociation{
+				MasterDiscogsID: int64(rawMaster.ID),
+				ArtistDiscogsID: int64(artist.ID),
+			}
+			buffers.MasterArtists.Channel <- association
 		}
 	}
 
@@ -305,10 +409,14 @@ func (s *SimplifiedXMLProcessingService) processRelease(rawRelease *imports.Rele
 		buffers.Artists.Channel <- artist
 	}
 
-	// Extract and send TrackList to track buffer
+	// Extract and send TrackList to track buffer with release context
 	for i := range rawRelease.TrackList {
 		track := &rawRelease.TrackList[i]
-		buffers.Tracks.Channel <- track
+		contextualTrack := &ContextualTrack{
+			Track:            track,
+			ReleaseDiscogsID: int64(rawRelease.ID),
+		}
+		buffers.Tracks.Channel <- contextualTrack
 	}
 
 	// Extract and send Genres to genre buffer
@@ -326,6 +434,28 @@ func (s *SimplifiedXMLProcessingService) processRelease(rawRelease *imports.Rele
 			ImageableType: models.ImageableTypeRelease,
 		}
 		buffers.Images.Channel <- contextualImage
+	}
+
+	// Extract and send Release-Genre associations
+	for _, genre := range rawRelease.Genres {
+		if genre != "" {
+			association := &ReleaseGenreAssociation{
+				ReleaseDiscogsID: int64(rawRelease.ID),
+				GenreName:        genre,
+			}
+			buffers.ReleaseGenres.Channel <- association
+		}
+	}
+
+	// Extract and send Release-Artist associations
+	for _, artist := range rawRelease.Artists {
+		if artist.ID > 0 {
+			association := &ReleaseArtistAssociation{
+				ReleaseDiscogsID: int64(rawRelease.ID),
+				ArtistDiscogsID:  int64(artist.ID),
+			}
+			buffers.ReleaseArtists.Channel <- association
+		}
 	}
 
 	// Convert to model and send to release buffer
@@ -434,12 +564,12 @@ func (s *SimplifiedXMLProcessingService) processGenreBuffer(ctx context.Context,
 	}
 }
 
-// processTrackBuffer consumes tracks from the buffer, deduplicates them by composite key (title + position), and executes batch creates when 5000 unique items are collected
+// processTrackBuffer consumes tracks from the buffer, deduplicates them by composite key (title + position + releaseID), and executes batch creates when 5000 unique items are collected
 func (s *SimplifiedXMLProcessingService) processTrackBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
 	defer wg.Done()
 	log := s.log.Function("processTrackBuffer")
 
-	// Use map for deduplication using composite key (title + position)
+	// Use map for deduplication using composite key (title + position + releaseID)
 	dedupeMap := make(map[trackKey]*models.Track)
 	totalProcessed := 0
 
@@ -452,7 +582,7 @@ func (s *SimplifiedXMLProcessingService) processTrackBuffer(ctx context.Context,
 			}
 			return
 
-		case discogsTrack, ok := <-buffers.Tracks.Channel:
+		case contextualTrack, ok := <-buffers.Tracks.Channel:
 			if !ok {
 				// Channel closed, process remaining batch
 				if len(dedupeMap) > 0 {
@@ -463,9 +593,9 @@ func (s *SimplifiedXMLProcessingService) processTrackBuffer(ctx context.Context,
 				return
 			}
 
-			// Convert Discogs Track to Track model
-			if modelTrack := s.convertDiscogsTrackToModel(discogsTrack); modelTrack != nil {
-				// Deduplicate using composite key
+			// Convert Contextual Track to Track model
+			if modelTrack := s.convertContextualTrackToModel(contextualTrack); modelTrack != nil {
+				// Deduplicate using composite key (title + position + releaseID for uniqueness)
 				key := trackKey{
 					title:    modelTrack.Title,
 					position: modelTrack.Position,
@@ -943,7 +1073,7 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 	var wg sync.WaitGroup
 	processingID := "simplified_processing" // Generate or pass actual processing ID
 
-	wg.Add(7) // Add for each buffer processor
+	wg.Add(11) // Add for each buffer processor (7 original + 4 association processors)
 	go s.processImageBuffer(ctx, buffers, &wg, processingID)
 	go s.processGenreBuffer(ctx, buffers, &wg, processingID)
 	go s.processTrackBuffer(ctx, buffers, &wg, processingID)
@@ -951,6 +1081,11 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 	go s.processLabelBuffer(ctx, buffers, &wg, processingID)
 	go s.processMasterBuffer(ctx, buffers, &wg, processingID)
 	go s.processReleaseBuffer(ctx, buffers, &wg, processingID)
+	// Association buffer processors
+	go s.processReleaseArtistAssociationBuffer(ctx, buffers, &wg, processingID)
+	go s.processReleaseGenreAssociationBuffer(ctx, buffers, &wg, processingID)
+	go s.processMasterArtistAssociationBuffer(ctx, buffers, &wg, processingID)
+	go s.processMasterGenreAssociationBuffer(ctx, buffers, &wg, processingID)
 
 	// Start parser in goroutine
 	parseOptions := ParseOptions{
@@ -1085,13 +1220,21 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 		"labelsInBuffer", len(buffers.Labels.Channel),
 		"mastersInBuffer", len(buffers.Masters.Channel),
 		"releasesInBuffer", len(buffers.Releases.Channel),
+		"releaseArtistsInBuffer", len(buffers.ReleaseArtists.Channel),
+		"releaseGenresInBuffer", len(buffers.ReleaseGenres.Channel),
+		"masterArtistsInBuffer", len(buffers.MasterArtists.Channel),
+		"masterGenresInBuffer", len(buffers.MasterGenres.Channel),
 		"imageBufferCapacity", buffers.Images.Capacity,
 		"genreBufferCapacity", buffers.Genres.Capacity,
 		"trackBufferCapacity", buffers.Tracks.Capacity,
 		"artistBufferCapacity", buffers.Artists.Capacity,
 		"labelBufferCapacity", buffers.Labels.Capacity,
 		"masterBufferCapacity", buffers.Masters.Capacity,
-		"releaseBufferCapacity", buffers.Releases.Capacity)
+		"releaseBufferCapacity", buffers.Releases.Capacity,
+		"releaseArtistBufferCapacity", buffers.ReleaseArtists.Capacity,
+		"releaseGenreBufferCapacity", buffers.ReleaseGenres.Capacity,
+		"masterArtistBufferCapacity", buffers.MasterArtists.Capacity,
+		"masterGenreBufferCapacity", buffers.MasterGenres.Capacity)
 
 	// Close buffers to signal completion and wait for all buffer processors to finish
 	s.closeProcessingBuffers(buffers)
@@ -1408,10 +1551,43 @@ func (s *SimplifiedXMLProcessingService) convertDiscogsTrackToModel(discogsTrack
 		return nil
 	}
 
-	// TODO: Tracks require ReleaseID to be valid, but we don't have release association implemented yet
-	// For now, skip track processing to avoid GORM validation errors
-	// This will be fixed when we implement proper release-track relationships
+	// TODO: This method is deprecated in favor of convertContextualTrackToModel
+	// which properly handles release association context
 	return nil
+}
+
+func (s *SimplifiedXMLProcessingService) convertContextualTrackToModel(contextualTrack *ContextualTrack) *models.Track {
+	if contextualTrack == nil || contextualTrack.Track == nil {
+		return nil
+	}
+
+	discogsTrack := contextualTrack.Track
+
+	// Validate required fields - skip tracks without required data
+	if discogsTrack.Title == "" || discogsTrack.Position == "" {
+		return nil
+	}
+
+	// Validate release context
+	if contextualTrack.ReleaseDiscogsID <= 0 {
+		return nil
+	}
+
+	track := &models.Track{
+		ReleaseID: contextualTrack.ReleaseDiscogsID,
+		Position:  discogsTrack.Position,
+		Title:     discogsTrack.Title,
+	}
+
+	// Parse duration if available
+	if discogsTrack.Duration != "" {
+		duration := s.parseDurationToSeconds(discogsTrack.Duration)
+		if duration > 0 {
+			track.Duration = &duration
+		}
+	}
+
+	return track
 }
 
 func (s *SimplifiedXMLProcessingService) convertDiscogsArtistToModel(discogsArtist *imports.Artist) *models.Artist {
@@ -1472,5 +1648,321 @@ func (s *SimplifiedXMLProcessingService) parseDurationToSeconds(duration string)
 	}
 
 	return totalSeconds
+}
+
+// Association buffer processors following the existing buffer pattern
+
+// processReleaseArtistAssociationBuffer processes release-artist associations in batches
+func (s *SimplifiedXMLProcessingService) processReleaseArtistAssociationBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+	defer wg.Done()
+	log := s.log.Function("processReleaseArtistAssociationBuffer")
+
+	// Group associations by release and artist for bulk operations
+	releaseArtistMap := make(map[int64][]int64) // releaseID -> []artistIDs
+	totalProcessed := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled, process remaining associations if any
+			if len(releaseArtistMap) > 0 {
+				s.processPendingReleaseArtistAssociations(ctx, releaseArtistMap, processingID)
+			}
+			return
+
+		case association, ok := <-buffers.ReleaseArtists.Channel:
+			if !ok {
+				// Channel closed, process remaining associations
+				if len(releaseArtistMap) > 0 {
+					s.processPendingReleaseArtistAssociations(ctx, releaseArtistMap, processingID)
+					totalProcessed += len(releaseArtistMap)
+				}
+				log.Info("Release-artist association buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				return
+			}
+
+			if association != nil {
+				// Group by release for efficient processing
+				if releaseArtistMap[association.ReleaseDiscogsID] == nil {
+					releaseArtistMap[association.ReleaseDiscogsID] = make([]int64, 0)
+				}
+				releaseArtistMap[association.ReleaseDiscogsID] = append(releaseArtistMap[association.ReleaseDiscogsID], association.ArtistDiscogsID)
+
+				// Process batch when we reach threshold
+				if len(releaseArtistMap) >= 1000 { // Smaller threshold for associations
+					s.processPendingReleaseArtistAssociations(ctx, releaseArtistMap, processingID)
+					totalProcessed += len(releaseArtistMap)
+					releaseArtistMap = make(map[int64][]int64) // Reset map
+				}
+			}
+		}
+	}
+}
+
+// processReleaseGenreAssociationBuffer processes release-genre associations in batches
+func (s *SimplifiedXMLProcessingService) processReleaseGenreAssociationBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+	defer wg.Done()
+	log := s.log.Function("processReleaseGenreAssociationBuffer")
+
+	// Group associations by release and genre for bulk operations
+	releaseGenreMap := make(map[int64][]string) // releaseID -> []genreNames
+	totalProcessed := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled, process remaining associations if any
+			if len(releaseGenreMap) > 0 {
+				s.processPendingReleaseGenreAssociations(ctx, releaseGenreMap, processingID)
+			}
+			return
+
+		case association, ok := <-buffers.ReleaseGenres.Channel:
+			if !ok {
+				// Channel closed, process remaining associations
+				if len(releaseGenreMap) > 0 {
+					s.processPendingReleaseGenreAssociations(ctx, releaseGenreMap, processingID)
+					totalProcessed += len(releaseGenreMap)
+				}
+				log.Info("Release-genre association buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				return
+			}
+
+			if association != nil {
+				// Group by release for efficient processing
+				if releaseGenreMap[association.ReleaseDiscogsID] == nil {
+					releaseGenreMap[association.ReleaseDiscogsID] = make([]string, 0)
+				}
+				releaseGenreMap[association.ReleaseDiscogsID] = append(releaseGenreMap[association.ReleaseDiscogsID], association.GenreName)
+
+				// Process batch when we reach threshold
+				if len(releaseGenreMap) >= 1000 { // Smaller threshold for associations
+					s.processPendingReleaseGenreAssociations(ctx, releaseGenreMap, processingID)
+					totalProcessed += len(releaseGenreMap)
+					releaseGenreMap = make(map[int64][]string) // Reset map
+				}
+			}
+		}
+	}
+}
+
+// processMasterArtistAssociationBuffer processes master-artist associations in batches
+func (s *SimplifiedXMLProcessingService) processMasterArtistAssociationBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+	defer wg.Done()
+	log := s.log.Function("processMasterArtistAssociationBuffer")
+
+	// Group associations by master and artist for bulk operations
+	masterArtistMap := make(map[int64][]int64) // masterID -> []artistIDs
+	totalProcessed := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled, process remaining associations if any
+			if len(masterArtistMap) > 0 {
+				s.processPendingMasterArtistAssociations(ctx, masterArtistMap, processingID)
+			}
+			return
+
+		case association, ok := <-buffers.MasterArtists.Channel:
+			if !ok {
+				// Channel closed, process remaining associations
+				if len(masterArtistMap) > 0 {
+					s.processPendingMasterArtistAssociations(ctx, masterArtistMap, processingID)
+					totalProcessed += len(masterArtistMap)
+				}
+				log.Info("Master-artist association buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				return
+			}
+
+			if association != nil {
+				// Group by master for efficient processing
+				if masterArtistMap[association.MasterDiscogsID] == nil {
+					masterArtistMap[association.MasterDiscogsID] = make([]int64, 0)
+				}
+				masterArtistMap[association.MasterDiscogsID] = append(masterArtistMap[association.MasterDiscogsID], association.ArtistDiscogsID)
+
+				// Process batch when we reach threshold
+				if len(masterArtistMap) >= 1000 { // Smaller threshold for associations
+					s.processPendingMasterArtistAssociations(ctx, masterArtistMap, processingID)
+					totalProcessed += len(masterArtistMap)
+					masterArtistMap = make(map[int64][]int64) // Reset map
+				}
+			}
+		}
+	}
+}
+
+// processMasterGenreAssociationBuffer processes master-genre associations in batches
+func (s *SimplifiedXMLProcessingService) processMasterGenreAssociationBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+	defer wg.Done()
+	log := s.log.Function("processMasterGenreAssociationBuffer")
+
+	// Group associations by master and genre for bulk operations
+	masterGenreMap := make(map[int64][]string) // masterID -> []genreNames
+	totalProcessed := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled, process remaining associations if any
+			if len(masterGenreMap) > 0 {
+				s.processPendingMasterGenreAssociations(ctx, masterGenreMap, processingID)
+			}
+			return
+
+		case association, ok := <-buffers.MasterGenres.Channel:
+			if !ok {
+				// Channel closed, process remaining associations
+				if len(masterGenreMap) > 0 {
+					s.processPendingMasterGenreAssociations(ctx, masterGenreMap, processingID)
+					totalProcessed += len(masterGenreMap)
+				}
+				log.Info("Master-genre association buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				return
+			}
+
+			if association != nil {
+				// Group by master for efficient processing
+				if masterGenreMap[association.MasterDiscogsID] == nil {
+					masterGenreMap[association.MasterDiscogsID] = make([]string, 0)
+				}
+				masterGenreMap[association.MasterDiscogsID] = append(masterGenreMap[association.MasterDiscogsID], association.GenreName)
+
+				// Process batch when we reach threshold
+				if len(masterGenreMap) >= 1000 { // Smaller threshold for associations
+					s.processPendingMasterGenreAssociations(ctx, masterGenreMap, processingID)
+					totalProcessed += len(masterGenreMap)
+					masterGenreMap = make(map[int64][]string) // Reset map
+				}
+			}
+		}
+	}
+}
+
+// Helper methods for processing pending association batches
+
+func (s *SimplifiedXMLProcessingService) processPendingReleaseArtistAssociations(ctx context.Context, releaseArtistMap map[int64][]int64, processingID string) {
+	log := s.log.Function("processPendingReleaseArtistAssociations")
+	if len(releaseArtistMap) == 0 {
+		return
+	}
+
+	// Extract all unique release and artist IDs
+	releaseIDs := make([]int64, 0, len(releaseArtistMap))
+	artistIDSet := make(map[int64]bool)
+
+	for releaseID, artistIDs := range releaseArtistMap {
+		releaseIDs = append(releaseIDs, releaseID)
+		for _, artistID := range artistIDs {
+			artistIDSet[artistID] = true
+		}
+	}
+
+	artistIDs := make([]int64, 0, len(artistIDSet))
+	for artistID := range artistIDSet {
+		artistIDs = append(artistIDs, artistID)
+	}
+
+	// Create associations using repository method
+	if err := s.releaseRepo.CreateReleaseArtistAssociations(ctx, releaseIDs, artistIDs); err != nil {
+		log.Error("Failed to create release-artist associations", "error", err, "releaseCount", len(releaseIDs), "artistCount", len(artistIDs), "processingID", processingID)
+		return
+	}
+
+	log.Info("Processed release-artist associations", "releaseCount", len(releaseIDs), "artistCount", len(artistIDs), "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingReleaseGenreAssociations(ctx context.Context, releaseGenreMap map[int64][]string, processingID string) {
+	log := s.log.Function("processPendingReleaseGenreAssociations")
+	if len(releaseGenreMap) == 0 {
+		return
+	}
+
+	// Extract all unique release IDs and genre names
+	releaseIDs := make([]int64, 0, len(releaseGenreMap))
+	genreNameSet := make(map[string]bool)
+
+	for releaseID, genreNames := range releaseGenreMap {
+		releaseIDs = append(releaseIDs, releaseID)
+		for _, genreName := range genreNames {
+			genreNameSet[genreName] = true
+		}
+	}
+
+	genreNames := make([]string, 0, len(genreNameSet))
+	for genreName := range genreNameSet {
+		genreNames = append(genreNames, genreName)
+	}
+
+	// Create associations using repository method
+	if err := s.releaseRepo.CreateReleaseGenreAssociations(ctx, releaseIDs, genreNames); err != nil {
+		log.Error("Failed to create release-genre associations", "error", err, "releaseCount", len(releaseIDs), "genreCount", len(genreNames), "processingID", processingID)
+		return
+	}
+
+	log.Info("Processed release-genre associations", "releaseCount", len(releaseIDs), "genreCount", len(genreNames), "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingMasterArtistAssociations(ctx context.Context, masterArtistMap map[int64][]int64, processingID string) {
+	log := s.log.Function("processPendingMasterArtistAssociations")
+	if len(masterArtistMap) == 0 {
+		return
+	}
+
+	// Extract all unique master and artist IDs
+	masterIDs := make([]int64, 0, len(masterArtistMap))
+	artistIDSet := make(map[int64]bool)
+
+	for masterID, artistIDs := range masterArtistMap {
+		masterIDs = append(masterIDs, masterID)
+		for _, artistID := range artistIDs {
+			artistIDSet[artistID] = true
+		}
+	}
+
+	artistIDs := make([]int64, 0, len(artistIDSet))
+	for artistID := range artistIDSet {
+		artistIDs = append(artistIDs, artistID)
+	}
+
+	// Create associations using repository method
+	if err := s.masterRepo.CreateMasterArtistAssociations(ctx, masterIDs, artistIDs); err != nil {
+		log.Error("Failed to create master-artist associations", "error", err, "masterCount", len(masterIDs), "artistCount", len(artistIDs), "processingID", processingID)
+		return
+	}
+
+	log.Info("Processed master-artist associations", "masterCount", len(masterIDs), "artistCount", len(artistIDs), "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingMasterGenreAssociations(ctx context.Context, masterGenreMap map[int64][]string, processingID string) {
+	log := s.log.Function("processPendingMasterGenreAssociations")
+	if len(masterGenreMap) == 0 {
+		return
+	}
+
+	// Extract all unique master IDs and genre names
+	masterIDs := make([]int64, 0, len(masterGenreMap))
+	genreNameSet := make(map[string]bool)
+
+	for masterID, genreNames := range masterGenreMap {
+		masterIDs = append(masterIDs, masterID)
+		for _, genreName := range genreNames {
+			genreNameSet[genreName] = true
+		}
+	}
+
+	genreNames := make([]string, 0, len(genreNameSet))
+	for genreName := range genreNameSet {
+		genreNames = append(genreNames, genreName)
+	}
+
+	// Create associations using repository method
+	if err := s.masterRepo.CreateMasterGenreAssociations(ctx, masterIDs, genreNames); err != nil {
+		log.Error("Failed to create master-genre associations", "error", err, "masterCount", len(masterIDs), "genreCount", len(genreNames), "processingID", processingID)
+		return
+	}
+
+	log.Info("Processed master-genre associations", "masterCount", len(masterIDs), "genreCount", len(genreNames), "processingID", processingID)
 }
 

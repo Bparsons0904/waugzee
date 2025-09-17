@@ -20,6 +20,7 @@ type GenreRepository interface {
 	Delete(ctx context.Context, id string) error
 	FindOrCreate(ctx context.Context, name string) (*Genre, error)
 	UpsertBatch(ctx context.Context, genres []*Genre) (int, int, error)
+	GetBatchByNames(ctx context.Context, names []string) (map[string]*Genre, error)
 }
 
 type genreRepository struct {
@@ -175,4 +176,26 @@ func (r *genreRepository) UpsertBatch(ctx context.Context, genres []*Genre) (int
 
 	log.Info("Batch upsert completed", "inserted", inserted, "updated", updated)
 	return inserted, updated, nil
+}
+
+func (r *genreRepository) GetBatchByNames(ctx context.Context, names []string) (map[string]*Genre, error) {
+	log := r.log.Function("GetBatchByNames")
+
+	if len(names) == 0 {
+		return make(map[string]*Genre), nil
+	}
+
+	var genres []*Genre
+	if err := r.getDB(ctx).Where("name IN ?", names).Find(&genres).Error; err != nil {
+		return nil, log.Err("failed to get genres by names", err, "count", len(names))
+	}
+
+	// Convert to map for O(1) lookup
+	result := make(map[string]*Genre, len(genres))
+	for _, genre := range genres {
+		result[genre.Name] = genre
+	}
+
+	log.Info("Retrieved genres by names", "requested", len(names), "found", len(result))
+	return result, nil
 }

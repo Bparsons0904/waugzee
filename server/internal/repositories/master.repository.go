@@ -24,6 +24,9 @@ type MasterRepository interface {
 	Delete(ctx context.Context, id string) error
 	UpsertBatch(ctx context.Context, masters []*Master) (int, int, error)
 	GetBatchByDiscogsIDs(ctx context.Context, discogsIDs []int64) (map[int64]*Master, error)
+	// Association methods
+	CreateMasterArtistAssociations(ctx context.Context, masterDiscogsIDs []int64, artistDiscogsIDs []int64) error
+	CreateMasterGenreAssociations(ctx context.Context, masterDiscogsIDs []int64, genreNames []string) error
 }
 
 type masterRepository struct {
@@ -165,4 +168,71 @@ func (r *masterRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs 
 
 	log.Info("Retrieved masters by Discogs IDs", "requested", len(discogsIDs), "found", len(result))
 	return result, nil
+}
+
+// CreateMasterArtistAssociations creates many-to-many associations between masters and artists
+func (r *masterRepository) CreateMasterArtistAssociations(ctx context.Context, masterDiscogsIDs []int64, artistDiscogsIDs []int64) error {
+	log := r.log.Function("CreateMasterArtistAssociations")
+
+	if len(masterDiscogsIDs) == 0 || len(artistDiscogsIDs) == 0 {
+		return nil
+	}
+
+	db := r.getDB(ctx)
+
+	// Build cross-product associations with ON CONFLICT DO NOTHING for idempotency
+	query := `
+		INSERT INTO master_artists (master_discogs_id, artist_discogs_id)
+		SELECT m.discogs_id, a.discogs_id
+		FROM unnest($1::bigint[]) AS m(discogs_id)
+		CROSS JOIN unnest($2::bigint[]) AS a(discogs_id)
+		ON CONFLICT (master_discogs_id, artist_discogs_id) DO NOTHING
+	`
+
+	result := db.Exec(query, masterDiscogsIDs, artistDiscogsIDs)
+	if result.Error != nil {
+		return log.Err("failed to create master-artist associations", result.Error,
+			"masterCount", len(masterDiscogsIDs), "artistCount", len(artistDiscogsIDs))
+	}
+
+	log.Info("Created master-artist associations",
+		"masterCount", len(masterDiscogsIDs),
+		"artistCount", len(artistDiscogsIDs),
+		"associationsCreated", result.RowsAffected)
+
+	return nil
+}
+
+// CreateMasterGenreAssociations creates many-to-many associations between masters and genres
+func (r *masterRepository) CreateMasterGenreAssociations(ctx context.Context, masterDiscogsIDs []int64, genreNames []string) error {
+	log := r.log.Function("CreateMasterGenreAssociations")
+
+	if len(masterDiscogsIDs) == 0 || len(genreNames) == 0 {
+		return nil
+	}
+
+	db := r.getDB(ctx)
+
+	// Build cross-product associations using genre names with ON CONFLICT DO NOTHING
+	query := `
+		INSERT INTO master_genres (master_discogs_id, genre_id)
+		SELECT m.discogs_id, g.id
+		FROM unnest($1::bigint[]) AS m(discogs_id)
+		CROSS JOIN genres g
+		WHERE g.name = ANY($2::text[])
+		ON CONFLICT (master_discogs_id, genre_id) DO NOTHING
+	`
+
+	result := db.Exec(query, masterDiscogsIDs, genreNames)
+	if result.Error != nil {
+		return log.Err("failed to create master-genre associations", result.Error,
+			"masterCount", len(masterDiscogsIDs), "genreCount", len(genreNames))
+	}
+
+	log.Info("Created master-genre associations",
+		"masterCount", len(masterDiscogsIDs),
+		"genreCount", len(genreNames),
+		"associationsCreated", result.RowsAffected)
+
+	return nil
 }
