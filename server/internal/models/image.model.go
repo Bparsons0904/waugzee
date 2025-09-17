@@ -14,7 +14,7 @@ type Image struct {
 	MimeType      *string `gorm:"type:varchar(100)" json:"mimeType,omitempty"`
 
 	// Polymorphic fields
-	ImageableID   string `gorm:"type:uuid;not null;index:idx_images_imageable" json:"imageableId"`
+	ImageableID   int64  `gorm:"type:bigint;not null;index:idx_images_imageable" json:"imageableId"`
 	ImageableType string `gorm:"type:varchar(50);not null;index:idx_images_imageable" json:"imageableType"`
 
 	// Image categorization
@@ -29,14 +29,14 @@ type Image struct {
 }
 
 func (i *Image) BeforeCreate(tx *gorm.DB) (err error) {
-	if i.URL == "" || i.ImageableID == "" || i.ImageableType == "" {
+	if i.URL == "" || i.ImageableID <= 0 || i.ImageableType == "" {
 		return gorm.ErrInvalidValue
 	}
 	return nil
 }
 
 func (i *Image) BeforeUpdate(tx *gorm.DB) (err error) {
-	if i.URL == "" || i.ImageableID == "" || i.ImageableType == "" {
+	if i.URL == "" || i.ImageableID <= 0 || i.ImageableType == "" {
 		return gorm.ErrInvalidValue
 	}
 	return nil

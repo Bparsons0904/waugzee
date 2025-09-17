@@ -1,15 +1,19 @@
 package models
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 	"waugzee/internal/utils"
 )
 
 type Artist struct {
-	BaseModel
-	Name        string `gorm:"type:text;not null;index:idx_artists_name" json:"name" validate:"required"`
-	IsActive    bool   `gorm:"type:bool;default:true;not null" json:"isActive"`
-	ContentHash string `gorm:"type:varchar(64);not null;index:idx_artists_content_hash" json:"contentHash"`
+	DiscogsID   int64     `gorm:"type:bigint;primaryKey;not null" json:"discogsId" validate:"required,gt=0"`
+	CreatedAt   time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+	Name        string    `gorm:"type:text;not null;index:idx_artists_name" json:"name" validate:"required"`
+	IsActive    bool      `gorm:"type:bool;default:true;not null" json:"isActive"`
+	ContentHash string    `gorm:"type:varchar(64);not null;index:idx_artists_content_hash" json:"contentHash"`
 
 	// Relationships
 	Releases []Release `gorm:"many2many:release_artists;" json:"releases,omitempty"`
@@ -17,6 +21,9 @@ type Artist struct {
 }
 
 func (a *Artist) BeforeCreate(tx *gorm.DB) (err error) {
+	if a.DiscogsID <= 0 {
+		return gorm.ErrInvalidValue
+	}
 	if a.Name == "" {
 		return gorm.ErrInvalidValue
 	}

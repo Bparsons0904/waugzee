@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	RELEASE_BATCH_SIZE = 1000
+	RELEASE_BATCH_SIZE = 5000
 )
 
 type ReleaseRepository interface {
@@ -65,7 +65,7 @@ func (r *releaseRepository) GetByDiscogsID(ctx context.Context, discogsID int64)
 	log := r.log.Function("GetByDiscogsID")
 
 	var release Release
-	if err := r.getDB(ctx).Preload("Label").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "id = ?", discogsID).Error; err != nil {
+	if err := r.getDB(ctx).Preload("Label").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "discogs_id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -111,34 +111,12 @@ func (r *releaseRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *releaseRepository) UpsertBatch(ctx context.Context, releases []*Release) (int, int, error) {
-	log := r.log.Function("UpsertBatch")
-
 	if len(releases) == 0 {
 		return 0, 0, nil
 	}
 
-	var totalInserted, totalUpdated int
-
-	// Process in batches to avoid memory issues
-	for i := 0; i < len(releases); i += RELEASE_BATCH_SIZE {
-		end := i + RELEASE_BATCH_SIZE
-		if end > len(releases) {
-			end = len(releases)
-		}
-
-		batch := releases[i:end]
-		inserted, updated, err := r.upsertSingleBatch(ctx, batch)
-		if err != nil {
-			return totalInserted, totalUpdated, log.Err("failed to upsert batch", err, "batchStart", i, "batchEnd", end)
-		}
-
-		totalInserted += inserted
-		totalUpdated += updated
-
-		log.Info("Processed release batch", "batchStart", i, "batchEnd", end, "inserted", inserted, "updated", updated)
-	}
-
-	return totalInserted, totalUpdated, nil
+	// Service has already deduplicated - process directly without re-deduplication
+	return r.upsertSingleBatch(ctx, releases)
 }
 
 func (r *releaseRepository) upsertSingleBatch(ctx context.Context, releases []*Release) (int, int, error) {
@@ -152,7 +130,7 @@ func (r *releaseRepository) upsertSingleBatch(ctx context.Context, releases []*R
 
 	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
 	result := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "id"}}, // Use primary key (ID as DiscogsID)
+		Columns: []clause.Column{{Name: "discogs_id"}}, // Use primary key (DiscogsID)
 		DoUpdates: clause.AssignmentColumns([]string{
 			"title", "year", "country", "format", "image_url", "track_count", "label_id", "master_id", "updated_at",
 		}),
@@ -175,14 +153,14 @@ func (r *releaseRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs
 	}
 
 	var releases []*Release
-	if err := r.getDB(ctx).Where("id IN ?", discogsIDs).Find(&releases).Error; err != nil {
+	if err := r.getDB(ctx).Where("discogs_id IN ?", discogsIDs).Find(&releases).Error; err != nil {
 		return nil, log.Err("failed to get releases by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
 	// Convert to map for O(1) lookup
 	result := make(map[int64]*Release, len(releases))
 	for _, release := range releases {
-		result[int64(release.ID)] = release
+		result[release.DiscogsID] = release
 	}
 
 	log.Info("Retrieved releases by Discogs IDs", "requested", len(discogsIDs), "found", len(result))

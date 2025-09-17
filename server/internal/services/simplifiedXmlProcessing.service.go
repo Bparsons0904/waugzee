@@ -3,7 +3,11 @@ package services
 import (
 	"context"
 	"runtime"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
+	"waugzee/internal/imports"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
 	"waugzee/internal/repositories"
@@ -11,10 +15,17 @@ import (
 
 // SimplifiedResult holds parsed entities in memory maps for simplified processing
 type SimplifiedResult struct {
-	Labels   map[int64]*models.Label   // DiscogsID -> Label
-	Artists  map[int64]*models.Artist  // DiscogsID -> Artist
-	Masters  map[int64]*models.Master  // DiscogsID -> Master
-	Releases map[int64]*models.Release // DiscogsID -> Release
+	// Raw entity storage - preserves ALL XML data
+	RawLabels   map[int64]*imports.Label   // DiscogsID -> Raw Label with ALL fields
+	RawArtists  map[int64]*imports.Artist  // DiscogsID -> Raw Artist with ALL fields
+	RawMasters  map[int64]*imports.Master  // DiscogsID -> Raw Master with ALL fields
+	RawReleases map[int64]*imports.Release // DiscogsID -> Raw Release with ALL fields
+
+	// Legacy converted models for compatibility
+	Labels   map[int64]*models.Label   // DiscogsID -> Converted Label
+	Artists  map[int64]*models.Artist  // DiscogsID -> Converted Artist
+	Masters  map[int64]*models.Master  // DiscogsID -> Converted Master
+	Releases map[int64]*models.Release // DiscogsID -> Converted Release
 
 	// Basic stats
 	TotalRecords   int
@@ -23,25 +34,871 @@ type SimplifiedResult struct {
 	Errors         []string
 }
 
+// Enhanced image structure with context about parent entity
+type ContextualDiscogsImage struct {
+	*imports.DiscogsImage
+	ImageableID   string // Parent entity ID
+	ImageableType string // Parent entity type (artist, master, release, label)
+}
+
+// trackKey is used for track deduplication using composite key (title + position)
+type trackKey struct {
+	title    string
+	position string
+}
+
+// Buffer definitions for batch processing related entities
+type ImageBuffer struct {
+	Channel  chan *ContextualDiscogsImage
+	Capacity int
+}
+
+type GenreBuffer struct {
+	Channel  chan string
+	Capacity int
+}
+
+type TrackBuffer struct {
+	Channel  chan *imports.Track
+	Capacity int
+}
+
+type ArtistBuffer struct {
+	Channel  chan *imports.Artist
+	Capacity int
+}
+
+type LabelBuffer struct {
+	Channel  chan *models.Label
+	Capacity int
+}
+
+type MasterBuffer struct {
+	Channel  chan *models.Master
+	Capacity int
+}
+
+type ReleaseBuffer struct {
+	Channel  chan *models.Release
+	Capacity int
+}
+
+// ProcessingBuffers contains all the buffered channels for related entity processing
+type ProcessingBuffers struct {
+	Images   *ImageBuffer
+	Genres   *GenreBuffer
+	Tracks   *TrackBuffer
+	Artists  *ArtistBuffer
+	Labels   *LabelBuffer
+	Masters  *MasterBuffer
+	Releases *ReleaseBuffer
+}
+
 type SimplifiedXMLProcessingService struct {
 	discogsDataProcessingRepo repositories.DiscogsDataProcessingRepository
+	labelRepo                 repositories.LabelRepository
+	artistRepo                repositories.ArtistRepository
+	masterRepo                repositories.MasterRepository
+	releaseRepo               repositories.ReleaseRepository
+	genreRepo                 repositories.GenreRepository
+	trackRepo                 repositories.TrackRepository
+	imageRepo                 repositories.ImageRepository
 	parserService             *DiscogsParserService
 	log                       logger.Logger
+	// DB association management
+	dbAssociationsEnabled bool
 }
 
 func NewSimplifiedXMLProcessingService(
 	discogsDataProcessingRepo repositories.DiscogsDataProcessingRepository,
+	labelRepo repositories.LabelRepository,
+	artistRepo repositories.ArtistRepository,
+	masterRepo repositories.MasterRepository,
+	releaseRepo repositories.ReleaseRepository,
+	genreRepo repositories.GenreRepository,
+	trackRepo repositories.TrackRepository,
+	imageRepo repositories.ImageRepository,
 	parserService *DiscogsParserService,
 ) *SimplifiedXMLProcessingService {
 	return &SimplifiedXMLProcessingService{
 		discogsDataProcessingRepo: discogsDataProcessingRepo,
+		labelRepo:                 labelRepo,
+		artistRepo:                artistRepo,
+		masterRepo:                masterRepo,
+		releaseRepo:               releaseRepo,
+		genreRepo:                 genreRepo,
+		trackRepo:                 trackRepo,
+		imageRepo:                 imageRepo,
 		parserService:             parserService,
 		log:                       logger.New("simplifiedXMLProcessingService"),
+		dbAssociationsEnabled:     true, // Default enabled
 	}
 }
 
-// ProcessFileToMap parses the entire file into memory maps without database operations
-// This is a simplified approach that eliminates batching and complex state management
+// DB Association Management Methods
+func (s *SimplifiedXMLProcessingService) DisableDBAssociations() {
+	s.dbAssociationsEnabled = false
+	s.log.Info("DB associations disabled for independent entity processing")
+}
+
+func (s *SimplifiedXMLProcessingService) EnableDBAssociations() {
+	s.dbAssociationsEnabled = true
+	s.log.Info("DB associations enabled for relationship linking")
+}
+
+func (s *SimplifiedXMLProcessingService) AreDBAssociationsEnabled() bool {
+	return s.dbAssociationsEnabled
+}
+
+// createProcessingBuffers initializes buffered channels for related entity processing
+func (s *SimplifiedXMLProcessingService) createProcessingBuffers() *ProcessingBuffers {
+	return &ProcessingBuffers{
+		Images: &ImageBuffer{
+			Channel:  make(chan *ContextualDiscogsImage, 5000),
+			Capacity: 5000,
+		},
+		Genres: &GenreBuffer{
+			Channel:  make(chan string, 5000),
+			Capacity: 5000,
+		},
+		Tracks: &TrackBuffer{
+			Channel:  make(chan *imports.Track, 5000),
+			Capacity: 5000,
+		},
+		Artists: &ArtistBuffer{
+			Channel:  make(chan *imports.Artist, 5000),
+			Capacity: 5000,
+		},
+		Labels: &LabelBuffer{
+			Channel:  make(chan *models.Label, 5000),
+			Capacity: 5000,
+		},
+		Masters: &MasterBuffer{
+			Channel:  make(chan *models.Master, 5000),
+			Capacity: 5000,
+		},
+		Releases: &ReleaseBuffer{
+			Channel:  make(chan *models.Release, 5000),
+			Capacity: 5000,
+		},
+	}
+}
+
+// closeProcessingBuffers safely closes all buffer channels
+func (s *SimplifiedXMLProcessingService) closeProcessingBuffers(buffers *ProcessingBuffers) {
+	close(buffers.Images.Channel)
+	close(buffers.Genres.Channel)
+	close(buffers.Tracks.Channel)
+	close(buffers.Artists.Channel)
+	close(buffers.Labels.Channel)
+	close(buffers.Masters.Channel)
+	close(buffers.Releases.Channel)
+	s.log.Info("All processing buffer channels closed")
+}
+
+// Specialized Processor Methods for Each Entity Type
+// These methods extract primary entity data and send related entities to appropriate buffers
+
+// processLabel extracts Label data only - no related entities
+func (s *SimplifiedXMLProcessingService) processLabel(rawLabel *imports.Label, processingID string, buffers *ProcessingBuffers) error {
+	if rawLabel == nil || rawLabel.ID <= 0 {
+		return s.log.Err("invalid label data", nil, "processingID", processingID)
+	}
+
+	// Labels have no related entities to extract - just process the label itself
+	s.log.Debug("Processing label",
+		"labelID", rawLabel.ID,
+		"name", rawLabel.Name,
+		"processingID", processingID)
+
+	// Convert to model and send to label buffer
+	if convertedLabel := s.parserService.convertDiscogsLabel(rawLabel); convertedLabel != nil {
+		buffers.Labels.Channel <- convertedLabel
+	}
+
+	return nil
+}
+
+// processArtist extracts Artist data + Images[] and sends Images to image buffer
+func (s *SimplifiedXMLProcessingService) processArtist(rawArtist *imports.Artist, processingID string, buffers *ProcessingBuffers) error {
+	if rawArtist == nil || rawArtist.ID <= 0 {
+		return s.log.Err("invalid artist data", nil, "processingID", processingID)
+	}
+
+	s.log.Debug("Processing artist",
+		"artistID", rawArtist.ID,
+		"name", rawArtist.Name,
+		"imageCount", len(rawArtist.Images),
+		"processingID", processingID)
+
+	// Extract and send Images to image buffer with context
+	for i := range rawArtist.Images {
+		contextualImage := &ContextualDiscogsImage{
+			DiscogsImage:  &rawArtist.Images[i],
+			ImageableID:   strconv.FormatInt(int64(rawArtist.ID), 10),
+			ImageableType: models.ImageableTypeArtist,
+		}
+		buffers.Images.Channel <- contextualImage
+	}
+
+	// Future: Save artist to database when DB operations are implemented
+	return nil
+}
+
+// processMaster extracts Master data + Images[] + Genres[] and sends to appropriate buffers
+func (s *SimplifiedXMLProcessingService) processMaster(rawMaster *imports.Master, processingID string, buffers *ProcessingBuffers) error {
+	if rawMaster == nil || rawMaster.ID <= 0 {
+		return s.log.Err("invalid master data", nil, "processingID", processingID)
+	}
+
+	s.log.Debug("Processing master",
+		"masterID", rawMaster.ID,
+		"title", rawMaster.Title,
+		"imageCount", len(rawMaster.Images),
+		"genreCount", len(rawMaster.Genres),
+		"processingID", processingID)
+
+	// Extract and send Images to image buffer with context
+	for i := range rawMaster.Images {
+		contextualImage := &ContextualDiscogsImage{
+			DiscogsImage:  &rawMaster.Images[i],
+			ImageableID:   strconv.FormatInt(int64(rawMaster.ID), 10),
+			ImageableType: models.ImageableTypeMaster,
+		}
+		buffers.Images.Channel <- contextualImage
+	}
+
+	// Extract and send Genres to genre buffer
+	for _, genre := range rawMaster.Genres {
+		if genre != "" {
+			buffers.Genres.Channel <- genre
+		}
+	}
+
+	// Convert to model and send to master buffer
+	if convertedMaster := s.parserService.convertDiscogsMaster(rawMaster); convertedMaster != nil {
+		buffers.Masters.Channel <- convertedMaster
+	}
+
+	return nil
+}
+
+// processRelease extracts Release data + Artists[] + TrackList[] + Genres[] + Images[]
+// and sends all related entities to appropriate buffers
+func (s *SimplifiedXMLProcessingService) processRelease(rawRelease *imports.Release, processingID string, buffers *ProcessingBuffers) error {
+	if rawRelease == nil || rawRelease.ID <= 0 {
+		return s.log.Err("invalid release data", nil, "processingID", processingID)
+	}
+
+	s.log.Debug("Processing release",
+		"releaseID", rawRelease.ID,
+		"title", rawRelease.Title,
+		"artistCount", len(rawRelease.Artists),
+		"trackCount", len(rawRelease.TrackList),
+		"genreCount", len(rawRelease.Genres),
+		"imageCount", len(rawRelease.Images),
+		"processingID", processingID)
+
+	// Extract and send Artists to artist buffer
+	for i := range rawRelease.Artists {
+		artist := &rawRelease.Artists[i]
+		buffers.Artists.Channel <- artist
+	}
+
+	// Extract and send TrackList to track buffer
+	for i := range rawRelease.TrackList {
+		track := &rawRelease.TrackList[i]
+		buffers.Tracks.Channel <- track
+	}
+
+	// Extract and send Genres to genre buffer
+	for _, genre := range rawRelease.Genres {
+		if genre != "" {
+			buffers.Genres.Channel <- genre
+		}
+	}
+
+	// Extract and send Images to image buffer with context
+	for i := range rawRelease.Images {
+		contextualImage := &ContextualDiscogsImage{
+			DiscogsImage:  &rawRelease.Images[i],
+			ImageableID:   strconv.FormatInt(int64(rawRelease.ID), 10),
+			ImageableType: models.ImageableTypeRelease,
+		}
+		buffers.Images.Channel <- contextualImage
+	}
+
+	// Convert to model and send to release buffer
+	if convertedRelease := s.parserService.convertDiscogsRelease(rawRelease); convertedRelease != nil {
+		buffers.Releases.Channel <- convertedRelease
+	}
+
+	return nil
+}
+
+// Batch processing methods for consuming from buffers and executing database operations
+
+// imageKey represents a composite key for image deduplication
+type imageKey struct {
+	imageableID   int64
+	imageableType string
+	url           string
+}
+
+// processImageBuffer consumes images from the buffer, deduplicates them by composite key (imageableID + imageableType + URL), and executes batch upserts when 5000 unique items are collected
+func (s *SimplifiedXMLProcessingService) processImageBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+	defer wg.Done()
+	log := s.log.Function("processImageBuffer")
+	dedupeMap := make(map[imageKey]*models.Image)
+	totalProcessed := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled, process remaining batch if any
+			if len(dedupeMap) > 0 {
+				s.processPendingImageBatchFromMap(ctx, dedupeMap, processingID)
+			}
+			return
+
+		case contextualImage, ok := <-buffers.Images.Channel:
+			if !ok {
+				// Channel closed, process remaining batch
+				if len(dedupeMap) > 0 {
+					s.processPendingImageBatchFromMap(ctx, dedupeMap, processingID)
+					totalProcessed += len(dedupeMap)
+				}
+				log.Info("Image buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				return
+			}
+
+			// Convert ContextualDiscogsImage to Image model
+			if modelImage := s.convertContextualDiscogsImageToModel(contextualImage); modelImage != nil {
+				// Deduplicate using composite key
+				key := imageKey{
+					imageableID:   modelImage.ImageableID,
+					imageableType: modelImage.ImageableType,
+					url:           modelImage.URL,
+				}
+				dedupeMap[key] = modelImage
+
+				// Process batch when we reach 5000 unique items
+				if len(dedupeMap) >= 5000 {
+					s.processPendingImageBatchFromMap(ctx, dedupeMap, processingID)
+					totalProcessed += len(dedupeMap)
+					dedupeMap = make(map[imageKey]*models.Image) // Reset map
+				}
+			}
+		}
+	}
+}
+
+// processGenreBuffer consumes genres from the buffer, deduplicates, and executes batch upserts
+func (s *SimplifiedXMLProcessingService) processGenreBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+	defer wg.Done()
+	log := s.log.Function("processGenreBuffer")
+
+	genreSet := make(map[string]*models.Genre)
+	totalReceived := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled, process remaining genres if any
+			if len(genreSet) > 0 {
+				s.processPendingGenreBatch(ctx, genreSet, processingID)
+			}
+			return
+
+		case genreName, ok := <-buffers.Genres.Channel:
+			if !ok {
+				// Channel closed, process remaining genres
+				if len(genreSet) > 0 {
+					s.processPendingGenreBatch(ctx, genreSet, processingID)
+				}
+				log.Info("Genre buffer processing completed", "totalReceived", totalReceived, "uniqueGenres", len(genreSet), "processingID", processingID)
+				return
+			}
+
+			totalReceived++
+			if genreName != "" && genreSet[genreName] == nil {
+				genreSet[genreName] = &models.Genre{Name: genreName}
+
+				// Process batch when it reaches 5000 unique genres
+				if len(genreSet) >= 5000 {
+					s.processPendingGenreBatch(ctx, genreSet, processingID)
+					genreSet = make(map[string]*models.Genre) // Reset map
+				}
+			}
+		}
+	}
+}
+
+// processTrackBuffer consumes tracks from the buffer, deduplicates them by composite key (title + position), and executes batch creates when 5000 unique items are collected
+func (s *SimplifiedXMLProcessingService) processTrackBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+	defer wg.Done()
+	log := s.log.Function("processTrackBuffer")
+
+	// Use map for deduplication using composite key (title + position)
+	dedupeMap := make(map[trackKey]*models.Track)
+	totalProcessed := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled, process remaining batch if any
+			if len(dedupeMap) > 0 {
+				s.processPendingTrackBatchFromMap(ctx, dedupeMap, processingID)
+			}
+			return
+
+		case discogsTrack, ok := <-buffers.Tracks.Channel:
+			if !ok {
+				// Channel closed, process remaining batch
+				if len(dedupeMap) > 0 {
+					s.processPendingTrackBatchFromMap(ctx, dedupeMap, processingID)
+					totalProcessed += len(dedupeMap)
+				}
+				log.Info("Track buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				return
+			}
+
+			// Convert Discogs Track to Track model
+			if modelTrack := s.convertDiscogsTrackToModel(discogsTrack); modelTrack != nil {
+				// Deduplicate using composite key
+				key := trackKey{
+					title:    modelTrack.Title,
+					position: modelTrack.Position,
+				}
+				dedupeMap[key] = modelTrack
+
+				// Process batch when we reach 5000 unique items
+				if len(dedupeMap) >= 5000 {
+					s.processPendingTrackBatchFromMap(ctx, dedupeMap, processingID)
+					totalProcessed += len(dedupeMap)
+					dedupeMap = make(map[trackKey]*models.Track) // Reset map
+				}
+			}
+		}
+	}
+}
+
+// processArtistBuffer consumes artists from the buffer, deduplicates them by DiscogsID, and executes batch upserts when 5000 unique items are collected
+func (s *SimplifiedXMLProcessingService) processArtistBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+	defer wg.Done()
+	log := s.log.Function("processArtistBuffer")
+
+	// Use map for deduplication using DiscogsID as key
+	dedupeMap := make(map[int64]*models.Artist)
+	totalProcessed := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled, process remaining batch if any
+			if len(dedupeMap) > 0 {
+				s.processPendingArtistBatchFromMap(ctx, dedupeMap, processingID)
+			}
+			return
+
+		case discogsArtist, ok := <-buffers.Artists.Channel:
+			if !ok {
+				// Channel closed, process remaining batch
+				if len(dedupeMap) > 0 {
+					s.processPendingArtistBatchFromMap(ctx, dedupeMap, processingID)
+					totalProcessed += len(dedupeMap)
+				}
+				log.Info("Artist buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				return
+			}
+
+			// Convert Discogs Artist to Artist model
+			if modelArtist := s.convertDiscogsArtistToModel(discogsArtist); modelArtist != nil {
+				// Deduplicate using DiscogsID as key
+				dedupeMap[modelArtist.DiscogsID] = modelArtist
+
+				// Process batch when we reach 5000 unique items
+				if len(dedupeMap) >= 5000 {
+					s.processPendingArtistBatchFromMap(ctx, dedupeMap, processingID)
+					totalProcessed += len(dedupeMap)
+					dedupeMap = make(map[int64]*models.Artist) // Reset map
+				}
+			}
+		}
+	}
+}
+
+// Helper methods for processing pending batches
+
+func (s *SimplifiedXMLProcessingService) processPendingImageBatch(ctx context.Context, batch []*models.Image, processingID string) {
+	log := s.log.Function("processPendingImageBatch")
+	if len(batch) == 0 {
+		return
+	}
+
+	// Service has already deduplicated - pass batch directly to repository
+	inserted, updated, err := s.imageRepo.UpsertBatch(ctx, batch)
+	if err != nil {
+		_ = log.Error("Failed to upsert image batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed image batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingImageBatchFromMap(ctx context.Context, dedupeMap map[imageKey]*models.Image, processingID string) {
+	log := s.log.Function("processPendingImageBatchFromMap")
+	if len(dedupeMap) == 0 {
+		return
+	}
+
+	// Convert map to slice
+	batch := make([]*models.Image, 0, len(dedupeMap))
+	for _, image := range dedupeMap {
+		batch = append(batch, image)
+	}
+
+	// Service has already deduplicated - pass batch directly to repository
+	inserted, updated, err := s.imageRepo.UpsertBatch(ctx, batch)
+	if err != nil {
+		_ = log.Error("Failed to upsert image batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed image batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingGenreBatch(ctx context.Context, genreSet map[string]*models.Genre, processingID string) {
+	log := s.log.Function("processPendingGenreBatch")
+	if len(genreSet) == 0 {
+		return
+	}
+
+	// Convert map to slice
+	batch := make([]*models.Genre, 0, len(genreSet))
+	for _, genre := range genreSet {
+		batch = append(batch, genre)
+	}
+
+	inserted, updated, err := s.genreRepo.UpsertBatch(ctx, batch)
+	if err != nil {
+		log.Error("Failed to upsert genre batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed genre batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingTrackBatch(ctx context.Context, batch []*models.Track, processingID string) {
+	log := s.log.Function("processPendingTrackBatch")
+	if len(batch) == 0 {
+		return
+	}
+
+	err := s.trackRepo.CreateBatch(ctx, batch)
+	if err != nil {
+		log.Error("Failed to create track batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed track batch", "batchSize", len(batch), "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingTrackBatchFromMap(ctx context.Context, dedupeMap map[trackKey]*models.Track, processingID string) {
+	log := s.log.Function("processPendingTrackBatchFromMap")
+	if len(dedupeMap) == 0 {
+		return
+	}
+
+	// Convert map to slice
+	batch := make([]*models.Track, 0, len(dedupeMap))
+	for _, track := range dedupeMap {
+		batch = append(batch, track)
+	}
+
+	// Service has already deduplicated - pass batch directly to repository
+	err := s.trackRepo.CreateBatch(ctx, batch)
+	if err != nil {
+		log.Error("Failed to create track batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed track batch", "batchSize", len(batch), "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingArtistBatch(ctx context.Context, batch []*models.Artist, processingID string) {
+	log := s.log.Function("processPendingArtistBatch")
+	if len(batch) == 0 {
+		return
+	}
+
+	// Service has already deduplicated - pass batch directly to repository
+	inserted, updated, err := s.artistRepo.UpsertBatch(ctx, batch)
+	if err != nil {
+		log.Error("Failed to upsert artist batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed artist batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingArtistBatchFromMap(ctx context.Context, dedupeMap map[int64]*models.Artist, processingID string) {
+	log := s.log.Function("processPendingArtistBatchFromMap")
+	if len(dedupeMap) == 0 {
+		return
+	}
+
+	// Convert map to slice
+	batch := make([]*models.Artist, 0, len(dedupeMap))
+	for _, artist := range dedupeMap {
+		batch = append(batch, artist)
+	}
+
+	// Service has already deduplicated - pass batch directly to repository
+	inserted, updated, err := s.artistRepo.UpsertBatch(ctx, batch)
+	if err != nil {
+		log.Error("Failed to upsert artist batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed artist batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingLabelBatch(ctx context.Context, batch []*models.Label, processingID string) {
+	log := s.log.Function("processPendingLabelBatch")
+	if len(batch) == 0 {
+		return
+	}
+
+	// Service has already deduplicated - pass batch directly to repository
+	inserted, updated, err := s.labelRepo.UpsertBatch(ctx, batch)
+	if err != nil {
+		log.Error("Failed to upsert label batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed label batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingLabelBatchFromMap(ctx context.Context, dedupeMap map[int64]*models.Label, processingID string) {
+	log := s.log.Function("processPendingLabelBatchFromMap")
+	if len(dedupeMap) == 0 {
+		return
+	}
+
+	// Convert map to slice
+	batch := make([]*models.Label, 0, len(dedupeMap))
+	for _, label := range dedupeMap {
+		batch = append(batch, label)
+	}
+
+	// Service has already deduplicated - pass batch directly to repository
+	inserted, updated, err := s.labelRepo.UpsertBatch(ctx, batch)
+	if err != nil {
+		log.Error("Failed to upsert label batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed label batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingMasterBatch(ctx context.Context, batch []*models.Master, processingID string) {
+	log := s.log.Function("processPendingMasterBatch")
+	if len(batch) == 0 {
+		return
+	}
+
+	// Service has already deduplicated - pass batch directly to repository
+	inserted, updated, err := s.masterRepo.UpsertBatch(ctx, batch)
+	if err != nil {
+		log.Error("Failed to upsert master batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed master batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingMasterBatchFromMap(ctx context.Context, dedupeMap map[int64]*models.Master, processingID string) {
+	log := s.log.Function("processPendingMasterBatchFromMap")
+	if len(dedupeMap) == 0 {
+		return
+	}
+
+	// Convert map to slice
+	batch := make([]*models.Master, 0, len(dedupeMap))
+	for _, master := range dedupeMap {
+		batch = append(batch, master)
+	}
+
+	// Service has already deduplicated - pass batch directly to repository
+	inserted, updated, err := s.masterRepo.UpsertBatch(ctx, batch)
+	if err != nil {
+		log.Error("Failed to upsert master batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed master batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingReleaseBatch(ctx context.Context, batch []*models.Release, processingID string) {
+	log := s.log.Function("processPendingReleaseBatch")
+	if len(batch) == 0 {
+		return
+	}
+
+	// Service has already deduplicated - pass batch directly to repository
+	inserted, updated, err := s.releaseRepo.UpsertBatch(ctx, batch)
+	if err != nil {
+		log.Error("Failed to upsert release batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed release batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+}
+
+func (s *SimplifiedXMLProcessingService) processPendingReleaseBatchFromMap(ctx context.Context, dedupeMap map[int64]*models.Release, processingID string) {
+	log := s.log.Function("processPendingReleaseBatchFromMap")
+	if len(dedupeMap) == 0 {
+		return
+	}
+
+	// Convert map to slice
+	batch := make([]*models.Release, 0, len(dedupeMap))
+	for _, release := range dedupeMap {
+		batch = append(batch, release)
+	}
+
+	// Service has already deduplicated - pass batch directly to repository
+	inserted, updated, err := s.releaseRepo.UpsertBatch(ctx, batch)
+	if err != nil {
+		log.Error("Failed to upsert release batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		return
+	}
+	log.Info("Processed release batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+}
+
+// processLabelBuffer consumes labels from the buffer, deduplicates them by DiscogsID, and executes batch upserts when 5000 unique items are collected
+func (s *SimplifiedXMLProcessingService) processLabelBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+	defer wg.Done()
+	log := s.log.Function("processLabelBuffer")
+
+	// Use map for deduplication using DiscogsID as key
+	dedupeMap := make(map[int64]*models.Label)
+	totalProcessed := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled, process remaining batch if any
+			if len(dedupeMap) > 0 {
+				s.processPendingLabelBatchFromMap(ctx, dedupeMap, processingID)
+			}
+			return
+
+		case modelLabel, ok := <-buffers.Labels.Channel:
+			if !ok {
+				// Channel closed, process remaining batch
+				if len(dedupeMap) > 0 {
+					s.processPendingLabelBatchFromMap(ctx, dedupeMap, processingID)
+					totalProcessed += len(dedupeMap)
+				}
+				log.Info("Label buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				return
+			}
+
+			if modelLabel != nil {
+				// Deduplicate using DiscogsID as key
+				dedupeMap[modelLabel.DiscogsID] = modelLabel
+
+				// Process batch when we reach 5000 unique items
+				if len(dedupeMap) >= 5000 {
+					s.processPendingLabelBatchFromMap(ctx, dedupeMap, processingID)
+					totalProcessed += len(dedupeMap)
+					dedupeMap = make(map[int64]*models.Label) // Reset map
+				}
+			}
+		}
+	}
+}
+
+// processMasterBuffer consumes masters from the buffer, deduplicates them by DiscogsID, and executes batch upserts when 5000 unique items are collected
+func (s *SimplifiedXMLProcessingService) processMasterBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+	defer wg.Done()
+	log := s.log.Function("processMasterBuffer")
+
+	// Use map for deduplication using DiscogsID as key
+	dedupeMap := make(map[int64]*models.Master)
+	totalProcessed := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled, process remaining batch if any
+			if len(dedupeMap) > 0 {
+				s.processPendingMasterBatchFromMap(ctx, dedupeMap, processingID)
+			}
+			return
+
+		case modelMaster, ok := <-buffers.Masters.Channel:
+			if !ok {
+				// Channel closed, process remaining batch
+				if len(dedupeMap) > 0 {
+					s.processPendingMasterBatchFromMap(ctx, dedupeMap, processingID)
+					totalProcessed += len(dedupeMap)
+				}
+				log.Info("Master buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				return
+			}
+
+			if modelMaster != nil {
+				// Deduplicate using DiscogsID as key
+				dedupeMap[modelMaster.DiscogsID] = modelMaster
+
+				// Process batch when we reach 5000 unique items
+				if len(dedupeMap) >= 5000 {
+					s.processPendingMasterBatchFromMap(ctx, dedupeMap, processingID)
+					totalProcessed += len(dedupeMap)
+					dedupeMap = make(map[int64]*models.Master) // Reset map
+				}
+			}
+		}
+	}
+}
+
+// processReleaseBuffer consumes releases from the buffer, deduplicates them by DiscogsID, and executes batch upserts when 5000 unique items are collected
+func (s *SimplifiedXMLProcessingService) processReleaseBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+	defer wg.Done()
+	log := s.log.Function("processReleaseBuffer")
+
+	// Use map for deduplication using DiscogsID as key
+	dedupeMap := make(map[int64]*models.Release)
+	totalProcessed := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled, process remaining batch if any
+			if len(dedupeMap) > 0 {
+				s.processPendingReleaseBatchFromMap(ctx, dedupeMap, processingID)
+			}
+			return
+
+		case modelRelease, ok := <-buffers.Releases.Channel:
+			if !ok {
+				// Channel closed, process remaining batch
+				if len(dedupeMap) > 0 {
+					s.processPendingReleaseBatchFromMap(ctx, dedupeMap, processingID)
+					totalProcessed += len(dedupeMap)
+				}
+				log.Info("Release buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				return
+			}
+
+			if modelRelease != nil {
+				// Deduplicate using DiscogsID as key
+				dedupeMap[modelRelease.DiscogsID] = modelRelease
+
+				// Process batch when we reach 5000 unique items
+				if len(dedupeMap) >= 5000 {
+					s.processPendingReleaseBatchFromMap(ctx, dedupeMap, processingID)
+					totalProcessed += len(dedupeMap)
+					dedupeMap = make(map[int64]*models.Release) // Reset map
+				}
+			}
+		}
+	}
+}
+
+// ProcessFileToMap parses the entire file using channel-based architecture to extract ALL XML data
+// This approach captures complete entity data instead of minimal converted models
 func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 	ctx context.Context,
 	filePath string,
@@ -54,82 +911,225 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 	runtime.ReadMemStats(&startMemStats)
 	startTime := time.Now()
 
-	log.Info("Starting simplified file processing",
+	log.Info("Starting channel-based file processing with full data extraction",
 		"filePath", filePath,
 		"fileType", fileType,
 		"startMemoryMB", startMemStats.Alloc/1024/1024,
 		"startHeapMB", startMemStats.HeapAlloc/1024/1024)
 
-	// Initialize result with maps
+	// Initialize result with both raw and converted maps
 	result := &SimplifiedResult{
+		// Raw entity maps - preserve ALL XML data
+		RawLabels:   make(map[int64]*imports.Label),
+		RawArtists:  make(map[int64]*imports.Artist),
+		RawMasters:  make(map[int64]*imports.Master),
+		RawReleases: make(map[int64]*imports.Release),
+		// Legacy converted maps for compatibility
 		Labels:   make(map[int64]*models.Label),
 		Artists:  make(map[int64]*models.Artist),
 		Masters:  make(map[int64]*models.Master),
 		Releases: make(map[int64]*models.Release),
-		Errors:   make([]string, 0),
+		Errors: make([]string, 0),
 	}
 
-	// Use the parser service to parse the entire file
+	// Create buffered channels for entity processing
+	entityChan := make(chan EntityMessage, 10000)
+	completionChan := make(chan CompletionMessage, 1)
+
+	// Create processing buffers for related entities
+	buffers := s.createProcessingBuffers()
+
+	// Start buffer processing goroutines
+	var wg sync.WaitGroup
+	processingID := "simplified_processing" // Generate or pass actual processing ID
+
+	wg.Add(7) // Add for each buffer processor
+	go s.processImageBuffer(ctx, buffers, &wg, processingID)
+	go s.processGenreBuffer(ctx, buffers, &wg, processingID)
+	go s.processTrackBuffer(ctx, buffers, &wg, processingID)
+	go s.processArtistBuffer(ctx, buffers, &wg, processingID)
+	go s.processLabelBuffer(ctx, buffers, &wg, processingID)
+	go s.processMasterBuffer(ctx, buffers, &wg, processingID)
+	go s.processReleaseBuffer(ctx, buffers, &wg, processingID)
+
+	// Start parser in goroutine
 	parseOptions := ParseOptions{
 		FilePath: filePath,
 		FileType: fileType,
 	}
 
-	parseResult, err := s.parserService.ParseFile(ctx, parseOptions)
-	if err != nil {
-		return nil, log.Err("parsing failed", err, "filePath", filePath)
+	go func() {
+		defer close(entityChan)
+		if err := s.parserService.ParseFileToChannel(ctx, parseOptions, entityChan, completionChan); err != nil {
+			log.Error("Channel parsing failed", "error", err, "filePath", filePath)
+		}
+	}()
+
+	// Process entities from channel
+	channelProcessingDone := false
+	var processingStats struct {
+		totalProcessed int
+		totalErrors    int
 	}
 
-	// Convert parsed results to maps based on file type
-	switch fileType {
-	case "labels":
-		for _, label := range parseResult.ParsedLabels {
-			if label != nil && label.ID != 0 {
-				result.Labels[int64(label.ID)] = label
-				result.ParsedRecords++
+	for !channelProcessingDone {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+
+		case entity, ok := <-entityChan:
+			if !ok {
+				// Channel closed, check for completion message
+				continue
 			}
-		}
-	case "artists":
-		for _, artist := range parseResult.ParsedArtists {
-			if artist != nil && artist.ID != 0 {
-				result.Artists[int64(artist.ID)] = artist
-				result.ParsedRecords++
+
+			processingStats.totalProcessed++
+
+			// Store RAW entity data and use specialized processors for related entity extraction
+			switch entity.Type {
+			case "label":
+				if rawLabel, ok := entity.RawEntity.(*imports.Label); ok && rawLabel.ID > 0 {
+					// Store complete raw data
+					result.RawLabels[int64(rawLabel.ID)] = rawLabel
+
+					// Use specialized processor to extract related entities
+					if err := s.processLabel(rawLabel, entity.ProcessingID, buffers); err != nil {
+						log.Warn("Label processing failed", "error", err, "labelID", rawLabel.ID)
+						processingStats.totalErrors++
+					} else {
+						result.ParsedRecords++
+					}
+
+					// Create converted model for compatibility
+					if convertedLabel := s.parserService.convertDiscogsLabel(rawLabel); convertedLabel != nil {
+						result.Labels[int64(rawLabel.ID)] = convertedLabel
+					}
+				}
+
+			case "artist":
+				if rawArtist, ok := entity.RawEntity.(*imports.Artist); ok && rawArtist.ID > 0 {
+					// Store complete raw data
+					result.RawArtists[int64(rawArtist.ID)] = rawArtist
+
+					// Use specialized processor to extract related entities (Images)
+					if err := s.processArtist(rawArtist, entity.ProcessingID, buffers); err != nil {
+						log.Warn("Artist processing failed", "error", err, "artistID", rawArtist.ID)
+						processingStats.totalErrors++
+					} else {
+						result.ParsedRecords++
+					}
+
+					// Create converted model for compatibility
+					if convertedArtist := s.parserService.convertDiscogsArtist(rawArtist); convertedArtist != nil {
+						result.Artists[int64(rawArtist.ID)] = convertedArtist
+					}
+				}
+
+			case "master":
+				if rawMaster, ok := entity.RawEntity.(*imports.Master); ok && rawMaster.ID > 0 {
+					// Store complete raw data
+					result.RawMasters[int64(rawMaster.ID)] = rawMaster
+
+					// Use specialized processor to extract related entities (Images, Genres)
+					if err := s.processMaster(rawMaster, entity.ProcessingID, buffers); err != nil {
+						log.Warn("Master processing failed", "error", err, "masterID", rawMaster.ID)
+						processingStats.totalErrors++
+					} else {
+						result.ParsedRecords++
+					}
+
+					// Create converted model for compatibility
+					if convertedMaster := s.parserService.convertDiscogsMaster(rawMaster); convertedMaster != nil {
+						result.Masters[int64(rawMaster.ID)] = convertedMaster
+					}
+				}
+
+			case "release":
+				if rawRelease, ok := entity.RawEntity.(*imports.Release); ok && rawRelease.ID > 0 {
+					// Store complete raw data
+					result.RawReleases[int64(rawRelease.ID)] = rawRelease
+
+					// Use specialized processor to extract related entities (Artists, Tracks, Genres, Images)
+					if err := s.processRelease(rawRelease, entity.ProcessingID, buffers); err != nil {
+						log.Warn("Release processing failed", "error", err, "releaseID", rawRelease.ID)
+						processingStats.totalErrors++
+					} else {
+						result.ParsedRecords++
+					}
+
+					// Create converted model for compatibility
+					if convertedRelease := s.parserService.convertDiscogsRelease(rawRelease); convertedRelease != nil {
+						result.Releases[int64(rawRelease.ID)] = convertedRelease
+					}
+				}
 			}
+
+		case completion := <-completionChan:
+			log.Info("File processing completion signal received",
+				"fileType", completion.FileType,
+				"completed", completion.Completed)
+			channelProcessingDone = true
 		}
-	case "masters":
-		for _, master := range parseResult.ParsedMasters {
-			if master != nil && master.ID != 0 {
-				result.Masters[int64(master.ID)] = master
-				result.ParsedRecords++
-			}
-		}
-	case "releases":
-		for _, release := range parseResult.ParsedReleases {
-			if release != nil && release.ID != 0 {
-				result.Releases[int64(release.ID)] = release
-				result.ParsedRecords++
-			}
-		}
-	default:
-		return nil, log.Err("unsupported file type", nil, "fileType", fileType)
 	}
 
-	// Copy basic stats from parse result
-	result.TotalRecords = parseResult.TotalRecords
-	result.ErroredRecords = parseResult.ErroredRecords
-	result.Errors = parseResult.Errors
+	// Set total records based on entities processed
+	result.TotalRecords = processingStats.totalProcessed
+	result.ErroredRecords = processingStats.totalErrors
+
+	// Log buffer usage statistics before closing
+	log.Info("Processing buffer usage statistics",
+		"imagesInBuffer", len(buffers.Images.Channel),
+		"genresInBuffer", len(buffers.Genres.Channel),
+		"tracksInBuffer", len(buffers.Tracks.Channel),
+		"artistsInBuffer", len(buffers.Artists.Channel),
+		"labelsInBuffer", len(buffers.Labels.Channel),
+		"mastersInBuffer", len(buffers.Masters.Channel),
+		"releasesInBuffer", len(buffers.Releases.Channel),
+		"imageBufferCapacity", buffers.Images.Capacity,
+		"genreBufferCapacity", buffers.Genres.Capacity,
+		"trackBufferCapacity", buffers.Tracks.Capacity,
+		"artistBufferCapacity", buffers.Artists.Capacity,
+		"labelBufferCapacity", buffers.Labels.Capacity,
+		"masterBufferCapacity", buffers.Masters.Capacity,
+		"releaseBufferCapacity", buffers.Releases.Capacity)
+
+	// Close buffers to signal completion and wait for all buffer processors to finish
+	s.closeProcessingBuffers(buffers)
+	log.Info("Waiting for buffer processors to complete")
+	wg.Wait()
+	log.Info("All buffer processors completed")
 
 	// Log completion with final memory allocation
 	var endMemStats runtime.MemStats
 	runtime.ReadMemStats(&endMemStats)
 	elapsed := time.Since(startTime)
 
-	log.Info("Completed simplified file processing",
+	rawMapSize := len(
+		result.RawLabels,
+	) + len(
+		result.RawArtists,
+	) + len(
+		result.RawMasters,
+	) + len(
+		result.RawReleases,
+	)
+	convertedMapSize := len(
+		result.Labels,
+	) + len(
+		result.Artists,
+	) + len(
+		result.Masters,
+	) + len(
+		result.Releases,
+	)
+
+	log.Info("Completed channel-based file processing with full data extraction",
 		"fileType", fileType,
 		"totalRecords", result.TotalRecords,
 		"parsedRecords", result.ParsedRecords,
 		"erroredRecords", result.ErroredRecords,
-		"mapSize", len(result.Labels)+len(result.Artists)+len(result.Masters)+len(result.Releases),
+		"rawMapSize", rawMapSize,
+		"convertedMapSize", convertedMapSize,
 		"elapsedMs", elapsed.Milliseconds(),
 		"finalMemoryMB", endMemStats.Alloc/1024/1024,
 		"finalHeapMB", endMemStats.HeapAlloc/1024/1024,
@@ -143,65 +1143,7 @@ func (s *SimplifiedXMLProcessingService) ProcessLabelsFile(
 	filePath string,
 	processingID string,
 ) (*ProcessingResult, error) {
-	log := s.log.Function("ProcessLabelsFile")
-
-	log.Info("Starting labels file processing with simplified approach",
-		"filePath", filePath,
-		"processingID", processingID)
-
-	// Update processing status to "processing"
-	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
-		log.Warn("failed to update processing status", "error", err, "processingID", processingID)
-	}
-
-	// Use simplified parsing approach
-	simplifiedResult, err := s.ProcessFileToMap(ctx, filePath, "labels")
-	if err != nil {
-		// Update status to failed
-		if statusErr := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusFailed, nil); statusErr != nil {
-			log.Warn(
-				"failed to update processing status to failed",
-				"error",
-				statusErr,
-				"processingID",
-				processingID,
-			)
-		}
-		return nil, log.Err("simplified parsing failed", err, "filePath", filePath)
-	}
-
-	// Convert SimplifiedResult to ProcessingResult for compatibility
-	result := &ProcessingResult{
-		TotalRecords:     simplifiedResult.TotalRecords,
-		ProcessedRecords: simplifiedResult.ParsedRecords,
-		InsertedRecords:  0, // No database operations performed
-		UpdatedRecords:   0, // No database operations performed
-		ErroredRecords:   simplifiedResult.ErroredRecords,
-		Errors:           simplifiedResult.Errors,
-	}
-
-	// Create processing stats for final status update
-	finalStats := s.createProcessingStats(
-		"labels",
-		result.TotalRecords,
-		result.ProcessedRecords,
-		result.ErroredRecords,
-	)
-
-	// Update final processing status to completed
-	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusCompleted, finalStats); err != nil {
-		log.Warn("failed to update final processing status", "error", err)
-	}
-
-	log.Info("Labels file processing completed with simplified approach (early return)",
-		"fileType", "labels",
-		"total", result.TotalRecords,
-		"processed", result.ProcessedRecords,
-		"errors", result.ErroredRecords,
-		"labelsInMap", len(simplifiedResult.Labels))
-
-	// Early return - no database operations performed
-	return result, nil
+	return s.ProcessFile(ctx, filePath, processingID, "labels")
 }
 
 func (s *SimplifiedXMLProcessingService) ProcessArtistsFile(
@@ -209,65 +1151,7 @@ func (s *SimplifiedXMLProcessingService) ProcessArtistsFile(
 	filePath string,
 	processingID string,
 ) (*ProcessingResult, error) {
-	log := s.log.Function("ProcessArtistsFile")
-
-	log.Info("Starting artists file processing with simplified approach",
-		"filePath", filePath,
-		"processingID", processingID)
-
-	// Update processing status to "processing"
-	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
-		log.Warn("failed to update processing status", "error", err, "processingID", processingID)
-	}
-
-	// Use simplified parsing approach
-	simplifiedResult, err := s.ProcessFileToMap(ctx, filePath, "artists")
-	if err != nil {
-		// Update status to failed
-		if statusErr := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusFailed, nil); statusErr != nil {
-			log.Warn(
-				"failed to update processing status to failed",
-				"error",
-				statusErr,
-				"processingID",
-				processingID,
-			)
-		}
-		return nil, log.Err("simplified parsing failed", err, "filePath", filePath)
-	}
-
-	// Convert SimplifiedResult to ProcessingResult for compatibility
-	result := &ProcessingResult{
-		TotalRecords:     simplifiedResult.TotalRecords,
-		ProcessedRecords: simplifiedResult.ParsedRecords,
-		InsertedRecords:  0, // No database operations performed
-		UpdatedRecords:   0, // No database operations performed
-		ErroredRecords:   simplifiedResult.ErroredRecords,
-		Errors:           simplifiedResult.Errors,
-	}
-
-	// Create processing stats for final status update
-	finalStats := s.createProcessingStats(
-		"artists",
-		result.TotalRecords,
-		result.ProcessedRecords,
-		result.ErroredRecords,
-	)
-
-	// Update final processing status to completed
-	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusCompleted, finalStats); err != nil {
-		log.Warn("failed to update final processing status", "error", err)
-	}
-
-	log.Info("Artists file processing completed with simplified approach (early return)",
-		"fileType", "artists",
-		"total", result.TotalRecords,
-		"processed", result.ProcessedRecords,
-		"errors", result.ErroredRecords,
-		"artistsInMap", len(simplifiedResult.Artists))
-
-	// Early return - no database operations performed
-	return result, nil
+	return s.ProcessFile(ctx, filePath, processingID, "artists")
 }
 
 func (s *SimplifiedXMLProcessingService) ProcessMastersFile(
@@ -275,65 +1159,7 @@ func (s *SimplifiedXMLProcessingService) ProcessMastersFile(
 	filePath string,
 	processingID string,
 ) (*ProcessingResult, error) {
-	log := s.log.Function("ProcessMastersFile")
-
-	log.Info("Starting masters file processing with simplified approach",
-		"filePath", filePath,
-		"processingID", processingID)
-
-	// Update processing status to "processing"
-	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
-		log.Warn("failed to update processing status", "error", err, "processingID", processingID)
-	}
-
-	// Use simplified parsing approach
-	simplifiedResult, err := s.ProcessFileToMap(ctx, filePath, "masters")
-	if err != nil {
-		// Update status to failed
-		if statusErr := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusFailed, nil); statusErr != nil {
-			log.Warn(
-				"failed to update processing status to failed",
-				"error",
-				statusErr,
-				"processingID",
-				processingID,
-			)
-		}
-		return nil, log.Err("simplified parsing failed", err, "filePath", filePath)
-	}
-
-	// Convert SimplifiedResult to ProcessingResult for compatibility
-	result := &ProcessingResult{
-		TotalRecords:     simplifiedResult.TotalRecords,
-		ProcessedRecords: simplifiedResult.ParsedRecords,
-		InsertedRecords:  0, // No database operations performed
-		UpdatedRecords:   0, // No database operations performed
-		ErroredRecords:   simplifiedResult.ErroredRecords,
-		Errors:           simplifiedResult.Errors,
-	}
-
-	// Create processing stats for final status update
-	finalStats := s.createProcessingStats(
-		"masters",
-		result.TotalRecords,
-		result.ProcessedRecords,
-		result.ErroredRecords,
-	)
-
-	// Update final processing status to completed
-	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusCompleted, finalStats); err != nil {
-		log.Warn("failed to update final processing status", "error", err)
-	}
-
-	log.Info("Masters file processing completed with simplified approach (early return)",
-		"fileType", "masters",
-		"total", result.TotalRecords,
-		"processed", result.ProcessedRecords,
-		"errors", result.ErroredRecords,
-		"mastersInMap", len(simplifiedResult.Masters))
-
-	// Early return - no database operations performed
-	return result, nil
+	return s.ProcessFile(ctx, filePath, processingID, "masters")
 }
 
 func (s *SimplifiedXMLProcessingService) ProcessReleasesFile(
@@ -341,11 +1167,64 @@ func (s *SimplifiedXMLProcessingService) ProcessReleasesFile(
 	filePath string,
 	processingID string,
 ) (*ProcessingResult, error) {
-	log := s.log.Function("ProcessReleasesFile")
+	return s.ProcessFile(ctx, filePath, processingID, "releases")
+}
 
-	log.Info("Starting releases file processing with simplified approach",
+// ProcessingConfig defines configuration for each file type
+type ProcessingConfig struct {
+	GetRawMapSize       func(*SimplifiedResult) int
+	GetConvertedMapSize func(*SimplifiedResult) int
+	RawMapName          string
+	ConvertedMapName    string
+}
+
+// Entity configurations for simplified processing
+var processingConfigs = map[string]ProcessingConfig{
+	"labels": {
+		GetRawMapSize:       func(r *SimplifiedResult) int { return len(r.RawLabels) },
+		GetConvertedMapSize: func(r *SimplifiedResult) int { return len(r.Labels) },
+		RawMapName:          "rawLabelsInMap",
+		ConvertedMapName:    "labelsInMap",
+	},
+	"artists": {
+		GetRawMapSize:       func(r *SimplifiedResult) int { return len(r.RawArtists) },
+		GetConvertedMapSize: func(r *SimplifiedResult) int { return len(r.Artists) },
+		RawMapName:          "rawArtistsInMap",
+		ConvertedMapName:    "artistsInMap",
+	},
+	"masters": {
+		GetRawMapSize:       func(r *SimplifiedResult) int { return len(r.RawMasters) },
+		GetConvertedMapSize: func(r *SimplifiedResult) int { return len(r.Masters) },
+		RawMapName:          "rawMastersInMap",
+		ConvertedMapName:    "mastersInMap",
+	},
+	"releases": {
+		GetRawMapSize:       func(r *SimplifiedResult) int { return len(r.RawReleases) },
+		GetConvertedMapSize: func(r *SimplifiedResult) int { return len(r.Releases) },
+		RawMapName:          "rawReleasesInMap",
+		ConvertedMapName:    "releasesInMap",
+	},
+}
+
+// ProcessFile is the consolidated generic method that handles all file types
+func (s *SimplifiedXMLProcessingService) ProcessFile(
+	ctx context.Context,
+	filePath string,
+	processingID string,
+	fileType string,
+) (*ProcessingResult, error) {
+	log := s.log.Function("ProcessFile")
+
+	// Validate file type
+	config, exists := processingConfigs[fileType]
+	if !exists {
+		return nil, log.Err("unsupported file type", nil, "fileType", fileType)
+	}
+
+	log.Info("Starting file processing with simplified approach",
 		"filePath", filePath,
-		"processingID", processingID)
+		"processingID", processingID,
+		"fileType", fileType)
 
 	// Update processing status to "processing"
 	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
@@ -353,7 +1232,7 @@ func (s *SimplifiedXMLProcessingService) ProcessReleasesFile(
 	}
 
 	// Use simplified parsing approach
-	simplifiedResult, err := s.ProcessFileToMap(ctx, filePath, "releases")
+	simplifiedResult, err := s.ProcessFileToMap(ctx, filePath, fileType)
 	if err != nil {
 		// Update status to failed
 		if statusErr := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusFailed, nil); statusErr != nil {
@@ -369,18 +1248,11 @@ func (s *SimplifiedXMLProcessingService) ProcessReleasesFile(
 	}
 
 	// Convert SimplifiedResult to ProcessingResult for compatibility
-	result := &ProcessingResult{
-		TotalRecords:     simplifiedResult.TotalRecords,
-		ProcessedRecords: simplifiedResult.ParsedRecords,
-		InsertedRecords:  0, // No database operations performed
-		UpdatedRecords:   0, // No database operations performed
-		ErroredRecords:   simplifiedResult.ErroredRecords,
-		Errors:           simplifiedResult.Errors,
-	}
+	result := s.convertToProcessingResult(simplifiedResult)
 
 	// Create processing stats for final status update
 	finalStats := s.createProcessingStats(
-		"releases",
+		fileType,
 		result.TotalRecords,
 		result.ProcessedRecords,
 		result.ErroredRecords,
@@ -391,15 +1263,33 @@ func (s *SimplifiedXMLProcessingService) ProcessReleasesFile(
 		log.Warn("failed to update final processing status", "error", err)
 	}
 
-	log.Info("Releases file processing completed with simplified approach (early return)",
-		"fileType", "releases",
+	// Log completion with map sizes
+	rawMapSize := config.GetRawMapSize(simplifiedResult)
+	convertedMapSize := config.GetConvertedMapSize(simplifiedResult)
+	log.Info("File processing completed with channel-based approach (early return)",
+		"fileType", fileType,
 		"total", result.TotalRecords,
 		"processed", result.ProcessedRecords,
 		"errors", result.ErroredRecords,
-		"releasesInMap", len(simplifiedResult.Releases))
+		config.RawMapName, rawMapSize,
+		config.ConvertedMapName, convertedMapSize)
 
 	// Early return - no database operations performed
 	return result, nil
+}
+
+// convertToProcessingResult converts SimplifiedResult to ProcessingResult for compatibility
+func (s *SimplifiedXMLProcessingService) convertToProcessingResult(
+	simplifiedResult *SimplifiedResult,
+) *ProcessingResult {
+	return &ProcessingResult{
+		TotalRecords:     simplifiedResult.TotalRecords,
+		ProcessedRecords: simplifiedResult.ParsedRecords,
+		InsertedRecords:  0, // No database operations performed
+		UpdatedRecords:   0, // No database operations performed
+		ErroredRecords:   simplifiedResult.ErroredRecords,
+		Errors:           simplifiedResult.Errors,
+	}
 }
 
 // Helper method to create appropriate ProcessingStats based on entity type
@@ -445,3 +1335,142 @@ func (s *SimplifiedXMLProcessingService) updateProcessingStatus(
 
 	return s.discogsDataProcessingRepo.Update(ctx, processing)
 }
+
+// Conversion helper methods for converting Discogs import types to model types
+
+func (s *SimplifiedXMLProcessingService) convertContextualDiscogsImageToModel(contextualImage *ContextualDiscogsImage) *models.Image {
+	if contextualImage == nil || contextualImage.DiscogsImage == nil {
+		return nil
+	}
+
+	discogsImage := contextualImage.DiscogsImage
+
+	// Validate required fields before creating the image
+	if discogsImage.URI == "" || contextualImage.ImageableID == "" || contextualImage.ImageableType == "" {
+		return nil // Skip invalid images
+	}
+
+	// Convert ImageableID from string to int64
+	imageableID, err := strconv.ParseInt(contextualImage.ImageableID, 10, 64)
+	if err != nil {
+		return nil // Skip invalid ImageableID
+	}
+
+	image := &models.Image{
+		URL:           discogsImage.URI,
+		ImageType:     models.ImageTypePrimary, // Default to primary, could be enhanced later
+		ImageableID:   imageableID,
+		ImageableType: contextualImage.ImageableType,
+	}
+
+	// Set Discogs-specific fields
+	if discogsImage.Type != "" {
+		image.DiscogsType = &discogsImage.Type
+		// Map Discogs type to our ImageType
+		switch discogsImage.Type {
+		case "primary":
+			image.ImageType = models.ImageTypePrimary
+		case "secondary":
+			image.ImageType = models.ImageTypeSecondary
+		default:
+			image.ImageType = models.ImageTypeGallery
+		}
+	}
+
+	if discogsImage.URI != "" {
+		image.DiscogsURI = &discogsImage.URI
+	}
+
+	if discogsImage.URI150 != "" {
+		image.DiscogsURI150 = &discogsImage.URI150
+	}
+
+	if discogsImage.Width > 0 {
+		width := int(discogsImage.Width)
+		image.Width = &width
+	}
+
+	if discogsImage.Height > 0 {
+		height := int(discogsImage.Height)
+		image.Height = &height
+	}
+
+	return image
+}
+
+func (s *SimplifiedXMLProcessingService) convertDiscogsTrackToModel(discogsTrack *imports.Track) *models.Track {
+	if discogsTrack == nil {
+		return nil
+	}
+
+	// Validate required fields - skip tracks without required data
+	if discogsTrack.Title == "" || discogsTrack.Position == "" {
+		return nil
+	}
+
+	// TODO: Tracks require ReleaseID to be valid, but we don't have release association implemented yet
+	// For now, skip track processing to avoid GORM validation errors
+	// This will be fixed when we implement proper release-track relationships
+	return nil
+}
+
+func (s *SimplifiedXMLProcessingService) convertDiscogsArtistToModel(discogsArtist *imports.Artist) *models.Artist {
+	if discogsArtist == nil || discogsArtist.ID <= 0 {
+		return nil
+	}
+
+	artist := &models.Artist{
+		DiscogsID: int64(discogsArtist.ID),
+		Name:      discogsArtist.Name,
+		IsActive:  true, // Default to active
+	}
+
+	return artist
+}
+
+// parseDurationToSeconds converts duration string formats to seconds
+// Supports formats like "4:23", "1:23:45", "123" (seconds only)
+func (s *SimplifiedXMLProcessingService) parseDurationToSeconds(duration string) int {
+	if duration == "" {
+		return 0
+	}
+
+	// If it's just a number, treat it as seconds
+	if seconds, err := strconv.Atoi(duration); err == nil {
+		return seconds
+	}
+
+	// Handle time format like "4:23" or "1:23:45"
+	parts := strings.Split(duration, ":")
+	if len(parts) < 2 {
+		return 0
+	}
+
+	var totalSeconds int
+
+	// Parse based on number of parts
+	switch len(parts) {
+	case 2: // mm:ss
+		minutes, err1 := strconv.Atoi(parts[0])
+		seconds, err2 := strconv.Atoi(parts[1])
+		if err1 != nil || err2 != nil {
+			return 0
+		}
+		totalSeconds = minutes*60 + seconds
+
+	case 3: // hh:mm:ss
+		hours, err1 := strconv.Atoi(parts[0])
+		minutes, err2 := strconv.Atoi(parts[1])
+		seconds, err3 := strconv.Atoi(parts[2])
+		if err1 != nil || err2 != nil || err3 != nil {
+			return 0
+		}
+		totalSeconds = hours*3600 + minutes*60 + seconds
+
+	default:
+		return 0
+	}
+
+	return totalSeconds
+}
+

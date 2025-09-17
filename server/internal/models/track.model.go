@@ -1,24 +1,28 @@
 package models
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 	"waugzee/internal/utils"
 )
 
 type Track struct {
-	BaseModel
-	ReleaseID   int    `gorm:"type:int;not null;index:idx_tracks_release" json:"releaseId" validate:"required"`
-	Position    string `gorm:"type:text;not null" json:"position" validate:"required"`
-	Title       string `gorm:"type:text;not null" json:"title" validate:"required"`
-	Duration    *int   `gorm:"type:int" json:"duration,omitempty"` // Duration in seconds
-	ContentHash string `gorm:"type:varchar(64);not null;index:idx_tracks_content_hash" json:"contentHash"`
+	ID          int       `gorm:"type:int;primaryKey;autoIncrement" json:"id"`
+	CreatedAt   time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+	ReleaseID   int64     `gorm:"type:bigint;not null;index:idx_tracks_release" json:"releaseId" validate:"required"`
+	Position    string    `gorm:"type:text;not null" json:"position" validate:"required"`
+	Title       string    `gorm:"type:text;not null" json:"title" validate:"required"`
+	Duration    *int      `gorm:"type:int" json:"duration,omitempty"` // Duration in seconds
+	ContentHash string    `gorm:"type:varchar(64);not null;index:idx_tracks_content_hash" json:"contentHash"`
 
 	// Relationships
 	Release *Release `gorm:"foreignKey:ReleaseID" json:"release,omitempty"`
 }
 
 func (t *Track) BeforeCreate(tx *gorm.DB) (err error) {
-	if t.ReleaseID == 0 {
+	if t.ReleaseID <= 0 {
 		return gorm.ErrInvalidValue
 	}
 	if t.Position == "" {
@@ -39,7 +43,7 @@ func (t *Track) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 func (t *Track) BeforeUpdate(tx *gorm.DB) (err error) {
-	if t.ReleaseID == 0 {
+	if t.ReleaseID <= 0 {
 		return gorm.ErrInvalidValue
 	}
 	if t.Position == "" {

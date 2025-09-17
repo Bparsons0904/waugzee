@@ -16,7 +16,7 @@ func TestLabelRepository_BatchProcessingLogic(t *testing.T) {
 			discogsID := int64(i + 1)
 			labels[i] = &models.Label{
 				Name:      "Test Label",
-				DiscogsID: &discogsID,
+				DiscogsID: discogsID,
 			}
 		}
 
@@ -72,13 +72,10 @@ func TestLabelRepository_LabelCreation(t *testing.T) {
 		},
 		{
 			name: "label with discogs ID",
-			labelData: func() *models.Label {
-				discogsID := int64(123)
-				return &models.Label{
-					Name:      "Test Label with Discogs ID",
-					DiscogsID: &discogsID,
-				}
-			}(),
+			labelData: &models.Label{
+				Name:      "Test Label with Discogs ID",
+				DiscogsID: 123,
+			},
 			expectErr: false,
 		},
 	}
@@ -88,8 +85,8 @@ func TestLabelRepository_LabelCreation(t *testing.T) {
 			// Test label validation
 			assert.NotEmpty(t, tt.labelData.Name)
 
-			if tt.labelData.DiscogsID != nil {
-				assert.Greater(t, *tt.labelData.DiscogsID, int64(0))
+			if tt.labelData.DiscogsID > 0 {
+				assert.Greater(t, tt.labelData.DiscogsID, int64(0))
 			}
 		})
 	}
@@ -104,16 +101,14 @@ func TestLabelRepository_DiscogsIDMapping(t *testing.T) {
 			{Name: "Label 2"},
 		}
 
-		discogsID1 := int64(123)
-		discogsID2 := int64(456)
-		labels[0].DiscogsID = &discogsID1
-		labels[1].DiscogsID = &discogsID2
+		labels[0].DiscogsID = 123
+		labels[1].DiscogsID = 456
 
 		// Create the map as the repository would
 		result := make(map[int64]*models.Label, len(labels))
 		for _, label := range labels {
-			if label.DiscogsID != nil {
-				result[*label.DiscogsID] = label
+			if label.DiscogsID > 0 {
+				result[label.DiscogsID] = label
 			}
 		}
 
@@ -146,8 +141,7 @@ func TestLabelRepository_UpsertLogic(t *testing.T) {
 
 		// Set Discogs IDs
 		for i, label := range labels {
-			discogsID := int64(i + 1)
-			label.DiscogsID = &discogsID
+			label.DiscogsID = int64(i + 1)
 		}
 
 		// Simulate existing labels map (labels 3 and 4 exist)
@@ -161,8 +155,8 @@ func TestLabelRepository_UpsertLogic(t *testing.T) {
 
 		// Separate logic as in repository
 		for _, label := range labels {
-			if label.DiscogsID != nil {
-				if existing, exists := existingLabels[*label.DiscogsID]; exists {
+			if label.DiscogsID > 0 {
+				if existing, exists := existingLabels[label.DiscogsID]; exists {
 					// Update existing
 					existing.Name = label.Name
 					toUpdate = append(toUpdate, existing)

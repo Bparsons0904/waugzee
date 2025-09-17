@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 	"waugzee/internal/utils"
 )
@@ -16,10 +18,12 @@ const (
 )
 
 type Release struct {
-	BaseModel
+	DiscogsID   int64         `gorm:"type:bigint;primaryKey;not null" json:"discogsId" validate:"required,gt=0"`
+	CreatedAt   time.Time     `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt   time.Time     `gorm:"autoUpdateTime" json:"updatedAt"`
 	Title       string        `gorm:"type:text;not null;index:idx_releases_title" json:"title" validate:"required"`
-	LabelID     *int          `gorm:"type:int;index:idx_releases_label" json:"labelId,omitempty"`
-	MasterID    *int          `gorm:"type:int;index:idx_releases_master" json:"masterId,omitempty"`
+	LabelID     *int64        `gorm:"type:bigint;index:idx_releases_label" json:"labelId,omitempty"`
+	MasterID    *int64        `gorm:"type:bigint;index:idx_releases_master" json:"masterId,omitempty"`
 	Year        *int          `gorm:"type:int;index:idx_releases_year" json:"year,omitempty"`
 	Country     *string       `gorm:"type:text" json:"country,omitempty"`
 	Format      ReleaseFormat `gorm:"type:text;default:'vinyl';index:idx_releases_format" json:"format"`
@@ -38,6 +42,9 @@ type Release struct {
 }
 
 func (r *Release) BeforeCreate(tx *gorm.DB) (err error) {
+	if r.DiscogsID <= 0 {
+		return gorm.ErrInvalidValue
+	}
 	if r.Title == "" {
 		return gorm.ErrInvalidValue
 	}

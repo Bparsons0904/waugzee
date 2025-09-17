@@ -1,16 +1,20 @@
 package models
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 	"waugzee/internal/utils"
 )
 
 type Master struct {
-	BaseModel
-	Title       string `gorm:"type:text;not null;index:idx_masters_title" json:"title" validate:"required"`
-	MainRelease *int   `gorm:"type:int" json:"mainRelease,omitempty"`
-	Year        *int   `gorm:"type:int;index:idx_masters_year" json:"year,omitempty"`
-	ContentHash string `gorm:"type:varchar(64);not null;index:idx_masters_content_hash" json:"contentHash"`
+	DiscogsID   int64     `gorm:"type:bigint;primaryKey;not null" json:"discogsId" validate:"required,gt=0"`
+	CreatedAt   time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+	Title       string    `gorm:"type:text;not null;index:idx_masters_title" json:"title" validate:"required"`
+	MainRelease *int      `gorm:"type:int" json:"mainRelease,omitempty"`
+	Year        *int      `gorm:"type:int;index:idx_masters_year" json:"year,omitempty"`
+	ContentHash string    `gorm:"type:varchar(64);not null;index:idx_masters_content_hash" json:"contentHash"`
 
 	// Relationships
 	Releases []Release `gorm:"foreignKey:MasterID" json:"releases,omitempty"`
@@ -19,6 +23,9 @@ type Master struct {
 }
 
 func (m *Master) BeforeCreate(tx *gorm.DB) (err error) {
+	if m.DiscogsID <= 0 {
+		return gorm.ErrInvalidValue
+	}
 	if m.Title == "" {
 		return gorm.ErrInvalidValue
 	}

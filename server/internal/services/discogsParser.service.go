@@ -10,14 +10,27 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 	"waugzee/internal/imports"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
-
-
 )
+
+// EntityMessage represents a single entity sent through the processing channel
+type EntityMessage struct {
+	Type         string      // "label", "artist", "master", "release"
+	RawEntity    interface{} // *imports.Label, *imports.Artist, *imports.Master, *imports.Release
+	ProcessingID string
+}
+
+// CompletionMessage signals that file processing has been completed
+type CompletionMessage struct {
+	ProcessingID string
+	FileType     string
+	Completed    bool
+}
 
 // ParseResult represents the result of parsing a Discogs XML file
 type ParseResult struct {
@@ -170,7 +183,10 @@ func (s *DiscogsParserService) parseEntityFile(
 			case "label":
 				var label imports.Label
 				if err := decoder.DecodeElement(&label, &startElement); err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("Failed to decode label: %v", err))
+					result.Errors = append(
+						result.Errors,
+						fmt.Sprintf("Failed to decode label: %v", err),
+					)
 					result.ErroredRecords++
 					continue
 				}
@@ -178,7 +194,10 @@ func (s *DiscogsParserService) parseEntityFile(
 			case "artist":
 				var artist imports.Artist
 				if err := decoder.DecodeElement(&artist, &startElement); err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("Failed to decode artist: %v", err))
+					result.Errors = append(
+						result.Errors,
+						fmt.Sprintf("Failed to decode artist: %v", err),
+					)
 					result.ErroredRecords++
 					continue
 				}
@@ -186,7 +205,10 @@ func (s *DiscogsParserService) parseEntityFile(
 			case "master":
 				var master imports.Master
 				if err := decoder.DecodeElement(&master, &startElement); err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("Failed to decode master: %v", err))
+					result.Errors = append(
+						result.Errors,
+						fmt.Sprintf("Failed to decode master: %v", err),
+					)
 					result.ErroredRecords++
 					continue
 				}
@@ -194,7 +216,10 @@ func (s *DiscogsParserService) parseEntityFile(
 			case "release":
 				var release imports.Release
 				if err := decoder.DecodeElement(&release, &startElement); err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("Failed to decode release: %v", err))
+					result.Errors = append(
+						result.Errors,
+						fmt.Sprintf("Failed to decode release: %v", err),
+					)
 					result.ErroredRecords++
 					continue
 				}
@@ -322,12 +347,6 @@ func (s *DiscogsParserService) logFinalSummary(
 	}
 }
 
-// NOTE: The following duplicate parsing methods (parseLabelsFile, parseArtistsFile,
-// parseMastersFile, parseReleasesFile) have been replaced by the generic
-// parseEntityFile method above. This eliminates ~800 lines of duplicated code.
-
-// Conversion methods - extracted from XMLProcessingService for reuse
-
 func (s *DiscogsParserService) convertDiscogsLabel(discogsLabel *imports.Label) *models.Label {
 	// Skip labels with invalid data
 	if discogsLabel.ID == 0 || len(discogsLabel.Name) == 0 {
@@ -342,19 +361,8 @@ func (s *DiscogsParserService) convertDiscogsLabel(discogsLabel *imports.Label) 
 
 	label := &models.Label{Name: name}
 
-	// Set ID directly from Discogs ID
-	label.BaseModel.ID = int(discogsLabel.ID)
-
-	// MEMORY OPTIMIZATION: Skip profile and website for now
-	// These can be populated later via API calls when actually needed
-	// if profile := strings.TrimSpace(discogsLabel.Profile); len(profile) > 0 {
-	// 	label.Profile = &profile
-	// }
-	// if len(discogsLabel.URLs) > 0 {
-	// 	if firstURL := strings.TrimSpace(discogsLabel.URLs[0]); len(firstURL) > 0 {
-	// 		label.Website = &firstURL
-	// 	}
-	// }
+	// Set DiscogsID directly from Discogs ID
+	label.DiscogsID = int64(discogsLabel.ID)
 
 	return label
 }
@@ -376,14 +384,9 @@ func (s *DiscogsParserService) convertDiscogsArtist(discogsArtist *imports.Artis
 		IsActive: true, // Default to active
 	}
 
-	// Set ID directly from Discogs ID
-	artist.BaseModel.ID = int(discogsArtist.ID)
+	// Set DiscogsID directly from Discogs ID
+	artist.DiscogsID = int64(discogsArtist.ID)
 
-	// MEMORY OPTIMIZATION: Skip biography and images for now
-	// These can be populated later via API calls when actually needed
-	// This significantly reduces memory usage as biographies can be very large
-	// and images are typically empty in current XML dumps anyway
-	
 	return artist
 }
 
@@ -402,9 +405,15 @@ func (s *DiscogsParserService) convertDiscogsImage(
 		imageType = models.ImageTypeSecondary
 	}
 
+	// Convert imageableID from string to int64
+	imageableIDInt64, err := strconv.ParseInt(imageableID, 10, 64)
+	if err != nil {
+		return nil // Skip invalid imageableID
+	}
+
 	image := &models.Image{
 		URL:           discogsImage.URI,
-		ImageableID:   imageableID,
+		ImageableID:   imageableIDInt64,
 		ImageableType: imageableType,
 		ImageType:     imageType,
 	}
@@ -443,8 +452,8 @@ func (s *DiscogsParserService) convertDiscogsMaster(discogsMaster *imports.Maste
 
 	master := &models.Master{Title: title}
 
-	// Set ID directly from Discogs ID
-	master.BaseModel.ID = int(discogsMaster.ID)
+	// Set DiscogsID directly from Discogs ID
+	master.DiscogsID = int64(discogsMaster.ID)
 
 	// Set essential fields only
 	if discogsMaster.MainRelease != 0 {
@@ -456,12 +465,6 @@ func (s *DiscogsParserService) convertDiscogsMaster(discogsMaster *imports.Maste
 		master.Year = &discogsMaster.Year
 	}
 
-	// MEMORY OPTIMIZATION: Skip heavy fields for now
-	// Notes can be very large text blocks - skip for now
-	// Data quality is not immediately essential - skip for now
-	// Genres and Artists create many relationships - skip for initial import
-	// These can be populated later via API calls when actually needed
-	
 	return master
 }
 
@@ -479,7 +482,7 @@ func (s *DiscogsParserService) convertDiscogsRelease(
 	}
 
 	release := &models.Release{
-		BaseModel: models.BaseModel{ID: int(discogsRelease.ID)},
+		DiscogsID: int64(discogsRelease.ID),
 		Title:     title,
 		Format:    models.FormatVinyl, // Default format
 	}
@@ -528,19 +531,6 @@ func (s *DiscogsParserService) convertDiscogsRelease(
 		release.TrackCount = &trackCount
 	}
 
-	// Note: CatalogNumber field not available in current Release model
-	// if len(discogsRelease.Labels) > 0 && len(discogsRelease.Labels[0].CatalogNo) > 0 {
-	//	catalogNo := strings.TrimSpace(discogsRelease.Labels[0].CatalogNo)
-	//	if len(catalogNo) > 0 {
-	//		release.CatalogNumber = &catalogNo
-	//	}
-	// }
-
-	// MEMORY OPTIMIZATION: Skip heavy collections for now
-	// Artists, Genres, and Tracks create many relationships and take significant memory
-	// These can be populated later via API calls when actually needed
-	// Only keep essential image URL for basic functionality
-	
 	// Set primary image URL from first image if available
 	if len(discogsRelease.Images) > 0 && discogsRelease.Images[0].URI != "" {
 		imageURL := strings.TrimSpace(discogsRelease.Images[0].URI)
@@ -714,9 +704,9 @@ func (s *DiscogsParserService) convertDiscogsArtists(
 			IsActive: true,
 		}
 
-		// Set ID from Discogs ID if available
+		// Set DiscogsID from Discogs ID if available
 		if discogsArtist.ID > 0 {
-			artist.BaseModel.ID = int(discogsArtist.ID)
+			artist.DiscogsID = int64(discogsArtist.ID)
 		}
 
 		// Note: Biography field not available in current Artist model
@@ -792,7 +782,7 @@ func (s *DiscogsParserService) convertDiscogsTracks(
 		}
 
 		track := models.Track{
-			ReleaseID: releaseID,
+			ReleaseID: int64(releaseID),
 			Position:  position,
 			Title:     title,
 		}

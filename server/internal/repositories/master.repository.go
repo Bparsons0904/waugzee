@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	MASTER_BATCH_SIZE = 2000
+	MASTER_BATCH_SIZE = 5000
 )
 
 type MasterRepository interface {
@@ -65,7 +65,7 @@ func (r *masterRepository) GetByDiscogsID(ctx context.Context, discogsID int64) 
 	log := r.log.Function("GetByDiscogsID")
 
 	var master Master
-	if err := r.getDB(ctx).First(&master, "id = ?", discogsID).Error; err != nil {
+	if err := r.getDB(ctx).First(&master, "discogs_id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -111,34 +111,12 @@ func (r *masterRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *masterRepository) UpsertBatch(ctx context.Context, masters []*Master) (int, int, error) {
-	log := r.log.Function("UpsertBatch")
-
 	if len(masters) == 0 {
 		return 0, 0, nil
 	}
 
-	var totalInserted, totalUpdated int
-
-	// Process in batches to avoid memory issues
-	for i := 0; i < len(masters); i += MASTER_BATCH_SIZE {
-		end := i + MASTER_BATCH_SIZE
-		if end > len(masters) {
-			end = len(masters)
-		}
-
-		batch := masters[i:end]
-		inserted, updated, err := r.upsertSingleBatch(ctx, batch)
-		if err != nil {
-			return totalInserted, totalUpdated, log.Err("failed to upsert batch", err, "batchStart", i, "batchEnd", end)
-		}
-
-		totalInserted += inserted
-		totalUpdated += updated
-
-		log.Info("Processed master batch", "batchStart", i, "batchEnd", end, "inserted", inserted, "updated", updated)
-	}
-
-	return totalInserted, totalUpdated, nil
+	// Service has already deduplicated - process directly without re-deduplication
+	return r.upsertSingleBatch(ctx, masters)
 }
 
 func (r *masterRepository) upsertSingleBatch(ctx context.Context, masters []*Master) (int, int, error) {
@@ -152,7 +130,7 @@ func (r *masterRepository) upsertSingleBatch(ctx context.Context, masters []*Mas
 
 	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
 	result := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "id"}}, // Use primary key (ID as DiscogsID)
+		Columns: []clause.Column{{Name: "discogs_id"}}, // Use primary key (DiscogsID)
 		DoUpdates: clause.AssignmentColumns([]string{
 			"title", "main_release", "year", "updated_at",
 		}),
@@ -175,14 +153,14 @@ func (r *masterRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs 
 	}
 
 	var masters []*Master
-	if err := r.getDB(ctx).Where("id IN ?", discogsIDs).Find(&masters).Error; err != nil {
+	if err := r.getDB(ctx).Where("discogs_id IN ?", discogsIDs).Find(&masters).Error; err != nil {
 		return nil, log.Err("failed to get masters by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
 	// Convert to map for O(1) lookup
 	result := make(map[int64]*Master, len(masters))
 	for _, master := range masters {
-		result[int64(master.ID)] = master
+		result[master.DiscogsID] = master
 	}
 
 	log.Info("Retrieved masters by Discogs IDs", "requested", len(discogsIDs), "found", len(result))

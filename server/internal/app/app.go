@@ -42,6 +42,7 @@ type App struct {
 	ReleaseRepo               repositories.ReleaseRepository
 	TrackRepo                 repositories.TrackRepository
 	GenreRepo                 repositories.GenreRepository
+	ImageRepo                 repositories.ImageRepository
 
 	// Controllers
 	AuthController authController.AuthControllerInterface
@@ -78,6 +79,7 @@ func New() (*App, error) {
 	releaseRepo := repositories.NewReleaseRepository(db)
 	trackRepo := repositories.NewTrackRepository(db)
 	genreRepo := repositories.NewGenreRepository(db)
+	imageRepo := repositories.NewImageRepository(db)
 
 	// Initialize services
 	discogsService := services.NewDiscogsService()
@@ -96,6 +98,13 @@ func New() (*App, error) {
 	)
 	simplifiedXMLProcessingService := services.NewSimplifiedXMLProcessingService(
 		discogsDataProcessingRepo,
+		labelRepo,
+		artistRepo,
+		masterRepo,
+		releaseRepo,
+		genreRepo,
+		trackRepo,
+		imageRepo,
 		discogsParserService,
 	)
 
@@ -155,6 +164,7 @@ func New() (*App, error) {
 		ReleaseRepo:               releaseRepo,
 		TrackRepo:                 trackRepo,
 		GenreRepo:                 genreRepo,
+		ImageRepo:                 imageRepo,
 		AuthController: authController,
 		UserController: userController,
 		Websocket:                 websocket,
@@ -198,6 +208,9 @@ func (a *App) validate() error {
 		a.ArtistRepo,
 		a.MasterRepo,
 		a.ReleaseRepo,
+		a.TrackRepo,
+		a.GenreRepo,
+		a.ImageRepo,
 	}
 
 	for _, check := range nilChecks {

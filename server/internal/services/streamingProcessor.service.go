@@ -384,8 +384,8 @@ func (s *StreamingProcessor) processLabelBatch(labels []*models.Label) {
 	firstID := 0
 	lastID := 0
 	if len(labels) > 0 {
-		firstID = labels[0].ID
-		lastID = labels[len(labels)-1].ID
+		firstID = int(labels[0].DiscogsID)
+		lastID = int(labels[len(labels)-1].DiscogsID)
 	}
 
 	s.log.Info("Processing label batch",
@@ -404,8 +404,8 @@ func (s *StreamingProcessor) processArtistBatch(artists []*models.Artist) {
 	firstID := 0
 	lastID := 0
 	if len(artists) > 0 {
-		firstID = artists[0].ID
-		lastID = artists[len(artists)-1].ID
+		firstID = int(artists[0].DiscogsID)
+		lastID = int(artists[len(artists)-1].DiscogsID)
 	}
 
 	s.log.Info("Processing artist batch",
@@ -444,8 +444,8 @@ func (s *StreamingProcessor) processMasterBatch(masters []*models.Master) {
 	firstID := 0
 	lastID := 0
 	if len(masters) > 0 {
-		firstID = masters[0].ID
-		lastID = masters[len(masters)-1].ID
+		firstID = int(masters[0].DiscogsID)
+		lastID = int(masters[len(masters)-1].DiscogsID)
 	}
 
 	s.log.Info("Processing master batch",
@@ -464,8 +464,8 @@ func (s *StreamingProcessor) processReleaseBatch(releases []*models.Release) {
 	firstID := 0
 	lastID := 0
 	if len(releases) > 0 {
-		firstID = releases[0].ID
-		lastID = releases[len(releases)-1].ID
+		firstID = int(releases[0].DiscogsID)
+		lastID = int(releases[len(releases)-1].DiscogsID)
 	}
 
 	s.log.Info("Processing release batch",

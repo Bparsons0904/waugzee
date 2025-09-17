@@ -65,7 +65,7 @@ func (r *labelRepository) GetByDiscogsID(ctx context.Context, discogsID int64) (
 	log := r.log.Function("GetByDiscogsID")
 
 	var label Label
-	if err := r.getDB(ctx).First(&label, "id = ?", discogsID).Error; err != nil {
+	if err := r.getDB(ctx).First(&label, "discogs_id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -111,34 +111,12 @@ func (r *labelRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *labelRepository) UpsertBatch(ctx context.Context, labels []*Label) (int, int, error) {
-	log := r.log.Function("UpsertBatch")
-
 	if len(labels) == 0 {
 		return 0, 0, nil
 	}
 
-	var totalInserted, totalUpdated int
-
-	// Process in batches to avoid memory issues
-	for i := 0; i < len(labels); i += LABEL_BATCH_SIZE {
-		end := i + LABEL_BATCH_SIZE
-		if end > len(labels) {
-			end = len(labels)
-		}
-
-		batch := labels[i:end]
-		inserted, updated, err := r.upsertSingleBatch(ctx, batch)
-		if err != nil {
-			return totalInserted, totalUpdated, log.Err("failed to upsert batch", err, "batchStart", i, "batchEnd", end)
-		}
-
-		totalInserted += inserted
-		totalUpdated += updated
-
-		log.Info("Processed label batch", "batchStart", i, "batchEnd", end, "inserted", inserted, "updated", updated)
-	}
-
-	return totalInserted, totalUpdated, nil
+	// Service has already deduplicated - process directly without re-deduplication
+	return r.upsertSingleBatch(ctx, labels)
 }
 
 func (r *labelRepository) upsertSingleBatch(ctx context.Context, labels []*Label) (int, int, error) {
@@ -152,7 +130,7 @@ func (r *labelRepository) upsertSingleBatch(ctx context.Context, labels []*Label
 
 	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
 	result := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "id"}}, // Use primary key (ID as DiscogsID)
+		Columns: []clause.Column{{Name: "discogs_id"}}, // Use primary key (DiscogsID)
 		DoUpdates: clause.AssignmentColumns([]string{
 			"name", "updated_at",
 		}),
@@ -182,14 +160,14 @@ func (r *labelRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs [
 	}
 
 	var labels []*Label
-	if err := r.getDB(ctx).Where("id IN ?", discogsIDs).Find(&labels).Error; err != nil {
+	if err := r.getDB(ctx).Where("discogs_id IN ?", discogsIDs).Find(&labels).Error; err != nil {
 		return nil, log.Err("failed to get labels by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
 	// Convert to map for O(1) lookup
 	result := make(map[int64]*Label, len(labels))
 	for _, label := range labels {
-		result[int64(label.ID)] = label
+		result[label.DiscogsID] = label
 	}
 
 	log.Info("Retrieved labels by Discogs IDs", "requested", len(discogsIDs), "found", len(result))

@@ -5,14 +5,16 @@ import (
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
+	"waugzee/internal/utils"
 	contextutil "waugzee/internal/context"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
-	TRACK_BATCH_SIZE = 1000
+	TRACK_BATCH_SIZE = 5000
 )
 
 type TrackRepository interface {
@@ -22,6 +24,7 @@ type TrackRepository interface {
 	Update(ctx context.Context, track *Track) error
 	Delete(ctx context.Context, id string) error
 	CreateBatch(ctx context.Context, tracks []*Track) error
+	UpsertBatch(ctx context.Context, tracks []*Track) (int, int, error)
 	DeleteByReleaseID(ctx context.Context, releaseID string) error
 }
 
@@ -138,6 +141,54 @@ func (t *trackRepository) CreateBatch(ctx context.Context, tracks []*Track) erro
 
 	log.Info("All track batches created successfully", "totalTracks", len(tracks))
 	return nil
+}
+
+func (t *trackRepository) UpsertBatch(ctx context.Context, tracks []*Track) (int, int, error) {
+	if len(tracks) == 0 {
+		return 0, 0, nil
+	}
+
+	// Service has already deduplicated - process directly without re-deduplication
+	return t.upsertSingleBatch(ctx, tracks)
+}
+
+func (t *trackRepository) upsertSingleBatch(ctx context.Context, tracks []*Track) (int, int, error) {
+	log := t.log.Function("upsertSingleBatch")
+
+	if len(tracks) == 0 {
+		return 0, 0, nil
+	}
+
+	db := t.getDB(ctx)
+
+	// Pre-generate content hashes to avoid hook issues during batch operations
+	for _, track := range tracks {
+		if track.ContentHash == "" {
+			hash, err := utils.GenerateEntityHash(track)
+			if err == nil {
+				track.ContentHash = hash
+			}
+		}
+	}
+
+	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
+	result := db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "release_id"},
+			{Name: "position"},
+		},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"title", "duration", "content_hash", "updated_at",
+		}),
+	}).CreateInBatches(tracks, TRACK_BATCH_SIZE)
+
+	if result.Error != nil {
+		return 0, 0, log.Err("failed to upsert track batch", result.Error, "count", len(tracks))
+	}
+
+	affectedRows := int(result.RowsAffected)
+	log.Info("Upserted tracks", "count", affectedRows)
+	return affectedRows, 0, nil
 }
 
 func (t *trackRepository) DeleteByReleaseID(ctx context.Context, releaseID string) error {

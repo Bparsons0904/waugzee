@@ -5,6 +5,7 @@ import (
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
+	"waugzee/internal/utils"
 	contextutil "waugzee/internal/context"
 
 	"github.com/google/uuid"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	ARTIST_BATCH_SIZE = 3000
+	ARTIST_BATCH_SIZE = 5000
 )
 
 type ArtistRepository interface {
@@ -66,7 +67,7 @@ func (r *artistRepository) GetByDiscogsID(ctx context.Context, discogsID int64) 
 	log := r.log.Function("GetByDiscogsID")
 
 	var artist Artist
-	if err := r.getDB(ctx).First(&artist, "id = ?", discogsID).Error; err != nil {
+	if err := r.getDB(ctx).First(&artist, "discogs_id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -112,34 +113,12 @@ func (r *artistRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *artistRepository) UpsertBatch(ctx context.Context, artists []*Artist) (int, int, error) {
-	log := r.log.Function("UpsertBatch")
-
 	if len(artists) == 0 {
 		return 0, 0, nil
 	}
 
-	var totalInserted, totalUpdated int
-
-	// Process in batches to avoid memory issues
-	for i := 0; i < len(artists); i += ARTIST_BATCH_SIZE {
-		end := i + ARTIST_BATCH_SIZE
-		if end > len(artists) {
-			end = len(artists)
-		}
-
-		batch := artists[i:end]
-		inserted, updated, err := r.upsertSingleBatch(ctx, batch)
-		if err != nil {
-			return totalInserted, totalUpdated, log.Err("failed to upsert batch", err, "batchStart", i, "batchEnd", end)
-		}
-
-		totalInserted += inserted
-		totalUpdated += updated
-
-		log.Info("Processed artist batch", "batchStart", i, "batchEnd", end, "inserted", inserted, "updated", updated)
-	}
-
-	return totalInserted, totalUpdated, nil
+	// Service has already deduplicated - process directly without re-deduplication
+	return r.upsertSingleBatch(ctx, artists)
 }
 
 func (r *artistRepository) upsertSingleBatch(ctx context.Context, artists []*Artist) (int, int, error) {
@@ -151,11 +130,21 @@ func (r *artistRepository) upsertSingleBatch(ctx context.Context, artists []*Art
 
 	db := r.getDB(ctx)
 
+	// Pre-generate content hashes to avoid hook issues during batch operations
+	for _, artist := range artists {
+		if artist.ContentHash == "" {
+			hash, err := utils.GenerateEntityHash(artist)
+			if err == nil {
+				artist.ContentHash = hash
+			}
+		}
+	}
+
 	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
 	result := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "id"}}, // Use primary key (ID as DiscogsID)
+		Columns: []clause.Column{{Name: "discogs_id"}}, // Use primary key (DiscogsID)
 		DoUpdates: clause.AssignmentColumns([]string{
-			"name", "is_active", "updated_at",
+			"name", "is_active", "content_hash", "updated_at",
 		}),
 	}).CreateInBatches(artists, ARTIST_BATCH_SIZE)
 
@@ -176,14 +165,14 @@ func (r *artistRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs 
 	}
 
 	var artists []*Artist
-	if err := r.getDB(ctx).Where("id IN ?", discogsIDs).Find(&artists).Error; err != nil {
+	if err := r.getDB(ctx).Where("discogs_id IN ?", discogsIDs).Find(&artists).Error; err != nil {
 		return nil, log.Err("failed to get artists by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
 	// Convert to map for O(1) lookup
 	result := make(map[int64]*Artist, len(artists))
 	for _, artist := range artists {
-		result[int64(artist.ID)] = artist
+		result[artist.DiscogsID] = artist
 	}
 
 	log.Info("Retrieved artists by Discogs IDs", "requested", len(discogsIDs), "found", len(result))
@@ -207,9 +196,9 @@ func (r *artistRepository) FindOrCreateByDiscogsID(ctx context.Context, discogsI
 		return artist, nil
 	}
 
-	// If not found, create new artist with the DiscogsID as the primary ID
+	// If not found, create new artist with the DiscogsID
 	newArtist := &Artist{
-		BaseModel: BaseModel{ID: int(discogsID)},
+		DiscogsID: discogsID,
 		Name:      name,
 		IsActive:  true, // Default to active
 	}
@@ -219,6 +208,6 @@ func (r *artistRepository) FindOrCreateByDiscogsID(ctx context.Context, discogsI
 		return nil, log.Err("failed to create new artist", err, "name", name, "discogsID", discogsID)
 	}
 
-	log.Info("Created new artist", "name", name, "discogsID", discogsID, "id", createdArtist.ID)
+	log.Info("Created new artist", "name", name, "discogsID", createdArtist.DiscogsID)
 	return createdArtist, nil
 }
