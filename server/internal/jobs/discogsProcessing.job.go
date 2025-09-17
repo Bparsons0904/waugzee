@@ -67,7 +67,7 @@ func (j *DiscogsProcessingJob) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	slog.Info("got here", "record", record)
+	log.Info("Starting record processing", "yearMonth", record.YearMonth, "id", record.ID)
 	if err := j.processRecord(ctx, record); err != nil {
 		log.Error("Failed to process record",
 			"error", err,
@@ -112,7 +112,7 @@ func (j *DiscogsProcessingJob) processRecord(
 	}
 
 	log.Info("Transitioned to processing status", "yearMonth", yearMonth, "status", record.Status)
-	downloadDir := fmt.Sprintf("/app/discogs-data/%s", yearMonth)
+	downloadDir := fmt.Sprintf("%s/%s", services.DiscogsDataDir, yearMonth)
 
 	fileTypes := []struct {
 		name   string

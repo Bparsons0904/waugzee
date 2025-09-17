@@ -153,32 +153,3 @@ func (r *discogsDataProcessingRepository) GetCurrentProcessing(
 
 	return &processing, nil
 }
-
-// Claude is this even used? I have found multiple versions of the same thing
-func (r *discogsDataProcessingRepository) UpdateStatus(
-	ctx context.Context,
-	id string,
-	status ProcessingStatus,
-	errorMessage *string,
-) error {
-	log := r.log.Function("UpdateStatus")
-
-	parsedID, err := uuid.Parse(id)
-	if err != nil {
-		return log.Err("failed to parse processing ID", err, "id", id)
-	}
-
-	updates := map[string]interface{}{
-		"status": status,
-	}
-
-	if errorMessage != nil {
-		updates["error_message"] = *errorMessage
-	}
-
-	if err := r.getDB(ctx).Model(&DiscogsDataProcessing{}).Where("id = ?", parsedID).Updates(updates).Error; err != nil {
-		return log.Err("failed to update processing status", err, "id", id, "status", status)
-	}
-
-	return nil
-}

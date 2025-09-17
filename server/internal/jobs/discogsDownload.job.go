@@ -215,7 +215,7 @@ func (j *DiscogsDownloadJob) performDownload(
 		processingRecord.ProcessingStats = &models.ProcessingStats{}
 	}
 
-	downloadDir := fmt.Sprintf("/app/discogs-data/%s", yearMonth)
+	downloadDir := fmt.Sprintf("%s/%s", services.DiscogsDataDir, yearMonth)
 
 	// Step 1: Handle checksum file
 	if err := j.handleChecksumFile(ctx, processingRecord, yearMonth); err != nil {
@@ -281,7 +281,7 @@ func (j *DiscogsDownloadJob) handleChecksumFile(
 
 		// Parse the downloaded checksum file
 		checksumFile := filepath.Join(
-			fmt.Sprintf("/app/discogs-data/%s", yearMonth),
+			fmt.Sprintf("%s/%s", services.DiscogsDataDir, yearMonth),
 			"CHECKSUM.txt",
 		)
 		checksums, err := j.download.ParseChecksumFile(checksumFile)

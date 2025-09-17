@@ -20,6 +20,7 @@ import (
 // Discogs S3 configuration constants
 const (
 	DiscogsS3BaseURL = "https://discogs-data-dumps.s3-us-west-2.amazonaws.com/data"
+	DiscogsDataDir = "/app/discogs-data"
 	DiscogsTimeoutSec = 3600      // 1 hour HTTP client timeout (safety net)
 	DiscogsStallTimeoutSec = 300  // 5 minutes stall timeout (no progress detection)
 	DiscogsUserAgent = "Waugzee/1.0 (Discogs Data Sync)"
@@ -90,7 +91,7 @@ func (ds *DownloadService) DownloadChecksum(ctx context.Context, yearMonth strin
 	)
 
 	// Create download directory
-	downloadDir := fmt.Sprintf("/app/discogs-data/%s", yearMonth)
+	downloadDir := fmt.Sprintf("%s/%s", DiscogsDataDir, yearMonth)
 	if err := ds.ensureDirectory(downloadDir); err != nil {
 		return log.Err("failed to create download directory", err, "directory", downloadDir)
 	}
@@ -217,7 +218,7 @@ func (ds *DownloadService) DownloadXMLFile(ctx context.Context, yearMonth, fileT
 	)
 
 	// Create download directory
-	downloadDir := fmt.Sprintf("/app/discogs-data/%s", yearMonth)
+	downloadDir := fmt.Sprintf("%s/%s", DiscogsDataDir, yearMonth)
 	if err := ds.ensureDirectory(downloadDir); err != nil {
 		return log.Err("failed to create download directory", err, "directory", downloadDir)
 	}
