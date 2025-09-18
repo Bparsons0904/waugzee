@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"waugzee/internal/utils"
 )
@@ -31,12 +32,16 @@ type Release struct {
 	TrackCount  *int          `gorm:"type:int" json:"trackCount,omitempty"`
 	ContentHash string        `gorm:"type:varchar(64);not null;index:idx_releases_content_hash" json:"contentHash"`
 
+	// JSONB columns for embedded data
+	TracksJSON  datatypes.JSON `gorm:"type:jsonb" json:"tracks,omitempty"`
+	ArtistsJSON datatypes.JSON `gorm:"type:jsonb" json:"artists,omitempty"`
+	GenresJSON  datatypes.JSON `gorm:"type:jsonb" json:"genres,omitempty"`
+
 	// Relationships
 	Label           *Label             `gorm:"foreignKey:LabelID" json:"label,omitempty"`
 	Master          *Master            `gorm:"foreignKey:MasterID" json:"master,omitempty"`
-	Artists         []Artist           `gorm:"many2many:release_artists;" json:"artists,omitempty"`
-	Genres          []Genre            `gorm:"many2many:release_genres;" json:"genres,omitempty"`
-	Tracks          []Track            `gorm:"foreignKey:ReleaseID" json:"tracks,omitempty"`
+	// Note: Track/Artist/Genre data now stored as JSONB for simple display
+	// Searchable relationships maintained at Master level
 	UserCollections []UserCollection   `gorm:"foreignKey:ReleaseID" json:"userCollections,omitempty"`
 	PlaySessions    []PlaySession      `gorm:"foreignKey:ReleaseID" json:"playSessions,omitempty"`
 }
@@ -80,14 +85,17 @@ func (r *Release) BeforeUpdate(tx *gorm.DB) (err error) {
 // Hashable interface implementation
 func (r *Release) GetHashableFields() map[string]interface{} {
 	return map[string]interface{}{
-		"Title":      r.Title,
-		"LabelID":    r.LabelID,
-		"MasterID":   r.MasterID,
-		"Year":       r.Year,
-		"Country":    r.Country,
-		"Format":     r.Format,
-		"ImageURL":   r.ImageURL,
-		"TrackCount": r.TrackCount,
+		"Title":       r.Title,
+		"LabelID":     r.LabelID,
+		"MasterID":    r.MasterID,
+		"Year":        r.Year,
+		"Country":     r.Country,
+		"Format":      r.Format,
+		"ImageURL":    r.ImageURL,
+		"TrackCount":  r.TrackCount,
+		"TracksJSON":  r.TracksJSON,
+		"ArtistsJSON": r.ArtistsJSON,
+		"GenresJSON":  r.GenresJSON,
 	}
 }
 

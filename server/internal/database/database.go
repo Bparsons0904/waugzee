@@ -63,11 +63,13 @@ func TXDefer(tx *gorm.DB, log logg.Logger) {
 }
 
 func (s *DB) initializeDB(config config.Config) error {
+	// Use Silent log level for bulk operations to prevent SQL query logging
+	// This will completely disable GORM SQL logging to improve performance during data processing
 	gormLogger := logger.New(
-		slog.NewLogLogger(slog.Default().Handler(), slog.LevelInfo),
+		slog.NewLogLogger(slog.Default().Handler(), slog.LevelError), // Only show errors
 		logger.Config{
-			SlowThreshold:             5 * time.Second,  // Only log queries slower than 5s
-			LogLevel:                  logger.Warn,      // Only log warnings and errors, not all queries
+			SlowThreshold:             10 * time.Second, // Only log extremely slow queries (10s+)
+			LogLevel:                  logger.Silent,    // Silent mode - no SQL query logging
 			IgnoreRecordNotFoundError: true,
 			ParameterizedQueries:      false,
 			Colorful:                  true,

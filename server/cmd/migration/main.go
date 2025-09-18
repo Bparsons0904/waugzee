@@ -28,7 +28,6 @@ var MODELS_TO_MIGRATE = []any{
 	&Cartridge{},
 	&Stylus{},
 	&Genre{},
-	&Track{},
 	&Label{},
 	&Artist{},
 	&Image{},

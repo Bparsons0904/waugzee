@@ -20,7 +20,6 @@ type XMLProcessingService struct {
 	artistRepo                repositories.ArtistRepository
 	masterRepo                repositories.MasterRepository
 	releaseRepo               repositories.ReleaseRepository
-	trackRepo                 repositories.TrackRepository
 	genreRepo                 repositories.GenreRepository
 	discogsDataProcessingRepo repositories.DiscogsDataProcessingRepository
 	parserService             *DiscogsParserService
@@ -36,7 +35,6 @@ func NewXMLProcessingService(
 	artistRepo repositories.ArtistRepository,
 	masterRepo repositories.MasterRepository,
 	releaseRepo repositories.ReleaseRepository,
-	trackRepo repositories.TrackRepository,
 	genreRepo repositories.GenreRepository,
 	discogsDataProcessingRepo repositories.DiscogsDataProcessingRepository,
 	parserService *DiscogsParserService,
@@ -46,7 +44,6 @@ func NewXMLProcessingService(
 		artistRepo:                artistRepo,
 		masterRepo:                masterRepo,
 		releaseRepo:               releaseRepo,
-		trackRepo:                 trackRepo,
 		genreRepo:                 genreRepo,
 		discogsDataProcessingRepo: discogsDataProcessingRepo,
 		parserService:             parserService,

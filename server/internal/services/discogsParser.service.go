@@ -526,6 +526,11 @@ func (s *DiscogsParserService) convertDiscogsRelease(
 		}
 	}
 
+	// VINYL-ONLY FILTERING: Skip non-vinyl releases to dramatically reduce processing volume
+	if release.Format != models.FormatVinyl {
+		return nil
+	}
+
 	// Track count
 	if trackCount := len(discogsRelease.TrackList); trackCount > 0 {
 		release.TrackCount = &trackCount
@@ -539,7 +544,133 @@ func (s *DiscogsParserService) convertDiscogsRelease(
 		}
 	}
 
+	// Generate JSONB data for tracks, artists, and genres
+	if err := s.generateReleaseJSONBData(release, discogsRelease); err != nil {
+		// Log error but don't fail the entire release
+		s.log.Warn("Failed to generate JSONB data", "releaseID", discogsRelease.ID, "error", err)
+	}
+
 	return release
+}
+
+// generateReleaseJSONBData creates JSONB data for tracks, artists, and genres
+func (s *DiscogsParserService) generateReleaseJSONBData(release *models.Release, discogsRelease *imports.Release) error {
+	// Generate tracks JSON
+	tracks := make([]map[string]interface{}, 0, len(discogsRelease.TrackList))
+	for _, track := range discogsRelease.TrackList {
+		if track.Title == "" || track.Position == "" {
+			continue // Skip invalid tracks
+		}
+
+		trackData := map[string]interface{}{
+			"position": strings.TrimSpace(track.Position),
+			"title":    strings.TrimSpace(track.Title),
+		}
+
+		// Add duration if available
+		if track.Duration != "" {
+			if duration := s.parseDurationToSeconds(track.Duration); duration > 0 {
+				trackData["duration"] = duration
+			}
+		}
+
+		tracks = append(tracks, trackData)
+	}
+
+	if len(tracks) > 0 {
+		tracksJSON, err := json.Marshal(tracks)
+		if err != nil {
+			return fmt.Errorf("failed to marshal tracks JSON: %w", err)
+		}
+		release.TracksJSON = tracksJSON
+	}
+
+	// Generate artists JSON
+	artists := make([]map[string]interface{}, 0, len(discogsRelease.Artists))
+	for _, artist := range discogsRelease.Artists {
+		if artist.ID <= 0 {
+			continue // Skip invalid artists
+		}
+
+		artistData := map[string]interface{}{
+			"id":   artist.ID,
+			"name": strings.TrimSpace(artist.Name),
+		}
+
+		artists = append(artists, artistData)
+	}
+
+	if len(artists) > 0 {
+		artistsJSON, err := json.Marshal(artists)
+		if err != nil {
+			return fmt.Errorf("failed to marshal artists JSON: %w", err)
+		}
+		release.ArtistsJSON = artistsJSON
+	}
+
+	// Generate genres JSON
+	genres := make([]string, 0, len(discogsRelease.Genres))
+	for _, genre := range discogsRelease.Genres {
+		if trimmedGenre := strings.TrimSpace(genre); trimmedGenre != "" {
+			genres = append(genres, trimmedGenre)
+		}
+	}
+
+	if len(genres) > 0 {
+		genresJSON, err := json.Marshal(genres)
+		if err != nil {
+			return fmt.Errorf("failed to marshal genres JSON: %w", err)
+		}
+		release.GenresJSON = genresJSON
+	}
+
+	return nil
+}
+
+// parseDurationToSeconds converts duration string formats to seconds
+// Supports formats like "4:23", "1:23:45", "123" (seconds only)
+func (s *DiscogsParserService) parseDurationToSeconds(duration string) int {
+	if duration == "" {
+		return 0
+	}
+
+	// If it's just a number, treat it as seconds
+	if seconds, err := strconv.Atoi(duration); err == nil {
+		return seconds
+	}
+
+	// Handle time format like "4:23" or "1:23:45"
+	parts := strings.Split(duration, ":")
+	if len(parts) < 2 {
+		return 0
+	}
+
+	var totalSeconds int
+
+	// Parse based on number of parts
+	switch len(parts) {
+	case 2: // mm:ss
+		minutes, err1 := strconv.Atoi(parts[0])
+		seconds, err2 := strconv.Atoi(parts[1])
+		if err1 != nil || err2 != nil {
+			return 0
+		}
+		totalSeconds = minutes*60 + seconds
+
+	case 3: // hh:mm:ss
+		hours, err1 := strconv.Atoi(parts[0])
+		minutes, err2 := strconv.Atoi(parts[1])
+		seconds, err3 := strconv.Atoi(parts[2])
+		if err1 != nil || err2 != nil || err3 != nil {
+			return 0
+		}
+		totalSeconds = hours*3600 + minutes*60 + seconds
+
+	default:
+		return 0
+	}
+
+	return totalSeconds
 }
 
 // validateAndLogXMLStructure reads and validates the beginning of the XML file
@@ -760,67 +891,3 @@ func (s *DiscogsParserService) convertDiscogsGenres(
 	return result
 }
 
-// convertDiscogsTracks converts Discogs track data to our Track models
-func (s *DiscogsParserService) convertDiscogsTracks(
-	discogsTracks []imports.Track,
-	releaseID int,
-) []models.Track {
-	if len(discogsTracks) == 0 {
-		return nil
-	}
-
-	var tracks []models.Track
-	for _, discogsTrack := range discogsTracks {
-		if discogsTrack.Title == "" || discogsTrack.Position == "" {
-			continue
-		}
-
-		title := strings.TrimSpace(discogsTrack.Title)
-		position := strings.TrimSpace(discogsTrack.Position)
-		if title == "" || position == "" {
-			continue
-		}
-
-		track := models.Track{
-			ReleaseID: int64(releaseID),
-			Position:  position,
-			Title:     title,
-		}
-
-		// Parse duration if available (format: "4:45")
-		if len(discogsTrack.Duration) > 0 {
-			duration := strings.TrimSpace(discogsTrack.Duration)
-			if len(duration) > 0 {
-				if seconds := s.parseDuration(duration); seconds > 0 {
-					track.Duration = &seconds
-				}
-			}
-		}
-
-		tracks = append(tracks, track)
-	}
-
-	return tracks
-}
-
-// parseDuration converts duration string (e.g., "4:45") to seconds
-func (s *DiscogsParserService) parseDuration(duration string) int {
-	parts := strings.Split(duration, ":")
-	if len(parts) != 2 {
-		return 0
-	}
-
-	var minutes, seconds int
-	if _, err := fmt.Sscanf(parts[0], "%d", &minutes); err != nil {
-		return 0
-	}
-	if _, err := fmt.Sscanf(parts[1], "%d", &seconds); err != nil {
-		return 0
-	}
-
-	if minutes < 0 || seconds < 0 || seconds >= 60 {
-		return 0
-	}
-
-	return minutes*60 + seconds
-}

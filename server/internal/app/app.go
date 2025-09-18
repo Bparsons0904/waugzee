@@ -40,7 +40,6 @@ type App struct {
 	ArtistRepo                repositories.ArtistRepository
 	MasterRepo                repositories.MasterRepository
 	ReleaseRepo               repositories.ReleaseRepository
-	TrackRepo                 repositories.TrackRepository
 	GenreRepo                 repositories.GenreRepository
 	ImageRepo                 repositories.ImageRepository
 
@@ -77,7 +76,6 @@ func New() (*App, error) {
 	artistRepo := repositories.NewArtistRepository(db)
 	masterRepo := repositories.NewMasterRepository(db)
 	releaseRepo := repositories.NewReleaseRepository(db)
-	trackRepo := repositories.NewTrackRepository(db)
 	genreRepo := repositories.NewGenreRepository(db)
 	imageRepo := repositories.NewImageRepository(db)
 
@@ -91,7 +89,6 @@ func New() (*App, error) {
 		artistRepo,
 		masterRepo,
 		releaseRepo,
-		trackRepo,
 		genreRepo,
 		discogsDataProcessingRepo,
 		discogsParserService,
@@ -103,7 +100,6 @@ func New() (*App, error) {
 		masterRepo,
 		releaseRepo,
 		genreRepo,
-		trackRepo,
 		imageRepo,
 		discogsParserService,
 	)
@@ -162,7 +158,6 @@ func New() (*App, error) {
 		ArtistRepo:                artistRepo,
 		MasterRepo:                masterRepo,
 		ReleaseRepo:               releaseRepo,
-		TrackRepo:                 trackRepo,
 		GenreRepo:                 genreRepo,
 		ImageRepo:                 imageRepo,
 		AuthController: authController,
@@ -208,7 +203,6 @@ func (a *App) validate() error {
 		a.ArtistRepo,
 		a.MasterRepo,
 		a.ReleaseRepo,
-		a.TrackRepo,
 		a.GenreRepo,
 		a.ImageRepo,
 	}

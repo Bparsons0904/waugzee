@@ -9,6 +9,7 @@ import (
 )
 
 const DefaultBatchSize = 2000
+const ReleaseBatchSize = 2000
 
 // StreamingProcessor manages concurrent channels for different entity types
 type StreamingProcessor struct {
@@ -18,14 +19,14 @@ type StreamingProcessor struct {
 	genreChan   chan *models.Genre
 	masterChan  chan *models.Master
 	releaseChan chan *models.Release
-	trackChan   chan *models.Track
 
 	// Configuration
-	batchSize int
-	log       logger.Logger
-	ctx       context.Context
-	cancel    context.CancelFunc
-	wg        sync.WaitGroup
+	batchSize        int
+	releaseBatchSize int
+	log              logger.Logger
+	ctx              context.Context
+	cancel           context.CancelFunc
+	wg               sync.WaitGroup
 
 	// Batch storage
 	labelBatch   []*models.Label
@@ -33,7 +34,6 @@ type StreamingProcessor struct {
 	genreBatch   []*models.Genre
 	masterBatch  []*models.Master
 	releaseBatch []*models.Release
-	trackBatch   []*models.Track
 
 	// Batch mutexes for thread safety
 	labelMux   sync.Mutex
@@ -41,7 +41,6 @@ type StreamingProcessor struct {
 	genreMux   sync.Mutex
 	masterMux  sync.Mutex
 	releaseMux sync.Mutex
-	trackMux   sync.Mutex
 
 	// Statistics
 	stats StreamingStats
@@ -54,7 +53,6 @@ type StreamingStats struct {
 	TotalGenres   int
 	TotalMasters  int
 	TotalReleases int
-	TotalTracks   int
 	BatchesProcessed map[string]int
 	StartTime        time.Time
 	LastUpdate       time.Time
@@ -71,21 +69,20 @@ func NewStreamingProcessor() *StreamingProcessor {
 		artistChan:  make(chan *models.Artist, DefaultBatchSize),
 		genreChan:   make(chan *models.Genre, DefaultBatchSize),
 		masterChan:  make(chan *models.Master, DefaultBatchSize),
-		releaseChan: make(chan *models.Release, DefaultBatchSize),
-		trackChan:   make(chan *models.Track, DefaultBatchSize),
+		releaseChan: make(chan *models.Release, ReleaseBatchSize),
 
-		batchSize: DefaultBatchSize,
-		log:       logger.New("streamingProcessor"),
-		ctx:       ctx,
-		cancel:    cancel,
+		batchSize:        DefaultBatchSize,
+		releaseBatchSize: ReleaseBatchSize,
+		log:              logger.New("streamingProcessor"),
+		ctx:              ctx,
+		cancel:           cancel,
 
 		// Initialize batch slices
 		labelBatch:   make([]*models.Label, 0, DefaultBatchSize),
 		artistBatch:  make([]*models.Artist, 0, DefaultBatchSize),
 		genreBatch:   make([]*models.Genre, 0, DefaultBatchSize),
 		masterBatch:  make([]*models.Master, 0, DefaultBatchSize),
-		releaseBatch: make([]*models.Release, 0, DefaultBatchSize),
-		trackBatch:   make([]*models.Track, 0, DefaultBatchSize),
+		releaseBatch: make([]*models.Release, 0, ReleaseBatchSize),
 
 		stats: StreamingStats{
 			BatchesProcessed: make(map[string]int),
@@ -101,16 +98,16 @@ func NewStreamingProcessor() *StreamingProcessor {
 func (s *StreamingProcessor) Start() {
 	s.log.Info("Starting streaming processor",
 		"batchSize", s.batchSize,
+		"releaseBatchSize", s.releaseBatchSize,
 		"channelBufferSize", DefaultBatchSize)
 
 	// Start goroutines for each entity type
-	s.wg.Add(6)
+	s.wg.Add(5)
 	go s.processLabels()
 	go s.processArtists()
 	go s.processGenres()
 	go s.processMasters()
 	go s.processReleases()
-	go s.processTracks()
 
 	s.log.Info("All channel processors started")
 }
@@ -125,7 +122,6 @@ func (s *StreamingProcessor) Stop() {
 	close(s.genreChan)
 	close(s.masterChan)
 	close(s.releaseChan)
-	close(s.trackChan)
 
 	// Cancel context and wait for all goroutines to finish
 	s.cancel()
@@ -188,15 +184,6 @@ func (s *StreamingProcessor) SendRelease(release *models.Release) {
 	}
 }
 
-// SendTrack sends a track to the processing channel
-func (s *StreamingProcessor) SendTrack(track *models.Track) {
-	select {
-	case s.trackChan <- track:
-		// Successfully sent
-	case <-s.ctx.Done():
-		s.log.Warn("Cannot send track, processor is shutting down")
-	}
-}
 
 // Channel processing goroutines
 
@@ -280,21 +267,6 @@ func (s *StreamingProcessor) processReleases() {
 	}
 }
 
-func (s *StreamingProcessor) processTracks() {
-	defer s.wg.Done()
-	
-	for {
-		select {
-		case track, ok := <-s.trackChan:
-			if !ok {
-				return // Channel closed
-			}
-			s.addTrackToBatch(track)
-		case <-s.ctx.Done():
-			return
-		}
-	}
-}
 
 // Batch management methods
 
@@ -357,24 +329,12 @@ func (s *StreamingProcessor) addReleaseToBatch(release *models.Release) {
 	s.releaseBatch = append(s.releaseBatch, release)
 	s.updateStats("releases", 1)
 
-	if len(s.releaseBatch) >= s.batchSize {
+	if len(s.releaseBatch) >= s.releaseBatchSize {
 		s.processReleaseBatch(s.releaseBatch)
-		s.releaseBatch = make([]*models.Release, 0, s.batchSize) // Reset batch
+		s.releaseBatch = make([]*models.Release, 0, s.releaseBatchSize) // Reset batch
 	}
 }
 
-func (s *StreamingProcessor) addTrackToBatch(track *models.Track) {
-	s.trackMux.Lock()
-	defer s.trackMux.Unlock()
-
-	s.trackBatch = append(s.trackBatch, track)
-	s.updateStats("tracks", 1)
-
-	if len(s.trackBatch) >= s.batchSize {
-		s.processTrackBatch(s.trackBatch)
-		s.trackBatch = make([]*models.Track, 0, s.batchSize) // Reset batch
-	}
-}
 
 // Batch processing methods (currently just logging)
 
@@ -478,25 +438,6 @@ func (s *StreamingProcessor) processReleaseBatch(releases []*models.Release) {
 	// TODO: Add database operations here when ready
 }
 
-func (s *StreamingProcessor) processTrackBatch(tracks []*models.Track) {
-	s.incrementBatchCount("tracks")
-	
-	firstID := 0
-	lastID := 0
-	if len(tracks) > 0 {
-		firstID = tracks[0].ID
-		lastID = tracks[len(tracks)-1].ID
-	}
-
-	s.log.Info("Processing track batch",
-		"batchSize", len(tracks),
-		"firstID", firstID,
-		"lastID", lastID,
-		"totalProcessed", s.stats.TotalTracks,
-		"batchNumber", s.stats.BatchesProcessed["tracks"])
-	
-	// TODO: Add database operations here when ready
-}
 
 // Statistics and utility methods
 
@@ -515,10 +456,8 @@ func (s *StreamingProcessor) updateStats(entityType string, count int) {
 		s.stats.TotalMasters += count
 	case "releases":
 		s.stats.TotalReleases += count
-	case "tracks":
-		s.stats.TotalTracks += count
 	}
-	
+
 	s.stats.LastUpdate = time.Now()
 }
 
@@ -562,11 +501,6 @@ func (s *StreamingProcessor) flushAllBatches() {
 	}
 	s.releaseMux.Unlock()
 
-	s.trackMux.Lock()
-	if len(s.trackBatch) > 0 {
-		s.processTrackBatch(s.trackBatch)
-	}
-	s.trackMux.Unlock()
 }
 
 func (s *StreamingProcessor) logFinalStats() {
@@ -574,8 +508,8 @@ func (s *StreamingProcessor) logFinalStats() {
 	defer s.stats.mu.RUnlock()
 
 	totalDuration := time.Since(s.stats.StartTime)
-	totalEntities := s.stats.TotalLabels + s.stats.TotalArtists + s.stats.TotalGenres + 
-		s.stats.TotalMasters + s.stats.TotalReleases + s.stats.TotalTracks
+	totalEntities := s.stats.TotalLabels + s.stats.TotalArtists + s.stats.TotalGenres +
+		s.stats.TotalMasters + s.stats.TotalReleases
 
 	s.log.Info("Final streaming processor statistics",
 		"totalDurationMs", totalDuration.Milliseconds(),
@@ -586,7 +520,6 @@ func (s *StreamingProcessor) logFinalStats() {
 		"genres", s.stats.TotalGenres,
 		"masters", s.stats.TotalMasters,
 		"releases", s.stats.TotalReleases,
-		"tracks", s.stats.TotalTracks,
 		"batchesProcessed", s.stats.BatchesProcessed)
 }
 
@@ -602,7 +535,6 @@ func (s *StreamingProcessor) GetStats() StreamingStats {
 		TotalGenres:      s.stats.TotalGenres,
 		TotalMasters:     s.stats.TotalMasters,
 		TotalReleases:    s.stats.TotalReleases,
-		TotalTracks:      s.stats.TotalTracks,
 		BatchesProcessed: make(map[string]int),
 		StartTime:        s.stats.StartTime,
 		LastUpdate:       s.stats.LastUpdate,
