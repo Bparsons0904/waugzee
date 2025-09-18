@@ -5,11 +5,17 @@ import (
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
+	"waugzee/internal/utils"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
+
+// MasterArtistAssociation represents a specific master-artist association pair
+type MasterArtistAssociation struct {
+	MasterDiscogsID int64
+	ArtistDiscogsID int64
+}
 
 
 
@@ -21,11 +27,13 @@ type MasterRepository interface {
 	Delete(ctx context.Context, id string) error
 	UpsertBatch(ctx context.Context, masters []*Master) (int, int, error)
 	GetBatchByDiscogsIDs(ctx context.Context, discogsIDs []int64) (map[int64]*Master, error)
+	GetHashesByDiscogsIDs(ctx context.Context, discogsIDs []int64) (map[int64]string, error)
+	InsertBatch(ctx context.Context, masters []*Master) (int, error)
+	UpdateBatch(ctx context.Context, masters []*Master) (int, error)
 	// Association methods
 	CreateMasterArtistAssociations(
 		ctx context.Context,
-		masterDiscogsIDs []int64,
-		artistDiscogsIDs []int64,
+		associations []MasterArtistAssociation,
 	) error
 	CreateMasterGenreAssociations(
 		ctx context.Context,
@@ -118,23 +126,60 @@ func (r *masterRepository) UpsertBatch(ctx context.Context, masters []*Master) (
 		return 0, 0, nil
 	}
 
-	db := r.db.SQLWithContext(ctx)
-
-	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
-	result := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "discogs_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"title", "main_release", "year", "updated_at",
-		}),
-	}).Create(masters)
-
-	if result.Error != nil {
-		return 0, 0, log.Err("failed to upsert master batch", result.Error, "count", len(masters))
+	// 1. Extract Discogs IDs from incoming masters
+	discogsIDs := make([]int64, len(masters))
+	for i, master := range masters {
+		discogsIDs[i] = master.DiscogsID
 	}
 
-	affectedRows := int(result.RowsAffected)
-	log.Info("Upserted masters", "count", affectedRows)
-	return affectedRows, 0, nil
+	// 2. Get existing hashes for these Discogs IDs
+	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, discogsIDs)
+	if err != nil {
+		return 0, 0, log.Err("failed to get existing hashes", err, "count", len(discogsIDs))
+	}
+
+	// 3. Convert masters to DiscogsHashable interface
+	hashableRecords := make([]utils.DiscogsHashable, len(masters))
+	for i, master := range masters {
+		hashableRecords[i] = master
+	}
+
+	// 4. Categorize records by hash comparison
+	categories := utils.CategorizeRecordsByHash(hashableRecords, existingHashes)
+
+	var insertedCount, updatedCount int
+
+	// 5. Execute insert batch for new records
+	if len(categories.Insert) > 0 {
+		insertMasters := make([]*Master, len(categories.Insert))
+		for i, record := range categories.Insert {
+			insertMasters[i] = record.(*Master)
+		}
+		insertedCount, err = r.InsertBatch(ctx, insertMasters)
+		if err != nil {
+			return 0, 0, log.Err("failed to insert master batch", err, "count", len(insertMasters))
+		}
+	}
+
+	// 6. Execute update batch for changed records
+	if len(categories.Update) > 0 {
+		updateMasters := make([]*Master, len(categories.Update))
+		for i, record := range categories.Update {
+			updateMasters[i] = record.(*Master)
+		}
+		updatedCount, err = r.UpdateBatch(ctx, updateMasters)
+		if err != nil {
+			return insertedCount, 0, log.Err("failed to update master batch", err, "count", len(updateMasters))
+		}
+	}
+
+	log.Info("Hash-based upsert completed",
+		"total", len(masters),
+		"inserted", insertedCount,
+		"updated", updatedCount,
+		"skipped", len(categories.Skip))
+
+	return insertedCount, updatedCount, nil
 }
 
 func (r *masterRepository) GetBatchByDiscogsIDs(
@@ -162,38 +207,134 @@ func (r *masterRepository) GetBatchByDiscogsIDs(
 	return result, nil
 }
 
-// CreateMasterArtistAssociations creates many-to-many associations between masters and artists
+func (r *masterRepository) GetHashesByDiscogsIDs(
+	ctx context.Context,
+	discogsIDs []int64,
+) (map[int64]string, error) {
+	log := r.log.Function("GetHashesByDiscogsIDs")
+
+	if len(discogsIDs) == 0 {
+		return make(map[int64]string), nil
+	}
+
+	var masters []struct {
+		DiscogsID   int64  `json:"discogsId"`
+		ContentHash string `json:"contentHash"`
+	}
+
+	if err := r.db.SQLWithContext(ctx).
+		Model(&Master{}).
+		Select("discogs_id, content_hash").
+		Where("discogs_id IN ?", discogsIDs).
+		Find(&masters).Error; err != nil {
+		return nil, log.Err("failed to get master hashes by Discogs IDs", err, "count", len(discogsIDs))
+	}
+
+	result := make(map[int64]string, len(masters))
+	for _, master := range masters {
+		result[master.DiscogsID] = master.ContentHash
+	}
+
+	log.Info("Retrieved master hashes by Discogs IDs", "requested", len(discogsIDs), "found", len(result))
+	return result, nil
+}
+
+func (r *masterRepository) InsertBatch(ctx context.Context, masters []*Master) (int, error) {
+	log := r.log.Function("InsertBatch")
+
+	if len(masters) == 0 {
+		return 0, nil
+	}
+
+	if err := r.db.SQLWithContext(ctx).Create(&masters).Error; err != nil {
+		return 0, log.Err("failed to insert master batch", err, "count", len(masters))
+	}
+
+	log.Info("Inserted masters", "count", len(masters))
+	return len(masters), nil
+}
+
+func (r *masterRepository) UpdateBatch(ctx context.Context, masters []*Master) (int, error) {
+	log := r.log.Function("UpdateBatch")
+
+	if len(masters) == 0 {
+		return 0, nil
+	}
+
+	updatedCount := 0
+	for _, master := range masters {
+		// Get existing record first to ensure we have the complete model
+		existingMaster := &Master{}
+		err := r.db.SQLWithContext(ctx).Where("discogs_id = ?", master.DiscogsID).First(existingMaster).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				// Skip if record doesn't exist (should not happen in our flow)
+				log.Warn("Master not found for update", "discogsID", master.DiscogsID)
+				continue
+			}
+			return updatedCount, log.Err("failed to get existing master", err, "discogsID", master.DiscogsID)
+		}
+
+		// Update only the specific fields we want to change
+		existingMaster.Title = master.Title
+		existingMaster.MainRelease = master.MainRelease
+		existingMaster.Year = master.Year
+		existingMaster.ContentHash = master.ContentHash
+
+		// Use Save() which handles all GORM hooks properly
+		result := r.db.SQLWithContext(ctx).Save(existingMaster)
+		if result.Error != nil {
+			return updatedCount, log.Err("failed to save master", result.Error, "discogsID", master.DiscogsID)
+		}
+
+		if result.RowsAffected > 0 {
+			updatedCount++
+		}
+	}
+
+	log.Info("Updated masters", "count", updatedCount)
+	return updatedCount, nil
+}
+
+// CreateMasterArtistAssociations creates specific master-artist association pairs
 func (r *masterRepository) CreateMasterArtistAssociations(
 	ctx context.Context,
-	masterDiscogsIDs []int64,
-	artistDiscogsIDs []int64,
+	associations []MasterArtistAssociation,
 ) error {
 	log := r.log.Function("CreateMasterArtistAssociations")
 
-	if len(masterDiscogsIDs) == 0 || len(artistDiscogsIDs) == 0 {
+	if len(associations) == 0 {
 		return nil
 	}
 
 	db := r.db.SQLWithContext(ctx)
 
-	// Build cross-product associations with ON CONFLICT DO NOTHING for idempotency
+	// Prepare association pairs for bulk insert with ordered processing to prevent deadlocks
+	masterIDs := make([]int64, len(associations))
+	artistIDs := make([]int64, len(associations))
+
+	for i, assoc := range associations {
+		masterIDs[i] = assoc.MasterDiscogsID
+		artistIDs[i] = assoc.ArtistDiscogsID
+	}
+
+	// Insert exact association pairs with ordering to prevent deadlocks
 	query := `
 		INSERT INTO master_artists (master_discogs_id, artist_discogs_id)
-		SELECT m.discogs_id, a.discogs_id
-		FROM unnest($1::bigint[]) AS m(discogs_id)
-		CROSS JOIN unnest($2::bigint[]) AS a(discogs_id)
+		SELECT master_id, artist_id
+		FROM unnest($1::bigint[], $2::bigint[]) AS t(master_id, artist_id)
+		ORDER BY master_id, artist_id
 		ON CONFLICT (master_discogs_id, artist_discogs_id) DO NOTHING
 	`
 
-	result := db.Exec(query, masterDiscogsIDs, artistDiscogsIDs)
+	result := db.Exec(query, masterIDs, artistIDs)
 	if result.Error != nil {
 		return log.Err("failed to create master-artist associations", result.Error,
-			"masterCount", len(masterDiscogsIDs), "artistCount", len(artistDiscogsIDs))
+			"associationCount", len(associations))
 	}
 
 	log.Info("Created master-artist associations",
-		"masterCount", len(masterDiscogsIDs),
-		"artistCount", len(artistDiscogsIDs),
+		"associationCount", len(associations),
 		"associationsCreated", result.RowsAffected)
 
 	return nil

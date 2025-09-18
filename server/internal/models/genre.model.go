@@ -62,3 +62,7 @@ func (g *Genre) SetContentHash(hash string) {
 func (g *Genre) GetContentHash() string {
 	return g.ContentHash
 }
+
+func (g *Genre) GetName() string {
+	return g.Name
+}

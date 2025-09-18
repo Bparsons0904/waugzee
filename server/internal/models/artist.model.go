@@ -98,3 +98,7 @@ func (a *Artist) GetContentHash() string {
 	return a.ContentHash
 }
 
+func (a *Artist) GetDiscogsID() int64 {
+	return a.DiscogsID
+}
+

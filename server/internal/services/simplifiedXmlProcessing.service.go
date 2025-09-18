@@ -524,7 +524,7 @@ func (s *SimplifiedXMLProcessingService) processArtistBuffer(
 				dedupeMap[modelArtist.DiscogsID] = modelArtist
 
 				// Process batch when we reach 5000 unique items
-				if len(dedupeMap) >= 1000 {
+				if len(dedupeMap) >= 5000 {
 					s.processPendingArtistBatchFromMap(ctx, dedupeMap, processingID)
 					totalProcessed += len(dedupeMap)
 					dedupeMap = make(map[int64]*models.Artist) // Reset map
@@ -964,7 +964,7 @@ func (s *SimplifiedXMLProcessingService) processReleaseBuffer(
 				dedupeMap[modelRelease.DiscogsID] = modelRelease
 
 				// Process batch when we reach 2000 unique items (smaller for releases due to JSONB data)
-				if len(dedupeMap) >= 1000 {
+				if len(dedupeMap) >= 2000 {
 					s.processPendingReleaseBatchFromMap(ctx, dedupeMap, processingID)
 					totalProcessed += len(dedupeMap)
 					dedupeMap = make(map[int64]*models.Release) // Reset map
@@ -1469,25 +1469,25 @@ func (s *SimplifiedXMLProcessingService) processMasterArtistAssociationBuffer(
 	defer wg.Done()
 	log := s.log.Function("processMasterArtistAssociationBuffer")
 
-	// Group associations by master and artist for bulk operations
-	masterArtistMap := make(map[int64][]int64) // masterID -> []artistIDs
+	// Collect exact association pairs for batch processing
+	associations := make([]*MasterArtistAssociation, 0, 5000)
 	totalProcessed := 0
 
 	for {
 		select {
 		case <-ctx.Done():
 			// Context cancelled, process remaining associations if any
-			if len(masterArtistMap) > 0 {
-				s.processPendingMasterArtistAssociations(ctx, masterArtistMap, processingID)
+			if len(associations) > 0 {
+				s.processPendingMasterArtistAssociations(ctx, associations, processingID)
 			}
 			return
 
 		case association, ok := <-buffers.MasterArtists.Channel:
 			if !ok {
 				// Channel closed, process remaining associations
-				if len(masterArtistMap) > 0 {
-					s.processPendingMasterArtistAssociations(ctx, masterArtistMap, processingID)
-					totalProcessed += len(masterArtistMap)
+				if len(associations) > 0 {
+					s.processPendingMasterArtistAssociations(ctx, associations, processingID)
+					totalProcessed += len(associations)
 				}
 				log.Info(
 					"Master-artist association buffer processing completed",
@@ -1500,20 +1500,14 @@ func (s *SimplifiedXMLProcessingService) processMasterArtistAssociationBuffer(
 			}
 
 			if association != nil {
-				// Group by master for efficient processing
-				if masterArtistMap[association.MasterDiscogsID] == nil {
-					masterArtistMap[association.MasterDiscogsID] = make([]int64, 0)
-				}
-				masterArtistMap[association.MasterDiscogsID] = append(
-					masterArtistMap[association.MasterDiscogsID],
-					association.ArtistDiscogsID,
-				)
+				// Add exact association pair to batch
+				associations = append(associations, association)
 
-				// Process batch when we reach threshold
-				if len(masterArtistMap) >= 1000 { // Smaller threshold for associations
-					s.processPendingMasterArtistAssociations(ctx, masterArtistMap, processingID)
-					totalProcessed += len(masterArtistMap)
-					masterArtistMap = make(map[int64][]int64) // Reset map
+				// Process batch when we reach 1000 associations
+				if len(associations) >= 5000 {
+					s.processPendingMasterArtistAssociations(ctx, associations, processingID)
+					totalProcessed += len(associations)
+					associations = make([]*MasterArtistAssociation, 0, 5000) // Reset slice
 				}
 			}
 		}
@@ -1571,7 +1565,7 @@ func (s *SimplifiedXMLProcessingService) processMasterGenreAssociationBuffer(
 				)
 
 				// Process batch when we reach threshold
-				if len(masterGenreMap) >= 1000 { // Smaller threshold for associations
+				if len(masterGenreMap) >= 5000 { // Smaller threshold for associations
 					s.processPendingMasterGenreAssociations(ctx, masterGenreMap, processingID)
 					totalProcessed += len(masterGenreMap)
 					masterGenreMap = make(map[int64][]string) // Reset map
@@ -1585,40 +1579,31 @@ func (s *SimplifiedXMLProcessingService) processMasterGenreAssociationBuffer(
 
 func (s *SimplifiedXMLProcessingService) processPendingMasterArtistAssociations(
 	ctx context.Context,
-	masterArtistMap map[int64][]int64,
+	associations []*MasterArtistAssociation,
 	processingID string,
 ) {
 	log := s.log.Function("processPendingMasterArtistAssociations")
-	if len(masterArtistMap) == 0 {
+	if len(associations) == 0 {
 		return
 	}
 
-	// Extract all unique master and artist IDs
-	masterIDs := make([]int64, 0, len(masterArtistMap))
-	artistIDSet := make(map[int64]bool)
-
-	for masterID, artistIDs := range masterArtistMap {
-		masterIDs = append(masterIDs, masterID)
-		for _, artistID := range artistIDs {
-			artistIDSet[artistID] = true
+	// Convert service associations to repository associations
+	repoAssociations := make([]repositories.MasterArtistAssociation, len(associations))
+	for i, assoc := range associations {
+		repoAssociations[i] = repositories.MasterArtistAssociation{
+			MasterDiscogsID: assoc.MasterDiscogsID,
+			ArtistDiscogsID: assoc.ArtistDiscogsID,
 		}
 	}
 
-	artistIDs := make([]int64, 0, len(artistIDSet))
-	for artistID := range artistIDSet {
-		artistIDs = append(artistIDs, artistID)
-	}
-
-	// Create associations using repository method
-	if err := s.masterRepo.CreateMasterArtistAssociations(ctx, masterIDs, artistIDs); err != nil {
+	// Create exact association pairs using repository method
+	if err := s.masterRepo.CreateMasterArtistAssociations(ctx, repoAssociations); err != nil {
 		log.Error(
 			"Failed to create master-artist associations",
 			"error",
 			err,
-			"masterCount",
-			len(masterIDs),
-			"artistCount",
-			len(artistIDs),
+			"associationCount",
+			len(associations),
 			"processingID",
 			processingID,
 		)
@@ -1627,10 +1612,8 @@ func (s *SimplifiedXMLProcessingService) processPendingMasterArtistAssociations(
 
 	log.Info(
 		"Processed master-artist associations",
-		"masterCount",
-		len(masterIDs),
-		"artistCount",
-		len(artistIDs),
+		"associationCount",
+		len(associations),
 		"processingID",
 		processingID,
 	)

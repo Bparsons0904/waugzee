@@ -28,6 +28,7 @@ Additional documentation available:
 - **[docs/API_IMPLEMENTATION_GUIDE.md](docs/API_IMPLEMENTATION_GUIDE.md)** - API development guidelines
 - **[docs/AUTH_STATUS.md](docs/AUTH_STATUS.md)** - Authentication implementation status
 - **[docs/PGO_GUIDE.md](docs/PGO_GUIDE.md)** - Performance optimization guide
+- **[docs/XML_PROCESSING_SERVICE.md](docs/XML_PROCESSING_SERVICE.md)** - Discogs XML processing service architecture
 
 ## Testing Philosophy
 
@@ -260,40 +261,44 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 
 ### Current Development: Discogs Data Import Infrastructure
 
-**Status**: ✅ **Phase 2 Complete** - Simplified JSONB processing implemented
+**Status**: ✅ **Phase 2 Complete** - Simplified JSONB processing implemented with deadlock resolution
 
 **Processing Approach (Major Simplification - 2025-01-17):**
 
-**Core Strategy**: Vinyl-only processing with JSONB storage to dramatically reduce complexity and processing time.
+**Core Strategy**: Vinyl-only processing with JSONB storage and exact association processing.
 
 **Data Architecture**:
 
 - **Vinyl-Only Filtering**: Process only vinyl releases, skip CD/digital/cassette (~70-80% volume reduction)
 - **JSONB Storage**: Store tracks, artists, genres as JSON in Release table (no separate Track table)
 - **Master-Level Relationships**: Maintain searchable relationships only at Master level
+- **Exact Association Processing**: Process specific master-artist pairs, never cross-products
 - **Query Pattern**: Release → Master → Artists/Genres for searches, direct JSONB for display
 
 **Key Changes**:
 
 - ✅ **Eliminated Track Model**: Removed separate Track table and repository entirely
 - ✅ **JSONB Columns**: Added TracksJSON, ArtistsJSON, GenresJSON to Release model using `gorm.io/datatypes`
-- ✅ **Simplified Processing**: Reduced from 11 to 8 concurrent goroutines, removed association processors
+- ✅ **Fixed Association Processing**: Eliminated cross-product bug that created millions of unwanted associations
+- ✅ **Deadlock Resolution**: Added proper ordering and exact pair processing to prevent database deadlocks
+- ✅ **Simplified Processing**: Single-threaded buffer processing with controlled batch sizes
 - ✅ **Early Filtering**: Skip non-vinyl releases immediately after format detection
-- ✅ **JSON Generation**: Convert XML track/artist/genre data directly to JSONB storage
 
 **Performance Impact**:
 
 - **Processing Volume**: 70-80% reduction through vinyl-only filtering
-- **Database Operations**: Eliminated duplicate release-level artist/genre associations
+- **Database Operations**: Eliminated cross-product associations (1M+ → 1K associations)
+- **Deadlock Prevention**: Proper ordering and batch size limits prevent lock contention
 - **Storage Efficiency**: JSONB replaces complex foreign key relationships
-- **Processing Speed**: Simplified pipeline with fewer database writes
+- **Processing Speed**: Simplified pipeline with exact association processing
 
 **Implementation Files**:
 
 - `server/internal/models/release.model.go` - JSONB columns added
 - `server/internal/services/discogsParser.service.go` - Vinyl filtering and JSONB generation
-- `server/internal/services/simplifiedXmlProcessing.service.go` - Simplified buffering
-- `server/internal/repositories/release.repository.go` - Removed association methods
+- `server/internal/services/simplifiedXmlProcessing.service.go` - Fixed association processing
+- `server/internal/repositories/master.repository.go` - Exact association pair processing
+- `docs/XML_PROCESSING_SERVICE.md` - Complete service architecture documentation
 
 ### Environment Configuration
 

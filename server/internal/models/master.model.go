@@ -72,3 +72,7 @@ func (m *Master) GetContentHash() string {
 	return m.ContentHash
 }
 
+func (m *Master) GetDiscogsID() int64 {
+	return m.DiscogsID
+}
+

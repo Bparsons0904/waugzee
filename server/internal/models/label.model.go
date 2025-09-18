@@ -66,3 +66,7 @@ func (l *Label) GetContentHash() string {
 	return l.ContentHash
 }
 
+func (l *Label) GetDiscogsID() int64 {
+	return l.DiscogsID
+}
+

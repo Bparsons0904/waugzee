@@ -175,3 +175,100 @@ func ValidateHash(hash string) bool {
 
 	return true
 }
+
+// BatchCategories categorizes records into insert/update/skip based on hash comparison
+type BatchCategories struct {
+	Insert []interface{} // New records (not in DB)
+	Update []interface{} // Changed records (hash mismatch)
+	Skip   []interface{} // Unchanged records (hash match)
+}
+
+// DiscogsHashable represents an entity with DiscogsID and hash capabilities
+type DiscogsHashable interface {
+	Hashable
+	GetDiscogsID() int64
+}
+
+// CategorizeRecordsByHash compares incoming records with existing hashes
+// and categorizes them into insert/update/skip operations
+func CategorizeRecordsByHash(incomingRecords []DiscogsHashable, existingHashes map[int64]string) *BatchCategories {
+	categories := &BatchCategories{
+		Insert: make([]interface{}, 0),
+		Update: make([]interface{}, 0),
+		Skip:   make([]interface{}, 0),
+	}
+
+	for _, record := range incomingRecords {
+		discogsID := record.GetDiscogsID()
+		incomingHash := record.GetContentHash()
+
+		// If hash is empty, generate it
+		if incomingHash == "" {
+			hash, err := GenerateEntityHash(record)
+			if err == nil {
+				record.SetContentHash(hash)
+				incomingHash = hash
+			}
+		}
+
+		existingHash, exists := existingHashes[discogsID]
+
+		if !exists {
+			// Record doesn't exist in DB - insert
+			categories.Insert = append(categories.Insert, record)
+		} else if existingHash != incomingHash {
+			// Record exists but hash changed - update
+			categories.Update = append(categories.Update, record)
+		} else {
+			// Record exists and hash matches - skip
+			categories.Skip = append(categories.Skip, record)
+		}
+	}
+
+	return categories
+}
+
+// NameHashable represents an entity with Name and hash capabilities (like Genre)
+type NameHashable interface {
+	Hashable
+	GetName() string
+}
+
+// CategorizeRecordsByNameHash compares incoming records with existing hashes using names
+// and categorizes them into insert/update/skip operations
+func CategorizeRecordsByNameHash(incomingRecords []NameHashable, existingHashes map[string]string) *BatchCategories {
+	categories := &BatchCategories{
+		Insert: make([]interface{}, 0),
+		Update: make([]interface{}, 0),
+		Skip:   make([]interface{}, 0),
+	}
+
+	for _, record := range incomingRecords {
+		name := record.GetName()
+		incomingHash := record.GetContentHash()
+
+		// If hash is empty, generate it
+		if incomingHash == "" {
+			hash, err := GenerateEntityHash(record)
+			if err == nil {
+				record.SetContentHash(hash)
+				incomingHash = hash
+			}
+		}
+
+		existingHash, exists := existingHashes[name]
+
+		if !exists {
+			// Record doesn't exist in DB - insert
+			categories.Insert = append(categories.Insert, record)
+		} else if existingHash != incomingHash {
+			// Record exists but hash changed - update
+			categories.Update = append(categories.Update, record)
+		} else {
+			// Record exists and hash matches - skip
+			categories.Skip = append(categories.Skip, record)
+		}
+	}
+
+	return categories
+}

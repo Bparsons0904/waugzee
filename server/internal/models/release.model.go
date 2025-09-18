@@ -107,5 +107,9 @@ func (r *Release) GetContentHash() string {
 	return r.ContentHash
 }
 
+func (r *Release) GetDiscogsID() int64 {
+	return r.DiscogsID
+}
+
 
 
