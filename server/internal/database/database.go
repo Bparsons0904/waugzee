@@ -6,12 +6,12 @@ import (
 	"log/slog"
 	"time"
 	"waugzee/config"
-	logg "waugzee/internal/logger"
+	"waugzee/internal/logger"
 
 	"github.com/valkey-io/valkey-go"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormLogger "gorm.io/gorm/logger"
 )
 
 type CacheClient valkey.Client
@@ -27,11 +27,11 @@ type Cache struct {
 type DB struct {
 	SQL   *gorm.DB
 	Cache Cache
-	log   logg.Logger
+	log   logger.Logger
 }
 
 func New(config config.Config) (DB, error) {
-	log := logg.New("database").Function("New")
+	log := logger.New("database").Function("New")
 
 	log.Info("Initializing database")
 	db := &DB{log: log}
@@ -49,7 +49,7 @@ func New(config config.Config) (DB, error) {
 	return *db, nil
 }
 
-func TXDefer(tx *gorm.DB, log logg.Logger) {
+func TXDefer(tx *gorm.DB, log logger.Logger) {
 	if tx.Error != nil {
 		log.Er("failed to commit transaction", tx.Error)
 		tx.Rollback()
@@ -65,11 +65,11 @@ func TXDefer(tx *gorm.DB, log logg.Logger) {
 func (s *DB) initializeDB(config config.Config) error {
 	// Use Silent log level for bulk operations to prevent SQL query logging
 	// This will completely disable GORM SQL logging to improve performance during data processing
-	gormLogger := logger.New(
+	gormLogger := gormLogger.New(
 		slog.NewLogLogger(slog.Default().Handler(), slog.LevelError), // Only show errors
-		logger.Config{
-			SlowThreshold:             10 * time.Second, // Only log extremely slow queries (10s+)
-			LogLevel:                  logger.Silent,    // Silent mode - no SQL query logging
+		gormLogger.Config{
+			SlowThreshold:             10 * time.Second,  // Only log extremely slow queries (10s+)
+			LogLevel:                  gormLogger.Silent, // Silent mode - no SQL query logging
 			IgnoreRecordNotFoundError: true,
 			ParameterizedQueries:      false,
 			Colorful:                  true,

@@ -5,7 +5,6 @@ import (
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
-	contextutil "waugzee/internal/context"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -38,13 +37,6 @@ func NewLabelRepository(db database.DB) LabelRepository {
 	}
 }
 
-func (r *labelRepository) getDB(ctx context.Context) *gorm.DB {
-	if tx, ok := contextutil.GetTransaction(ctx); ok {
-		return tx
-	}
-	return r.db.SQLWithContext(ctx)
-}
-
 func (r *labelRepository) GetByID(ctx context.Context, id string) (*Label, error) {
 	log := r.log.Function("GetByID")
 
@@ -54,7 +46,7 @@ func (r *labelRepository) GetByID(ctx context.Context, id string) (*Label, error
 	}
 
 	var label Label
-	if err := r.getDB(ctx).First(&label, "id = ?", labelID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&label, "id = ?", labelID).Error; err != nil {
 		return nil, log.Err("failed to get label by ID", err, "id", id)
 	}
 
@@ -65,7 +57,7 @@ func (r *labelRepository) GetByDiscogsID(ctx context.Context, discogsID int64) (
 	log := r.log.Function("GetByDiscogsID")
 
 	var label Label
-	if err := r.getDB(ctx).First(&label, "discogs_id = ?", discogsID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&label, "discogs_id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -78,7 +70,7 @@ func (r *labelRepository) GetByDiscogsID(ctx context.Context, discogsID int64) (
 func (r *labelRepository) Create(ctx context.Context, label *Label) (*Label, error) {
 	log := r.log.Function("Create")
 
-	if err := r.getDB(ctx).Create(label).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Create(label).Error; err != nil {
 		return nil, log.Err("failed to create label", err, "label", label)
 	}
 
@@ -88,7 +80,7 @@ func (r *labelRepository) Create(ctx context.Context, label *Label) (*Label, err
 func (r *labelRepository) Update(ctx context.Context, label *Label) error {
 	log := r.log.Function("Update")
 
-	if err := r.getDB(ctx).Save(label).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Save(label).Error; err != nil {
 		return log.Err("failed to update label", err, "label", label)
 	}
 
@@ -103,7 +95,7 @@ func (r *labelRepository) Delete(ctx context.Context, id string) error {
 		return log.Err("failed to parse label ID", err, "id", id)
 	}
 
-	if err := r.getDB(ctx).Delete(&Label{}, "id = ?", labelID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Delete(&Label{}, "id = ?", labelID).Error; err != nil {
 		return log.Err("failed to delete label", err, "id", id)
 	}
 
@@ -119,14 +111,17 @@ func (r *labelRepository) UpsertBatch(ctx context.Context, labels []*Label) (int
 	return r.upsertSingleBatch(ctx, labels)
 }
 
-func (r *labelRepository) upsertSingleBatch(ctx context.Context, labels []*Label) (int, int, error) {
+func (r *labelRepository) upsertSingleBatch(
+	ctx context.Context,
+	labels []*Label,
+) (int, int, error) {
 	log := r.log.Function("upsertSingleBatch")
 
 	if len(labels) == 0 {
 		return 0, 0, nil
 	}
 
-	db := r.getDB(ctx)
+	db := r.db.SQLWithContext(ctx)
 
 	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
 	result := db.Clauses(clause.OnConflict{
@@ -140,19 +135,16 @@ func (r *labelRepository) upsertSingleBatch(ctx context.Context, labels []*Label
 		return 0, 0, log.Err("failed to upsert label batch", result.Error, "count", len(labels))
 	}
 
-	// PostgreSQL doesn't directly provide insert vs update counts from UPSERT
-	// For now, we'll approximate based on affected rows
 	affectedRows := int(result.RowsAffected)
-
-	// Since we can't easily distinguish inserts from updates with GORM's ON CONFLICT,
-	// we'll return the total as "inserted" for simplicity. This is a trade-off for performance.
-	// In a production system, you might use raw SQL with RETURNING clauses to get exact counts.
 
 	log.Info("Upserted labels", "count", affectedRows)
 	return affectedRows, 0, nil
 }
 
-func (r *labelRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs []int64) (map[int64]*Label, error) {
+func (r *labelRepository) GetBatchByDiscogsIDs(
+	ctx context.Context,
+	discogsIDs []int64,
+) (map[int64]*Label, error) {
 	log := r.log.Function("GetBatchByDiscogsIDs")
 
 	if len(discogsIDs) == 0 {
@@ -160,7 +152,7 @@ func (r *labelRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs [
 	}
 
 	var labels []*Label
-	if err := r.getDB(ctx).Where("discogs_id IN ?", discogsIDs).Find(&labels).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Where("discogs_id IN ?", discogsIDs).Find(&labels).Error; err != nil {
 		return nil, log.Err("failed to get labels by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
@@ -173,3 +165,4 @@ func (r *labelRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs [
 	log.Info("Retrieved labels by Discogs IDs", "requested", len(discogsIDs), "found", len(result))
 	return result, nil
 }
+

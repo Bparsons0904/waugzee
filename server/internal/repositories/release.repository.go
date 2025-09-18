@@ -5,7 +5,6 @@ import (
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
-	contextutil "waugzee/internal/context"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -39,13 +38,6 @@ func NewReleaseRepository(db database.DB) ReleaseRepository {
 	}
 }
 
-func (r *releaseRepository) getDB(ctx context.Context) *gorm.DB {
-	if tx, ok := contextutil.GetTransaction(ctx); ok {
-		return tx
-	}
-	return r.db.SQLWithContext(ctx)
-}
-
 func (r *releaseRepository) GetByID(ctx context.Context, id string) (*Release, error) {
 	log := r.log.Function("GetByID")
 
@@ -55,7 +47,7 @@ func (r *releaseRepository) GetByID(ctx context.Context, id string) (*Release, e
 	}
 
 	var release Release
-	if err := r.getDB(ctx).Preload("Label").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "id = ?", releaseID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Preload("Label").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "id = ?", releaseID).Error; err != nil {
 		return nil, log.Err("failed to get release by ID", err, "id", id)
 	}
 
@@ -66,7 +58,7 @@ func (r *releaseRepository) GetByDiscogsID(ctx context.Context, discogsID int64)
 	log := r.log.Function("GetByDiscogsID")
 
 	var release Release
-	if err := r.getDB(ctx).Preload("Label").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "discogs_id = ?", discogsID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Preload("Label").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "discogs_id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -79,7 +71,7 @@ func (r *releaseRepository) GetByDiscogsID(ctx context.Context, discogsID int64)
 func (r *releaseRepository) Create(ctx context.Context, release *Release) (*Release, error) {
 	log := r.log.Function("Create")
 
-	if err := r.getDB(ctx).Create(release).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Create(release).Error; err != nil {
 		return nil, log.Err("failed to create release", err, "release", release)
 	}
 
@@ -89,7 +81,7 @@ func (r *releaseRepository) Create(ctx context.Context, release *Release) (*Rele
 func (r *releaseRepository) Update(ctx context.Context, release *Release) error {
 	log := r.log.Function("Update")
 
-	if err := r.getDB(ctx).Save(release).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Save(release).Error; err != nil {
 		return log.Err("failed to update release", err, "release", release)
 	}
 
@@ -104,14 +96,17 @@ func (r *releaseRepository) Delete(ctx context.Context, id string) error {
 		return log.Err("failed to parse release ID", err, "id", id)
 	}
 
-	if err := r.getDB(ctx).Delete(&Release{}, "id = ?", releaseID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Delete(&Release{}, "id = ?", releaseID).Error; err != nil {
 		return log.Err("failed to delete release", err, "id", id)
 	}
 
 	return nil
 }
 
-func (r *releaseRepository) UpsertBatch(ctx context.Context, releases []*Release) (int, int, error) {
+func (r *releaseRepository) UpsertBatch(
+	ctx context.Context,
+	releases []*Release,
+) (int, int, error) {
 	if len(releases) == 0 {
 		return 0, 0, nil
 	}
@@ -120,14 +115,17 @@ func (r *releaseRepository) UpsertBatch(ctx context.Context, releases []*Release
 	return r.upsertSingleBatch(ctx, releases)
 }
 
-func (r *releaseRepository) upsertSingleBatch(ctx context.Context, releases []*Release) (int, int, error) {
+func (r *releaseRepository) upsertSingleBatch(
+	ctx context.Context,
+	releases []*Release,
+) (int, int, error) {
 	log := r.log.Function("upsertSingleBatch")
 
 	if len(releases) == 0 {
 		return 0, 0, nil
 	}
 
-	db := r.getDB(ctx)
+	db := r.db.SQLWithContext(ctx)
 
 	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
 	result := db.Clauses(clause.OnConflict{
@@ -146,7 +144,10 @@ func (r *releaseRepository) upsertSingleBatch(ctx context.Context, releases []*R
 	return affectedRows, 0, nil
 }
 
-func (r *releaseRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs []int64) (map[int64]*Release, error) {
+func (r *releaseRepository) GetBatchByDiscogsIDs(
+	ctx context.Context,
+	discogsIDs []int64,
+) (map[int64]*Release, error) {
 	log := r.log.Function("GetBatchByDiscogsIDs")
 
 	if len(discogsIDs) == 0 {
@@ -154,7 +155,7 @@ func (r *releaseRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs
 	}
 
 	var releases []*Release
-	if err := r.getDB(ctx).Where("discogs_id IN ?", discogsIDs).Find(&releases).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Where("discogs_id IN ?", discogsIDs).Find(&releases).Error; err != nil {
 		return nil, log.Err("failed to get releases by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
@@ -164,7 +165,12 @@ func (r *releaseRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs
 		result[release.DiscogsID] = release
 	}
 
-	log.Info("Retrieved releases by Discogs IDs", "requested", len(discogsIDs), "found", len(result))
+	log.Info(
+		"Retrieved releases by Discogs IDs",
+		"requested",
+		len(discogsIDs),
+		"found",
+		len(result),
+	)
 	return result, nil
 }
-

@@ -6,10 +6,8 @@ import (
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
-	contextutil "waugzee/internal/context"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 const (
@@ -38,13 +36,6 @@ func New(db database.DB) UserRepository {
 	}
 }
 
-func (r *userRepository) getDB(ctx context.Context) *gorm.DB {
-	if tx, ok := contextutil.GetTransaction(ctx); ok {
-		return tx
-	}
-	return r.db.SQLWithContext(ctx)
-}
-
 func (r *userRepository) GetByID(ctx context.Context, id string) (*User, error) {
 	log := r.log.Function("GetByID")
 
@@ -67,7 +58,7 @@ func (r *userRepository) GetByID(ctx context.Context, id string) (*User, error) 
 func (r *userRepository) Update(ctx context.Context, user *User) error {
 	log := r.log.Function("Update")
 
-	db := r.getDB(ctx).Set("waugzee:cache", r.db.Cache.User)
+	db := r.db.SQLWithContext(ctx).Set("waugzee:cache", r.db.Cache.User)
 
 	if err := db.Save(user).Error; err != nil {
 		return log.Err("failed to update user", err, "user", user)
@@ -81,7 +72,7 @@ func (r *userRepository) Delete(ctx context.Context, id string) error {
 
 	// Get user first to clean up OIDC mapping cache
 	var user User
-	if err := r.getDB(ctx).First(&user, "id = ?", id).Error; err == nil {
+	if err := r.db.SQLWithContext(ctx).First(&user, "id = ?", id).Error; err == nil {
 		// Clean up OIDC mapping cache if user has OIDC ID
 		if user.OIDCUserID != "" {
 			oidcCacheKey := "oidc:" + user.OIDCUserID
@@ -97,7 +88,7 @@ func (r *userRepository) Delete(ctx context.Context, id string) error {
 		}
 	}
 
-	if err := r.getDB(ctx).Delete(&User{}, "id = ?", id).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Delete(&User{}, "id = ?", id).Error; err != nil {
 		return log.Err("failed to delete user", err, "id", id)
 	}
 
@@ -143,7 +134,7 @@ func (r *userRepository) getDBByID(ctx context.Context, userID string, user *Use
 		return log.Err("failed to parse userID", err, "userID", userID)
 	}
 
-	if err := r.getDB(ctx).First(user, "id = ?", id).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(user, "id = ?", id).Error; err != nil {
 		return log.Err("failed to get user by id", err, "id", userID)
 	}
 
@@ -154,7 +145,7 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*User, e
 	log := r.log.Function("GetByEmail")
 
 	var user User
-	if err := r.getDB(ctx).First(&user, "email = ?", email).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&user, "email = ?", email).Error; err != nil {
 		return nil, log.Err("failed to get user by email", err, "email", email)
 	}
 
@@ -183,7 +174,7 @@ func (r *userRepository) GetByOIDCUserID(ctx context.Context, oidcUserID string)
 
 	// Cache miss, query database
 	var user User
-	if err := r.getDB(ctx).First(&user, "oidc_user_id = ?", oidcUserID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&user, "oidc_user_id = ?", oidcUserID).Error; err != nil {
 		return nil, log.Err("failed to get user by OIDC user ID", err, "oidcUserID", oidcUserID)
 	}
 
@@ -219,7 +210,7 @@ func (r *userRepository) CreateFromOIDC(
 		user.LastLoginAt = &now
 	}
 
-	if err := r.getDB(ctx).Create(user).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Create(user).Error; err != nil {
 		return nil, log.Err("failed to create OIDC user", err, "userID", user.OIDCUserID)
 	}
 

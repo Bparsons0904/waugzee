@@ -5,10 +5,8 @@ import (
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
-	contextutil "waugzee/internal/context"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type GenreRepository interface {
@@ -35,18 +33,11 @@ func NewGenreRepository(db database.DB) GenreRepository {
 	}
 }
 
-func (r *genreRepository) getDB(ctx context.Context) *gorm.DB {
-	if tx, ok := contextutil.GetTransaction(ctx); ok {
-		return tx
-	}
-	return r.db.SQLWithContext(ctx)
-}
-
 func (r *genreRepository) GetAll(ctx context.Context) ([]*Genre, error) {
 	log := r.log.Function("GetAll")
 
 	var genres []*Genre
-	if err := r.getDB(ctx).Find(&genres).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Find(&genres).Error; err != nil {
 		return nil, log.Err("failed to get all genres", err)
 	}
 
@@ -62,7 +53,7 @@ func (r *genreRepository) GetByID(ctx context.Context, id string) (*Genre, error
 	}
 
 	var genre Genre
-	if err := r.getDB(ctx).First(&genre, "id = ?", genreID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&genre, "id = ?", genreID).Error; err != nil {
 		return nil, log.Err("failed to get genre by ID", err, "id", id)
 	}
 
@@ -73,7 +64,7 @@ func (r *genreRepository) GetByName(ctx context.Context, name string) (*Genre, e
 	log := r.log.Function("GetByName")
 
 	var genre Genre
-	if err := r.getDB(ctx).First(&genre, "name = ?", name).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&genre, "name = ?", name).Error; err != nil {
 		return nil, log.Err("failed to get genre by name", err, "name", name)
 	}
 
@@ -83,7 +74,7 @@ func (r *genreRepository) GetByName(ctx context.Context, name string) (*Genre, e
 func (r *genreRepository) Create(ctx context.Context, genre *Genre) (*Genre, error) {
 	log := r.log.Function("Create")
 
-	if err := r.getDB(ctx).Create(genre).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Create(genre).Error; err != nil {
 		return nil, log.Err("failed to create genre", err, "name", genre.Name)
 	}
 
@@ -93,7 +84,7 @@ func (r *genreRepository) Create(ctx context.Context, genre *Genre) (*Genre, err
 func (r *genreRepository) Update(ctx context.Context, genre *Genre) error {
 	log := r.log.Function("Update")
 
-	if err := r.getDB(ctx).Save(genre).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Save(genre).Error; err != nil {
 		return log.Err("failed to update genre", err, "id", genre.ID, "name", genre.Name)
 	}
 
@@ -108,7 +99,7 @@ func (r *genreRepository) Delete(ctx context.Context, id string) error {
 		return log.Err("failed to parse genre ID", err, "id", id)
 	}
 
-	if err := r.getDB(ctx).Delete(&Genre{}, "id = ?", genreID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Delete(&Genre{}, "id = ?", genreID).Error; err != nil {
 		return log.Err("failed to delete genre", err, "id", id)
 	}
 
@@ -178,7 +169,10 @@ func (r *genreRepository) UpsertBatch(ctx context.Context, genres []*Genre) (int
 	return inserted, updated, nil
 }
 
-func (r *genreRepository) GetBatchByNames(ctx context.Context, names []string) (map[string]*Genre, error) {
+func (r *genreRepository) GetBatchByNames(
+	ctx context.Context,
+	names []string,
+) (map[string]*Genre, error) {
 	log := r.log.Function("GetBatchByNames")
 
 	if len(names) == 0 {
@@ -186,7 +180,7 @@ func (r *genreRepository) GetBatchByNames(ctx context.Context, names []string) (
 	}
 
 	var genres []*Genre
-	if err := r.getDB(ctx).Where("name IN ?", names).Find(&genres).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Where("name IN ?", names).Find(&genres).Error; err != nil {
 		return nil, log.Err("failed to get genres by names", err, "count", len(names))
 	}
 
@@ -199,3 +193,4 @@ func (r *genreRepository) GetBatchByNames(ctx context.Context, names []string) (
 	log.Info("Retrieved genres by names", "requested", len(names), "found", len(result))
 	return result, nil
 }
+

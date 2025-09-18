@@ -4,7 +4,6 @@ import (
 	"context"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 	"waugzee/internal/imports"
@@ -41,7 +40,6 @@ type ContextualDiscogsImage struct {
 	ImageableType string // Parent entity type (artist, master, release, label)
 }
 
-
 // Buffer definitions for batch processing related entities
 type ImageBuffer struct {
 	Channel  chan *ContextualDiscogsImage
@@ -52,7 +50,6 @@ type GenreBuffer struct {
 	Channel  chan string
 	Capacity int
 }
-
 
 type ArtistBuffer struct {
 	Channel  chan *imports.Artist
@@ -98,15 +95,15 @@ type MasterGenreAssociation struct {
 
 // ProcessingBuffers contains all the buffered channels for related entity processing
 type ProcessingBuffers struct {
-	Images              *ImageBuffer
-	Genres              *GenreBuffer
-	Artists             *ArtistBuffer
-	Labels              *LabelBuffer
-	Masters             *MasterBuffer
-	Releases            *ReleaseBuffer
+	Images   *ImageBuffer
+	Genres   *GenreBuffer
+	Artists  *ArtistBuffer
+	Labels   *LabelBuffer
+	Masters  *MasterBuffer
+	Releases *ReleaseBuffer
 	// Association buffers (Master-level only)
-	MasterArtists       *MasterArtistAssociationBuffer
-	MasterGenres        *MasterGenreAssociationBuffer
+	MasterArtists *MasterArtistAssociationBuffer
+	MasterGenres  *MasterGenreAssociationBuffer
 }
 
 type SimplifiedXMLProcessingService struct {
@@ -122,8 +119,17 @@ type SimplifiedXMLProcessingService struct {
 	// DB association management
 	dbAssociationsEnabled bool
 	// Processing counters for summary logging
-	processedCounts map[string]int
+	processedCounts      map[string]int
 	processedCountsMutex sync.RWMutex
+}
+
+type ProcessingResult struct {
+	TotalRecords     int
+	ProcessedRecords int
+	InsertedRecords  int
+	UpdatedRecords   int
+	ErroredRecords   int
+	Errors           []string
 }
 
 func NewSimplifiedXMLProcessingService(
@@ -246,7 +252,11 @@ func (s *SimplifiedXMLProcessingService) closeProcessingBuffers(buffers *Process
 // These methods extract primary entity data and send related entities to appropriate buffers
 
 // processLabel extracts Label data only - no related entities
-func (s *SimplifiedXMLProcessingService) processLabel(rawLabel *imports.Label, processingID string, buffers *ProcessingBuffers) error {
+func (s *SimplifiedXMLProcessingService) processLabel(
+	rawLabel *imports.Label,
+	processingID string,
+	buffers *ProcessingBuffers,
+) error {
 	if rawLabel == nil || rawLabel.ID <= 0 {
 		return s.log.Err("invalid label data", nil, "processingID", processingID)
 	}
@@ -263,7 +273,11 @@ func (s *SimplifiedXMLProcessingService) processLabel(rawLabel *imports.Label, p
 }
 
 // processArtist extracts Artist data + Images[] and sends Images to image buffer
-func (s *SimplifiedXMLProcessingService) processArtist(rawArtist *imports.Artist, processingID string, buffers *ProcessingBuffers) error {
+func (s *SimplifiedXMLProcessingService) processArtist(
+	rawArtist *imports.Artist,
+	processingID string,
+	buffers *ProcessingBuffers,
+) error {
 	if rawArtist == nil || rawArtist.ID <= 0 {
 		return s.log.Err("invalid artist data", nil, "processingID", processingID)
 	}
@@ -285,7 +299,11 @@ func (s *SimplifiedXMLProcessingService) processArtist(rawArtist *imports.Artist
 }
 
 // processMaster extracts Master data + Images[] + Genres[] + Artists[] and sends to appropriate buffers
-func (s *SimplifiedXMLProcessingService) processMaster(rawMaster *imports.Master, processingID string, buffers *ProcessingBuffers) error {
+func (s *SimplifiedXMLProcessingService) processMaster(
+	rawMaster *imports.Master,
+	processingID string,
+	buffers *ProcessingBuffers,
+) error {
 	if rawMaster == nil || rawMaster.ID <= 0 {
 		return s.log.Err("invalid master data", nil, "processingID", processingID)
 	}
@@ -348,7 +366,11 @@ func (s *SimplifiedXMLProcessingService) processMaster(rawMaster *imports.Master
 
 // processRelease extracts Release data + Artists[] + TrackList[] + Genres[] + Images[]
 // and sends all related entities to appropriate buffers
-func (s *SimplifiedXMLProcessingService) processRelease(rawRelease *imports.Release, processingID string, buffers *ProcessingBuffers) error {
+func (s *SimplifiedXMLProcessingService) processRelease(
+	rawRelease *imports.Release,
+	processingID string,
+	buffers *ProcessingBuffers,
+) error {
 	if rawRelease == nil || rawRelease.ID <= 0 {
 		return s.log.Err("invalid release data", nil, "processingID", processingID)
 	}
@@ -401,7 +423,12 @@ type imageKey struct {
 }
 
 // processImageBuffer consumes images from the buffer, deduplicates them by composite key (imageableID + imageableType + URL), and executes batch upserts when 5000 unique items are collected
-func (s *SimplifiedXMLProcessingService) processImageBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+func (s *SimplifiedXMLProcessingService) processImageBuffer(
+	ctx context.Context,
+	buffers *ProcessingBuffers,
+	wg *sync.WaitGroup,
+	processingID string,
+) {
 	defer wg.Done()
 	log := s.log.Function("processImageBuffer")
 	dedupeMap := make(map[imageKey]*models.Image)
@@ -423,7 +450,13 @@ func (s *SimplifiedXMLProcessingService) processImageBuffer(ctx context.Context,
 					s.processPendingImageBatchFromMap(ctx, dedupeMap, processingID)
 					totalProcessed += len(dedupeMap)
 				}
-				log.Info("Image buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				log.Info(
+					"Image buffer processing completed",
+					"totalProcessed",
+					totalProcessed,
+					"processingID",
+					processingID,
+				)
 				return
 			}
 
@@ -449,7 +482,12 @@ func (s *SimplifiedXMLProcessingService) processImageBuffer(ctx context.Context,
 }
 
 // processGenreBuffer consumes genres from the buffer, deduplicates, and executes batch upserts
-func (s *SimplifiedXMLProcessingService) processGenreBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+func (s *SimplifiedXMLProcessingService) processGenreBuffer(
+	ctx context.Context,
+	buffers *ProcessingBuffers,
+	wg *sync.WaitGroup,
+	processingID string,
+) {
 	defer wg.Done()
 	log := s.log.Function("processGenreBuffer")
 
@@ -471,7 +509,15 @@ func (s *SimplifiedXMLProcessingService) processGenreBuffer(ctx context.Context,
 				if len(genreSet) > 0 {
 					s.processPendingGenreBatch(ctx, genreSet, processingID)
 				}
-				log.Info("Genre buffer processing completed", "totalReceived", totalReceived, "uniqueGenres", len(genreSet), "processingID", processingID)
+				log.Info(
+					"Genre buffer processing completed",
+					"totalReceived",
+					totalReceived,
+					"uniqueGenres",
+					len(genreSet),
+					"processingID",
+					processingID,
+				)
 				return
 			}
 
@@ -489,9 +535,13 @@ func (s *SimplifiedXMLProcessingService) processGenreBuffer(ctx context.Context,
 	}
 }
 
-
 // processArtistBuffer consumes artists from the buffer, deduplicates them by DiscogsID, and executes batch upserts when 5000 unique items are collected
-func (s *SimplifiedXMLProcessingService) processArtistBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+func (s *SimplifiedXMLProcessingService) processArtistBuffer(
+	ctx context.Context,
+	buffers *ProcessingBuffers,
+	wg *sync.WaitGroup,
+	processingID string,
+) {
 	defer wg.Done()
 	log := s.log.Function("processArtistBuffer")
 
@@ -515,7 +565,13 @@ func (s *SimplifiedXMLProcessingService) processArtistBuffer(ctx context.Context
 					s.processPendingArtistBatchFromMap(ctx, dedupeMap, processingID)
 					totalProcessed += len(dedupeMap)
 				}
-				log.Info("Artist buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				log.Info(
+					"Artist buffer processing completed",
+					"totalProcessed",
+					totalProcessed,
+					"processingID",
+					processingID,
+				)
 				return
 			}
 
@@ -535,27 +591,11 @@ func (s *SimplifiedXMLProcessingService) processArtistBuffer(ctx context.Context
 	}
 }
 
-// Helper methods for processing pending batches
-
-func (s *SimplifiedXMLProcessingService) processPendingImageBatch(ctx context.Context, batch []*models.Image, processingID string) {
-	log := s.log.Function("processPendingImageBatch")
-	if len(batch) == 0 {
-		return
-	}
-
-	// Service has already deduplicated - pass batch directly to repository
-	inserted, updated, err := s.imageRepo.UpsertBatch(ctx, batch)
-	if err != nil {
-		_ = log.Error("Failed to upsert image batch", "error", err, "batchSize", len(batch), "processingID", processingID)
-		return
-	}
-	// Reduced logging: only log significant batches or errors to improve performance
-	if len(batch) >= 10000 {
-		log.Info("Processed large image batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
-	}
-}
-
-func (s *SimplifiedXMLProcessingService) processPendingImageBatchFromMap(ctx context.Context, dedupeMap map[imageKey]*models.Image, processingID string) {
+func (s *SimplifiedXMLProcessingService) processPendingImageBatchFromMap(
+	ctx context.Context,
+	dedupeMap map[imageKey]*models.Image,
+	processingID string,
+) {
 	log := s.log.Function("processPendingImageBatchFromMap")
 	if len(dedupeMap) == 0 {
 		return
@@ -570,16 +610,38 @@ func (s *SimplifiedXMLProcessingService) processPendingImageBatchFromMap(ctx con
 	// Service has already deduplicated - pass batch directly to repository
 	inserted, updated, err := s.imageRepo.UpsertBatch(ctx, batch)
 	if err != nil {
-		_ = log.Error("Failed to upsert image batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		_ = log.Error(
+			"Failed to upsert image batch",
+			"error",
+			err,
+			"batchSize",
+			len(batch),
+			"processingID",
+			processingID,
+		)
 		return
 	}
 	// Reduced logging: only log significant batches or errors to improve performance
 	if len(batch) >= 10000 {
-		log.Info("Processed large image batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+		log.Info(
+			"Processed large image batch",
+			"batchSize",
+			len(batch),
+			"inserted",
+			inserted,
+			"updated",
+			updated,
+			"processingID",
+			processingID,
+		)
 	}
 }
 
-func (s *SimplifiedXMLProcessingService) processPendingGenreBatch(ctx context.Context, genreSet map[string]*models.Genre, processingID string) {
+func (s *SimplifiedXMLProcessingService) processPendingGenreBatch(
+	ctx context.Context,
+	genreSet map[string]*models.Genre,
+	processingID string,
+) {
 	log := s.log.Function("processPendingGenreBatch")
 	if len(genreSet) == 0 {
 		return
@@ -593,35 +655,38 @@ func (s *SimplifiedXMLProcessingService) processPendingGenreBatch(ctx context.Co
 
 	inserted, updated, err := s.genreRepo.UpsertBatch(ctx, batch)
 	if err != nil {
-		log.Error("Failed to upsert genre batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		log.Error(
+			"Failed to upsert genre batch",
+			"error",
+			err,
+			"batchSize",
+			len(batch),
+			"processingID",
+			processingID,
+		)
 		return
 	}
 	// Reduced logging: only log significant batches or errors to improve performance
 	if len(batch) >= 10000 {
-		log.Info("Processed large genre batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+		log.Info(
+			"Processed large genre batch",
+			"batchSize",
+			len(batch),
+			"inserted",
+			inserted,
+			"updated",
+			updated,
+			"processingID",
+			processingID,
+		)
 	}
 }
 
-
-func (s *SimplifiedXMLProcessingService) processPendingArtistBatch(ctx context.Context, batch []*models.Artist, processingID string) {
-	log := s.log.Function("processPendingArtistBatch")
-	if len(batch) == 0 {
-		return
-	}
-
-	// Service has already deduplicated - pass batch directly to repository
-	inserted, updated, err := s.artistRepo.UpsertBatch(ctx, batch)
-	if err != nil {
-		log.Error("Failed to upsert artist batch", "error", err, "batchSize", len(batch), "processingID", processingID)
-		return
-	}
-	// Reduced logging: only log significant batches or errors to improve performance
-	if len(batch) >= 10000 {
-		log.Info("Processed large artist batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
-	}
-}
-
-func (s *SimplifiedXMLProcessingService) processPendingArtistBatchFromMap(ctx context.Context, dedupeMap map[int64]*models.Artist, processingID string) {
+func (s *SimplifiedXMLProcessingService) processPendingArtistBatchFromMap(
+	ctx context.Context,
+	dedupeMap map[int64]*models.Artist,
+	processingID string,
+) {
 	log := s.log.Function("processPendingArtistBatchFromMap")
 	if len(dedupeMap) == 0 {
 		return
@@ -636,34 +701,38 @@ func (s *SimplifiedXMLProcessingService) processPendingArtistBatchFromMap(ctx co
 	// Service has already deduplicated - pass batch directly to repository
 	inserted, updated, err := s.artistRepo.UpsertBatch(ctx, batch)
 	if err != nil {
-		log.Error("Failed to upsert artist batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		log.Error(
+			"Failed to upsert artist batch",
+			"error",
+			err,
+			"batchSize",
+			len(batch),
+			"processingID",
+			processingID,
+		)
 		return
 	}
 	// Reduced logging: only log significant batches or errors to improve performance
 	if len(batch) >= 10000 {
-		log.Info("Processed large artist batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+		log.Info(
+			"Processed large artist batch",
+			"batchSize",
+			len(batch),
+			"inserted",
+			inserted,
+			"updated",
+			updated,
+			"processingID",
+			processingID,
+		)
 	}
 }
 
-func (s *SimplifiedXMLProcessingService) processPendingLabelBatch(ctx context.Context, batch []*models.Label, processingID string) {
-	log := s.log.Function("processPendingLabelBatch")
-	if len(batch) == 0 {
-		return
-	}
-
-	// Service has already deduplicated - pass batch directly to repository
-	inserted, updated, err := s.labelRepo.UpsertBatch(ctx, batch)
-	if err != nil {
-		log.Error("Failed to upsert label batch", "error", err, "batchSize", len(batch), "processingID", processingID)
-		return
-	}
-	// Reduced logging: only log significant batches or errors to improve performance
-	if len(batch) >= 10000 {
-		log.Info("Processed large label batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
-	}
-}
-
-func (s *SimplifiedXMLProcessingService) processPendingLabelBatchFromMap(ctx context.Context, dedupeMap map[int64]*models.Label, processingID string) {
+func (s *SimplifiedXMLProcessingService) processPendingLabelBatchFromMap(
+	ctx context.Context,
+	dedupeMap map[int64]*models.Label,
+	processingID string,
+) {
 	log := s.log.Function("processPendingLabelBatchFromMap")
 	if len(dedupeMap) == 0 {
 		return
@@ -678,34 +747,38 @@ func (s *SimplifiedXMLProcessingService) processPendingLabelBatchFromMap(ctx con
 	// Service has already deduplicated - pass batch directly to repository
 	inserted, updated, err := s.labelRepo.UpsertBatch(ctx, batch)
 	if err != nil {
-		log.Error("Failed to upsert label batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		log.Error(
+			"Failed to upsert label batch",
+			"error",
+			err,
+			"batchSize",
+			len(batch),
+			"processingID",
+			processingID,
+		)
 		return
 	}
 	// Reduced logging: only log significant batches or errors to improve performance
 	if len(batch) >= 10000 {
-		log.Info("Processed large label batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+		log.Info(
+			"Processed large label batch",
+			"batchSize",
+			len(batch),
+			"inserted",
+			inserted,
+			"updated",
+			updated,
+			"processingID",
+			processingID,
+		)
 	}
 }
 
-func (s *SimplifiedXMLProcessingService) processPendingMasterBatch(ctx context.Context, batch []*models.Master, processingID string) {
-	log := s.log.Function("processPendingMasterBatch")
-	if len(batch) == 0 {
-		return
-	}
-
-	// Service has already deduplicated - pass batch directly to repository
-	inserted, updated, err := s.masterRepo.UpsertBatch(ctx, batch)
-	if err != nil {
-		log.Error("Failed to upsert master batch", "error", err, "batchSize", len(batch), "processingID", processingID)
-		return
-	}
-	// Reduced logging: only log significant batches or errors to improve performance
-	if len(batch) >= 10000 {
-		log.Info("Processed large master batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
-	}
-}
-
-func (s *SimplifiedXMLProcessingService) processPendingMasterBatchFromMap(ctx context.Context, dedupeMap map[int64]*models.Master, processingID string) {
+func (s *SimplifiedXMLProcessingService) processPendingMasterBatchFromMap(
+	ctx context.Context,
+	dedupeMap map[int64]*models.Master,
+	processingID string,
+) {
 	log := s.log.Function("processPendingMasterBatchFromMap")
 	if len(dedupeMap) == 0 {
 		return
@@ -720,34 +793,38 @@ func (s *SimplifiedXMLProcessingService) processPendingMasterBatchFromMap(ctx co
 	// Service has already deduplicated - pass batch directly to repository
 	inserted, updated, err := s.masterRepo.UpsertBatch(ctx, batch)
 	if err != nil {
-		log.Error("Failed to upsert master batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		log.Error(
+			"Failed to upsert master batch",
+			"error",
+			err,
+			"batchSize",
+			len(batch),
+			"processingID",
+			processingID,
+		)
 		return
 	}
 	// Reduced logging: only log significant batches or errors to improve performance
 	if len(batch) >= 10000 {
-		log.Info("Processed large master batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+		log.Info(
+			"Processed large master batch",
+			"batchSize",
+			len(batch),
+			"inserted",
+			inserted,
+			"updated",
+			updated,
+			"processingID",
+			processingID,
+		)
 	}
 }
 
-func (s *SimplifiedXMLProcessingService) processPendingReleaseBatch(ctx context.Context, batch []*models.Release, processingID string) {
-	log := s.log.Function("processPendingReleaseBatch")
-	if len(batch) == 0 {
-		return
-	}
-
-	// Service has already deduplicated - pass batch directly to repository
-	inserted, updated, err := s.releaseRepo.UpsertBatch(ctx, batch)
-	if err != nil {
-		log.Error("Failed to upsert release batch", "error", err, "batchSize", len(batch), "processingID", processingID)
-		return
-	}
-	// Reduced logging: only log significant batches or errors to improve performance
-	if len(batch) >= 10000 {
-		log.Info("Processed large release batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
-	}
-}
-
-func (s *SimplifiedXMLProcessingService) processPendingReleaseBatchFromMap(ctx context.Context, dedupeMap map[int64]*models.Release, processingID string) {
+func (s *SimplifiedXMLProcessingService) processPendingReleaseBatchFromMap(
+	ctx context.Context,
+	dedupeMap map[int64]*models.Release,
+	processingID string,
+) {
 	log := s.log.Function("processPendingReleaseBatchFromMap")
 	if len(dedupeMap) == 0 {
 		return
@@ -762,17 +839,40 @@ func (s *SimplifiedXMLProcessingService) processPendingReleaseBatchFromMap(ctx c
 	// Service has already deduplicated - pass batch directly to repository
 	inserted, updated, err := s.releaseRepo.UpsertBatch(ctx, batch)
 	if err != nil {
-		log.Error("Failed to upsert release batch", "error", err, "batchSize", len(batch), "processingID", processingID)
+		log.Error(
+			"Failed to upsert release batch",
+			"error",
+			err,
+			"batchSize",
+			len(batch),
+			"processingID",
+			processingID,
+		)
 		return
 	}
 	// Reduced logging: only log significant batches or errors to improve performance
 	if len(batch) >= 10000 {
-		log.Info("Processed large release batch", "batchSize", len(batch), "inserted", inserted, "updated", updated, "processingID", processingID)
+		log.Info(
+			"Processed large release batch",
+			"batchSize",
+			len(batch),
+			"inserted",
+			inserted,
+			"updated",
+			updated,
+			"processingID",
+			processingID,
+		)
 	}
 }
 
 // processLabelBuffer consumes labels from the buffer, deduplicates them by DiscogsID, and executes batch upserts when 5000 unique items are collected
-func (s *SimplifiedXMLProcessingService) processLabelBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+func (s *SimplifiedXMLProcessingService) processLabelBuffer(
+	ctx context.Context,
+	buffers *ProcessingBuffers,
+	wg *sync.WaitGroup,
+	processingID string,
+) {
 	defer wg.Done()
 	log := s.log.Function("processLabelBuffer")
 
@@ -796,7 +896,13 @@ func (s *SimplifiedXMLProcessingService) processLabelBuffer(ctx context.Context,
 					s.processPendingLabelBatchFromMap(ctx, dedupeMap, processingID)
 					totalProcessed += len(dedupeMap)
 				}
-				log.Info("Label buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				log.Info(
+					"Label buffer processing completed",
+					"totalProcessed",
+					totalProcessed,
+					"processingID",
+					processingID,
+				)
 				return
 			}
 
@@ -816,7 +922,12 @@ func (s *SimplifiedXMLProcessingService) processLabelBuffer(ctx context.Context,
 }
 
 // processMasterBuffer consumes masters from the buffer, deduplicates them by DiscogsID, and executes batch upserts when 5000 unique items are collected
-func (s *SimplifiedXMLProcessingService) processMasterBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+func (s *SimplifiedXMLProcessingService) processMasterBuffer(
+	ctx context.Context,
+	buffers *ProcessingBuffers,
+	wg *sync.WaitGroup,
+	processingID string,
+) {
 	defer wg.Done()
 	log := s.log.Function("processMasterBuffer")
 
@@ -840,7 +951,13 @@ func (s *SimplifiedXMLProcessingService) processMasterBuffer(ctx context.Context
 					s.processPendingMasterBatchFromMap(ctx, dedupeMap, processingID)
 					totalProcessed += len(dedupeMap)
 				}
-				log.Info("Master buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				log.Info(
+					"Master buffer processing completed",
+					"totalProcessed",
+					totalProcessed,
+					"processingID",
+					processingID,
+				)
 				return
 			}
 
@@ -860,7 +977,12 @@ func (s *SimplifiedXMLProcessingService) processMasterBuffer(ctx context.Context
 }
 
 // processReleaseBuffer consumes releases from the buffer, deduplicates them by DiscogsID, and executes batch upserts when 2000 unique items are collected
-func (s *SimplifiedXMLProcessingService) processReleaseBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+func (s *SimplifiedXMLProcessingService) processReleaseBuffer(
+	ctx context.Context,
+	buffers *ProcessingBuffers,
+	wg *sync.WaitGroup,
+	processingID string,
+) {
 	defer wg.Done()
 	log := s.log.Function("processReleaseBuffer")
 
@@ -884,7 +1006,13 @@ func (s *SimplifiedXMLProcessingService) processReleaseBuffer(ctx context.Contex
 					s.processPendingReleaseBatchFromMap(ctx, dedupeMap, processingID)
 					totalProcessed += len(dedupeMap)
 				}
-				log.Info("Release buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				log.Info(
+					"Release buffer processing completed",
+					"totalProcessed",
+					totalProcessed,
+					"processingID",
+					processingID,
+				)
 				return
 			}
 
@@ -945,7 +1073,7 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 		Artists:  make(map[int64]*models.Artist),
 		Masters:  make(map[int64]*models.Master),
 		Releases: make(map[int64]*models.Release),
-		Errors: make([]string, 0),
+		Errors:   make([]string, 0),
 	}
 
 	// Create buffered channels for entity processing
@@ -1069,7 +1197,13 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 
 					// Use specialized processor to extract related entities (Artists, Tracks, Genres, Images)
 					if err := s.processRelease(rawRelease, entity.ProcessingID, buffers); err != nil {
-						log.Warn("Release processing failed", "error", err, "releaseID", rawRelease.ID)
+						log.Warn(
+							"Release processing failed",
+							"error",
+							err,
+							"releaseID",
+							rawRelease.ID,
+						)
 						processingStats.totalErrors++
 					} else {
 						result.ParsedRecords++
@@ -1372,7 +1506,9 @@ func (s *SimplifiedXMLProcessingService) updateProcessingStatus(
 
 // Conversion helper methods for converting Discogs import types to model types
 
-func (s *SimplifiedXMLProcessingService) convertContextualDiscogsImageToModel(contextualImage *ContextualDiscogsImage) *models.Image {
+func (s *SimplifiedXMLProcessingService) convertContextualDiscogsImageToModel(
+	contextualImage *ContextualDiscogsImage,
+) *models.Image {
 	if contextualImage == nil || contextualImage.DiscogsImage == nil {
 		return nil
 	}
@@ -1380,7 +1516,8 @@ func (s *SimplifiedXMLProcessingService) convertContextualDiscogsImageToModel(co
 	discogsImage := contextualImage.DiscogsImage
 
 	// Validate required fields before creating the image
-	if discogsImage.URI == "" || contextualImage.ImageableID == "" || contextualImage.ImageableType == "" {
+	if discogsImage.URI == "" || contextualImage.ImageableID == "" ||
+		contextualImage.ImageableType == "" {
 		return nil // Skip invalid images
 	}
 
@@ -1432,8 +1569,9 @@ func (s *SimplifiedXMLProcessingService) convertContextualDiscogsImageToModel(co
 	return image
 }
 
-
-func (s *SimplifiedXMLProcessingService) convertDiscogsArtistToModel(discogsArtist *imports.Artist) *models.Artist {
+func (s *SimplifiedXMLProcessingService) convertDiscogsArtistToModel(
+	discogsArtist *imports.Artist,
+) *models.Artist {
 	if discogsArtist == nil || discogsArtist.ID <= 0 {
 		return nil
 	}
@@ -1447,57 +1585,13 @@ func (s *SimplifiedXMLProcessingService) convertDiscogsArtistToModel(discogsArti
 	return artist
 }
 
-// parseDurationToSeconds converts duration string formats to seconds
-// Supports formats like "4:23", "1:23:45", "123" (seconds only)
-func (s *SimplifiedXMLProcessingService) parseDurationToSeconds(duration string) int {
-	if duration == "" {
-		return 0
-	}
-
-	// If it's just a number, treat it as seconds
-	if seconds, err := strconv.Atoi(duration); err == nil {
-		return seconds
-	}
-
-	// Handle time format like "4:23" or "1:23:45"
-	parts := strings.Split(duration, ":")
-	if len(parts) < 2 {
-		return 0
-	}
-
-	var totalSeconds int
-
-	// Parse based on number of parts
-	switch len(parts) {
-	case 2: // mm:ss
-		minutes, err1 := strconv.Atoi(parts[0])
-		seconds, err2 := strconv.Atoi(parts[1])
-		if err1 != nil || err2 != nil {
-			return 0
-		}
-		totalSeconds = minutes*60 + seconds
-
-	case 3: // hh:mm:ss
-		hours, err1 := strconv.Atoi(parts[0])
-		minutes, err2 := strconv.Atoi(parts[1])
-		seconds, err3 := strconv.Atoi(parts[2])
-		if err1 != nil || err2 != nil || err3 != nil {
-			return 0
-		}
-		totalSeconds = hours*3600 + minutes*60 + seconds
-
-	default:
-		return 0
-	}
-
-	return totalSeconds
-}
-
-// Association buffer processors following the existing buffer pattern
-
-
 // processMasterArtistAssociationBuffer processes master-artist associations in batches
-func (s *SimplifiedXMLProcessingService) processMasterArtistAssociationBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+func (s *SimplifiedXMLProcessingService) processMasterArtistAssociationBuffer(
+	ctx context.Context,
+	buffers *ProcessingBuffers,
+	wg *sync.WaitGroup,
+	processingID string,
+) {
 	defer wg.Done()
 	log := s.log.Function("processMasterArtistAssociationBuffer")
 
@@ -1521,7 +1615,13 @@ func (s *SimplifiedXMLProcessingService) processMasterArtistAssociationBuffer(ct
 					s.processPendingMasterArtistAssociations(ctx, masterArtistMap, processingID)
 					totalProcessed += len(masterArtistMap)
 				}
-				log.Info("Master-artist association buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				log.Info(
+					"Master-artist association buffer processing completed",
+					"totalProcessed",
+					totalProcessed,
+					"processingID",
+					processingID,
+				)
 				return
 			}
 
@@ -1530,7 +1630,10 @@ func (s *SimplifiedXMLProcessingService) processMasterArtistAssociationBuffer(ct
 				if masterArtistMap[association.MasterDiscogsID] == nil {
 					masterArtistMap[association.MasterDiscogsID] = make([]int64, 0)
 				}
-				masterArtistMap[association.MasterDiscogsID] = append(masterArtistMap[association.MasterDiscogsID], association.ArtistDiscogsID)
+				masterArtistMap[association.MasterDiscogsID] = append(
+					masterArtistMap[association.MasterDiscogsID],
+					association.ArtistDiscogsID,
+				)
 
 				// Process batch when we reach threshold
 				if len(masterArtistMap) >= 1000 { // Smaller threshold for associations
@@ -1544,7 +1647,12 @@ func (s *SimplifiedXMLProcessingService) processMasterArtistAssociationBuffer(ct
 }
 
 // processMasterGenreAssociationBuffer processes master-genre associations in batches
-func (s *SimplifiedXMLProcessingService) processMasterGenreAssociationBuffer(ctx context.Context, buffers *ProcessingBuffers, wg *sync.WaitGroup, processingID string) {
+func (s *SimplifiedXMLProcessingService) processMasterGenreAssociationBuffer(
+	ctx context.Context,
+	buffers *ProcessingBuffers,
+	wg *sync.WaitGroup,
+	processingID string,
+) {
 	defer wg.Done()
 	log := s.log.Function("processMasterGenreAssociationBuffer")
 
@@ -1568,7 +1676,13 @@ func (s *SimplifiedXMLProcessingService) processMasterGenreAssociationBuffer(ctx
 					s.processPendingMasterGenreAssociations(ctx, masterGenreMap, processingID)
 					totalProcessed += len(masterGenreMap)
 				}
-				log.Info("Master-genre association buffer processing completed", "totalProcessed", totalProcessed, "processingID", processingID)
+				log.Info(
+					"Master-genre association buffer processing completed",
+					"totalProcessed",
+					totalProcessed,
+					"processingID",
+					processingID,
+				)
 				return
 			}
 
@@ -1577,7 +1691,10 @@ func (s *SimplifiedXMLProcessingService) processMasterGenreAssociationBuffer(ctx
 				if masterGenreMap[association.MasterDiscogsID] == nil {
 					masterGenreMap[association.MasterDiscogsID] = make([]string, 0)
 				}
-				masterGenreMap[association.MasterDiscogsID] = append(masterGenreMap[association.MasterDiscogsID], association.GenreName)
+				masterGenreMap[association.MasterDiscogsID] = append(
+					masterGenreMap[association.MasterDiscogsID],
+					association.GenreName,
+				)
 
 				// Process batch when we reach threshold
 				if len(masterGenreMap) >= 1000 { // Smaller threshold for associations
@@ -1592,8 +1709,11 @@ func (s *SimplifiedXMLProcessingService) processMasterGenreAssociationBuffer(ctx
 
 // Helper methods for processing pending association batches
 
-
-func (s *SimplifiedXMLProcessingService) processPendingMasterArtistAssociations(ctx context.Context, masterArtistMap map[int64][]int64, processingID string) {
+func (s *SimplifiedXMLProcessingService) processPendingMasterArtistAssociations(
+	ctx context.Context,
+	masterArtistMap map[int64][]int64,
+	processingID string,
+) {
 	log := s.log.Function("processPendingMasterArtistAssociations")
 	if len(masterArtistMap) == 0 {
 		return
@@ -1617,14 +1737,36 @@ func (s *SimplifiedXMLProcessingService) processPendingMasterArtistAssociations(
 
 	// Create associations using repository method
 	if err := s.masterRepo.CreateMasterArtistAssociations(ctx, masterIDs, artistIDs); err != nil {
-		log.Error("Failed to create master-artist associations", "error", err, "masterCount", len(masterIDs), "artistCount", len(artistIDs), "processingID", processingID)
+		log.Error(
+			"Failed to create master-artist associations",
+			"error",
+			err,
+			"masterCount",
+			len(masterIDs),
+			"artistCount",
+			len(artistIDs),
+			"processingID",
+			processingID,
+		)
 		return
 	}
 
-	log.Info("Processed master-artist associations", "masterCount", len(masterIDs), "artistCount", len(artistIDs), "processingID", processingID)
+	log.Info(
+		"Processed master-artist associations",
+		"masterCount",
+		len(masterIDs),
+		"artistCount",
+		len(artistIDs),
+		"processingID",
+		processingID,
+	)
 }
 
-func (s *SimplifiedXMLProcessingService) processPendingMasterGenreAssociations(ctx context.Context, masterGenreMap map[int64][]string, processingID string) {
+func (s *SimplifiedXMLProcessingService) processPendingMasterGenreAssociations(
+	ctx context.Context,
+	masterGenreMap map[int64][]string,
+	processingID string,
+) {
 	log := s.log.Function("processPendingMasterGenreAssociations")
 	if len(masterGenreMap) == 0 {
 		return
@@ -1648,10 +1790,27 @@ func (s *SimplifiedXMLProcessingService) processPendingMasterGenreAssociations(c
 
 	// Create associations using repository method
 	if err := s.masterRepo.CreateMasterGenreAssociations(ctx, masterIDs, genreNames); err != nil {
-		log.Error("Failed to create master-genre associations", "error", err, "masterCount", len(masterIDs), "genreCount", len(genreNames), "processingID", processingID)
+		log.Error(
+			"Failed to create master-genre associations",
+			"error",
+			err,
+			"masterCount",
+			len(masterIDs),
+			"genreCount",
+			len(genreNames),
+			"processingID",
+			processingID,
+		)
 		return
 	}
 
-	log.Info("Processed master-genre associations", "masterCount", len(masterIDs), "genreCount", len(genreNames), "processingID", processingID)
+	log.Info(
+		"Processed master-genre associations",
+		"masterCount",
+		len(masterIDs),
+		"genreCount",
+		len(genreNames),
+		"processingID",
+		processingID,
+	)
 }
-

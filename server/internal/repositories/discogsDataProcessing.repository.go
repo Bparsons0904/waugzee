@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"context"
-	contextUtil "waugzee/internal/context"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
@@ -39,13 +38,6 @@ func NewDiscogsDataProcessingRepository(db database.DB) DiscogsDataProcessingRep
 	}
 }
 
-func (r *discogsDataProcessingRepository) getDB(ctx context.Context) *gorm.DB {
-	if tx, ok := contextUtil.GetTransaction(ctx); ok {
-		return tx
-	}
-	return r.db.SQLWithContext(ctx)
-}
-
 func (r *discogsDataProcessingRepository) GetByYearMonth(
 	ctx context.Context,
 	yearMonth string,
@@ -53,7 +45,7 @@ func (r *discogsDataProcessingRepository) GetByYearMonth(
 	log := r.log.Function("GetByYearMonth")
 
 	var processing DiscogsDataProcessing
-	if err := r.getDB(ctx).First(&processing, "year_month = ?", yearMonth).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&processing, "year_month = ?", yearMonth).Error; err != nil {
 		return nil, log.Err("failed to get processing by year month", err, "yearMonth", yearMonth)
 	}
 
@@ -72,7 +64,7 @@ func (r *discogsDataProcessingRepository) GetByID(
 	}
 
 	var processing DiscogsDataProcessing
-	if err := r.getDB(ctx).First(&processing, "id = ?", parsedID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&processing, "id = ?", parsedID).Error; err != nil {
 		return nil, log.Err("failed to get processing by id", err, "id", id)
 	}
 
@@ -85,7 +77,7 @@ func (r *discogsDataProcessingRepository) Create(
 ) (*DiscogsDataProcessing, error) {
 	log := r.log.Function("Create")
 
-	if err := r.getDB(ctx).Create(processing).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Create(processing).Error; err != nil {
 		return nil, log.Err("failed to create processing", err, "yearMonth", processing.YearMonth)
 	}
 
@@ -98,7 +90,7 @@ func (r *discogsDataProcessingRepository) Update(
 ) error {
 	log := r.log.Function("Update")
 
-	if err := r.getDB(ctx).Save(processing).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Save(processing).Error; err != nil {
 		return log.Err("failed to update processing", err, "processing", processing)
 	}
 
@@ -113,7 +105,7 @@ func (r *discogsDataProcessingRepository) Delete(ctx context.Context, id string)
 		return log.Err("failed to parse processing ID", err, "id", id)
 	}
 
-	if err := r.getDB(ctx).Delete(&DiscogsDataProcessing{}, "id = ?", parsedID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Delete(&DiscogsDataProcessing{}, "id = ?", parsedID).Error; err != nil {
 		return log.Err("failed to delete processing", err, "id", id)
 	}
 
@@ -127,7 +119,7 @@ func (r *discogsDataProcessingRepository) GetByStatus(
 	log := r.log.Function("GetByStatus")
 
 	var processing []*DiscogsDataProcessing
-	if err := r.getDB(ctx).Find(&processing, &DiscogsDataProcessing{Status: status}).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Find(&processing, &DiscogsDataProcessing{Status: status}).Error; err != nil {
 		return nil, log.Err("failed to get processing by status", err, "status", status)
 	}
 
@@ -140,7 +132,7 @@ func (r *discogsDataProcessingRepository) GetCurrentProcessing(
 	log := r.log.Function("GetCurrentProcessing")
 
 	var processing DiscogsDataProcessing
-	if err := r.getDB(ctx).Where("status IN ?", []ProcessingStatus{
+	if err := r.db.SQLWithContext(ctx).Where("status IN ?", []ProcessingStatus{
 		ProcessingStatusDownloading,
 		ProcessingStatusReadyForProcessing,
 		ProcessingStatusProcessing,
@@ -175,7 +167,7 @@ func (r *discogsDataProcessingRepository) UpdateStatus(
 		updates["error_message"] = *errorMessage
 	}
 
-	if err := r.getDB(ctx).Model(&DiscogsDataProcessing{}).Where("id = ?", parsedID).Updates(updates).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Model(&DiscogsDataProcessing{}).Where("id = ?", parsedID).Updates(updates).Error; err != nil {
 		return log.Err("failed to update processing status", err, "id", id, "status", status)
 	}
 

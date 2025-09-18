@@ -6,7 +6,6 @@ import (
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/utils"
-	contextutil "waugzee/internal/context"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -40,13 +39,6 @@ func NewArtistRepository(db database.DB) ArtistRepository {
 	}
 }
 
-func (r *artistRepository) getDB(ctx context.Context) *gorm.DB {
-	if tx, ok := contextutil.GetTransaction(ctx); ok {
-		return tx
-	}
-	return r.db.SQLWithContext(ctx)
-}
-
 func (r *artistRepository) GetByID(ctx context.Context, id string) (*Artist, error) {
 	log := r.log.Function("GetByID")
 
@@ -56,7 +48,7 @@ func (r *artistRepository) GetByID(ctx context.Context, id string) (*Artist, err
 	}
 
 	var artist Artist
-	if err := r.getDB(ctx).First(&artist, "id = ?", artistID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&artist, "id = ?", artistID).Error; err != nil {
 		return nil, log.Err("failed to get artist by ID", err, "id", id)
 	}
 
@@ -67,7 +59,7 @@ func (r *artistRepository) GetByDiscogsID(ctx context.Context, discogsID int64) 
 	log := r.log.Function("GetByDiscogsID")
 
 	var artist Artist
-	if err := r.getDB(ctx).First(&artist, "discogs_id = ?", discogsID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&artist, "discogs_id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -80,7 +72,7 @@ func (r *artistRepository) GetByDiscogsID(ctx context.Context, discogsID int64) 
 func (r *artistRepository) Create(ctx context.Context, artist *Artist) (*Artist, error) {
 	log := r.log.Function("Create")
 
-	if err := r.getDB(ctx).Create(artist).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Create(artist).Error; err != nil {
 		return nil, log.Err("failed to create artist", err, "artist", artist)
 	}
 
@@ -90,7 +82,7 @@ func (r *artistRepository) Create(ctx context.Context, artist *Artist) (*Artist,
 func (r *artistRepository) Update(ctx context.Context, artist *Artist) error {
 	log := r.log.Function("Update")
 
-	if err := r.getDB(ctx).Save(artist).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Save(artist).Error; err != nil {
 		return log.Err("failed to update artist", err, "artist", artist)
 	}
 
@@ -105,7 +97,7 @@ func (r *artistRepository) Delete(ctx context.Context, id string) error {
 		return log.Err("failed to parse artist ID", err, "id", id)
 	}
 
-	if err := r.getDB(ctx).Delete(&Artist{}, "id = ?", artistID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Delete(&Artist{}, "id = ?", artistID).Error; err != nil {
 		return log.Err("failed to delete artist", err, "id", id)
 	}
 
@@ -121,14 +113,17 @@ func (r *artistRepository) UpsertBatch(ctx context.Context, artists []*Artist) (
 	return r.upsertSingleBatch(ctx, artists)
 }
 
-func (r *artistRepository) upsertSingleBatch(ctx context.Context, artists []*Artist) (int, int, error) {
+func (r *artistRepository) upsertSingleBatch(
+	ctx context.Context,
+	artists []*Artist,
+) (int, int, error) {
 	log := r.log.Function("upsertSingleBatch")
 
 	if len(artists) == 0 {
 		return 0, 0, nil
 	}
 
-	db := r.getDB(ctx)
+	db := r.db.SQLWithContext(ctx)
 
 	// Pre-generate content hashes to avoid hook issues during batch operations
 	for _, artist := range artists {
@@ -157,7 +152,10 @@ func (r *artistRepository) upsertSingleBatch(ctx context.Context, artists []*Art
 	return affectedRows, 0, nil
 }
 
-func (r *artistRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs []int64) (map[int64]*Artist, error) {
+func (r *artistRepository) GetBatchByDiscogsIDs(
+	ctx context.Context,
+	discogsIDs []int64,
+) (map[int64]*Artist, error) {
 	log := r.log.Function("GetBatchByDiscogsIDs")
 
 	if len(discogsIDs) == 0 {
@@ -165,7 +163,7 @@ func (r *artistRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs 
 	}
 
 	var artists []*Artist
-	if err := r.getDB(ctx).Where("discogs_id IN ?", discogsIDs).Find(&artists).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Where("discogs_id IN ?", discogsIDs).Find(&artists).Error; err != nil {
 		return nil, log.Err("failed to get artists by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
@@ -179,11 +177,22 @@ func (r *artistRepository) GetBatchByDiscogsIDs(ctx context.Context, discogsIDs 
 	return result, nil
 }
 
-func (r *artistRepository) FindOrCreateByDiscogsID(ctx context.Context, discogsID int64, name string) (*Artist, error) {
+func (r *artistRepository) FindOrCreateByDiscogsID(
+	ctx context.Context,
+	discogsID int64,
+	name string,
+) (*Artist, error) {
 	log := r.log.Function("FindOrCreateByDiscogsID")
 
 	if discogsID == 0 || name == "" {
-		return nil, log.Err("artist discogsID and name cannot be empty", nil, "discogsID", discogsID, "name", name)
+		return nil, log.Err(
+			"artist discogsID and name cannot be empty",
+			nil,
+			"discogsID",
+			discogsID,
+			"name",
+			name,
+		)
 	}
 
 	// First, try to find existing artist by Discogs ID
@@ -205,9 +214,17 @@ func (r *artistRepository) FindOrCreateByDiscogsID(ctx context.Context, discogsI
 
 	createdArtist, err := r.Create(ctx, newArtist)
 	if err != nil {
-		return nil, log.Err("failed to create new artist", err, "name", name, "discogsID", discogsID)
+		return nil, log.Err(
+			"failed to create new artist",
+			err,
+			"name",
+			name,
+			"discogsID",
+			discogsID,
+		)
 	}
 
 	log.Info("Created new artist", "name", name, "discogsID", createdArtist.DiscogsID)
 	return createdArtist, nil
 }
+

@@ -15,7 +15,6 @@ import (
 
 type DiscogsProcessingJob struct {
 	repo                    repositories.DiscogsDataProcessingRepository
-	xmlProcessing           *services.XMLProcessingService
 	simplifiedXMLProcessing *services.SimplifiedXMLProcessingService
 	log                     logger.Logger
 	schedule                services.Schedule
@@ -23,13 +22,11 @@ type DiscogsProcessingJob struct {
 
 func NewDiscogsProcessingJob(
 	repo repositories.DiscogsDataProcessingRepository,
-	xmlProcessing *services.XMLProcessingService,
 	simplifiedXMLProcessing *services.SimplifiedXMLProcessingService,
 	schedule services.Schedule,
 ) *DiscogsProcessingJob {
 	return &DiscogsProcessingJob{
 		repo:                    repo,
-		xmlProcessing:           xmlProcessing,
 		simplifiedXMLProcessing: simplifiedXMLProcessing,
 		log:                     logger.New("discogsProcessingJob"),
 		schedule:                schedule,

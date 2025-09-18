@@ -24,13 +24,12 @@ type App struct {
 	Config     config.Config
 
 	// Services
-	TransactionService    *services.TransactionService
-	ZitadelService        *services.ZitadelService
-	DiscogsService        *services.DiscogsService
-	DiscogsParserService  *services.DiscogsParserService
-	DownloadService       *services.DownloadService
-	SchedulerService      *services.SchedulerService
-	XMLProcessingService           *services.XMLProcessingService
+	TransactionService             *services.TransactionService
+	ZitadelService                 *services.ZitadelService
+	DiscogsService                 *services.DiscogsService
+	DiscogsParserService           *services.DiscogsParserService
+	DownloadService                *services.DownloadService
+	SchedulerService               *services.SchedulerService
 	SimplifiedXMLProcessingService *services.SimplifiedXMLProcessingService
 
 	// Repositories
@@ -84,15 +83,6 @@ func New() (*App, error) {
 	discogsParserService := services.NewDiscogsParserService()
 	downloadService := services.NewDownloadService(config)
 	schedulerService := services.NewSchedulerService()
-	xmlProcessingService := services.NewXMLProcessingService(
-		labelRepo,
-		artistRepo,
-		masterRepo,
-		releaseRepo,
-		genreRepo,
-		discogsDataProcessingRepo,
-		discogsParserService,
-	)
 	simplifiedXMLProcessingService := services.NewSimplifiedXMLProcessingService(
 		discogsDataProcessingRepo,
 		labelRepo,
@@ -130,7 +120,6 @@ func New() (*App, error) {
 		// Processing job runs at 3:00 AM UTC daily (1 hour after download)
 		discogsProcessingJob := jobs.NewDiscogsProcessingJob(
 			discogsDataProcessingRepo,
-			xmlProcessingService,
 			simplifiedXMLProcessingService,
 			services.Hourly, // TODO: CHange back to daily after testing, Claude do not revert
 		)
@@ -141,29 +130,28 @@ func New() (*App, error) {
 	}
 
 	app := &App{
-		Database:                  db,
-		Config:                    config,
-		Middleware:                middleware,
-		TransactionService:        transactionService,
-		ZitadelService:            zitadelService,
-		DiscogsService:            discogsService,
-		DiscogsParserService:      discogsParserService,
-		DownloadService:           downloadService,
-		SchedulerService:          schedulerService,
-		XMLProcessingService:           xmlProcessingService,
+		Database:                       db,
+		Config:                         config,
+		Middleware:                     middleware,
+		TransactionService:             transactionService,
+		ZitadelService:                 zitadelService,
+		DiscogsService:                 discogsService,
+		DiscogsParserService:           discogsParserService,
+		DownloadService:                downloadService,
+		SchedulerService:               schedulerService,
 		SimplifiedXMLProcessingService: simplifiedXMLProcessingService,
-		UserRepo:                  userRepo,
-		DiscogsDataProcessingRepo: discogsDataProcessingRepo,
-		LabelRepo:                 labelRepo,
-		ArtistRepo:                artistRepo,
-		MasterRepo:                masterRepo,
-		ReleaseRepo:               releaseRepo,
-		GenreRepo:                 genreRepo,
-		ImageRepo:                 imageRepo,
-		AuthController: authController,
-		UserController: userController,
-		Websocket:                 websocket,
-		EventBus:                  eventBus,
+		UserRepo:                       userRepo,
+		DiscogsDataProcessingRepo:      discogsDataProcessingRepo,
+		LabelRepo:                      labelRepo,
+		ArtistRepo:                     artistRepo,
+		MasterRepo:                     masterRepo,
+		ReleaseRepo:                    releaseRepo,
+		GenreRepo:                      genreRepo,
+		ImageRepo:                      imageRepo,
+		AuthController:                 authController,
+		UserController:                 userController,
+		Websocket:                      websocket,
+		EventBus:                       eventBus,
 	}
 
 	if err := app.validate(); err != nil {
@@ -192,7 +180,6 @@ func (a *App) validate() error {
 		a.DiscogsParserService,
 		a.DownloadService,
 		a.SchedulerService,
-		a.XMLProcessingService,
 		a.SimplifiedXMLProcessingService,
 		a.AuthController,
 		a.UserController,
