@@ -1,7 +1,6 @@
 package services
 
 import (
-	"bufio"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -9,10 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
-	"time"
 	"waugzee/internal/imports"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
@@ -102,6 +99,162 @@ func NewDiscogsParserService() *DiscogsParserService {
 	return &DiscogsParserService{
 		log: logger.New("discogsParserService"),
 	}
+}
+
+// ParseFileToChannel parses a Discogs XML file and sends raw entities to the provided channel
+// This extracts ALL data from XML without conversion or memory optimization
+func (s *DiscogsParserService) ParseFileToChannel(
+	ctx context.Context,
+	options ParseOptions,
+	entityChan chan<- EntityMessage,
+	completionChan chan<- CompletionMessage,
+) error {
+	if options.FilePath == "" || options.FileType == "" {
+		return fmt.Errorf("filePath and fileType are required")
+	}
+
+	// Get entity configuration
+	config, exists := entityConfigs[options.FileType]
+	if !exists {
+		return fmt.Errorf("unsupported file type: %s", options.FileType)
+	}
+
+	// Open and decompress the gzipped XML file
+	file, err := os.Open(options.FilePath)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		return fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzipReader.Close()
+
+	// Parse the file and send to channel
+	err = s.parseEntityFileToChannel(
+		ctx,
+		gzipReader,
+		config.ElementName,
+		entityChan,
+	)
+
+	// Send completion signal
+	select {
+	case completionChan <- CompletionMessage{
+		ProcessingID: "", // Will be set by calling service
+		FileType:     options.FileType,
+		Completed:    err == nil,
+	}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	return err
+}
+
+// parseEntityFileToChannel handles parsing and sends ALL raw entity data to channel
+func (s *DiscogsParserService) parseEntityFileToChannel(
+	ctx context.Context,
+	reader io.Reader,
+	elementName string,
+	entityChan chan<- EntityMessage,
+) error {
+	decoder := xml.NewDecoder(reader)
+
+	// Stream through the XML file
+	for {
+		// Check context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			s.log.Error("XML parsing error", "error", err)
+			continue
+		}
+
+		// Look for entity start elements
+		if startElement, ok := token.(xml.StartElement); ok &&
+			startElement.Name.Local == elementName {
+
+			// Decode the element and send RAW entity to channel
+			switch elementName {
+			case "label":
+				var label imports.Label
+				if err := decoder.DecodeElement(&label, &startElement); err != nil {
+					s.log.Error("Failed to decode label", "error", err)
+					continue
+				}
+				// Send RAW label with ALL fields preserved
+				select {
+				case entityChan <- EntityMessage{
+					Type:      "label",
+					RawEntity: &label,
+				}:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+
+			case "artist":
+				var artist imports.Artist
+				if err := decoder.DecodeElement(&artist, &startElement); err != nil {
+					s.log.Error("Failed to decode artist", "error", err)
+					continue
+				}
+				// Send RAW artist with ALL fields preserved
+				select {
+				case entityChan <- EntityMessage{
+					Type:      "artist",
+					RawEntity: &artist,
+				}:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+
+			case "master":
+				var master imports.Master
+				if err := decoder.DecodeElement(&master, &startElement); err != nil {
+					s.log.Error("Failed to decode master", "error", err)
+					continue
+				}
+				// Send RAW master with ALL fields preserved
+				select {
+				case entityChan <- EntityMessage{
+					Type:      "master",
+					RawEntity: &master,
+				}:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+
+			case "release":
+				var release imports.Release
+				if err := decoder.DecodeElement(&release, &startElement); err != nil {
+					s.log.Error("Failed to decode release", "error", err)
+					continue
+				}
+				// Send RAW release with ALL fields preserved
+				select {
+				case entityChan <- EntityMessage{
+					Type:      "release",
+					RawEntity: &release,
+				}:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // ParseFile parses a Discogs XML file and returns parsed models without database operations
@@ -239,113 +392,6 @@ func (s *DiscogsParserService) parseEntityFile(
 	return result, nil
 }
 
-// handleDecodeError handles XML decode errors consistently
-func (s *DiscogsParserService) handleDecodeError(
-	result *ParseResult,
-	err error,
-	startElement xml.StartElement,
-	log logger.Logger,
-) {
-	errorMsg := fmt.Sprintf(
-		"Failed to decode %s element at record %d: %v",
-		startElement.Name.Local,
-		result.TotalRecords,
-		err,
-	)
-	log.Error("XML decode error",
-		"error", err,
-		"recordNumber", result.TotalRecords,
-		"elementName", startElement.Name.Local,
-		"elementAttrs", s.formatAttributes(startElement.Attr))
-	result.Errors = append(result.Errors, errorMsg)
-	result.ErroredRecords++
-}
-
-// logProgress logs parsing progress with performance metrics
-func (s *DiscogsParserService) logProgress(
-	result *ParseResult,
-	progressInterval int,
-	startTime time.Time,
-	lastProgressTime *time.Time,
-	log logger.Logger,
-) {
-	currentTime := time.Now()
-	elapsed := currentTime.Sub(*lastProgressTime)
-	recordsPerSecond := float64(progressInterval) / elapsed.Seconds()
-	totalElapsed := currentTime.Sub(startTime)
-
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-
-	successfulRecords := result.TotalRecords - result.ErroredRecords
-	log.Info(
-		"Parsing progress",
-		"totalRecords",
-		result.TotalRecords,
-		"processedRecords",
-		result.ProcessedRecords,
-		"erroredRecords",
-		result.ErroredRecords,
-		"successfulRecords",
-		successfulRecords,
-		"recordsPerSecond",
-		fmt.Sprintf("%.1f", recordsPerSecond),
-		"totalElapsedMs",
-		totalElapsed.Milliseconds(),
-		"memoryUsageMB",
-		memStats.Alloc/1024/1024,
-		"successRate",
-		fmt.Sprintf(
-			"%.2f%%",
-			float64(successfulRecords)/float64(result.TotalRecords)*100,
-		),
-	)
-
-	*lastProgressTime = currentTime
-}
-
-// logFinalSummary logs final parsing results and errors
-func (s *DiscogsParserService) logFinalSummary(
-	result *ParseResult,
-	entityType string,
-	startTime time.Time,
-	log logger.Logger,
-) {
-	totalElapsed := time.Since(startTime)
-	overallRecordsPerSecond := float64(result.TotalRecords) / totalElapsed.Seconds()
-	successfulRecords := result.TotalRecords - result.ErroredRecords
-
-	log.Info(
-		fmt.Sprintf(
-			"%s file parsing completed",
-			strings.ToUpper(string(entityType[0]))+entityType[1:],
-		),
-		"total",
-		result.TotalRecords,
-		"processed",
-		result.ProcessedRecords,
-		"errors",
-		result.ErroredRecords,
-		"successful",
-		successfulRecords,
-		"totalElapsedMs",
-		totalElapsed.Milliseconds(),
-		"overallRecordsPerSecond",
-		fmt.Sprintf("%.1f", overallRecordsPerSecond),
-		"successRate",
-		fmt.Sprintf("%.2f%%", float64(successfulRecords)/float64(result.TotalRecords)*100),
-		"errorSampleCount",
-		len(result.Errors),
-	)
-
-	// Log first few errors for debugging
-	if len(result.Errors) > 0 {
-		maxErrorsToLog := min(len(result.Errors), 5)
-		log.Error("Sample parsing errors",
-			"sampleErrors", result.Errors[:maxErrorsToLog],
-			"totalErrors", len(result.Errors))
-	}
-}
 
 func (s *DiscogsParserService) convertDiscogsLabel(discogsLabel *imports.Label) *models.Label {
 	// Skip labels with invalid data
@@ -390,53 +436,6 @@ func (s *DiscogsParserService) convertDiscogsArtist(discogsArtist *imports.Artis
 	return artist
 }
 
-func (s *DiscogsParserService) convertDiscogsImage(
-	discogsImage *imports.DiscogsImage,
-	imageableID, imageableType string,
-) *models.Image {
-	// Skip images with no URI (common in current XML dumps)
-	if len(discogsImage.URI) == 0 {
-		return nil
-	}
-
-	// Determine image type based on Discogs type
-	imageType := models.ImageTypePrimary
-	if discogsImage.Type == "secondary" {
-		imageType = models.ImageTypeSecondary
-	}
-
-	// Convert imageableID from string to int64
-	imageableIDInt64, err := strconv.ParseInt(imageableID, 10, 64)
-	if err != nil {
-		return nil // Skip invalid imageableID
-	}
-
-	image := &models.Image{
-		URL:           discogsImage.URI,
-		ImageableID:   imageableIDInt64,
-		ImageableType: imageableType,
-		ImageType:     imageType,
-	}
-
-	// Set optional fields if available
-	if discogsImage.Width > 0 {
-		image.Width = &discogsImage.Width
-	}
-	if discogsImage.Height > 0 {
-		image.Height = &discogsImage.Height
-	}
-	if len(discogsImage.URI150) > 0 {
-		image.DiscogsURI150 = &discogsImage.URI150
-	}
-	if len(discogsImage.Type) > 0 {
-		image.DiscogsType = &discogsImage.Type
-	}
-
-	// Store original Discogs URI for reference
-	image.DiscogsURI = &discogsImage.URI
-
-	return image
-}
 
 func (s *DiscogsParserService) convertDiscogsMaster(discogsMaster *imports.Master) *models.Master {
 	// Skip masters with invalid data
@@ -673,221 +672,4 @@ func (s *DiscogsParserService) parseDurationToSeconds(duration string) int {
 	return totalSeconds
 }
 
-// validateAndLogXMLStructure reads and validates the beginning of the XML file
-func (s *DiscogsParserService) validateAndLogXMLStructure(
-	reader io.Reader,
-	fileType string,
-	log logger.Logger,
-) error {
-	// Create a buffered reader to peek at content
-	bufReader := bufio.NewReader(reader)
-
-	// Read first 2KB for structure analysis
-	headerBytes := make([]byte, 2048)
-	n, err := bufReader.Read(headerBytes)
-	if err != nil && err != io.EOF {
-		return fmt.Errorf("failed to read XML header: %w", err)
-	}
-
-	headerContent := string(headerBytes[:n])
-	log.Info("XML file header validation",
-		"bytesRead", n,
-		"firstLine", s.getFirstLine(headerContent),
-		"hasXMLDeclaration", strings.Contains(headerContent, "<?xml"),
-		"fileType", fileType)
-
-	// Check for expected root elements based on file type
-	expectedRoot := ""
-	expectedElement := ""
-	switch fileType {
-	case "labels":
-		expectedRoot = "<labels>"
-		expectedElement = "<label"
-	case "artists":
-		expectedRoot = "<artists>"
-		expectedElement = "<artist"
-	case "masters":
-		expectedRoot = "<masters>"
-		expectedElement = "<master"
-	case "releases":
-		expectedRoot = "<releases>"
-		expectedElement = "<release"
-	}
-
-	hasRoot := strings.Contains(headerContent, expectedRoot)
-	hasElement := strings.Contains(headerContent, expectedElement)
-
-	log.Info("XML structure analysis",
-		"expectedRoot", expectedRoot,
-		"hasExpectedRoot", hasRoot,
-		"expectedElement", expectedElement,
-		"hasExpectedElement", hasElement,
-		"sampleContent", s.getSampleContent(headerContent, 200))
-
-	if !hasRoot && !hasElement {
-		return fmt.Errorf(
-			"XML does not contain expected structure for %s: missing %s or %s",
-			fileType,
-			expectedRoot,
-			expectedElement,
-		)
-	}
-
-	return nil
-}
-
-// getFirstLine extracts the first line from content
-func (s *DiscogsParserService) getFirstLine(content string) string {
-	lines := strings.Split(content, "\n")
-	if len(lines) > 0 {
-		return strings.TrimSpace(lines[0])
-	}
-	return ""
-}
-
-// getSampleContent returns a cleaned sample of the content for logging
-func (s *DiscogsParserService) getSampleContent(content string, maxLen int) string {
-	// Remove excessive whitespace and newlines for cleaner logging
-	cleaned := strings.ReplaceAll(content, "\n", " ")
-	cleaned = strings.ReplaceAll(cleaned, "\t", " ")
-	// Compress multiple spaces
-	for strings.Contains(cleaned, "  ") {
-		cleaned = strings.ReplaceAll(cleaned, "  ", " ")
-	}
-
-	if len(cleaned) > maxLen {
-		return cleaned[:maxLen] + "..."
-	}
-	return cleaned
-}
-
-// formatAttributes formats XML attributes for logging
-func (s *DiscogsParserService) formatAttributes(attrs []xml.Attr) string {
-	if len(attrs) == 0 {
-		return "none"
-	}
-
-	var attrStrs []string
-	for _, attr := range attrs {
-		attrStrs = append(attrStrs, fmt.Sprintf("%s=%q", attr.Name.Local, attr.Value))
-	}
-	return strings.Join(attrStrs, ", ")
-}
-
-// logSuccessfulRecord logs details of successfully parsed records for debugging
-func (s *DiscogsParserService) logSuccessfulRecord(
-	recordType string,
-	discogsRecord any,
-	convertedRecord any,
-	recordNumber int,
-	log logger.Logger,
-) {
-	// Convert to JSON for readable logging
-	discogsJSON, _ := json.Marshal(discogsRecord)
-	convertedJSON, _ := json.Marshal(convertedRecord)
-
-	log.Info("Successful record parse sample",
-		"recordType", recordType,
-		"recordNumber", recordNumber,
-		"discogsRecord", string(discogsJSON),
-		"convertedRecord", string(convertedJSON))
-}
-
-// findOrCreateGenre finds an existing genre by name or creates a new one
-func (s *DiscogsParserService) findOrCreateGenre(name string) *models.Genre {
-	if name == "" {
-		return nil
-	}
-
-	trimmedName := strings.TrimSpace(name)
-	if trimmedName == "" {
-		return nil
-	}
-
-	// For now, just create a new genre object without database interaction
-	// The database layer will handle deduplication through unique constraints
-	return &models.Genre{
-		Name: trimmedName,
-	}
-}
-
-// convertDiscogsArtists converts Discogs artist data to our Artist models
-func (s *DiscogsParserService) convertDiscogsArtists(
-	discogsArtists []imports.Artist,
-) []models.Artist {
-	if len(discogsArtists) == 0 {
-		return nil
-	}
-
-	var artists []models.Artist
-	for _, discogsArtist := range discogsArtists {
-		if discogsArtist.Name == "" {
-			continue
-		}
-
-		name := strings.TrimSpace(discogsArtist.Name)
-		if name == "" {
-			continue
-		}
-
-		artist := models.Artist{
-			Name:     name,
-			IsActive: true,
-		}
-
-		// Set DiscogsID from Discogs ID if available
-		if discogsArtist.ID > 0 {
-			artist.DiscogsID = int64(discogsArtist.ID)
-		}
-
-		// Note: Biography field not available in current Artist model
-		// if len(discogsArtist.Profile) > 0 {
-		//	profile := strings.TrimSpace(discogsArtist.Profile)
-		//	if len(profile) > 0 {
-		//		artist.Biography = &profile
-		//	}
-		// }
-
-		artists = append(artists, artist)
-	}
-
-	return artists
-}
-
-// convertDiscogsGenres converts Discogs genres and styles to our Genre models
-func (s *DiscogsParserService) convertDiscogsGenres(
-	genres []string,
-	styles []string,
-) []models.Genre {
-	var result []models.Genre
-	genreMap := make(map[string]bool) // Track duplicates
-
-	// Add genres
-	for _, genre := range genres {
-		if genre == "" {
-			continue
-		}
-		name := strings.TrimSpace(genre)
-		if name == "" || genreMap[name] {
-			continue
-		}
-		genreMap[name] = true
-		result = append(result, models.Genre{Name: name})
-	}
-
-	// Add styles (as sub-genres)
-	for _, style := range styles {
-		if style == "" {
-			continue
-		}
-		name := strings.TrimSpace(style)
-		if name == "" || genreMap[name] {
-			continue
-		}
-		genreMap[name] = true
-		result = append(result, models.Genre{Name: name})
-	}
-
-	return result
-}
 

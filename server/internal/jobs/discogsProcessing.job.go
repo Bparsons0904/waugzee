@@ -14,22 +14,22 @@ import (
 )
 
 type DiscogsProcessingJob struct {
-	repo                    repositories.DiscogsDataProcessingRepository
-	simplifiedXMLProcessing *services.SimplifiedXMLProcessingService
-	log                     logger.Logger
-	schedule                services.Schedule
+	repo             repositories.DiscogsDataProcessingRepository
+	xmlProcessing    *services.XMLProcessingService
+	log              logger.Logger
+	schedule         services.Schedule
 }
 
 func NewDiscogsProcessingJob(
 	repo repositories.DiscogsDataProcessingRepository,
-	simplifiedXMLProcessing *services.SimplifiedXMLProcessingService,
+	xmlProcessing *services.XMLProcessingService,
 	schedule services.Schedule,
 ) *DiscogsProcessingJob {
 	return &DiscogsProcessingJob{
-		repo:                    repo,
-		simplifiedXMLProcessing: simplifiedXMLProcessing,
-		log:                     logger.New("discogsProcessingJob"),
-		schedule:                schedule,
+		repo:          repo,
+		xmlProcessing: xmlProcessing,
+		log:           logger.New("discogsProcessingJob"),
+		schedule:      schedule,
 	}
 }
 
@@ -114,10 +114,10 @@ func (j *DiscogsProcessingJob) processRecord(
 		name   string
 		method func(context.Context, string, string) (*services.ProcessingResult, error)
 	}{
-		{"labels", j.simplifiedXMLProcessing.ProcessLabelsFile},
-		{"artists", j.simplifiedXMLProcessing.ProcessArtistsFile},
-		{"masters", j.simplifiedXMLProcessing.ProcessMastersFile},
-		{"releases", j.simplifiedXMLProcessing.ProcessReleasesFile},
+		{"labels", j.xmlProcessing.ProcessLabelsFile},
+		{"artists", j.xmlProcessing.ProcessArtistsFile},
+		{"masters", j.xmlProcessing.ProcessMastersFile},
+		{"releases", j.xmlProcessing.ProcessReleasesFile},
 	}
 
 	var totalProcessed int

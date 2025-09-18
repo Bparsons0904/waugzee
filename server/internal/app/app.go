@@ -30,7 +30,7 @@ type App struct {
 	DiscogsParserService           *services.DiscogsParserService
 	DownloadService                *services.DownloadService
 	SchedulerService               *services.SchedulerService
-	SimplifiedXMLProcessingService *services.SimplifiedXMLProcessingService
+	XMLProcessingService *services.XMLProcessingService
 
 	// Repositories
 	UserRepo                  repositories.UserRepository
@@ -83,7 +83,7 @@ func New() (*App, error) {
 	discogsParserService := services.NewDiscogsParserService()
 	downloadService := services.NewDownloadService(config)
 	schedulerService := services.NewSchedulerService()
-	simplifiedXMLProcessingService := services.NewSimplifiedXMLProcessingService(
+	xmlProcessingService := services.NewXMLProcessingService(
 		discogsDataProcessingRepo,
 		labelRepo,
 		artistRepo,
@@ -120,7 +120,7 @@ func New() (*App, error) {
 		// Processing job runs at 3:00 AM UTC daily (1 hour after download)
 		discogsProcessingJob := jobs.NewDiscogsProcessingJob(
 			discogsDataProcessingRepo,
-			simplifiedXMLProcessingService,
+			xmlProcessingService,
 			services.Hourly, // TODO: CHange back to daily after testing, Claude do not revert
 		)
 		if err := schedulerService.AddJob(discogsProcessingJob); err != nil {
@@ -139,7 +139,7 @@ func New() (*App, error) {
 		DiscogsParserService:           discogsParserService,
 		DownloadService:                downloadService,
 		SchedulerService:               schedulerService,
-		SimplifiedXMLProcessingService: simplifiedXMLProcessingService,
+		XMLProcessingService: xmlProcessingService,
 		UserRepo:                       userRepo,
 		DiscogsDataProcessingRepo:      discogsDataProcessingRepo,
 		LabelRepo:                      labelRepo,
@@ -180,7 +180,7 @@ func (a *App) validate() error {
 		a.DiscogsParserService,
 		a.DownloadService,
 		a.SchedulerService,
-		a.SimplifiedXMLProcessingService,
+		a.XMLProcessingService,
 		a.AuthController,
 		a.UserController,
 		a.Middleware,

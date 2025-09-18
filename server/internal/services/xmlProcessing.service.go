@@ -14,7 +14,7 @@ type SimplifiedResult struct {
 	Errors []string
 }
 
-type SimplifiedXMLProcessingService struct {
+type XMLProcessingService struct {
 	discogsDataProcessingRepo repositories.DiscogsDataProcessingRepository
 	parserService             *DiscogsParserService
 	bufferManager             *BufferManager
@@ -32,7 +32,7 @@ type ProcessingResult struct {
 	Errors           []string
 }
 
-func NewSimplifiedXMLProcessingService(
+func NewXMLProcessingService(
 	discogsDataProcessingRepo repositories.DiscogsDataProcessingRepository,
 	labelRepo repositories.LabelRepository,
 	artistRepo repositories.ArtistRepository,
@@ -41,7 +41,7 @@ func NewSimplifiedXMLProcessingService(
 	genreRepo repositories.GenreRepository,
 	imageRepo repositories.ImageRepository,
 	parserService *DiscogsParserService,
-) *SimplifiedXMLProcessingService {
+) *XMLProcessingService {
 	bufferManager := NewBufferManager(
 		labelRepo,
 		artistRepo,
@@ -62,18 +62,18 @@ func NewSimplifiedXMLProcessingService(
 
 	entityProcessor := NewEntityProcessor(parserService)
 
-	return &SimplifiedXMLProcessingService{
+	return &XMLProcessingService{
 		discogsDataProcessingRepo: discogsDataProcessingRepo,
 		parserService:             parserService,
 		bufferManager:             bufferManager,
 		batchCoordinator:          batchCoordinator,
 		entityProcessor:           entityProcessor,
-		log:                       logger.New("simplifiedXMLProcessingService"),
+		log:                       logger.New("xmlProcessingService"),
 	}
 }
 
 // ProcessFileToMap parses the entire file using channel-based architecture to extract ALL XML data
-func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
+func (s *XMLProcessingService) ProcessFileToMap(
 	ctx context.Context,
 	filePath string,
 	fileType string,
@@ -172,7 +172,7 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 	return result, nil
 }
 
-func (s *SimplifiedXMLProcessingService) ProcessLabelsFile(
+func (s *XMLProcessingService) ProcessLabelsFile(
 	ctx context.Context,
 	filePath string,
 	processingID string,
@@ -180,7 +180,7 @@ func (s *SimplifiedXMLProcessingService) ProcessLabelsFile(
 	return s.ProcessFile(ctx, filePath, processingID, "labels")
 }
 
-func (s *SimplifiedXMLProcessingService) ProcessArtistsFile(
+func (s *XMLProcessingService) ProcessArtistsFile(
 	ctx context.Context,
 	filePath string,
 	processingID string,
@@ -188,7 +188,7 @@ func (s *SimplifiedXMLProcessingService) ProcessArtistsFile(
 	return s.ProcessFile(ctx, filePath, processingID, "artists")
 }
 
-func (s *SimplifiedXMLProcessingService) ProcessMastersFile(
+func (s *XMLProcessingService) ProcessMastersFile(
 	ctx context.Context,
 	filePath string,
 	processingID string,
@@ -196,7 +196,7 @@ func (s *SimplifiedXMLProcessingService) ProcessMastersFile(
 	return s.ProcessFile(ctx, filePath, processingID, "masters")
 }
 
-func (s *SimplifiedXMLProcessingService) ProcessReleasesFile(
+func (s *XMLProcessingService) ProcessReleasesFile(
 	ctx context.Context,
 	filePath string,
 	processingID string,
@@ -205,7 +205,7 @@ func (s *SimplifiedXMLProcessingService) ProcessReleasesFile(
 }
 
 // ProcessFile is the consolidated generic method that handles all file types
-func (s *SimplifiedXMLProcessingService) ProcessFile(
+func (s *XMLProcessingService) ProcessFile(
 	ctx context.Context,
 	filePath string,
 	processingID string,
@@ -246,7 +246,7 @@ func (s *SimplifiedXMLProcessingService) ProcessFile(
 }
 
 // convertToProcessingResult converts SimplifiedResult to ProcessingResult for compatibility
-func (s *SimplifiedXMLProcessingService) convertToProcessingResult(
+func (s *XMLProcessingService) convertToProcessingResult(
 	simplifiedResult *SimplifiedResult,
 ) *ProcessingResult {
 	return &ProcessingResult{
@@ -259,7 +259,7 @@ func (s *SimplifiedXMLProcessingService) convertToProcessingResult(
 	}
 }
 
-func (s *SimplifiedXMLProcessingService) updateProcessingStatus(
+func (s *XMLProcessingService) updateProcessingStatus(
 	ctx context.Context,
 	processingID string,
 	status models.ProcessingStatus,
