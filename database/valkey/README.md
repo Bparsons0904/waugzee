@@ -1,4 +1,4 @@
-# Vim Actions Valkey Database
+# waugzee Actions Valkey Database
 
 A high-performance Valkey cache database configured for session management, caching, and real-time data storage. Valkey is a Redis-compatible database that provides enhanced performance and modern features.
 
@@ -33,8 +33,8 @@ The Valkey database is automatically started through the main project's Tilt or 
 
 ```bash
 # Build and run the Valkey container
-docker build -f Dockerfile.dev -t vim-actions-valkey-dev .
-docker run -p 6399:6379 vim-actions-valkey-dev
+docker build -f Dockerfile.dev -t waugzee-actions-valkey-dev .
+docker run -p 6399:6379 waugzee-actions-valkey-dev
 ```
 
 ### Connection Information
@@ -105,13 +105,11 @@ loglevel notice                 # Appropriate logging for development
 ### Primary Use Cases
 
 1. **Session Management**
-
    - User authentication sessions
    - JWT token storage and validation
    - Session expiration handling
 
 2. **Application Caching**
-
    - API response caching
    - Database query result caching
    - Computed data caching

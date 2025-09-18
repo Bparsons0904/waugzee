@@ -1,4 +1,4 @@
-# Tiltfile for Vim Actions development environment
+# Tiltfile for Waugzee development environment
 
 # Load environment variables from client/.env
 load('ext://dotenv', 'dotenv')
@@ -280,7 +280,7 @@ if DEV_MODE:
     )
 
 
-print("🚀 Vim Actions Development Environment (Environment: %s)" % DOCKER_ENV)
+print("🚀 Waugzee Development Environment (Environment: %s)" % DOCKER_ENV)
 print("📊 Tilt Dashboard: http://localhost:%s" % TILT_PORT)
 print("🔧 Server API: http://localhost:%s" % SERVER_PORT)
 print("🎨 Client App: http://localhost:%s" % CLIENT_PORT)

@@ -4,7 +4,6 @@ import { AuthProvider } from "./context/AuthContext";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { WebSocketProvider } from "@context/WebSocketContext";
 // import { ToastProvider } from "./context/ToastContext";
-// import { VimMotionProvider } from "./context/VimMotionContext";
 import { RouteSectionProps } from "@solidjs/router";
 import { NavBar } from "@components/layout/Navbar/Navbar";
 // import { useAutoCacheInvalidation } from "./services/cacheInvalidation.service";
@@ -17,11 +16,9 @@ const App: Component<RouteSectionProps<unknown>> = (props) => {
       {/* <ToastProvider> */}
       <AuthProvider>
         <WebSocketProvider>
-          {/* <VimMotionProvider> */}
           {/* <CacheInvalidationProvider /> */}
           <NavBar />
           <main class="content">{props.children}</main>
-          {/* </VimMotionProvider> */}
         </WebSocketProvider>
       </AuthProvider>
       {/* </ToastProvider> */}

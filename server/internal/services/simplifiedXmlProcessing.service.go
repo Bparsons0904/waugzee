@@ -166,37 +166,37 @@ func NewSimplifiedXMLProcessingService(
 func (s *SimplifiedXMLProcessingService) createProcessingBuffers() *ProcessingBuffers {
 	return &ProcessingBuffers{
 		Images: &ImageBuffer{
-			Channel:  make(chan *ContextualDiscogsImage, 20000),
-			Capacity: 20000,
+			Channel:  make(chan *ContextualDiscogsImage, 10000),
+			Capacity: 10000,
 		},
 		Genres: &GenreBuffer{
-			Channel:  make(chan string, 20000),
-			Capacity: 20000,
+			Channel:  make(chan string, 10000),
+			Capacity: 10000,
 		},
 		Artists: &ArtistBuffer{
-			Channel:  make(chan *imports.Artist, 20000),
-			Capacity: 20000,
+			Channel:  make(chan *imports.Artist, 10000),
+			Capacity: 10000,
 		},
 		Labels: &LabelBuffer{
-			Channel:  make(chan *models.Label, 20000),
-			Capacity: 20000,
+			Channel:  make(chan *models.Label, 10000),
+			Capacity: 10000,
 		},
 		Masters: &MasterBuffer{
-			Channel:  make(chan *models.Master, 20000),
-			Capacity: 20000,
+			Channel:  make(chan *models.Master, 10000),
+			Capacity: 10000,
 		},
 		Releases: &ReleaseBuffer{
-			Channel:  make(chan *models.Release, 20000),
-			Capacity: 20000,
+			Channel:  make(chan *models.Release, 10000),
+			Capacity: 10000,
 		},
 		// Association buffers (Master-level only)
 		MasterArtists: &MasterArtistAssociationBuffer{
-			Channel:  make(chan *MasterArtistAssociation, 20000),
-			Capacity: 20000,
+			Channel:  make(chan *MasterArtistAssociation, 10000),
+			Capacity: 10000,
 		},
 		MasterGenres: &MasterGenreAssociationBuffer{
-			Channel:  make(chan *MasterGenreAssociation, 20000),
-			Capacity: 20000,
+			Channel:  make(chan *MasterGenreAssociation, 10000),
+			Capacity: 10000,
 		},
 	}
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/helmet/v2"
 	fiberLogs "github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/helmet/v2"
 )
 
 type AppServer struct {
@@ -28,7 +28,7 @@ func New(app *app.App) (*AppServer, error) {
 			"APIServer/%s",
 			app.Config.GeneralVersion,
 		),
-		AppName:                  "vim_server",
+		AppName:                  "waugzee_server",
 		BodyLimit:                10 * 1024 * 1024,
 		ReadBufferSize:           16384,
 		WriteBufferSize:          16384,
@@ -61,7 +61,7 @@ func New(app *app.App) (*AppServer, error) {
 
 	server.Use(fiberLogs.New())
 	server.Use(compress.New())
-	
+
 	// Enhanced security headers
 	server.Use(helmet.New(helmet.Config{
 		XSSProtection:             "1; mode=block",

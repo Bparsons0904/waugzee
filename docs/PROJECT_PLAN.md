@@ -2,11 +2,11 @@
 
 ## Project Overview
 
-**Waugzee** is a complete rewrite of the Kleio vinyl record collection management system, built using proven architectural patterns from the Vim project. This represents a fresh start with modern infrastructure, clean architecture, and scalable design patterns.
+**Waugzee** is a complete rewrite of the Kleio vinyl record collection management system, built using proven architectural patterns from the project. This represents a fresh start with modern infrastructure, clean architecture, and scalable design patterns.
 
 ## Migration Strategy: Fresh Start Approach
 
-After analyzing both the current Kleio (in messy migration state) and the robust Vim project architecture, we've chosen to **start completely fresh** rather than attempt to migrate the existing codebase. This approach provides:
+After analyzing both the current Kleio (in messy migration state) and the robust LoadTest project architecture, we've chosen to **start completely fresh** rather than attempt to migrate the existing codebase. This approach provides:
 
 - **Clean Architecture**: Proven patterns from day one
 - **Modern Infrastructure**: PostgreSQL + Redis, proper caching, production-ready setup
@@ -25,7 +25,7 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 - No caching layer
 - Manual authentication handling
 
-### Waugzee Advantages (Vim-Based)
+### Waugzee Advantages
 
 - PostgreSQL + Valkey (Redis) dual database architecture
 - Multi-user ready with Zitadel OIDC integration
@@ -43,9 +43,9 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 
 **Tasks**:
 
-- [x] Create new project structure based on Vim architecture
+- [x] Create new project structure based on LoadTest architecture
 - [x] Set up project documentation (CLAUDE.md, PROJECT_PLAN.md)
-- [x] Strip Vim to bare bones foundation
+- [x] Strip LoadTest to bare bones foundation
 - [x] Update module names and basic configuration
 - [x] Verify development environment setup
 
@@ -118,12 +118,12 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 
 **Performance Results**:
 
-| Component | Before | After | Improvement |
-|-----------|--------|-------|-------------|
-| Database Operations | N+1 queries | Single UPSERT | 50-70% faster |
-| Batch Processing | 1000 records | 2000-5000 records | 30-50% faster |
-| Logging Overhead | Every SQL query | Warnings only | Major I/O reduction |
-| Overall Processing | Baseline | **5-10x faster** | **500-1000% improvement** |
+| Component           | Before          | After             | Improvement               |
+| ------------------- | --------------- | ----------------- | ------------------------- |
+| Database Operations | N+1 queries     | Single UPSERT     | 50-70% faster             |
+| Batch Processing    | 1000 records    | 2000-5000 records | 30-50% faster             |
+| Logging Overhead    | Every SQL query | Warnings only     | Major I/O reduction       |
+| Overall Processing  | Baseline        | **5-10x faster**  | **500-1000% improvement** |
 
 **Implemented Models**:
 
@@ -376,7 +376,7 @@ tilt trigger migrate-seed
 
 - **Zitadel Integration Complexity**: Start with basic OIDC, expand gradually
 - **Data Migration Challenges**: Create comprehensive migration scripts with rollback
-- **Performance Concerns**: Use established patterns from Vim project
+- **Performance Concerns**: Use established patterns from prior project
 
 ### Deployment Risks
 
@@ -388,7 +388,7 @@ tilt trigger migrate-seed
 
 ### Phase 1 ✅ COMPLETED:
 
-- ✅ Project structure with Vim architecture foundation
+- ✅ Project structure with clean architecture foundation
 - ✅ Development environment (Tilt + Docker)
 - ✅ PostgreSQL + Valkey infrastructure
 - ✅ Repository pattern + dependency injection

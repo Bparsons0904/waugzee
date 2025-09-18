@@ -1,4 +1,4 @@
-# Vim Actions Server
+# Waugzee Server
 
 A high-performance Go backend API built with Fiber framework, featuring authentication, WebSocket support, and comprehensive database management. Uses an App Container architecture pattern to eliminate circular dependencies and ensure clean initialization.
 
@@ -138,8 +138,8 @@ The recommended way is through the main project's Tilt setup, but you can also r
 
 ```bash
 # Build and run development container
-docker build -f Dockerfile.dev -t vim-actions-server-dev .
-docker run -p 8288:8288 vim-actions-server-dev
+docker build -f Dockerfile.dev -t waugzee-server-dev .
+docker run -p 8288:8288 -waugzee-server-dev
 ```
 
 ## 🔧 Configuration
@@ -157,7 +157,6 @@ ENVIRONMENT=development
 SERVER_PORT=8288
 
 # Database
-DB_PATH=data/vim.db
 DB_CACHE_ADDRESS=valkey  # or localhost for local development
 DB_CACHE_PORT=6379
 

@@ -15,7 +15,7 @@ This prevents wasted time and ensures accurate implementation.
 
 ## Project Overview
 
-**Waugzee** is a modern vinyl record collection management system built as a fresh implementation using proven architectural patterns. This project represents a complete rewrite of the Kleio system, leveraging the robust foundation from the Vim project architecture.
+**Waugzee** is a modern vinyl record collection management system built as a fresh implementation using proven architectural patterns. This project represents a complete rewrite of the Kleio system, leveraging the robust foundation from the waugzee project architecture.
 
 ## Project Plan
 
@@ -24,6 +24,7 @@ For comprehensive information about the migration strategy, architecture decisio
 **[docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md)** - Complete migration strategy and implementation plan
 
 Additional documentation available:
+
 - **[docs/API_IMPLEMENTATION_GUIDE.md](docs/API_IMPLEMENTATION_GUIDE.md)** - API development guidelines
 - **[docs/AUTH_STATUS.md](docs/AUTH_STATUS.md)** - Authentication implementation status
 - **[docs/PGO_GUIDE.md](docs/PGO_GUIDE.md)** - Performance optimization guide
@@ -43,6 +44,7 @@ When writing or fixing tests, follow these principles:
 ## Technology Stack
 
 ### Backend (Go)
+
 - **Framework**: Fiber web framework
 - **Database**: PostgreSQL (primary) + Valkey/Redis (cache)
 - **ORM**: GORM with UUID7 primary keys
@@ -51,6 +53,7 @@ When writing or fixing tests, follow these principles:
 - **WebSockets**: Real-time communication support
 
 ### Frontend (SolidJS)
+
 - **Framework**: SolidJS with TypeScript
 - **Build Tool**: Vite
 - **Styling**: SCSS with CSS Modules
@@ -58,6 +61,7 @@ When writing or fixing tests, follow these principles:
 - **Authentication**: OIDC flow integration
 
 ### Infrastructure
+
 - **Development**: Tilt orchestration with Docker
 - **Cache**: Valkey (Redis-compatible)
 - **Database**: PostgreSQL with proper migrations
@@ -153,6 +157,7 @@ Full-stack vinyl record collection management application:
 6. **NEW** Hybrid JWT validation middleware (optimized 2025-09-12)
 
 **Performance Optimizations** ✅:
+
 - `/auth/me` endpoint uses local database instead of external Zitadel API calls
 - Dual-layer caching: User cache + OIDC ID mapping for sub-20ms response times
 - **NEW** Sub-millisecond JWT validation (500x improvement: 500ms → <1ms)
@@ -175,12 +180,14 @@ response := fiber.Map{"user": user.ToProfile()}
 ```
 
 **Key Benefits:**
+
 - **Performance**: User fetched once in middleware, cached in context
 - **Simplicity**: No AuthInfo conversion needed in handlers
 - **Type Safety**: Direct access to full User model with all fields and methods
 - **Consistency**: Standardized pattern across all protected endpoints
 
 **Legacy Pattern (No Longer Needed):**
+
 ```go
 // OLD - Don't use this pattern anymore
 authInfo := middleware.GetAuthInfo(c)
@@ -192,6 +199,7 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 ### Coding Standards
 
 **Clean Code Principles:**
+
 - **Self-documenting code**: Use descriptive variable and function names instead of comments
 - **Comments only for critical areas**: Limit comments to complex business logic or hard-to-understand algorithms
 - **No obvious comments**: Avoid comments that simply restate what the code does
@@ -199,13 +207,15 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 - **Consistent formatting**: Follow project linting and formatting rules
 
 **Comment Guidelines:**
+
 - ✅ **Good**: `// Fallback to introspection for legacy tokens without 'sub' claim`
 - ✅ **Good**: `// CRITICAL: Reset loaded state when switching to fallback to prevent flashing`
-- ❌ **Avoid**: `// Increased padding for larger cards` 
+- ❌ **Avoid**: `// Increased padding for larger cards`
 - ❌ **Avoid**: `// Set background color to white`
 - ❌ **Avoid**: `// Hero Section` or `// Features Section`
 
 **SCSS/CSS Standards:**
+
 - **Use design system variables**: `$spacing-xl` not `2rem`, `$text-default` not `#333`
 - **Semantic class names**: `.featureCard` not `.socialCard`, `.heroImage` not `.cardImage`
 - **Mobile-first responsive**: Use `@media (min-width: ...)` for larger screens
@@ -213,6 +223,7 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 - **No magic numbers**: All values should reference design system variables
 
 **Component Development:**
+
 - **Single responsibility**: Each component should have one clear purpose
 - **Proper TypeScript**: Full type safety with interfaces for all props
 - **Loading states**: Use skeleton loading for better UX
@@ -232,7 +243,7 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 **Legacy Code Reference**: The `/oldReferenceOnlyRepository` directory contains the complete legacy implementation for reference purposes:
 
 - **Models & Logic**: Reference existing data models, business logic patterns, and API structures
-- **Styling & UI**: Reference SCSS patterns, component structures, and design system elements  
+- **Styling & UI**: Reference SCSS patterns, component structures, and design system elements
 - **Implementation Patterns**: Reference proven patterns for features like collection management, equipment tracking, and user workflows
 
 **Important**: This directory is for reference only - do not modify files in this location. Use it to understand existing patterns when implementing new features in the current codebase.
@@ -256,12 +267,14 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 **Core Strategy**: Vinyl-only processing with JSONB storage to dramatically reduce complexity and processing time.
 
 **Data Architecture**:
+
 - **Vinyl-Only Filtering**: Process only vinyl releases, skip CD/digital/cassette (~70-80% volume reduction)
 - **JSONB Storage**: Store tracks, artists, genres as JSON in Release table (no separate Track table)
 - **Master-Level Relationships**: Maintain searchable relationships only at Master level
 - **Query Pattern**: Release → Master → Artists/Genres for searches, direct JSONB for display
 
 **Key Changes**:
+
 - ✅ **Eliminated Track Model**: Removed separate Track table and repository entirely
 - ✅ **JSONB Columns**: Added TracksJSON, ArtistsJSON, GenresJSON to Release model using `gorm.io/datatypes`
 - ✅ **Simplified Processing**: Reduced from 11 to 8 concurrent goroutines, removed association processors
@@ -269,12 +282,14 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 - ✅ **JSON Generation**: Convert XML track/artist/genre data directly to JSONB storage
 
 **Performance Impact**:
+
 - **Processing Volume**: 70-80% reduction through vinyl-only filtering
 - **Database Operations**: Eliminated duplicate release-level artist/genre associations
 - **Storage Efficiency**: JSONB replaces complex foreign key relationships
 - **Processing Speed**: Simplified pipeline with fewer database writes
 
 **Implementation Files**:
+
 - `server/internal/models/release.model.go` - JSONB columns added
 - `server/internal/services/discogsParser.service.go` - Vinyl filtering and JSONB generation
 - `server/internal/services/simplifiedXmlProcessing.service.go` - Simplified buffering
@@ -324,6 +339,7 @@ Available MCP tools and their preferred usage:
 This project is currently in **Phase 2: Authentication & User Management**. See docs/PROJECT_PLAN.md for detailed progress and next steps.
 
 **Recent Improvements** (2025-09-10):
+
 - ✅ **Auth Performance Optimization**: Eliminated redundant Zitadel API calls for user info requests
 - ✅ **Dual-Layer Caching**: Implemented OIDC ID mapping cache for faster user lookups
 - ✅ **Database-First Approach**: `/auth/me` now uses local database with Valkey cache fallback
@@ -331,4 +347,6 @@ This project is currently in **Phase 2: Authentication & User Management**. See 
 ---
 
 **Project Status**: 🚧 **Active Development** - Phase 2: Authentication & User Management
+
 - File names should be camelCase or PascalCase
+
