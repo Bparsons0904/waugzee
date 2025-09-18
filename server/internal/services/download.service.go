@@ -19,12 +19,12 @@ import (
 
 // Discogs S3 configuration constants
 const (
-	DiscogsS3BaseURL = "https://discogs-data-dumps.s3-us-west-2.amazonaws.com/data"
-	DiscogsDataDir = "/app/discogs-data"
-	DiscogsTimeoutSec = 3600      // 1 hour HTTP client timeout (safety net)
+	DiscogsS3BaseURL       = "https://discogs-data-dumps.s3-us-west-2.amazonaws.com/data"
+	DiscogsDataDir         = "/app/discogs-data"
+	DiscogsTimeoutSec      = 3600 // 1 hour HTTP client timeout (safety net)
 	DiscogsStallTimeoutSec = 300  // 5 minutes stall timeout (no progress detection)
-	DiscogsUserAgent = "Waugzee/1.0 (Discogs Data Sync)"
-	DiscogsMaxRetries = 5
+	DiscogsUserAgent       = "Waugzee/1.0 (Discogs Data Sync)"
+	DiscogsMaxRetries      = 5
 )
 
 type DownloadService struct {
@@ -35,11 +35,11 @@ type DownloadService struct {
 
 // Exponential backoff schedule (immediate, 5min, 25min, 75min, 375min)
 var retrySchedule = []time.Duration{
-	0 * time.Second,      // Immediate
-	5 * time.Minute,      // 5 minutes
-	25 * time.Minute,     // 25 minutes
-	75 * time.Minute,     // 75 minutes
-	375 * time.Minute,    // 375 minutes (6.25 hours)
+	0 * time.Second,   // Immediate
+	5 * time.Minute,   // 5 minutes
+	25 * time.Minute,  // 25 minutes
+	75 * time.Minute,  // 75 minutes
+	375 * time.Minute, // 375 minutes (6.25 hours)
 }
 
 const maxRetries = DiscogsMaxRetries
@@ -53,10 +53,10 @@ func NewDownloadService(cfg config.Config) *DownloadService {
 	httpClient := &http.Client{
 		Timeout: timeout,
 		Transport: &http.Transport{
-			MaxIdleConns:        10,
-			IdleConnTimeout:     90 * time.Second,
-			DisableCompression:  false,
-			MaxConnsPerHost:     10,
+			MaxIdleConns:       10,
+			IdleConnTimeout:    90 * time.Second,
+			DisableCompression: false,
+			MaxConnsPerHost:    10,
 		},
 	}
 
@@ -73,15 +73,18 @@ func (ds *DownloadService) DownloadChecksum(ctx context.Context, yearMonth strin
 
 	// Validate yearMonth format
 	if !isValidYearMonth(yearMonth) {
-		return log.Err("invalid yearMonth format", fmt.Errorf("expected YYYY-MM format, got: %s", yearMonth))
+		return log.Err(
+			"invalid yearMonth format",
+			fmt.Errorf("expected YYYY-MM format, got: %s", yearMonth),
+		)
 	}
 
 	// Use current year-month if not provided (always use current for URL construction)
 	currentYearMonth := time.Now().UTC().Format("2006-01")
-	
+
 	// Extract year for URL construction
 	year := strings.Split(currentYearMonth, "-")[0]
-	
+
 	// Build S3 URL for CHECKSUM.txt
 	checksumURL := fmt.Sprintf(
 		"%s/%s/discogs_%s01_CHECKSUM.txt",
@@ -167,9 +170,14 @@ func (ds *DownloadService) ParseChecksumFile(filePath string) (*models.FileCheck
 	}
 
 	// Validate that we found at least some checksums
-	if checksums.ArtistsDump == "" && checksums.LabelsDump == "" && 
+	if checksums.ArtistsDump == "" && checksums.LabelsDump == "" &&
 		checksums.MastersDump == "" && checksums.ReleasesDump == "" {
-		return nil, log.Err("no valid checksums found in file", fmt.Errorf("empty or invalid checksum file"), "filePath", filePath)
+		return nil, log.Err(
+			"no valid checksums found in file",
+			fmt.Errorf("empty or invalid checksum file"),
+			"filePath",
+			filePath,
+		)
 	}
 
 	log.Info("Successfully parsed checksum file",
@@ -188,7 +196,10 @@ func (ds *DownloadService) DownloadXMLFile(ctx context.Context, yearMonth, fileT
 
 	// Validate inputs
 	if !isValidYearMonth(yearMonth) {
-		return log.Err("invalid yearMonth format", fmt.Errorf("expected YYYY-MM format, got: %s", yearMonth))
+		return log.Err(
+			"invalid yearMonth format",
+			fmt.Errorf("expected YYYY-MM format, got: %s", yearMonth),
+		)
 	}
 
 	// Validate file type
@@ -201,7 +212,10 @@ func (ds *DownloadService) DownloadXMLFile(ctx context.Context, yearMonth, fileT
 		}
 	}
 	if !isValid {
-		return log.Err("invalid file type", fmt.Errorf("expected one of %v, got: %s", validFileTypes, fileType))
+		return log.Err(
+			"invalid file type",
+			fmt.Errorf("expected one of %v, got: %s", validFileTypes, fileType),
+		)
 	}
 
 	// Use current year-month for URL construction (always download current month data)
@@ -247,7 +261,13 @@ func (ds *DownloadService) ValidateFileChecksum(filePath, expectedChecksum strin
 	}
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
-			log.Warn("failed to close file after checksum validation", "error", closeErr, "filePath", filePath)
+			log.Warn(
+				"failed to close file after checksum validation",
+				"error",
+				closeErr,
+				"filePath",
+				filePath,
+			)
 		}
 	}()
 
@@ -292,7 +312,10 @@ func (ds *DownloadService) ValidateFileChecksum(filePath, expectedChecksum strin
 }
 
 // downloadFileWithRetry downloads a file with exponential backoff retry logic
-func (ds *DownloadService) downloadFileWithRetry(ctx context.Context, url, targetFile string) error {
+func (ds *DownloadService) downloadFileWithRetry(
+	ctx context.Context,
+	url, targetFile string,
+) error {
 	log := ds.log.Function("downloadFileWithRetry")
 
 	var lastErr error
@@ -493,7 +516,11 @@ func (ds *DownloadService) ensureDirectory(dir string) error {
 }
 
 // CheckExistingFile checks if a file exists and optionally validates its checksum
-func (ds *DownloadService) CheckExistingFile(filePath string, expectedChecksum string, validateChecksum bool) (exists bool, valid bool, size int64, err error) {
+func (ds *DownloadService) CheckExistingFile(
+	filePath string,
+	expectedChecksum string,
+	validateChecksum bool,
+) (exists bool, valid bool, size int64, err error) {
 	log := ds.log.Function("CheckExistingFile")
 
 	// Check if file exists
@@ -530,10 +557,17 @@ func (ds *DownloadService) CheckExistingFile(filePath string, expectedChecksum s
 }
 
 // GetFileStatus returns the current status of a file based on existence and checksum validation
-func (ds *DownloadService) GetFileStatus(filePath string, expectedChecksum string) (*models.FileDownloadInfo, error) {
+func (ds *DownloadService) GetFileStatus(
+	filePath string,
+	expectedChecksum string,
+) (*models.FileDownloadInfo, error) {
 	log := ds.log.Function("GetFileStatus")
 
-	exists, valid, size, err := ds.CheckExistingFile(filePath, expectedChecksum, expectedChecksum != "")
+	exists, valid, size, err := ds.CheckExistingFile(
+		filePath,
+		expectedChecksum,
+		expectedChecksum != "",
+	)
 	if err != nil {
 		return nil, log.Err("failed to check existing file", err, "filePath", filePath)
 	}
@@ -574,3 +608,4 @@ func isValidYearMonth(yearMonth string) bool {
 	year, month := parts[0], parts[1]
 	return len(year) == 4 && len(month) == 2
 }
+

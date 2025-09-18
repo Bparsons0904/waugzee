@@ -12,21 +12,9 @@ import (
 	"waugzee/internal/repositories"
 )
 
-// SimplifiedResult holds parsed entities in memory maps for simplified processing
+// SimplifiedResult holds processing counters for streaming processing
 type SimplifiedResult struct {
-	// Raw entity storage - preserves ALL XML data
-	RawLabels   map[int64]*imports.Label   // DiscogsID -> Raw Label with ALL fields
-	RawArtists  map[int64]*imports.Artist  // DiscogsID -> Raw Artist with ALL fields
-	RawMasters  map[int64]*imports.Master  // DiscogsID -> Raw Master with ALL fields
-	RawReleases map[int64]*imports.Release // DiscogsID -> Raw Release with ALL fields
-
-	// Legacy converted models for compatibility
-	Labels   map[int64]*models.Label   // DiscogsID -> Converted Label
-	Artists  map[int64]*models.Artist  // DiscogsID -> Converted Artist
-	Masters  map[int64]*models.Master  // DiscogsID -> Converted Master
-	Releases map[int64]*models.Release // DiscogsID -> Converted Release
-
-	// Basic stats
+	// Processing counters only - no entity maps to prevent memory leaks
 	TotalRecords   int
 	ParsedRecords  int
 	ErroredRecords int
@@ -536,7 +524,7 @@ func (s *SimplifiedXMLProcessingService) processArtistBuffer(
 				dedupeMap[modelArtist.DiscogsID] = modelArtist
 
 				// Process batch when we reach 5000 unique items
-				if len(dedupeMap) >= 5000 {
+				if len(dedupeMap) >= 1000 {
 					s.processPendingArtistBatchFromMap(ctx, dedupeMap, processingID)
 					totalProcessed += len(dedupeMap)
 					dedupeMap = make(map[int64]*models.Artist) // Reset map
@@ -976,7 +964,7 @@ func (s *SimplifiedXMLProcessingService) processReleaseBuffer(
 				dedupeMap[modelRelease.DiscogsID] = modelRelease
 
 				// Process batch when we reach 2000 unique items (smaller for releases due to JSONB data)
-				if len(dedupeMap) >= 2000 {
+				if len(dedupeMap) >= 1000 {
 					s.processPendingReleaseBatchFromMap(ctx, dedupeMap, processingID)
 					totalProcessed += len(dedupeMap)
 					dedupeMap = make(map[int64]*models.Release) // Reset map
@@ -1016,19 +1004,9 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 		"startMemoryMB", startMemStats.Alloc/1024/1024,
 		"startHeapMB", startMemStats.HeapAlloc/1024/1024)
 
-	// Initialize result with both raw and converted maps
+	// Initialize result with counters only - no entity maps
 	result := &SimplifiedResult{
-		// Raw entity maps - preserve ALL XML data
-		RawLabels:   make(map[int64]*imports.Label),
-		RawArtists:  make(map[int64]*imports.Artist),
-		RawMasters:  make(map[int64]*imports.Master),
-		RawReleases: make(map[int64]*imports.Release),
-		// Legacy converted maps for compatibility
-		Labels:   make(map[int64]*models.Label),
-		Artists:  make(map[int64]*models.Artist),
-		Masters:  make(map[int64]*models.Master),
-		Releases: make(map[int64]*models.Release),
-		Errors:   make([]string, 0),
+		Errors: make([]string, 0),
 	}
 
 	// Create buffered channels for entity processing
@@ -1086,13 +1064,10 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 
 			processingStats.totalProcessed++
 
-			// Store RAW entity data and use specialized processors for related entity extraction
+			// Process entities through streaming channels - no memory accumulation
 			switch entity.Type {
 			case "label":
 				if rawLabel, ok := entity.RawEntity.(*imports.Label); ok && rawLabel.ID > 0 {
-					// Store complete raw data
-					result.RawLabels[int64(rawLabel.ID)] = rawLabel
-
 					// Use specialized processor to extract related entities
 					if err := s.processLabel(rawLabel, entity.ProcessingID, buffers); err != nil {
 						log.Warn("Label processing failed", "error", err, "labelID", rawLabel.ID)
@@ -1100,18 +1075,10 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 					} else {
 						result.ParsedRecords++
 					}
-
-					// Create converted model for compatibility
-					if convertedLabel := s.parserService.convertDiscogsLabel(rawLabel); convertedLabel != nil {
-						result.Labels[int64(rawLabel.ID)] = convertedLabel
-					}
 				}
 
 			case "artist":
 				if rawArtist, ok := entity.RawEntity.(*imports.Artist); ok && rawArtist.ID > 0 {
-					// Store complete raw data
-					result.RawArtists[int64(rawArtist.ID)] = rawArtist
-
 					// Use specialized processor to extract related entities (Images)
 					if err := s.processArtist(rawArtist, entity.ProcessingID, buffers); err != nil {
 						log.Warn("Artist processing failed", "error", err, "artistID", rawArtist.ID)
@@ -1119,18 +1086,10 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 					} else {
 						result.ParsedRecords++
 					}
-
-					// Create converted model for compatibility
-					if convertedArtist := s.parserService.convertDiscogsArtist(rawArtist); convertedArtist != nil {
-						result.Artists[int64(rawArtist.ID)] = convertedArtist
-					}
 				}
 
 			case "master":
 				if rawMaster, ok := entity.RawEntity.(*imports.Master); ok && rawMaster.ID > 0 {
-					// Store complete raw data
-					result.RawMasters[int64(rawMaster.ID)] = rawMaster
-
 					// Use specialized processor to extract related entities (Images, Genres)
 					if err := s.processMaster(rawMaster, entity.ProcessingID, buffers); err != nil {
 						log.Warn("Master processing failed", "error", err, "masterID", rawMaster.ID)
@@ -1138,18 +1097,10 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 					} else {
 						result.ParsedRecords++
 					}
-
-					// Create converted model for compatibility
-					if convertedMaster := s.parserService.convertDiscogsMaster(rawMaster); convertedMaster != nil {
-						result.Masters[int64(rawMaster.ID)] = convertedMaster
-					}
 				}
 
 			case "release":
 				if rawRelease, ok := entity.RawEntity.(*imports.Release); ok && rawRelease.ID > 0 {
-					// Store complete raw data
-					result.RawReleases[int64(rawRelease.ID)] = rawRelease
-
 					// Use specialized processor to extract related entities (Artists, Tracks, Genres, Images)
 					if err := s.processRelease(rawRelease, entity.ProcessingID, buffers); err != nil {
 						log.Warn(
@@ -1162,11 +1113,6 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 						processingStats.totalErrors++
 					} else {
 						result.ParsedRecords++
-					}
-
-					// Create converted model for compatibility
-					if convertedRelease := s.parserService.convertDiscogsRelease(rawRelease); convertedRelease != nil {
-						result.Releases[int64(rawRelease.ID)] = convertedRelease
 					}
 				}
 			}
@@ -1213,25 +1159,6 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 	runtime.ReadMemStats(&endMemStats)
 	elapsed := time.Since(startTime)
 
-	rawMapSize := len(
-		result.RawLabels,
-	) + len(
-		result.RawArtists,
-	) + len(
-		result.RawMasters,
-	) + len(
-		result.RawReleases,
-	)
-	convertedMapSize := len(
-		result.Labels,
-	) + len(
-		result.Artists,
-	) + len(
-		result.Masters,
-	) + len(
-		result.Releases,
-	)
-
 	// Log final processing counts for all entity types
 	s.processedCountsMutex.RLock()
 	labelsProcessed := s.processedCounts["labels"]
@@ -1246,13 +1173,13 @@ func (s *SimplifiedXMLProcessingService) ProcessFileToMap(
 		"mastersProcessed", mastersProcessed,
 		"releasesProcessed", releasesProcessed)
 
-	log.Info("Completed channel-based file processing with full data extraction",
+	log.Info("Completed streaming file processing - no memory accumulation",
 		"fileType", fileType,
 		"totalRecords", result.TotalRecords,
 		"parsedRecords", result.ParsedRecords,
 		"erroredRecords", result.ErroredRecords,
-		"rawMapSize", rawMapSize,
-		"convertedMapSize", convertedMapSize,
+		"streamingMode", "enabled",
+		"memoryMapsUsed", false,
 		"elapsedMs", elapsed.Milliseconds(),
 		"finalMemoryMB", endMemStats.Alloc/1024/1024,
 		"finalHeapMB", endMemStats.HeapAlloc/1024/1024,
@@ -1301,31 +1228,31 @@ type ProcessingConfig struct {
 	ConvertedMapName    string
 }
 
-// Entity configurations for simplified processing
+// Entity configurations for streaming processing
 var processingConfigs = map[string]ProcessingConfig{
 	"labels": {
-		GetRawMapSize:       func(r *SimplifiedResult) int { return len(r.RawLabels) },
-		GetConvertedMapSize: func(r *SimplifiedResult) int { return len(r.Labels) },
-		RawMapName:          "rawLabelsInMap",
-		ConvertedMapName:    "labelsInMap",
+		GetRawMapSize:       func(r *SimplifiedResult) int { return 0 }, // No maps used
+		GetConvertedMapSize: func(r *SimplifiedResult) int { return 0 }, // No maps used
+		RawMapName:          "streamingMode",
+		ConvertedMapName:    "streamingMode",
 	},
 	"artists": {
-		GetRawMapSize:       func(r *SimplifiedResult) int { return len(r.RawArtists) },
-		GetConvertedMapSize: func(r *SimplifiedResult) int { return len(r.Artists) },
-		RawMapName:          "rawArtistsInMap",
-		ConvertedMapName:    "artistsInMap",
+		GetRawMapSize:       func(r *SimplifiedResult) int { return 0 }, // No maps used
+		GetConvertedMapSize: func(r *SimplifiedResult) int { return 0 }, // No maps used
+		RawMapName:          "streamingMode",
+		ConvertedMapName:    "streamingMode",
 	},
 	"masters": {
-		GetRawMapSize:       func(r *SimplifiedResult) int { return len(r.RawMasters) },
-		GetConvertedMapSize: func(r *SimplifiedResult) int { return len(r.Masters) },
-		RawMapName:          "rawMastersInMap",
-		ConvertedMapName:    "mastersInMap",
+		GetRawMapSize:       func(r *SimplifiedResult) int { return 0 }, // No maps used
+		GetConvertedMapSize: func(r *SimplifiedResult) int { return 0 }, // No maps used
+		RawMapName:          "streamingMode",
+		ConvertedMapName:    "streamingMode",
 	},
 	"releases": {
-		GetRawMapSize:       func(r *SimplifiedResult) int { return len(r.RawReleases) },
-		GetConvertedMapSize: func(r *SimplifiedResult) int { return len(r.Releases) },
-		RawMapName:          "rawReleasesInMap",
-		ConvertedMapName:    "releasesInMap",
+		GetRawMapSize:       func(r *SimplifiedResult) int { return 0 }, // No maps used
+		GetConvertedMapSize: func(r *SimplifiedResult) int { return 0 }, // No maps used
+		RawMapName:          "streamingMode",
+		ConvertedMapName:    "streamingMode",
 	},
 }
 
@@ -1337,12 +1264,6 @@ func (s *SimplifiedXMLProcessingService) ProcessFile(
 	fileType string,
 ) (*ProcessingResult, error) {
 	log := s.log.Function("ProcessFile")
-
-	// Validate file type
-	config, exists := processingConfigs[fileType]
-	if !exists {
-		return nil, log.Err("unsupported file type", nil, "fileType", fileType)
-	}
 
 	log.Info("Starting file processing with simplified approach",
 		"filePath", filePath,
@@ -1386,16 +1307,14 @@ func (s *SimplifiedXMLProcessingService) ProcessFile(
 		log.Warn("failed to update final processing status", "error", err)
 	}
 
-	// Log completion with map sizes
-	rawMapSize := config.GetRawMapSize(simplifiedResult)
-	convertedMapSize := config.GetConvertedMapSize(simplifiedResult)
-	log.Info("File processing completed with channel-based approach (early return)",
+	// Log completion with streaming status
+	log.Info("File processing completed with streaming approach",
 		"fileType", fileType,
 		"total", result.TotalRecords,
 		"processed", result.ProcessedRecords,
 		"errors", result.ErroredRecords,
-		config.RawMapName, rawMapSize,
-		config.ConvertedMapName, convertedMapSize)
+		"processingMode", "streaming",
+		"memoryMapsUsed", false)
 
 	// Early return - no database operations performed
 	return result, nil

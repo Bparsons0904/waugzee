@@ -29,7 +29,11 @@ func TestNewDownloadService(t *testing.T) {
 	// Should use the constant timeout value
 	expectedTimeout := time.Duration(DiscogsTimeoutSec) * time.Second
 	if service.httpClient.Timeout != expectedTimeout {
-		t.Errorf("expected HTTP client timeout %v, got %v", expectedTimeout, service.httpClient.Timeout)
+		t.Errorf(
+			"expected HTTP client timeout %v, got %v",
+			expectedTimeout,
+			service.httpClient.Timeout,
+		)
 	}
 }
 
@@ -43,7 +47,11 @@ func TestNewDownloadService_ConstantTimeout(t *testing.T) {
 	// Should always use the constant timeout value
 	expectedTimeout := time.Duration(DiscogsTimeoutSec) * time.Second
 	if service.httpClient.Timeout != expectedTimeout {
-		t.Errorf("expected constant HTTP client timeout %v, got %v", expectedTimeout, service.httpClient.Timeout)
+		t.Errorf(
+			"expected constant HTTP client timeout %v, got %v",
+			expectedTimeout,
+			service.httpClient.Timeout,
+		)
 	}
 }
 
@@ -87,19 +95,35 @@ xyz789uvw456  some_other_file.txt
 	}
 
 	if checksums.ArtistsDump != expectedChecksums.ArtistsDump {
-		t.Errorf("expected ArtistsDump %s, got %s", expectedChecksums.ArtistsDump, checksums.ArtistsDump)
+		t.Errorf(
+			"expected ArtistsDump %s, got %s",
+			expectedChecksums.ArtistsDump,
+			checksums.ArtistsDump,
+		)
 	}
 
 	if checksums.LabelsDump != expectedChecksums.LabelsDump {
-		t.Errorf("expected LabelsDump %s, got %s", expectedChecksums.LabelsDump, checksums.LabelsDump)
+		t.Errorf(
+			"expected LabelsDump %s, got %s",
+			expectedChecksums.LabelsDump,
+			checksums.LabelsDump,
+		)
 	}
 
 	if checksums.MastersDump != expectedChecksums.MastersDump {
-		t.Errorf("expected MastersDump %s, got %s", expectedChecksums.MastersDump, checksums.MastersDump)
+		t.Errorf(
+			"expected MastersDump %s, got %s",
+			expectedChecksums.MastersDump,
+			checksums.MastersDump,
+		)
 	}
 
 	if checksums.ReleasesDump != expectedChecksums.ReleasesDump {
-		t.Errorf("expected ReleasesDump %s, got %s", expectedChecksums.ReleasesDump, checksums.ReleasesDump)
+		t.Errorf(
+			"expected ReleasesDump %s, got %s",
+			expectedChecksums.ReleasesDump,
+			checksums.ReleasesDump,
+		)
 	}
 }
 
@@ -148,12 +172,12 @@ func TestIsValidYearMonth(t *testing.T) {
 		{"2024-01", true},
 		{"2024-12", true},
 		{"1999-06", true},
-		{"2024-1", false},   // month should be 2 digits
-		{"24-01", false},    // year should be 4 digits
-		{"2024/01", false},  // wrong separator
-		{"2024-13", true},   // validation doesn't check month range (by design)
-		{"2024", false},     // missing month
-		{"", false},         // empty string
+		{"2024-1", false},     // month should be 2 digits
+		{"24-01", false},      // year should be 4 digits
+		{"2024/01", false},    // wrong separator
+		{"2024-13", true},     // validation doesn't check month range (by design)
+		{"2024", false},       // missing month
+		{"", false},           // empty string
 		{"2024-01-01", false}, // too many parts
 	}
 
@@ -240,7 +264,8 @@ func TestDownloadXMLFile_InvalidFileType(t *testing.T) {
 		t.Fatal("expected error for invalid file type, got nil")
 	}
 
-	if !strings.Contains(err.Error(), "expected one of") || !strings.Contains(err.Error(), "invalid-type") {
+	if !strings.Contains(err.Error(), "expected one of") ||
+		!strings.Contains(err.Error(), "invalid-type") {
 		t.Errorf("expected file type validation error, got: %v", err)
 	}
 }
@@ -310,3 +335,4 @@ func TestValidateFileChecksum_Mismatch(t *testing.T) {
 		t.Errorf("expected checksum mismatch error with computed and expected values, got: %v", err)
 	}
 }
+
