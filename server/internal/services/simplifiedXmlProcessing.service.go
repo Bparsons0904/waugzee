@@ -162,39 +162,6 @@ func NewSimplifiedXMLProcessingService(
 	}
 }
 
-// DB Association Management Methods
-func (s *SimplifiedXMLProcessingService) DisableDBAssociations() {
-	s.dbAssociationsEnabled = false
-	s.log.Info("DB associations disabled for independent entity processing")
-}
-
-func (s *SimplifiedXMLProcessingService) EnableDBAssociations() {
-	s.dbAssociationsEnabled = true
-	s.log.Info("DB associations enabled for relationship linking")
-}
-
-func (s *SimplifiedXMLProcessingService) AreDBAssociationsEnabled() bool {
-	return s.dbAssociationsEnabled
-}
-
-// logProcessingSummary logs periodic summaries instead of individual record logs
-func (s *SimplifiedXMLProcessingService) logProcessingSummary(entityType string, increment bool) {
-	s.processedCountsMutex.Lock()
-	defer s.processedCountsMutex.Unlock()
-
-	if increment {
-		s.processedCounts[entityType]++
-	}
-
-	// Log summary every 10,000 records to reduce console noise
-	if s.processedCounts[entityType]%10000 == 0 {
-		s.log.Info("Processing summary",
-			"entityType", entityType,
-			"processedCount", s.processedCounts[entityType],
-			"milestone", "10k records")
-	}
-}
-
 // createProcessingBuffers initializes buffered channels for related entity processing
 func (s *SimplifiedXMLProcessingService) createProcessingBuffers() *ProcessingBuffers {
 	return &ProcessingBuffers{
@@ -266,9 +233,6 @@ func (s *SimplifiedXMLProcessingService) processLabel(
 		buffers.Labels.Channel <- convertedLabel
 	}
 
-	// Log processing summary periodically (every 10k records)
-	s.logProcessingSummary("labels", true)
-
 	return nil
 }
 
@@ -291,9 +255,6 @@ func (s *SimplifiedXMLProcessingService) processArtist(
 		}
 		buffers.Images.Channel <- contextualImage
 	}
-
-	// Log processing summary periodically (every 10k records)
-	s.logProcessingSummary("artists", true)
 
 	return nil
 }
@@ -358,9 +319,6 @@ func (s *SimplifiedXMLProcessingService) processMaster(
 		buffers.Masters.Channel <- convertedMaster
 	}
 
-	// Log processing summary periodically (every 10k records)
-	s.logProcessingSummary("masters", true)
-
 	return nil
 }
 
@@ -406,9 +364,6 @@ func (s *SimplifiedXMLProcessingService) processRelease(
 	if convertedRelease := s.parserService.convertDiscogsRelease(rawRelease); convertedRelease != nil {
 		buffers.Releases.Channel <- convertedRelease
 	}
-
-	// Log processing summary periodically (every 10k records)
-	s.logProcessingSummary("releases", true)
 
 	return nil
 }

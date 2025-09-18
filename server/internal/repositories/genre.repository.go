@@ -7,7 +7,10 @@ import (
 	. "waugzee/internal/models"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm/clause"
 )
+
+
 
 type GenreRepository interface {
 	GetAll(ctx context.Context) ([]*Genre, error)
@@ -140,33 +143,23 @@ func (r *genreRepository) UpsertBatch(ctx context.Context, genres []*Genre) (int
 		return 0, 0, nil
 	}
 
-	inserted := 0
-	updated := 0
+	db := r.db.SQLWithContext(ctx)
 
-	for _, genre := range genres {
-		existingGenre, err := r.GetByName(ctx, genre.Name)
-		if err != nil {
-			// Genre doesn't exist, create it
-			_, err := r.Create(ctx, genre)
-			if err != nil {
-				return inserted, updated, log.Err("failed to create genre", err, "name", genre.Name)
-			}
-			inserted++
-		} else {
-			// Genre exists, update if needed
-			if existingGenre.ParentGenreID != genre.ParentGenreID {
-				existingGenre.ParentGenreID = genre.ParentGenreID
+	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
+	result := db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "name"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"parent_genre_id", "updated_at",
+		}),
+	}).Create(genres)
 
-				if err := r.Update(ctx, existingGenre); err != nil {
-					return inserted, updated, log.Err("failed to update genre", err, "name", genre.Name)
-				}
-				updated++
-			}
-		}
+	if result.Error != nil {
+		return 0, 0, log.Err("failed to upsert genre batch", result.Error, "count", len(genres))
 	}
 
-	log.Info("Batch upsert completed", "inserted", inserted, "updated", updated)
-	return inserted, updated, nil
+	affectedRows := int(result.RowsAffected)
+	log.Info("Upserted genres", "count", affectedRows)
+	return affectedRows, 0, nil
 }
 
 func (r *genreRepository) GetBatchByNames(
@@ -193,4 +186,3 @@ func (r *genreRepository) GetBatchByNames(
 	log.Info("Retrieved genres by names", "requested", len(names), "found", len(result))
 	return result, nil
 }
-

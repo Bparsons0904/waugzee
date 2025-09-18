@@ -133,7 +133,7 @@ func (s *DB) initializePostgresDB(gormConfig *gorm.Config, config config.Config)
 
 	log.Info("Successfully connected to PostgreSQL with GORM")
 	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetMaxOpenConns(50)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	s.SQL = db

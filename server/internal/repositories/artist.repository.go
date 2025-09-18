@@ -12,9 +12,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-const (
-	ARTIST_BATCH_SIZE = 5000
-)
+
 
 type ArtistRepository interface {
 	GetByID(ctx context.Context, id string) (*Artist, error)
@@ -105,19 +103,7 @@ func (r *artistRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *artistRepository) UpsertBatch(ctx context.Context, artists []*Artist) (int, int, error) {
-	if len(artists) == 0 {
-		return 0, 0, nil
-	}
-
-	// Service has already deduplicated - process directly without re-deduplication
-	return r.upsertSingleBatch(ctx, artists)
-}
-
-func (r *artistRepository) upsertSingleBatch(
-	ctx context.Context,
-	artists []*Artist,
-) (int, int, error) {
-	log := r.log.Function("upsertSingleBatch")
+	log := r.log.Function("UpsertBatch")
 
 	if len(artists) == 0 {
 		return 0, 0, nil
@@ -137,11 +123,11 @@ func (r *artistRepository) upsertSingleBatch(
 
 	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
 	result := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "discogs_id"}}, // Use primary key (DiscogsID)
+		Columns: []clause.Column{{Name: "discogs_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"name", "is_active", "content_hash", "updated_at",
 		}),
-	}).CreateInBatches(artists, ARTIST_BATCH_SIZE)
+	}).Create(artists)
 
 	if result.Error != nil {
 		return 0, 0, log.Err("failed to upsert artist batch", result.Error, "count", len(artists))

@@ -11,9 +11,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-const (
-	RELEASE_BATCH_SIZE = 5000
-)
+
 
 type ReleaseRepository interface {
 	GetByID(ctx context.Context, id string) (*Release, error)
@@ -107,19 +105,7 @@ func (r *releaseRepository) UpsertBatch(
 	ctx context.Context,
 	releases []*Release,
 ) (int, int, error) {
-	if len(releases) == 0 {
-		return 0, 0, nil
-	}
-
-	// Service has already deduplicated - process directly without re-deduplication
-	return r.upsertSingleBatch(ctx, releases)
-}
-
-func (r *releaseRepository) upsertSingleBatch(
-	ctx context.Context,
-	releases []*Release,
-) (int, int, error) {
-	log := r.log.Function("upsertSingleBatch")
+	log := r.log.Function("UpsertBatch")
 
 	if len(releases) == 0 {
 		return 0, 0, nil
@@ -129,11 +115,11 @@ func (r *releaseRepository) upsertSingleBatch(
 
 	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
 	result := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "discogs_id"}}, // Use primary key (DiscogsID)
+		Columns: []clause.Column{{Name: "discogs_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"title", "year", "country", "format", "image_url", "track_count", "label_id", "master_id", "updated_at",
 		}),
-	}).CreateInBatches(releases, RELEASE_BATCH_SIZE)
+	}).Create(releases)
 
 	if result.Error != nil {
 		return 0, 0, log.Err("failed to upsert release batch", result.Error, "count", len(releases))

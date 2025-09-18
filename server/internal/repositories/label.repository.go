@@ -11,9 +11,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-const (
-	LABEL_BATCH_SIZE = 5000
-)
+
 
 type LabelRepository interface {
 	GetByID(ctx context.Context, id string) (*Label, error)
@@ -103,19 +101,7 @@ func (r *labelRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *labelRepository) UpsertBatch(ctx context.Context, labels []*Label) (int, int, error) {
-	if len(labels) == 0 {
-		return 0, 0, nil
-	}
-
-	// Service has already deduplicated - process directly without re-deduplication
-	return r.upsertSingleBatch(ctx, labels)
-}
-
-func (r *labelRepository) upsertSingleBatch(
-	ctx context.Context,
-	labels []*Label,
-) (int, int, error) {
-	log := r.log.Function("upsertSingleBatch")
+	log := r.log.Function("UpsertBatch")
 
 	if len(labels) == 0 {
 		return 0, 0, nil
@@ -125,18 +111,17 @@ func (r *labelRepository) upsertSingleBatch(
 
 	// Use native PostgreSQL UPSERT with ON CONFLICT for single database round-trip
 	result := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "discogs_id"}}, // Use primary key (DiscogsID)
+		Columns: []clause.Column{{Name: "discogs_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"name", "updated_at",
 		}),
-	}).CreateInBatches(labels, LABEL_BATCH_SIZE)
+	}).Create(labels)
 
 	if result.Error != nil {
 		return 0, 0, log.Err("failed to upsert label batch", result.Error, "count", len(labels))
 	}
 
 	affectedRows := int(result.RowsAffected)
-
 	log.Info("Upserted labels", "count", affectedRows)
 	return affectedRows, 0, nil
 }

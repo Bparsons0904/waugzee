@@ -46,7 +46,6 @@ func (s *DiscogsParserService) ParseFileToChannel(
 		ctx,
 		gzipReader,
 		config.ElementName,
-		options.FileType,
 		entityChan,
 	)
 
@@ -69,7 +68,6 @@ func (s *DiscogsParserService) parseEntityFileToChannel(
 	ctx context.Context,
 	reader io.Reader,
 	elementName string,
-	fileType string,
 	entityChan chan<- EntityMessage,
 ) error {
 	decoder := xml.NewDecoder(reader)

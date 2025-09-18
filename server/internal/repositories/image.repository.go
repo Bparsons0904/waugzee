@@ -10,9 +10,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-const (
-	IMAGE_BATCH_SIZE = 5000
-)
+
 
 type ImageRepository interface {
 	GetByID(ctx context.Context, id string) (*Image, error)
@@ -119,19 +117,7 @@ func (r *imageRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *imageRepository) UpsertBatch(ctx context.Context, images []*Image) (int, int, error) {
-	if len(images) == 0 {
-		return 0, 0, nil
-	}
-
-	// Service has already deduplicated - process directly without re-deduplication
-	return r.upsertSingleBatch(ctx, images)
-}
-
-func (r *imageRepository) upsertSingleBatch(
-	ctx context.Context,
-	images []*Image,
-) (int, int, error) {
-	log := r.log.Function("upsertSingleBatch")
+	log := r.log.Function("UpsertBatch")
 
 	if len(images) == 0 {
 		return 0, 0, nil
@@ -152,7 +138,7 @@ func (r *imageRepository) upsertSingleBatch(
 			"image_type", "sort_order", "discogs_id", "discogs_type",
 			"discogs_uri", "discogs_uri150", "updated_at",
 		}),
-	}).CreateInBatches(images, IMAGE_BATCH_SIZE)
+	}).Create(images)
 
 	if result.Error != nil {
 		return 0, 0, log.Err("failed to upsert image batch", result.Error, "count", len(images))
