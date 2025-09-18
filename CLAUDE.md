@@ -238,6 +238,7 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 - Index files create confusion and make navigation harder as projects grow
 - Prefer explicit imports like `import { Modal } from "./components/Modal/Modal"`
 - **Component organization**: Each component in own directory with `.tsx` and `.module.scss`
+- **File names should be camelCase or PascalCase** - Use descriptive camelCase for service files and PascalCase for components
 
 ### Reference Repository
 
