@@ -93,9 +93,8 @@ func (s *XMLProcessingService) ProcessFileToMap(
 
 	// Start buffer processing goroutines
 	var wg sync.WaitGroup
-	processingID := "simplified_processing"
 
-	s.bufferManager.StartBufferProcessors(ctx, buffers, &wg, processingID, s.batchCoordinator)
+	s.bufferManager.StartBufferProcessors(ctx, buffers, &wg, s.batchCoordinator)
 
 	// Start parser in goroutine
 	parseOptions := ParseOptions{
@@ -164,7 +163,7 @@ func (s *XMLProcessingService) ProcessFileToMap(
 	wg.Wait()
 
 	// Flush any remaining batches
-	if err := s.batchCoordinator.FlushAllBatches(ctx, processingID); err != nil {
+	if err := s.batchCoordinator.FlushAllBatches(ctx); err != nil {
 		log.Error("Failed to flush final batches", "error", err)
 		result.Errors = append(result.Errors, err.Error())
 	}
@@ -215,7 +214,7 @@ func (s *XMLProcessingService) ProcessFile(
 
 	// Update processing status to "processing"
 	if err := s.updateProcessingStatus(ctx, processingID, models.ProcessingStatusProcessing, nil); err != nil {
-		log.Error("failed to update processing status", "error", err, "processingID", processingID)
+		log.Err("failed to update processing status", err)
 	}
 
 	// Use simplified parsing approach
@@ -278,4 +277,3 @@ func (s *XMLProcessingService) updateProcessingStatus(
 
 	return s.discogsDataProcessingRepo.Update(ctx, processing)
 }
-

@@ -146,7 +146,10 @@ func (bc *BatchCoordinator) ConvertDiscogsArtistToModel(
 
 // Batch management methods
 
-func (bc *BatchCoordinator) AddImageToBatch(ctx context.Context, image *models.Image, processingID string) error {
+func (bc *BatchCoordinator) AddImageToBatch(
+	ctx context.Context,
+	image *models.Image,
+) error {
 	bc.imageMutex.Lock()
 	defer bc.imageMutex.Unlock()
 
@@ -158,12 +161,15 @@ func (bc *BatchCoordinator) AddImageToBatch(ctx context.Context, image *models.I
 	bc.imageBatch[key] = image
 
 	if len(bc.imageBatch) >= 5000 {
-		return bc.flushImageBatchInternal(ctx, processingID)
+		return bc.flushImageBatchInternal(ctx)
 	}
 	return nil
 }
 
-func (bc *BatchCoordinator) AddGenreToBatch(ctx context.Context, genreName string, processingID string) error {
+func (bc *BatchCoordinator) AddGenreToBatch(
+	ctx context.Context,
+	genreName string,
+) error {
 	bc.genreMutex.Lock()
 	defer bc.genreMutex.Unlock()
 
@@ -171,69 +177,83 @@ func (bc *BatchCoordinator) AddGenreToBatch(ctx context.Context, genreName strin
 		bc.genreBatch[genreName] = &models.Genre{Name: genreName}
 
 		if len(bc.genreBatch) >= 5000 {
-			return bc.flushGenreBatchInternal(ctx, processingID)
+			return bc.flushGenreBatchInternal(ctx)
 		}
 	}
 	return nil
 }
 
-func (bc *BatchCoordinator) AddArtistToBatch(ctx context.Context, artist *models.Artist, processingID string) error {
+func (bc *BatchCoordinator) AddArtistToBatch(
+	ctx context.Context,
+	artist *models.Artist,
+) error {
 	bc.artistMutex.Lock()
 	defer bc.artistMutex.Unlock()
 
 	bc.artistBatch[artist.DiscogsID] = artist
 
 	if len(bc.artistBatch) >= 5000 {
-		return bc.flushArtistBatchInternal(ctx, processingID)
+		return bc.flushArtistBatchInternal(ctx)
 	}
 	return nil
 }
 
-func (bc *BatchCoordinator) AddLabelToBatch(ctx context.Context, label *models.Label, processingID string) error {
+func (bc *BatchCoordinator) AddLabelToBatch(
+	ctx context.Context,
+	label *models.Label,
+) error {
 	bc.labelMutex.Lock()
 	defer bc.labelMutex.Unlock()
 
 	bc.labelBatch[label.DiscogsID] = label
 
 	if len(bc.labelBatch) >= 5000 {
-		return bc.flushLabelBatchInternal(ctx, processingID)
+		return bc.flushLabelBatchInternal(ctx)
 	}
 	return nil
 }
 
-func (bc *BatchCoordinator) AddMasterToBatch(ctx context.Context, master *models.Master, processingID string) error {
+func (bc *BatchCoordinator) AddMasterToBatch(
+	ctx context.Context,
+	master *models.Master,
+) error {
 	bc.masterMutex.Lock()
 	defer bc.masterMutex.Unlock()
 
 	bc.masterBatch[master.DiscogsID] = master
 
 	if len(bc.masterBatch) >= 5000 {
-		return bc.flushMasterBatchInternal(ctx, processingID)
+		return bc.flushMasterBatchInternal(ctx)
 	}
 	return nil
 }
 
-func (bc *BatchCoordinator) AddReleaseToBatch(ctx context.Context, release *models.Release, processingID string) error {
+func (bc *BatchCoordinator) AddReleaseToBatch(
+	ctx context.Context,
+	release *models.Release,
+) error {
 	bc.releaseMutex.Lock()
 	defer bc.releaseMutex.Unlock()
 
 	bc.releaseBatch[release.DiscogsID] = release
 
 	if len(bc.releaseBatch) >= 2000 {
-		return bc.flushReleaseBatchInternal(ctx, processingID)
+		return bc.flushReleaseBatchInternal(ctx)
 	}
 	return nil
 }
 
 // Batch flushing methods
 
-func (bc *BatchCoordinator) FlushImageBatch(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) FlushImageBatch(ctx context.Context) error {
 	bc.imageMutex.Lock()
 	defer bc.imageMutex.Unlock()
-	return bc.flushImageBatchInternal(ctx, processingID)
+	return bc.flushImageBatchInternal(ctx)
 }
 
-func (bc *BatchCoordinator) flushImageBatchInternal(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) flushImageBatchInternal(
+	ctx context.Context,
+) error {
 	log := bc.log.Function("flushImageBatchInternal")
 	if len(bc.imageBatch) == 0 {
 		return nil
@@ -253,13 +273,15 @@ func (bc *BatchCoordinator) flushImageBatchInternal(ctx context.Context, process
 	return nil
 }
 
-func (bc *BatchCoordinator) FlushGenreBatch(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) FlushGenreBatch(ctx context.Context) error {
 	bc.genreMutex.Lock()
 	defer bc.genreMutex.Unlock()
-	return bc.flushGenreBatchInternal(ctx, processingID)
+	return bc.flushGenreBatchInternal(ctx)
 }
 
-func (bc *BatchCoordinator) flushGenreBatchInternal(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) flushGenreBatchInternal(
+	ctx context.Context,
+) error {
 	log := bc.log.Function("flushGenreBatchInternal")
 	if len(bc.genreBatch) == 0 {
 		return nil
@@ -270,7 +292,7 @@ func (bc *BatchCoordinator) flushGenreBatchInternal(ctx context.Context, process
 		batch = append(batch, genre)
 	}
 
-	_, _, err := bc.genreRepo.UpsertBatch(ctx, batch)
+	err := bc.genreRepo.UpsertBatch(ctx, batch)
 	if err != nil {
 		return log.Err("Failed to upsert genre batch", err)
 	}
@@ -279,13 +301,15 @@ func (bc *BatchCoordinator) flushGenreBatchInternal(ctx context.Context, process
 	return nil
 }
 
-func (bc *BatchCoordinator) FlushArtistBatch(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) FlushArtistBatch(ctx context.Context) error {
 	bc.artistMutex.Lock()
 	defer bc.artistMutex.Unlock()
-	return bc.flushArtistBatchInternal(ctx, processingID)
+	return bc.flushArtistBatchInternal(ctx)
 }
 
-func (bc *BatchCoordinator) flushArtistBatchInternal(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) flushArtistBatchInternal(
+	ctx context.Context,
+) error {
 	log := bc.log.Function("flushArtistBatchInternal")
 	if len(bc.artistBatch) == 0 {
 		return nil
@@ -296,7 +320,7 @@ func (bc *BatchCoordinator) flushArtistBatchInternal(ctx context.Context, proces
 		batch = append(batch, artist)
 	}
 
-	_, _, err := bc.artistRepo.UpsertBatch(ctx, batch)
+	err := bc.artistRepo.UpsertBatch(ctx, batch)
 	if err != nil {
 		return log.Err("Failed to upsert artist batch", err)
 	}
@@ -305,13 +329,15 @@ func (bc *BatchCoordinator) flushArtistBatchInternal(ctx context.Context, proces
 	return nil
 }
 
-func (bc *BatchCoordinator) FlushLabelBatch(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) FlushLabelBatch(ctx context.Context) error {
 	bc.labelMutex.Lock()
 	defer bc.labelMutex.Unlock()
-	return bc.flushLabelBatchInternal(ctx, processingID)
+	return bc.flushLabelBatchInternal(ctx)
 }
 
-func (bc *BatchCoordinator) flushLabelBatchInternal(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) flushLabelBatchInternal(
+	ctx context.Context,
+) error {
 	log := bc.log.Function("flushLabelBatchInternal")
 	if len(bc.labelBatch) == 0 {
 		return nil
@@ -322,7 +348,7 @@ func (bc *BatchCoordinator) flushLabelBatchInternal(ctx context.Context, process
 		batch = append(batch, label)
 	}
 
-	_, _, err := bc.labelRepo.UpsertBatch(ctx, batch)
+	err := bc.labelRepo.UpsertBatch(ctx, batch)
 	if err != nil {
 		return log.Err("Failed to upsert label batch", err)
 	}
@@ -331,13 +357,15 @@ func (bc *BatchCoordinator) flushLabelBatchInternal(ctx context.Context, process
 	return nil
 }
 
-func (bc *BatchCoordinator) FlushMasterBatch(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) FlushMasterBatch(ctx context.Context) error {
 	bc.masterMutex.Lock()
 	defer bc.masterMutex.Unlock()
-	return bc.flushMasterBatchInternal(ctx, processingID)
+	return bc.flushMasterBatchInternal(ctx)
 }
 
-func (bc *BatchCoordinator) flushMasterBatchInternal(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) flushMasterBatchInternal(
+	ctx context.Context,
+) error {
 	log := bc.log.Function("flushMasterBatchInternal")
 	if len(bc.masterBatch) == 0 {
 		return nil
@@ -348,7 +376,7 @@ func (bc *BatchCoordinator) flushMasterBatchInternal(ctx context.Context, proces
 		batch = append(batch, master)
 	}
 
-	_, _, err := bc.masterRepo.UpsertBatch(ctx, batch)
+	err := bc.masterRepo.UpsertBatch(ctx, batch)
 	if err != nil {
 		return log.Err("Failed to upsert master batch", err)
 	}
@@ -357,13 +385,15 @@ func (bc *BatchCoordinator) flushMasterBatchInternal(ctx context.Context, proces
 	return nil
 }
 
-func (bc *BatchCoordinator) FlushReleaseBatch(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) FlushReleaseBatch(ctx context.Context) error {
 	bc.releaseMutex.Lock()
 	defer bc.releaseMutex.Unlock()
-	return bc.flushReleaseBatchInternal(ctx, processingID)
+	return bc.flushReleaseBatchInternal(ctx)
 }
 
-func (bc *BatchCoordinator) flushReleaseBatchInternal(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) flushReleaseBatchInternal(
+	ctx context.Context,
+) error {
 	log := bc.log.Function("flushReleaseBatchInternal")
 	if len(bc.releaseBatch) == 0 {
 		return nil
@@ -374,7 +404,7 @@ func (bc *BatchCoordinator) flushReleaseBatchInternal(ctx context.Context, proce
 		batch = append(batch, release)
 	}
 
-	_, _, err := bc.releaseRepo.UpsertBatch(ctx, batch)
+	err := bc.releaseRepo.UpsertBatch(ctx, batch)
 	if err != nil {
 		return log.Err("Failed to upsert release batch", err)
 	}
@@ -384,25 +414,25 @@ func (bc *BatchCoordinator) flushReleaseBatchInternal(ctx context.Context, proce
 }
 
 // FlushAllBatches flushes any remaining items in all batches
-func (bc *BatchCoordinator) FlushAllBatches(ctx context.Context, processingID string) error {
+func (bc *BatchCoordinator) FlushAllBatches(ctx context.Context) error {
 	var err error
 
-	if flushErr := bc.FlushImageBatch(ctx, processingID); flushErr != nil {
+	if flushErr := bc.FlushImageBatch(ctx); flushErr != nil {
 		err = flushErr
 	}
-	if flushErr := bc.FlushGenreBatch(ctx, processingID); flushErr != nil {
+	if flushErr := bc.FlushGenreBatch(ctx); flushErr != nil {
 		err = flushErr
 	}
-	if flushErr := bc.FlushArtistBatch(ctx, processingID); flushErr != nil {
+	if flushErr := bc.FlushArtistBatch(ctx); flushErr != nil {
 		err = flushErr
 	}
-	if flushErr := bc.FlushLabelBatch(ctx, processingID); flushErr != nil {
+	if flushErr := bc.FlushLabelBatch(ctx); flushErr != nil {
 		err = flushErr
 	}
-	if flushErr := bc.FlushMasterBatch(ctx, processingID); flushErr != nil {
+	if flushErr := bc.FlushMasterBatch(ctx); flushErr != nil {
 		err = flushErr
 	}
-	if flushErr := bc.FlushReleaseBatch(ctx, processingID); flushErr != nil {
+	if flushErr := bc.FlushReleaseBatch(ctx); flushErr != nil {
 		err = flushErr
 	}
 

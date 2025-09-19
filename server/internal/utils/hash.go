@@ -10,7 +10,7 @@ import (
 
 // Hashable interface defines methods that models must implement for hash generation
 type Hashable interface {
-	GetHashableFields() map[string]interface{}
+	GetHashableFields() map[string]any
 	SetContentHash(hash string)
 	GetContentHash() string
 }
@@ -22,7 +22,7 @@ func GenerateEntityHash(entity Hashable) (string, error) {
 }
 
 // HashFields creates a deterministic hash from a map of fields
-func HashFields(fields map[string]interface{}) string {
+func HashFields(fields map[string]any) string {
 	// Create a sorted slice of keys for deterministic ordering
 	keys := make([]string, 0, len(fields))
 	for key := range fields {
@@ -31,7 +31,7 @@ func HashFields(fields map[string]interface{}) string {
 	sort.Strings(keys)
 
 	// Build ordered map for consistent JSON serialization
-	orderedMap := make(map[string]interface{})
+	orderedMap := make(map[string]any)
 	for _, key := range keys {
 		orderedMap[key] = normalizeValue(fields[key])
 	}
@@ -49,7 +49,7 @@ func HashFields(fields map[string]interface{}) string {
 }
 
 // normalizeValue ensures consistent representation of values for hashing
-func normalizeValue(value interface{}) interface{} {
+func normalizeValue(value any) interface{} {
 	if value == nil {
 		return nil
 	}
@@ -84,8 +84,8 @@ func normalizeValue(value interface{}) interface{} {
 
 // PrepareHashableFields extracts hashable fields from a struct using reflection
 // This is a helper function for models that want to auto-generate hashable fields
-func PrepareHashableFields(entity interface{}, excludeFields ...string) map[string]interface{} {
-	fields := make(map[string]interface{})
+func PrepareHashableFields(entity any, excludeFields ...string) map[string]interface{} {
+	fields := make(map[string]any)
 	excludeMap := make(map[string]bool)
 
 	// Create exclusion map
@@ -178,9 +178,9 @@ func ValidateHash(hash string) bool {
 
 // BatchCategories categorizes records into insert/update/skip based on hash comparison
 type BatchCategories struct {
-	Insert []interface{} // New records (not in DB)
-	Update []interface{} // Changed records (hash mismatch)
-	Skip   []interface{} // Unchanged records (hash match)
+	Insert []any // New records (not in DB)
+	Update []any // Changed records (hash mismatch)
+	Skip   []any // Unchanged records (hash match)
 }
 
 // DiscogsHashable represents an entity with DiscogsID and hash capabilities
@@ -191,11 +191,14 @@ type DiscogsHashable interface {
 
 // CategorizeRecordsByHash compares incoming records with existing hashes
 // and categorizes them into insert/update/skip operations
-func CategorizeRecordsByHash(incomingRecords []DiscogsHashable, existingHashes map[int64]string) *BatchCategories {
+func CategorizeRecordsByHash(
+	incomingRecords []DiscogsHashable,
+	existingHashes map[int64]string,
+) *BatchCategories {
 	categories := &BatchCategories{
-		Insert: make([]interface{}, 0),
-		Update: make([]interface{}, 0),
-		Skip:   make([]interface{}, 0),
+		Insert: make([]any, 0),
+		Update: make([]any, 0),
+		Skip:   make([]any, 0),
 	}
 
 	for _, record := range incomingRecords {
@@ -236,11 +239,14 @@ type NameHashable interface {
 
 // CategorizeRecordsByNameHash compares incoming records with existing hashes using names
 // and categorizes them into insert/update/skip operations
-func CategorizeRecordsByNameHash(incomingRecords []NameHashable, existingHashes map[string]string) *BatchCategories {
+func CategorizeRecordsByNameHash(
+	incomingRecords []NameHashable,
+	existingHashes map[string]string,
+) *BatchCategories {
 	categories := &BatchCategories{
-		Insert: make([]interface{}, 0),
-		Update: make([]interface{}, 0),
-		Skip:   make([]interface{}, 0),
+		Insert: make([]any, 0),
+		Update: make([]any, 0),
+		Skip:   make([]any, 0),
 	}
 
 	for _, record := range incomingRecords {
@@ -272,3 +278,4 @@ func CategorizeRecordsByNameHash(incomingRecords []NameHashable, existingHashes 
 
 	return categories
 }
+

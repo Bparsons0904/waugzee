@@ -83,13 +83,13 @@ type ProcessingBuffers struct {
 }
 
 type BufferManager struct {
-	labelRepo     repositories.LabelRepository
-	artistRepo    repositories.ArtistRepository
-	masterRepo    repositories.MasterRepository
-	releaseRepo   repositories.ReleaseRepository
-	genreRepo     repositories.GenreRepository
-	imageRepo     repositories.ImageRepository
-	log           logger.Logger
+	labelRepo   repositories.LabelRepository
+	artistRepo  repositories.ArtistRepository
+	masterRepo  repositories.MasterRepository
+	releaseRepo repositories.ReleaseRepository
+	genreRepo   repositories.GenreRepository
+	imageRepo   repositories.ImageRepository
+	log         logger.Logger
 }
 
 func NewBufferManager(
@@ -111,41 +111,45 @@ func NewBufferManager(
 	}
 }
 
+const (
+	BUFFER_CHANNEL_SIZE = 10_000
+)
+
 // CreateProcessingBuffers initializes buffered channels for related entity processing
 func (bm *BufferManager) CreateProcessingBuffers() *ProcessingBuffers {
 	return &ProcessingBuffers{
 		Images: &ImageBuffer{
-			Channel:  make(chan *ContextualDiscogsImage, 10000),
-			Capacity: 10000,
+			Channel:  make(chan *ContextualDiscogsImage, BUFFER_CHANNEL_SIZE),
+			Capacity: BUFFER_CHANNEL_SIZE,
 		},
 		Genres: &GenreBuffer{
-			Channel:  make(chan string, 10000),
-			Capacity: 10000,
+			Channel:  make(chan string, BUFFER_CHANNEL_SIZE),
+			Capacity: BUFFER_CHANNEL_SIZE,
 		},
 		Artists: &ArtistBuffer{
-			Channel:  make(chan *imports.Artist, 10000),
-			Capacity: 10000,
+			Channel:  make(chan *imports.Artist, BUFFER_CHANNEL_SIZE),
+			Capacity: BUFFER_CHANNEL_SIZE,
 		},
 		Labels: &LabelBuffer{
-			Channel:  make(chan *models.Label, 10000),
-			Capacity: 10000,
+			Channel:  make(chan *models.Label, BUFFER_CHANNEL_SIZE),
+			Capacity: BUFFER_CHANNEL_SIZE,
 		},
 		Masters: &MasterBuffer{
-			Channel:  make(chan *models.Master, 10000),
-			Capacity: 10000,
+			Channel:  make(chan *models.Master, BUFFER_CHANNEL_SIZE),
+			Capacity: BUFFER_CHANNEL_SIZE,
 		},
 		Releases: &ReleaseBuffer{
-			Channel:  make(chan *models.Release, 10000),
-			Capacity: 10000,
+			Channel:  make(chan *models.Release, BUFFER_CHANNEL_SIZE),
+			Capacity: BUFFER_CHANNEL_SIZE,
 		},
 		// Association buffers (Master-level only)
 		MasterArtists: &MasterArtistAssociationBuffer{
-			Channel:  make(chan *MasterArtistAssociation, 10000),
-			Capacity: 10000,
+			Channel:  make(chan *MasterArtistAssociation, BUFFER_CHANNEL_SIZE),
+			Capacity: BUFFER_CHANNEL_SIZE,
 		},
 		MasterGenres: &MasterGenreAssociationBuffer{
-			Channel:  make(chan *MasterGenreAssociation, 10000),
-			Capacity: 10000,
+			Channel:  make(chan *MasterGenreAssociation, BUFFER_CHANNEL_SIZE),
+			Capacity: BUFFER_CHANNEL_SIZE,
 		},
 	}
 }
@@ -168,19 +172,18 @@ func (bm *BufferManager) StartBufferProcessors(
 	ctx context.Context,
 	buffers *ProcessingBuffers,
 	wg *sync.WaitGroup,
-	processingID string,
 	batchCoordinator *BatchCoordinator,
 ) {
 	wg.Add(8) // Add for each buffer processor
-	go bm.processImageBuffer(ctx, buffers, wg, processingID, batchCoordinator)
-	go bm.processGenreBuffer(ctx, buffers, wg, processingID, batchCoordinator)
-	go bm.processArtistBuffer(ctx, buffers, wg, processingID, batchCoordinator)
-	go bm.processLabelBuffer(ctx, buffers, wg, processingID, batchCoordinator)
-	go bm.processMasterBuffer(ctx, buffers, wg, processingID, batchCoordinator)
-	go bm.processReleaseBuffer(ctx, buffers, wg, processingID, batchCoordinator)
+	go bm.processImageBuffer(ctx, buffers, wg, batchCoordinator)
+	go bm.processGenreBuffer(ctx, buffers, wg, batchCoordinator)
+	go bm.processArtistBuffer(ctx, buffers, wg, batchCoordinator)
+	go bm.processLabelBuffer(ctx, buffers, wg, batchCoordinator)
+	go bm.processMasterBuffer(ctx, buffers, wg, batchCoordinator)
+	go bm.processReleaseBuffer(ctx, buffers, wg, batchCoordinator)
 	// Association buffer processors (Master-level only)
-	go bm.processMasterArtistAssociationBuffer(ctx, buffers, wg, processingID)
-	go bm.processMasterGenreAssociationBuffer(ctx, buffers, wg, processingID)
+	go bm.processMasterArtistAssociationBuffer(ctx, buffers, wg)
+	go bm.processMasterGenreAssociationBuffer(ctx, buffers, wg)
 }
 
 // Buffer processor methods - these handle the consumption from channels and batching
@@ -189,7 +192,6 @@ func (bm *BufferManager) processImageBuffer(
 	ctx context.Context,
 	buffers *ProcessingBuffers,
 	wg *sync.WaitGroup,
-	processingID string,
 	batchCoordinator *BatchCoordinator,
 ) {
 	defer wg.Done()
@@ -204,7 +206,7 @@ func (bm *BufferManager) processImageBuffer(
 				return
 			}
 			if modelImage := batchCoordinator.ConvertContextualDiscogsImageToModel(contextualImage); modelImage != nil {
-				if err := batchCoordinator.AddImageToBatch(ctx, modelImage, processingID); err != nil {
+				if err := batchCoordinator.AddImageToBatch(ctx, modelImage); err != nil {
 					log.Error("Failed to add image to batch", "error", err)
 				}
 			}
@@ -216,7 +218,6 @@ func (bm *BufferManager) processGenreBuffer(
 	ctx context.Context,
 	buffers *ProcessingBuffers,
 	wg *sync.WaitGroup,
-	processingID string,
 	batchCoordinator *BatchCoordinator,
 ) {
 	defer wg.Done()
@@ -231,7 +232,7 @@ func (bm *BufferManager) processGenreBuffer(
 				return
 			}
 			if genreName != "" {
-				if err := batchCoordinator.AddGenreToBatch(ctx, genreName, processingID); err != nil {
+				if err := batchCoordinator.AddGenreToBatch(ctx, genreName); err != nil {
 					log.Error("Failed to add genre to batch", "error", err)
 				}
 			}
@@ -243,7 +244,6 @@ func (bm *BufferManager) processArtistBuffer(
 	ctx context.Context,
 	buffers *ProcessingBuffers,
 	wg *sync.WaitGroup,
-	processingID string,
 	batchCoordinator *BatchCoordinator,
 ) {
 	defer wg.Done()
@@ -258,7 +258,7 @@ func (bm *BufferManager) processArtistBuffer(
 				return
 			}
 			if modelArtist := batchCoordinator.ConvertDiscogsArtistToModel(discogsArtist); modelArtist != nil {
-				if err := batchCoordinator.AddArtistToBatch(ctx, modelArtist, processingID); err != nil {
+				if err := batchCoordinator.AddArtistToBatch(ctx, modelArtist); err != nil {
 					log.Error("Failed to add artist to batch", "error", err)
 				}
 			}
@@ -270,7 +270,6 @@ func (bm *BufferManager) processLabelBuffer(
 	ctx context.Context,
 	buffers *ProcessingBuffers,
 	wg *sync.WaitGroup,
-	processingID string,
 	batchCoordinator *BatchCoordinator,
 ) {
 	defer wg.Done()
@@ -285,7 +284,7 @@ func (bm *BufferManager) processLabelBuffer(
 				return
 			}
 			if modelLabel != nil {
-				if err := batchCoordinator.AddLabelToBatch(ctx, modelLabel, processingID); err != nil {
+				if err := batchCoordinator.AddLabelToBatch(ctx, modelLabel); err != nil {
 					log.Error("Failed to add label to batch", "error", err)
 				}
 			}
@@ -297,7 +296,6 @@ func (bm *BufferManager) processMasterBuffer(
 	ctx context.Context,
 	buffers *ProcessingBuffers,
 	wg *sync.WaitGroup,
-	processingID string,
 	batchCoordinator *BatchCoordinator,
 ) {
 	defer wg.Done()
@@ -312,7 +310,7 @@ func (bm *BufferManager) processMasterBuffer(
 				return
 			}
 			if modelMaster != nil {
-				if err := batchCoordinator.AddMasterToBatch(ctx, modelMaster, processingID); err != nil {
+				if err := batchCoordinator.AddMasterToBatch(ctx, modelMaster); err != nil {
 					log.Error("Failed to add master to batch", "error", err)
 				}
 			}
@@ -324,7 +322,6 @@ func (bm *BufferManager) processReleaseBuffer(
 	ctx context.Context,
 	buffers *ProcessingBuffers,
 	wg *sync.WaitGroup,
-	processingID string,
 	batchCoordinator *BatchCoordinator,
 ) {
 	defer wg.Done()
@@ -339,7 +336,7 @@ func (bm *BufferManager) processReleaseBuffer(
 				return
 			}
 			if modelRelease != nil {
-				if err := batchCoordinator.AddReleaseToBatch(ctx, modelRelease, processingID); err != nil {
+				if err := batchCoordinator.AddReleaseToBatch(ctx, modelRelease); err != nil {
 					log.Error("Failed to add release to batch", "error", err)
 				}
 			}
@@ -351,7 +348,6 @@ func (bm *BufferManager) processMasterArtistAssociationBuffer(
 	ctx context.Context,
 	buffers *ProcessingBuffers,
 	wg *sync.WaitGroup,
-	processingID string,
 ) {
 	defer wg.Done()
 
@@ -361,14 +357,14 @@ func (bm *BufferManager) processMasterArtistAssociationBuffer(
 		select {
 		case <-ctx.Done():
 			if len(associations) > 0 {
-				bm.processPendingMasterArtistAssociations(ctx, associations, processingID)
+				bm.processPendingMasterArtistAssociations(ctx, associations)
 			}
 			return
 
 		case association, ok := <-buffers.MasterArtists.Channel:
 			if !ok {
 				if len(associations) > 0 {
-					bm.processPendingMasterArtistAssociations(ctx, associations, processingID)
+					bm.processPendingMasterArtistAssociations(ctx, associations)
 				}
 				return
 			}
@@ -376,7 +372,7 @@ func (bm *BufferManager) processMasterArtistAssociationBuffer(
 			if association != nil {
 				associations = append(associations, association)
 				if len(associations) >= 5000 {
-					bm.processPendingMasterArtistAssociations(ctx, associations, processingID)
+					bm.processPendingMasterArtistAssociations(ctx, associations)
 					associations = make([]*MasterArtistAssociation, 0, 5000)
 				}
 			}
@@ -388,7 +384,6 @@ func (bm *BufferManager) processMasterGenreAssociationBuffer(
 	ctx context.Context,
 	buffers *ProcessingBuffers,
 	wg *sync.WaitGroup,
-	processingID string,
 ) {
 	defer wg.Done()
 
@@ -398,14 +393,14 @@ func (bm *BufferManager) processMasterGenreAssociationBuffer(
 		select {
 		case <-ctx.Done():
 			if len(masterGenreMap) > 0 {
-				bm.processPendingMasterGenreAssociations(ctx, masterGenreMap, processingID)
+				bm.processPendingMasterGenreAssociations(ctx, masterGenreMap)
 			}
 			return
 
 		case association, ok := <-buffers.MasterGenres.Channel:
 			if !ok {
 				if len(masterGenreMap) > 0 {
-					bm.processPendingMasterGenreAssociations(ctx, masterGenreMap, processingID)
+					bm.processPendingMasterGenreAssociations(ctx, masterGenreMap)
 				}
 				return
 			}
@@ -420,7 +415,7 @@ func (bm *BufferManager) processMasterGenreAssociationBuffer(
 				)
 
 				if len(masterGenreMap) >= 5000 {
-					bm.processPendingMasterGenreAssociations(ctx, masterGenreMap, processingID)
+					bm.processPendingMasterGenreAssociations(ctx, masterGenreMap)
 					masterGenreMap = make(map[int64][]string)
 				}
 			}
@@ -431,7 +426,6 @@ func (bm *BufferManager) processMasterGenreAssociationBuffer(
 func (bm *BufferManager) processPendingMasterArtistAssociations(
 	ctx context.Context,
 	associations []*MasterArtistAssociation,
-	processingID string,
 ) {
 	log := bm.log.Function("processPendingMasterArtistAssociations")
 	if len(associations) == 0 {
@@ -454,7 +448,6 @@ func (bm *BufferManager) processPendingMasterArtistAssociations(
 func (bm *BufferManager) processPendingMasterGenreAssociations(
 	ctx context.Context,
 	masterGenreMap map[int64][]string,
-	processingID string,
 ) {
 	log := bm.log.Function("processPendingMasterGenreAssociations")
 	if len(masterGenreMap) == 0 {
@@ -480,3 +473,4 @@ func (bm *BufferManager) processPendingMasterGenreAssociations(
 		_ = log.Error("Failed to create master-genre associations", "error", err)
 	}
 }
+

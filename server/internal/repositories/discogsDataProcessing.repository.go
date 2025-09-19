@@ -159,7 +159,7 @@ func (r *discogsDataProcessingRepository) UpdateStatus(
 		return log.Err("failed to parse processing ID", err, "id", id)
 	}
 
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"status": status,
 	}
 

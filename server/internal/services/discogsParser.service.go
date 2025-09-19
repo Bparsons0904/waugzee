@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 	"waugzee/internal/imports"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
@@ -163,6 +164,11 @@ func (s *DiscogsParserService) parseEntityFileToChannel(
 ) error {
 	decoder := xml.NewDecoder(reader)
 
+	// Progress tracking
+	processedCount := 0
+	lastLogTime := time.Now()
+	const logInterval = 10 * time.Second
+
 	// Stream through the XML file
 	for {
 		// Check context cancellation
@@ -250,6 +256,15 @@ func (s *DiscogsParserService) parseEntityFileToChannel(
 				case <-ctx.Done():
 					return ctx.Err()
 				}
+			}
+
+			// Progress tracking for all successful entity processing
+			processedCount++
+			if time.Since(lastLogTime) >= logInterval {
+				s.log.Info("Processing progress",
+					"entityType", elementName,
+					"processed", processedCount)
+				lastLogTime = time.Now()
 			}
 		}
 	}
