@@ -104,29 +104,9 @@ func New() (*App, error) {
 	authController := authController.New(zitadelService, userRepo, db)
 	userController := userController.New(userRepo, discogsService, config)
 
-	// Register jobs with scheduler if enabled
-	if config.SchedulerEnabled {
-		// Download job runs at 2:00 AM UTC daily
-		discogsDownloadJob := jobs.NewDiscogsDownloadJob(
-			discogsDataProcessingRepo,
-			downloadService,
-			services.Hourly, // TODO: CHange back to daily after testing, Claude do not revert
-		)
-		if err := schedulerService.AddJob(discogsDownloadJob); err != nil {
-			return &App{}, log.Err("failed to register Discogs download job", err)
-		}
-		log.Info("Registered Discogs download job with scheduler")
-
-		// Processing job runs at 3:00 AM UTC daily (1 hour after download)
-		discogsProcessingJob := jobs.NewDiscogsProcessingJob(
-			discogsDataProcessingRepo,
-			xmlProcessingService,
-			services.Hourly, // TODO: CHange back to daily after testing, Claude do not revert
-		)
-		if err := schedulerService.AddJob(discogsProcessingJob); err != nil {
-			return &App{}, log.Err("failed to register Discogs processing job", err)
-		}
-		log.Info("Registered Discogs processing job with scheduler")
+	// Register all jobs with scheduler
+	if err := jobs.RegisterAllJobs(schedulerService, config, discogsDataProcessingRepo, downloadService, xmlProcessingService); err != nil {
+		return &App{}, log.Err("failed to register jobs", err)
 	}
 
 	app := &App{

@@ -465,7 +465,13 @@ func (j *DiscogsDownloadJob) handleSingleFileDownload(
 	// TODO: Re-enable after confirming validation works correctly
 	// If file exists but is invalid, remove it
 	if currentStatus.Status == models.FileDownloadStatusFailed && currentStatus.Downloaded {
-		log.Warn("Invalid existing file detected (cleanup disabled during testing)", "fileType", fileType, "filePath", filePath)
+		log.Warn(
+			"Invalid existing file detected (cleanup disabled during testing)",
+			"fileType",
+			fileType,
+			"filePath",
+			filePath,
+		)
 		// if removeErr := os.Remove(filePath); removeErr != nil {
 		// 	log.Warn("failed to remove invalid file", "error", removeErr, "file", filePath)
 		// }
@@ -513,7 +519,13 @@ func (j *DiscogsDownloadJob) handleSingleFileDownload(
 		// if removeErr := os.Remove(filePath); removeErr != nil {
 		// 	log.Warn("failed to remove invalid file", "error", removeErr, "file", filePath)
 		// }
-		log.Warn("Checksum validation failed (cleanup disabled during testing)", "fileType", fileType, "filePath", filePath)
+		log.Warn(
+			"Checksum validation failed (cleanup disabled during testing)",
+			"fileType",
+			fileType,
+			"filePath",
+			filePath,
+		)
 
 		return log.Err(
 			"file checksum validation failed",
@@ -554,7 +566,6 @@ func (j *DiscogsDownloadJob) handleSingleFileDownload(
 
 	return nil
 }
-
 
 func (j *DiscogsDownloadJob) Schedule() services.Schedule {
 	return j.schedule
