@@ -198,8 +198,8 @@ const HomePageDashboard: Component = () => {
           <div class={styles.activityList}>
             {isLoading() ? (
               <div class={styles.activitySkeleton}>
-                {[1, 2, 3].map((i) => (
-                  <div class={styles.skeletonItem}>
+                {[1, 2, 3].map((_, index) => (
+                  <div key={index} class={styles.skeletonItem}>
                     <div class={styles.skeletonIcon}></div>
                     <div class={styles.skeletonContent}>
                       <div class={styles.skeletonTitle}></div>

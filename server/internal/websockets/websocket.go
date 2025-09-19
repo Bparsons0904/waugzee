@@ -10,7 +10,7 @@ import (
 	"waugzee/internal/events"
 	"waugzee/internal/logger"
 	"waugzee/internal/repositories"
-	"waugzee/internal/services"
+	"waugzee/internal/types"
 
 	"github.com/gofiber/websocket/v2"
 	"github.com/google/uuid"
@@ -41,20 +41,41 @@ const (
 	SEND_CHANNEL_SIZE                   = 64
 )
 
+// DiscogsOrchestrationService interface to avoid circular imports
+type DiscogsOrchestrationService interface {
+	ProcessApiResponse(ctx context.Context, requestID string, response *types.ApiResponse) error
+	HandleSyncDisconnection(ctx context.Context, userID uuid.UUID) error
+	HandleSyncReconnection(ctx context.Context, userID uuid.UUID) error
+}
+
+// ZitadelService interface to avoid circular imports
+type ZitadelService interface {
+	ValidateTokenWithFallback(ctx context.Context, token string) (*types.TokenInfo, string, error)
+}
+
 // Channels
 const (
 	BROADCAST_CHANNEL = "broadcast"
 )
 
 type Message struct {
-	ID        string         `json:"id"`
-	Type      string         `json:"type"`
-	Channel   string         `json:"channel,omitempty"`
-	Action    string         `json:"action,omitempty"`
-	UserID    string         `json:"userId,omitempty"`
-	Data      map[string]any `json:"data,omitempty"`
-	Timestamp time.Time      `json:"timestamp"`
+	ID        string                 `json:"id"`
+	Type      string                 `json:"type"`
+	Channel   string                 `json:"channel,omitempty"`
+	Action    string                 `json:"action,omitempty"`
+	UserID    string                 `json:"userId,omitempty"`
+	Data      map[string]interface{} `json:"data,omitempty"`
+	Timestamp time.Time              `json:"timestamp"`
 }
+
+// Implement WebSocketMessage interface
+func (m *Message) GetID() string                     { return m.ID }
+func (m *Message) GetType() string                   { return m.Type }
+func (m *Message) GetChannel() string               { return m.Channel }
+func (m *Message) GetAction() string                { return m.Action }
+func (m *Message) GetUserID() string                { return m.UserID }
+func (m *Message) GetData() map[string]interface{}  { return m.Data }
+func (m *Message) GetTimestamp() time.Time          { return m.Timestamp }
 
 type Client struct {
 	ID         string
@@ -71,18 +92,18 @@ type Manager struct {
 	config                    config.Config
 	log                       logger.Logger
 	eventBus                  *events.EventBus
-	zitadelService            *services.ZitadelService
+	zitadelService            ZitadelService
 	userRepo                  repositories.UserRepository
-	discogsOrchestrationSvc   services.DiscogsOrchestrationService
+	discogsOrchestrationSvc   DiscogsOrchestrationService
 }
 
 func New(
 	db database.DB,
 	eventBus *events.EventBus,
 	config config.Config,
-	zitadelService *services.ZitadelService,
+	zitadelService ZitadelService,
 	userRepo repositories.UserRepository,
-	discogsOrchestrationSvc services.DiscogsOrchestrationService,
+	discogsOrchestrationSvc DiscogsOrchestrationService,
 ) (*Manager, error) {
 	log := logger.New("websockets")
 
@@ -541,7 +562,7 @@ func (m *Manager) BroadcastCacheInvalidation(
 		Type:    MESSAGE_TYPE_MESSAGE,
 		Channel: "user",
 		Action:  "invalidateCache",
-		Data: map[string]any{
+		Data: map[string]interface{}{
 			"resourceType": resourceType,
 			"resourceId":   resourceID,
 		},
@@ -564,7 +585,7 @@ func (m *Manager) BroadcastCacheInvalidation(
 			continue
 		}
 
-		m.SendMessageToUser(userUUID, message)
+		m.SendMessageToUser(userUUID, &message)
 		sentCount++
 	}
 
@@ -624,7 +645,7 @@ func (c *Client) handleDiscogsApiResponse(message Message) {
 	}
 
 	// Create API response
-	apiResponse := &services.ApiResponse{
+	apiResponse := &types.ApiResponse{
 		RequestID: requestID,
 		Status:    int(status),
 		Headers:   headerMap,
@@ -640,7 +661,7 @@ func (c *Client) handleDiscogsApiResponse(message Message) {
 
 	// Process the response
 	if err := c.Manager.discogsOrchestrationSvc.ProcessApiResponse(context.Background(), requestID, apiResponse); err != nil {
-		log.Error("Failed to process Discogs API response", "error", err, "requestID", requestID)
+		_ = log.Error("Failed to process Discogs API response", "error", err, "requestID", requestID)
 	} else {
 		log.Info("Discogs API response processed successfully", "requestID", requestID, "status", status)
 	}
@@ -655,7 +676,7 @@ func (m *Manager) handleClientDisconnection(userID uuid.UUID) {
 	}
 
 	if err := m.discogsOrchestrationSvc.HandleSyncDisconnection(context.Background(), userID); err != nil {
-		log.Error("Failed to handle sync disconnection", "error", err, "userID", userID)
+		_ = log.Error("Failed to handle sync disconnection", "error", err, "userID", userID)
 	} else {
 		log.Info("Sync disconnection handled", "userID", userID)
 	}
@@ -670,8 +691,9 @@ func (m *Manager) handleClientReconnection(userID uuid.UUID) {
 	}
 
 	if err := m.discogsOrchestrationSvc.HandleSyncReconnection(context.Background(), userID); err != nil {
-		log.Error("Failed to handle sync reconnection", "error", err, "userID", userID)
+		_ = log.Error("Failed to handle sync reconnection", "error", err, "userID", userID)
 	} else {
 		log.Info("Sync reconnection handled", "userID", userID)
 	}
 }
+

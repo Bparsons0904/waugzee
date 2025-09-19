@@ -9,7 +9,7 @@ export interface DiscogsApiResponse {
   requestId: string;
   status: number;
   headers: Record<string, string>;
-  body: any;
+  body: unknown;
   error?: string;
 }
 
@@ -42,7 +42,7 @@ export class DiscogsApiService {
       console.log(`[DiscogsApi] Rate limit info:`, rateLimitInfo);
 
       // Get response body
-      let body: any;
+      let body: unknown;
       const contentType = response.headers.get('content-type');
 
       if (contentType && contentType.includes('application/json')) {

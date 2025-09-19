@@ -9,6 +9,7 @@ import (
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
+	"waugzee/internal/types"
 )
 
 type AuthController struct {
@@ -89,7 +90,7 @@ func (ac *AuthController) GetAuthConfig() (*AuthConfigResponse, error) {
 // getOrCreateOIDCUser finds or creates a user from OIDC token claims
 func (ac *AuthController) getOrCreateOIDCUser(
 	ctx context.Context,
-	tokenInfo *services.TokenInfo,
+	tokenInfo *types.TokenInfo,
 ) (*User, error) {
 	log := ac.log.Function("getOrCreateOIDCUser")
 

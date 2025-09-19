@@ -8,6 +8,7 @@ import (
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
 	"waugzee/internal/services"
+	"waugzee/internal/types"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -151,7 +152,7 @@ func (h *DiscogsHandler) InitiateCollectionSync(c *fiber.Ctx) error {
 		req.PageLimit,
 	)
 	if err != nil {
-		log.Error("Failed to initiate collection sync", "error", err, "userID", user.ID)
+		_ = log.Error("Failed to initiate collection sync", "error", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
@@ -188,7 +189,7 @@ func (h *DiscogsHandler) GetSyncStatus(c *fiber.Ctx) error {
 	// Get sync progress
 	progress, err := h.orchestrationService.GetSyncProgress(c.Context(), sessionID)
 	if err != nil {
-		log.Error("Failed to get sync progress", "error", err, "sessionID", sessionID)
+		_ = log.Error("Failed to get sync progress", "error", err, "sessionID", sessionID)
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Sync session not found",
 		})
@@ -231,7 +232,7 @@ func (h *DiscogsHandler) CancelSync(c *fiber.Ctx) error {
 	}
 
 	if err := h.orchestrationService.CancelSync(c.Context(), sessionID); err != nil {
-		log.Error("Failed to cancel sync", "error", err, "sessionID", sessionID)
+		_ = log.Error("Failed to cancel sync", "error", err, "sessionID", sessionID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
@@ -262,7 +263,7 @@ func (h *DiscogsHandler) ResumeSync(c *fiber.Ctx) error {
 	}
 
 	if err := h.orchestrationService.ResumeSync(c.Context(), sessionID); err != nil {
-		log.Error("Failed to resume sync", "error", err, "sessionID", sessionID)
+		_ = log.Error("Failed to resume sync", "error", err, "sessionID", sessionID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
@@ -293,7 +294,7 @@ func (h *DiscogsHandler) PauseSync(c *fiber.Ctx) error {
 	}
 
 	if err := h.orchestrationService.PauseSync(c.Context(), sessionID); err != nil {
-		log.Error("Failed to pause sync", "error", err, "sessionID", sessionID)
+		_ = log.Error("Failed to pause sync", "error", err, "sessionID", sessionID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
@@ -333,7 +334,7 @@ func (h *DiscogsHandler) UpdateDiscogsToken(c *fiber.Ctx) error {
 	// Update user's Discogs token
 	user.DiscogsToken = &req.DiscogsToken
 	if err := h.app.UserRepo.Update(c.Context(), user); err != nil {
-		log.Error("Failed to update Discogs token", "error", err, "userID", user.ID)
+		_ = log.Error("Failed to update Discogs token", "error", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to update token",
 		})
@@ -451,6 +452,6 @@ func (h *DiscogsHandler) GetActiveSyncs(c *fiber.Ctx) error {
 }
 
 // ProcessApiResponse handles API responses from the client
-func (h *DiscogsHandler) ProcessApiResponse(ctx context.Context, response *services.ApiResponse) error {
+func (h *DiscogsHandler) ProcessApiResponse(ctx context.Context, response *types.ApiResponse) error {
 	return h.orchestrationService.ProcessApiResponse(ctx, response.RequestID, response)
 }

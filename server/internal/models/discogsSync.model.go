@@ -7,14 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type SyncStatus string
-
-const (
-	SyncStatusNeverSynced SyncStatus = "never_synced"
-	SyncStatusInProgress  SyncStatus = "in_progress"
-	SyncStatusCompleted   SyncStatus = "completed"
-	SyncStatusError       SyncStatus = "error"
-)
+// SyncStatus is defined in discogsCollectionSync.model.go to avoid duplication
 
 type DiscogsSettings struct {
 	AutoSync            bool `json:"autoSync"`

@@ -8,16 +8,26 @@ import (
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
 	"waugzee/internal/repositories"
-	"waugzee/internal/websockets"
+	"waugzee/internal/types"
 
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 )
 
 type DiscogsOrchestrationService interface {
-	InitiateCollectionSync(ctx context.Context, userID uuid.UUID, syncType models.SyncType, fullSync bool, pageLimit *int) (*models.DiscogsCollectionSync, error)
-	CreateApiRequestQueue(ctx context.Context, syncSession *models.DiscogsCollectionSync, discogsToken string) error
-	ProcessApiResponse(ctx context.Context, requestID string, response *ApiResponse) error
+	InitiateCollectionSync(
+		ctx context.Context,
+		userID uuid.UUID,
+		syncType models.SyncType,
+		fullSync bool,
+		pageLimit *int,
+	) (*models.DiscogsCollectionSync, error)
+	CreateApiRequestQueue(
+		ctx context.Context,
+		syncSession *models.DiscogsCollectionSync,
+		discogsToken string,
+	) error
+	ProcessApiResponse(ctx context.Context, requestID string, response *types.ApiResponse) error
 	GetSyncProgress(ctx context.Context, sessionID string) (*SyncProgress, error)
 	CancelSync(ctx context.Context, sessionID string) error
 	ResumeSync(ctx context.Context, sessionID string) error
@@ -26,14 +36,7 @@ type DiscogsOrchestrationService interface {
 	GetPausedSyncs(ctx context.Context, userID uuid.UUID) ([]models.DiscogsCollectionSync, error)
 	HandleSyncDisconnection(ctx context.Context, userID uuid.UUID) error
 	HandleSyncReconnection(ctx context.Context, userID uuid.UUID) error
-}
-
-type ApiResponse struct {
-	RequestID       string            `json:"requestId"`
-	Status          int               `json:"status"`
-	Headers         map[string]string `json:"headers"`
-	Body            json.RawMessage   `json:"body"`
-	Error           *string           `json:"error,omitempty"`
+	SetWebSocketSender(sender types.WebSocketSender)
 }
 
 type SyncProgress struct {
@@ -52,14 +55,14 @@ type SyncProgress struct {
 }
 
 type discogsOrchestrationService struct {
-	syncRepo       repositories.DiscogsCollectionSyncRepository
-	requestRepo    repositories.DiscogsApiRequestRepository
-	userRepo       repositories.UserRepository
-	rateLimitSvc   DiscogsRateLimitService
-	websocketMgr   *websockets.Manager
-	log            logger.Logger
-	maxRetries     int
-	requestTimeout time.Duration
+	syncRepo        repositories.DiscogsCollectionSyncRepository
+	requestRepo     repositories.DiscogsApiRequestRepository
+	userRepo        repositories.UserRepository
+	rateLimitSvc    DiscogsRateLimitService
+	websocketSender types.WebSocketSender
+	log             logger.Logger
+	maxRetries      int
+	requestTimeout  time.Duration
 }
 
 func NewDiscogsOrchestrationService(
@@ -67,18 +70,22 @@ func NewDiscogsOrchestrationService(
 	requestRepo repositories.DiscogsApiRequestRepository,
 	userRepo repositories.UserRepository,
 	rateLimitSvc DiscogsRateLimitService,
-	websocketMgr *websockets.Manager,
+	websocketSender types.WebSocketSender,
 ) DiscogsOrchestrationService {
 	return &discogsOrchestrationService{
-		syncRepo:       syncRepo,
-		requestRepo:    requestRepo,
-		userRepo:       userRepo,
-		rateLimitSvc:   rateLimitSvc,
-		websocketMgr:   websocketMgr,
-		log:            logger.New("DiscogsOrchestrationService"),
-		maxRetries:     3,
-		requestTimeout: 30 * time.Second,
+		syncRepo:        syncRepo,
+		requestRepo:     requestRepo,
+		userRepo:        userRepo,
+		rateLimitSvc:    rateLimitSvc,
+		websocketSender: websocketSender,
+		log:             logger.New("DiscogsOrchestrationService"),
+		maxRetries:      3,
+		requestTimeout:  30 * time.Second,
 	}
+}
+
+func (s *discogsOrchestrationService) SetWebSocketSender(sender types.WebSocketSender) {
+	s.websocketSender = sender
 }
 
 func (s *discogsOrchestrationService) InitiateCollectionSync(
@@ -101,7 +108,7 @@ func (s *discogsOrchestrationService) InitiateCollectionSync(
 	}
 
 	// Get user to validate Discogs token
-	user, err := s.userRepo.GetByID(ctx, userID)
+	user, err := s.userRepo.GetByID(ctx, userID.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
@@ -130,7 +137,7 @@ func (s *discogsOrchestrationService) InitiateCollectionSync(
 	// Create API request queue
 	go func() {
 		if err := s.CreateApiRequestQueue(context.Background(), syncSession, *user.DiscogsToken); err != nil {
-			log.Error("Failed to create API request queue", "error", err)
+			_ = log.Error("Failed to create API request queue", "error", err)
 			s.markSyncAsFailed(context.Background(), sessionID, err.Error())
 		}
 	}()
@@ -146,7 +153,7 @@ func (s *discogsOrchestrationService) CreateApiRequestQueue(
 	log := s.log.Function("CreateApiRequestQueue")
 
 	// Get user to determine username
-	user, err := s.userRepo.GetByID(ctx, syncSession.UserID)
+	user, err := s.userRepo.GetByID(ctx, syncSession.UserID.String())
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
@@ -156,11 +163,21 @@ func (s *discogsOrchestrationService) CreateApiRequestQueue(
 	baseURL := "https://api.discogs.com"
 	var endpoint string
 
+	var username string
+	if user.Email != nil {
+		username = *user.Email
+	} else {
+		return fmt.Errorf("user has no email configured for Discogs username")
+	}
+
 	switch syncSession.SyncType {
 	case models.SyncTypeCollection:
-		endpoint = fmt.Sprintf("/users/%s/collection/folders/0/releases", user.Email) // Using email as username for now
+		endpoint = fmt.Sprintf(
+			"/users/%s/collection/folders/0/releases",
+			username,
+		) // Using email as username for now
 	case models.SyncTypeWantlist:
-		endpoint = fmt.Sprintf("/users/%s/wants", user.Email)
+		endpoint = fmt.Sprintf("/users/%s/wants", username)
 	default:
 		return fmt.Errorf("unsupported sync type: %s", syncSession.SyncType)
 	}
@@ -214,7 +231,7 @@ func (s *discogsOrchestrationService) CreateApiRequestQueue(
 func (s *discogsOrchestrationService) ProcessApiResponse(
 	ctx context.Context,
 	requestID string,
-	response *ApiResponse,
+	response *types.ApiResponse,
 ) error {
 	log := s.log.Function("ProcessApiResponse")
 
@@ -225,7 +242,7 @@ func (s *discogsOrchestrationService) ProcessApiResponse(
 	}
 
 	// Update rate limit info
-	if err := s.rateLimitSvc.UpdateRateLimit(ctx, apiRequest.UserID, response.Headers); err != nil {
+	if err = s.rateLimitSvc.UpdateRateLimit(ctx, apiRequest.UserID, response.Headers); err != nil {
 		log.Warn("Failed to update rate limit", "error", err)
 	}
 
@@ -239,13 +256,13 @@ func (s *discogsOrchestrationService) ProcessApiResponse(
 		// Process pagination if this is the first request
 		if apiRequest.URL == s.getFirstPageURL(apiRequest) {
 			if err := s.handlePagination(ctx, apiRequest, response.Body); err != nil {
-				log.Error("Failed to handle pagination", "error", err)
+				_ = log.Error("Failed to handle pagination", "error", err)
 			}
 		}
 
 		// Process the actual data (releases, wants, etc.)
 		if err := s.processResponseData(ctx, apiRequest, response.Body); err != nil {
-			log.Error("Failed to process response data", "error", err)
+			_ = log.Error("Failed to process response data", "error", err)
 		}
 	}
 
@@ -286,7 +303,10 @@ func (s *discogsOrchestrationService) ProcessApiResponse(
 	return nil
 }
 
-func (s *discogsOrchestrationService) GetSyncProgress(ctx context.Context, sessionID string) (*SyncProgress, error) {
+func (s *discogsOrchestrationService) GetSyncProgress(
+	ctx context.Context,
+	sessionID string,
+) (*SyncProgress, error) {
 	syncSession, err := s.syncRepo.GetBySessionID(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sync session: %w", err)
@@ -366,15 +386,24 @@ func (s *discogsOrchestrationService) PauseSync(ctx context.Context, sessionID s
 	return nil
 }
 
-func (s *discogsOrchestrationService) GetActiveSyncs(ctx context.Context, userID uuid.UUID) ([]models.DiscogsCollectionSync, error) {
+func (s *discogsOrchestrationService) GetActiveSyncs(
+	ctx context.Context,
+	userID uuid.UUID,
+) ([]models.DiscogsCollectionSync, error) {
 	return s.syncRepo.GetActiveByUserID(ctx, userID)
 }
 
-func (s *discogsOrchestrationService) GetPausedSyncs(ctx context.Context, userID uuid.UUID) ([]models.DiscogsCollectionSync, error) {
+func (s *discogsOrchestrationService) GetPausedSyncs(
+	ctx context.Context,
+	userID uuid.UUID,
+) ([]models.DiscogsCollectionSync, error) {
 	return s.syncRepo.GetPausedByUserID(ctx, userID)
 }
 
-func (s *discogsOrchestrationService) HandleSyncDisconnection(ctx context.Context, userID uuid.UUID) error {
+func (s *discogsOrchestrationService) HandleSyncDisconnection(
+	ctx context.Context,
+	userID uuid.UUID,
+) error {
 	activeSyncs, err := s.GetActiveSyncs(ctx, userID)
 	if err != nil {
 		return err
@@ -382,14 +411,23 @@ func (s *discogsOrchestrationService) HandleSyncDisconnection(ctx context.Contex
 
 	for _, sync := range activeSyncs {
 		if err := s.PauseSync(ctx, sync.SessionID); err != nil {
-			s.log.Error("Failed to pause sync on disconnection", "sessionID", sync.SessionID, "error", err)
+			_ = s.log.Error(
+				"Failed to pause sync on disconnection",
+				"sessionID",
+				sync.SessionID,
+				"error",
+				err,
+			)
 		}
 	}
 
 	return nil
 }
 
-func (s *discogsOrchestrationService) HandleSyncReconnection(ctx context.Context, userID uuid.UUID) error {
+func (s *discogsOrchestrationService) HandleSyncReconnection(
+	ctx context.Context,
+	userID uuid.UUID,
+) error {
 	pausedSyncs, err := s.GetPausedSyncs(ctx, userID)
 	if err != nil {
 		return err
@@ -397,7 +435,13 @@ func (s *discogsOrchestrationService) HandleSyncReconnection(ctx context.Context
 
 	for _, sync := range pausedSyncs {
 		if err := s.ResumeSync(ctx, sync.SessionID); err != nil {
-			s.log.Error("Failed to resume sync on reconnection", "sessionID", sync.SessionID, "error", err)
+			_ = s.log.Error(
+				"Failed to resume sync on reconnection",
+				"sessionID",
+				sync.SessionID,
+				"error",
+				err,
+			)
 		}
 	}
 
@@ -406,19 +450,23 @@ func (s *discogsOrchestrationService) HandleSyncReconnection(ctx context.Context
 
 // Helper methods
 
-func (s *discogsOrchestrationService) sendApiRequestToClient(ctx context.Context, userID uuid.UUID, apiRequest *models.DiscogsApiRequest) {
+func (s *discogsOrchestrationService) sendApiRequestToClient(
+	ctx context.Context,
+	userID uuid.UUID,
+	apiRequest *models.DiscogsApiRequest,
+) {
 	var headers map[string]interface{}
 	if err := json.Unmarshal(apiRequest.Headers, &headers); err != nil {
-		s.log.Error("Failed to unmarshal headers", "error", err)
+		_ = s.log.Error("Failed to unmarshal headers", "error", err)
 		return
 	}
 
-	message := websockets.Message{
-		ID:        uuid.New().String(),
-		Type:      websockets.MESSAGE_TYPE_DISCOGS_API_REQUEST,
-		Channel:   "sync",
-		Action:    "make_request",
-		Data: map[string]any{
+	message := &types.WebSocketMessageImpl{
+		ID:      uuid.New().String(),
+		Type:    "discogs_api_request",
+		Channel: "sync",
+		Action:  "make_request",
+		Data: map[string]interface{}{
 			"requestId": apiRequest.RequestID,
 			"url":       apiRequest.URL,
 			"method":    apiRequest.Method,
@@ -427,57 +475,71 @@ func (s *discogsOrchestrationService) sendApiRequestToClient(ctx context.Context
 		Timestamp: time.Now(),
 	}
 
-	s.websocketMgr.SendMessageToUser(userID, message)
+	s.websocketSender.SendMessageToUser(userID, message)
 	apiRequest.MarkAsSent()
-	s.requestRepo.Update(ctx, apiRequest)
+	_ = s.requestRepo.Update(ctx, apiRequest)
 }
 
-func (s *discogsOrchestrationService) sendProgressUpdate(ctx context.Context, syncSession *models.DiscogsCollectionSync) {
+func (s *discogsOrchestrationService) sendProgressUpdate(
+	ctx context.Context,
+	syncSession *models.DiscogsCollectionSync,
+) {
 	progress, err := s.GetSyncProgress(ctx, syncSession.SessionID)
 	if err != nil {
-		s.log.Error("Failed to get sync progress", "error", err)
+		_ = s.log.Error("Failed to get sync progress", "error", err)
 		return
 	}
 
-	message := websockets.Message{
+	message := &types.WebSocketMessageImpl{
 		ID:        uuid.New().String(),
-		Type:      websockets.MESSAGE_TYPE_SYNC_PROGRESS,
+		Type:      "sync_progress",
 		Channel:   "sync",
 		Action:    "progress_update",
-		Data:      map[string]any{"progress": progress},
+		Data:      map[string]interface{}{"progress": progress},
 		Timestamp: time.Now(),
 	}
 
-	s.websocketMgr.SendMessageToUser(syncSession.UserID, message)
+	s.websocketSender.SendMessageToUser(syncSession.UserID, message)
 }
 
-func (s *discogsOrchestrationService) sendSyncCompleteMessage(ctx context.Context, userID uuid.UUID, sessionID string) {
-	message := websockets.Message{
+func (s *discogsOrchestrationService) sendSyncCompleteMessage(
+	ctx context.Context,
+	userID uuid.UUID,
+	sessionID string,
+) {
+	message := &types.WebSocketMessageImpl{
 		ID:        uuid.New().String(),
-		Type:      websockets.MESSAGE_TYPE_SYNC_COMPLETE,
+		Type:      "sync_complete",
 		Channel:   "sync",
 		Action:    "sync_complete",
-		Data:      map[string]any{"sessionId": sessionID},
+		Data:      map[string]interface{}{"sessionId": sessionID},
 		Timestamp: time.Now(),
 	}
 
-	s.websocketMgr.SendMessageToUser(userID, message)
+	s.websocketSender.SendMessageToUser(userID, message)
 }
 
-func (s *discogsOrchestrationService) sendSyncCancelledMessage(ctx context.Context, userID uuid.UUID, sessionID string) {
-	message := websockets.Message{
+func (s *discogsOrchestrationService) sendSyncCancelledMessage(
+	ctx context.Context,
+	userID uuid.UUID,
+	sessionID string,
+) {
+	message := &types.WebSocketMessageImpl{
 		ID:        uuid.New().String(),
-		Type:      websockets.MESSAGE_TYPE_SYNC_ERROR,
+		Type:      "sync_error",
 		Channel:   "sync",
 		Action:    "sync_cancelled",
-		Data:      map[string]any{"sessionId": sessionID, "reason": "cancelled by user"},
+		Data:      map[string]interface{}{"sessionId": sessionID, "reason": "cancelled by user"},
 		Timestamp: time.Now(),
 	}
 
-	s.websocketMgr.SendMessageToUser(userID, message)
+	s.websocketSender.SendMessageToUser(userID, message)
 }
 
-func (s *discogsOrchestrationService) sendNextPendingRequest(ctx context.Context, syncSession *models.DiscogsCollectionSync) {
+func (s *discogsOrchestrationService) sendNextPendingRequest(
+	ctx context.Context,
+	syncSession *models.DiscogsCollectionSync,
+) {
 	if !syncSession.IsActive() {
 		return
 	}
@@ -490,17 +552,23 @@ func (s *discogsOrchestrationService) sendNextPendingRequest(ctx context.Context
 	// Check rate limit before sending
 	canMakeRequest, delay, err := s.rateLimitSvc.CanMakeRequest(ctx, syncSession.UserID)
 	if err != nil {
-		s.log.Error("Failed to check rate limit", "error", err)
+		_ = s.log.Error("Failed to check rate limit", "error", err)
 		return
 	}
 
 	if !canMakeRequest {
-		s.log.Info("Rate limit reached, pausing sync", "sessionID", syncSession.SessionID, "delay", delay)
-		s.PauseSync(ctx, syncSession.SessionID)
+		s.log.Info(
+			"Rate limit reached, pausing sync",
+			"sessionID",
+			syncSession.SessionID,
+			"delay",
+			delay,
+		)
+		_ = s.PauseSync(ctx, syncSession.SessionID)
 
 		// Schedule resume
 		time.AfterFunc(delay, func() {
-			s.ResumeSync(context.Background(), syncSession.SessionID)
+			_ = s.ResumeSync(context.Background(), syncSession.SessionID)
 		})
 		return
 	}
@@ -509,25 +577,29 @@ func (s *discogsOrchestrationService) sendNextPendingRequest(ctx context.Context
 	s.sendApiRequestToClient(ctx, syncSession.UserID, &pendingRequests[0])
 }
 
-func (s *discogsOrchestrationService) markSyncAsFailed(ctx context.Context, sessionID string, errorMessage string) {
+func (s *discogsOrchestrationService) markSyncAsFailed(
+	ctx context.Context,
+	sessionID string,
+	errorMessage string,
+) {
 	syncSession, err := s.syncRepo.GetBySessionID(ctx, sessionID)
 	if err != nil {
 		return
 	}
 
 	syncSession.MarkAsFailed(errorMessage)
-	s.syncRepo.Update(ctx, syncSession)
+	_ = s.syncRepo.Update(ctx, syncSession)
 
-	message := websockets.Message{
+	message := &types.WebSocketMessageImpl{
 		ID:        uuid.New().String(),
-		Type:      websockets.MESSAGE_TYPE_SYNC_ERROR,
+		Type:      "sync_error",
 		Channel:   "sync",
 		Action:    "sync_failed",
-		Data:      map[string]any{"sessionId": sessionID, "error": errorMessage},
+		Data:      map[string]interface{}{"sessionId": sessionID, "error": errorMessage},
 		Timestamp: time.Now(),
 	}
 
-	s.websocketMgr.SendMessageToUser(syncSession.UserID, message)
+	s.websocketSender.SendMessageToUser(syncSession.UserID, message)
 }
 
 func (s *discogsOrchestrationService) getFirstPageURL(apiRequest *models.DiscogsApiRequest) string {
@@ -536,7 +608,11 @@ func (s *discogsOrchestrationService) getFirstPageURL(apiRequest *models.Discogs
 	return apiRequest.URL
 }
 
-func (s *discogsOrchestrationService) handlePagination(ctx context.Context, apiRequest *models.DiscogsApiRequest, responseBody json.RawMessage) error {
+func (s *discogsOrchestrationService) handlePagination(
+	ctx context.Context,
+	apiRequest *models.DiscogsApiRequest,
+	responseBody json.RawMessage,
+) error {
 	// Parse response to get pagination info
 	var response struct {
 		Pagination struct {
@@ -572,14 +648,18 @@ func (s *discogsOrchestrationService) handlePagination(ctx context.Context, apiR
 
 		// Create requests for pages 2 onwards
 		for page := 2; page <= 1+additionalRequests; page++ {
-			s.createPageRequest(ctx, apiRequest, page)
+			_ = s.createPageRequest(ctx, apiRequest, page)
 		}
 	}
 
 	return s.syncRepo.Update(ctx, syncSession)
 }
 
-func (s *discogsOrchestrationService) createPageRequest(ctx context.Context, originalRequest *models.DiscogsApiRequest, page int) error {
+func (s *discogsOrchestrationService) createPageRequest(
+	ctx context.Context,
+	originalRequest *models.DiscogsApiRequest,
+	page int,
+) error {
 	// Parse original URL and replace page parameter
 	url := fmt.Sprintf("%s&page=%d", originalRequest.URL, page) // Simplified URL manipulation
 
@@ -597,16 +677,33 @@ func (s *discogsOrchestrationService) createPageRequest(ctx context.Context, ori
 	return s.requestRepo.Create(ctx, pageRequest)
 }
 
-func (s *discogsOrchestrationService) processResponseData(ctx context.Context, apiRequest *models.DiscogsApiRequest, responseBody json.RawMessage) error {
+func (s *discogsOrchestrationService) processResponseData(
+	ctx context.Context,
+	apiRequest *models.DiscogsApiRequest,
+	responseBody json.RawMessage,
+) error {
 	// This would implement the actual data processing logic
 	// For now, we'll just log that we received data
-	s.log.Info("Processing response data", "requestID", apiRequest.RequestID, "dataSize", len(responseBody))
+	s.log.Info(
+		"Processing response data",
+		"requestID",
+		apiRequest.RequestID,
+		"dataSize",
+		len(responseBody),
+	)
 	return nil
 }
 
-func (s *discogsOrchestrationService) getCurrentAction(syncSession *models.DiscogsCollectionSync) string {
+func (s *discogsOrchestrationService) getCurrentAction(
+	syncSession *models.DiscogsCollectionSync,
+) string {
 	if syncSession.LastPage != nil && syncSession.TotalPages != nil {
-		return fmt.Sprintf("Processing page %d of %d", *syncSession.LastPage, *syncSession.TotalPages)
+		return fmt.Sprintf(
+			"Processing page %d of %d",
+			*syncSession.LastPage,
+			*syncSession.TotalPages,
+		)
 	}
 	return "Processing requests..."
 }
+

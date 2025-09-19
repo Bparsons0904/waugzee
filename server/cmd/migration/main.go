@@ -161,7 +161,7 @@ func autoMigrate(db *gorm.DB, log logger.Logger) error {
 	// Two-phase migration to handle circular dependencies
 	// Phase 1: Create all tables without foreign key constraints
 	log.Info("Phase 1: Creating tables without foreign key constraints")
-	db.Config.DisableForeignKeyConstraintWhenMigrating = true
+	db.DisableForeignKeyConstraintWhenMigrating = true
 	for _, table := range MODELS_TO_MIGRATE {
 		if !db.Migrator().HasTable(table) {
 			log.Info("Creating table structure", "table", table)
@@ -174,7 +174,7 @@ func autoMigrate(db *gorm.DB, log logger.Logger) error {
 
 	// Phase 2: Add all constraints and relationships
 	// Re-enable foreign key constraint creation
-	db.Config.DisableForeignKeyConstraintWhenMigrating = false
+	db.DisableForeignKeyConstraintWhenMigrating = false
 	log.Info("Phase 2: Adding foreign key constraints and relationships")
 	err := db.AutoMigrate(MODELS_TO_MIGRATE...)
 	if err != nil {

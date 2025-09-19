@@ -34,12 +34,12 @@ func NewDiscogsApiRequestRepository(db database.DB) DiscogsApiRequestRepository 
 }
 
 func (r *discogsApiRequestRepository) Create(ctx context.Context, request *models.DiscogsApiRequest) error {
-	return r.db.WithContext(ctx).Create(request).Error
+	return r.db.SQLWithContext(ctx).Create(request).Error
 }
 
 func (r *discogsApiRequestRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.DiscogsApiRequest, error) {
 	var request models.DiscogsApiRequest
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Preload("User").
 		Preload("SyncSession").
 		Where("id = ?", id).
@@ -52,7 +52,7 @@ func (r *discogsApiRequestRepository) GetByID(ctx context.Context, id uuid.UUID)
 
 func (r *discogsApiRequestRepository) GetByRequestID(ctx context.Context, requestID string) (*models.DiscogsApiRequest, error) {
 	var request models.DiscogsApiRequest
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Preload("User").
 		Preload("SyncSession").
 		Where("request_id = ?", requestID).
@@ -65,7 +65,7 @@ func (r *discogsApiRequestRepository) GetByRequestID(ctx context.Context, reques
 
 func (r *discogsApiRequestRepository) GetBySyncSession(ctx context.Context, syncSessionID uuid.UUID) ([]models.DiscogsApiRequest, error) {
 	var requests []models.DiscogsApiRequest
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Where("sync_session_id = ?", syncSessionID).
 		Order("created_at ASC").
 		Find(&requests).Error
@@ -74,7 +74,7 @@ func (r *discogsApiRequestRepository) GetBySyncSession(ctx context.Context, sync
 
 func (r *discogsApiRequestRepository) GetPendingBySyncSession(ctx context.Context, syncSessionID uuid.UUID) ([]models.DiscogsApiRequest, error) {
 	var requests []models.DiscogsApiRequest
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Where("sync_session_id = ? AND status = ?", syncSessionID, models.RequestStatusPending).
 		Order("created_at ASC").
 		Find(&requests).Error
@@ -83,7 +83,7 @@ func (r *discogsApiRequestRepository) GetPendingBySyncSession(ctx context.Contex
 
 func (r *discogsApiRequestRepository) GetByUserAndStatus(ctx context.Context, userID uuid.UUID, status models.RequestStatus) ([]models.DiscogsApiRequest, error) {
 	var requests []models.DiscogsApiRequest
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Where("user_id = ? AND status = ?", userID, status).
 		Order("created_at ASC").
 		Find(&requests).Error
@@ -91,23 +91,23 @@ func (r *discogsApiRequestRepository) GetByUserAndStatus(ctx context.Context, us
 }
 
 func (r *discogsApiRequestRepository) Update(ctx context.Context, request *models.DiscogsApiRequest) error {
-	return r.db.WithContext(ctx).Save(request).Error
+	return r.db.SQLWithContext(ctx).Save(request).Error
 }
 
 func (r *discogsApiRequestRepository) UpdateStatus(ctx context.Context, requestID string, status models.RequestStatus) error {
-	return r.db.WithContext(ctx).
+	return r.db.SQLWithContext(ctx).
 		Model(&models.DiscogsApiRequest{}).
 		Where("request_id = ?", requestID).
 		Update("status", status).Error
 }
 
 func (r *discogsApiRequestRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&models.DiscogsApiRequest{}, id).Error
+	return r.db.SQLWithContext(ctx).Delete(&models.DiscogsApiRequest{}, id).Error
 }
 
 func (r *discogsApiRequestRepository) GetFailedRequests(ctx context.Context, syncSessionID uuid.UUID) ([]models.DiscogsApiRequest, error) {
 	var requests []models.DiscogsApiRequest
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Where("sync_session_id = ? AND status = ?", syncSessionID, models.RequestStatusFailed).
 		Order("created_at ASC").
 		Find(&requests).Error
@@ -116,7 +116,7 @@ func (r *discogsApiRequestRepository) GetFailedRequests(ctx context.Context, syn
 
 func (r *discogsApiRequestRepository) GetCompletedRequests(ctx context.Context, syncSessionID uuid.UUID) ([]models.DiscogsApiRequest, error) {
 	var requests []models.DiscogsApiRequest
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Where("sync_session_id = ? AND status = ?", syncSessionID, models.RequestStatusCompleted).
 		Order("created_at ASC").
 		Find(&requests).Error
@@ -125,7 +125,7 @@ func (r *discogsApiRequestRepository) GetCompletedRequests(ctx context.Context, 
 
 func (r *discogsApiRequestRepository) CountByStatus(ctx context.Context, syncSessionID uuid.UUID, status models.RequestStatus) (int64, error) {
 	var count int64
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Model(&models.DiscogsApiRequest{}).
 		Where("sync_session_id = ? AND status = ?", syncSessionID, status).
 		Count(&count).Error

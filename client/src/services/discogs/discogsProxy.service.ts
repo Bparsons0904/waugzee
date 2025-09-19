@@ -268,7 +268,7 @@ export class DiscogsProxyService {
   /**
    * Handle incoming API request from server
    */
-  private async handleApiRequest(message: any): Promise<void> {
+  private async handleApiRequest(message: { data: { requestId?: string; url?: string; method?: string; headers?: Record<string, string> } }): Promise<void> {
     console.log('[DiscogsProxy] Received API request from server', message);
 
     const { requestId, url, method, headers } = message.data;
@@ -335,7 +335,7 @@ export class DiscogsProxyService {
   /**
    * Handle sync progress updates from server
    */
-  private handleSyncProgress(message: any): void {
+  private handleSyncProgress(message: { data?: { progress?: unknown } }): void {
     console.log('[DiscogsProxy] Received sync progress update', message);
 
     const progress = message.data?.progress;
@@ -357,7 +357,7 @@ export class DiscogsProxyService {
   /**
    * Handle sync completion from server
    */
-  private handleSyncComplete(message: any): void {
+  private handleSyncComplete(message: { data?: { sessionId?: string } }): void {
     console.log('[DiscogsProxy] Received sync complete notification', message);
 
     const sessionId = message.data?.sessionId;
@@ -379,7 +379,7 @@ export class DiscogsProxyService {
   /**
    * Handle sync errors from server
    */
-  private handleSyncError(message: any): void {
+  private handleSyncError(message: { data?: { sessionId?: string; error?: string } }): void {
     console.log('[DiscogsProxy] Received sync error notification', message);
 
     const { sessionId, error } = message.data || {};

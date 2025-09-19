@@ -116,7 +116,7 @@ func (r *artistRepository) UpsertBatch(ctx context.Context, artists []*Artist) e
 
 	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, discogsIDs)
 	if err != nil {
-		log.Err("failed to get existing hashes", err, "count", len(discogsIDs))
+		_ = log.Err("failed to get existing hashes", err, "count", len(discogsIDs))
 	}
 
 	hashableRecords := make([]utils.DiscogsHashable, len(artists))

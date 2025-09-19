@@ -38,7 +38,7 @@ func (db *DB) MigrateModels() error {
 	// Run migration for each model
 	for _, model := range modelsToMigrate {
 		if err := db.SQL.AutoMigrate(model); err != nil {
-			log.Error("Failed to migrate model", "model", model, "error", err)
+			_ = log.Error("Failed to migrate model", "model", model, "error", err)
 			return err
 		}
 	}

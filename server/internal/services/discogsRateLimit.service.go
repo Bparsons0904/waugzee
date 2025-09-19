@@ -103,7 +103,10 @@ func (s *discogsRateLimitService) UpdateRateLimit(ctx context.Context, userID uu
 		ttl = s.defaultWindow
 	}
 
-	if err := s.cache.Set(ctx, cacheKey, string(rateLimitJSON), ttl); err != nil {
+	if err := database.NewCacheBuilder(s.cache, cacheKey).
+		WithValue(string(rateLimitJSON)).
+		WithTTL(ttl).
+		Set(); err != nil {
 		return fmt.Errorf("failed to cache rate limit: %w", err)
 	}
 
@@ -121,8 +124,12 @@ func (s *discogsRateLimitService) UpdateRateLimit(ctx context.Context, userID uu
 func (s *discogsRateLimitService) GetRateLimit(ctx context.Context, userID uuid.UUID) (*RateLimit, error) {
 	cacheKey := s.getRateLimitCacheKey(userID)
 
-	rateLimitJSON, err := s.cache.Get(ctx, cacheKey)
+	var rateLimitJSON string
+	found, err := database.NewCacheBuilder(s.cache, cacheKey).Get(&rateLimitJSON)
 	if err != nil {
+		return nil, fmt.Errorf("failed to get rate limit from cache: %w", err)
+	}
+	if !found {
 		// Return default rate limit if not found
 		return &RateLimit{
 			UserID:           userID,
@@ -185,7 +192,7 @@ func (s *discogsRateLimitService) CalculateRequestDelay(ctx context.Context, use
 
 func (s *discogsRateLimitService) ResetUserRateLimit(ctx context.Context, userID uuid.UUID) error {
 	cacheKey := s.getRateLimitCacheKey(userID)
-	return s.cache.Delete(ctx, cacheKey)
+	return database.NewCacheBuilder(s.cache, cacheKey).Delete()
 }
 
 // Helper methods

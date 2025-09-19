@@ -10,12 +10,14 @@ import (
 type SyncStatus string
 
 const (
-	SyncStatusInitiated  SyncStatus = "initiated"
-	SyncStatusInProgress SyncStatus = "in_progress"
-	SyncStatusPaused     SyncStatus = "paused"
-	SyncStatusCompleted  SyncStatus = "completed"
-	SyncStatusFailed     SyncStatus = "failed"
-	SyncStatusCancelled  SyncStatus = "cancelled"
+	SyncStatusNeverSynced SyncStatus = "never_synced"
+	SyncStatusInitiated   SyncStatus = "initiated"
+	SyncStatusInProgress  SyncStatus = "in_progress"
+	SyncStatusPaused      SyncStatus = "paused"
+	SyncStatusCompleted   SyncStatus = "completed"
+	SyncStatusFailed      SyncStatus = "failed"
+	SyncStatusCancelled   SyncStatus = "cancelled"
+	SyncStatusError       SyncStatus = "error"
 )
 
 type SyncType string

@@ -3,6 +3,7 @@ package websockets
 import (
 	"sync"
 	"time"
+	"waugzee/internal/types"
 
 	"github.com/google/uuid"
 )
@@ -164,8 +165,19 @@ func (m *Manager) promoteClientToAuthenticated(client *Client) {
 	)
 }
 
-func (m *Manager) SendMessageToUser(userID uuid.UUID, message Message) {
+func (m *Manager) SendMessageToUser(userID uuid.UUID, wsMessage types.WebSocketMessage) {
 	log := m.log.Function("SendMessageToUser")
+
+	// Convert types.WebSocketMessage to our internal Message type
+	message := Message{
+		ID:        wsMessage.GetID(),
+		Type:      wsMessage.GetType(),
+		Channel:   wsMessage.GetChannel(),
+		Action:    wsMessage.GetAction(),
+		UserID:    wsMessage.GetUserID(),
+		Data:      wsMessage.GetData(),
+		Timestamp: wsMessage.GetTimestamp(),
+	}
 
 	m.hub.mutex.RLock()
 	defer m.hub.mutex.RUnlock()

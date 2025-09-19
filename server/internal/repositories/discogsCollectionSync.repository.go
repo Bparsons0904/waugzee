@@ -6,6 +6,7 @@ import (
 	"waugzee/internal/models"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type DiscogsCollectionSyncRepository interface {
@@ -35,12 +36,12 @@ func NewDiscogsCollectionSyncRepository(db database.DB) DiscogsCollectionSyncRep
 }
 
 func (r *discogsCollectionSyncRepository) Create(ctx context.Context, sync *models.DiscogsCollectionSync) error {
-	return r.db.WithContext(ctx).Create(sync).Error
+	return r.db.SQLWithContext(ctx).Create(sync).Error
 }
 
 func (r *discogsCollectionSyncRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.DiscogsCollectionSync, error) {
 	var sync models.DiscogsCollectionSync
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Preload("User").
 		Where("id = ?", id).
 		First(&sync).Error
@@ -52,7 +53,7 @@ func (r *discogsCollectionSyncRepository) GetByID(ctx context.Context, id uuid.U
 
 func (r *discogsCollectionSyncRepository) GetBySessionID(ctx context.Context, sessionID string) (*models.DiscogsCollectionSync, error) {
 	var sync models.DiscogsCollectionSync
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Preload("User").
 		Where("session_id = ?", sessionID).
 		First(&sync).Error
@@ -64,7 +65,7 @@ func (r *discogsCollectionSyncRepository) GetBySessionID(ctx context.Context, se
 
 func (r *discogsCollectionSyncRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]models.DiscogsCollectionSync, error) {
 	var syncs []models.DiscogsCollectionSync
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Where("user_id = ?", userID).
 		Order("created_at DESC").
 		Find(&syncs).Error
@@ -73,7 +74,7 @@ func (r *discogsCollectionSyncRepository) GetByUserID(ctx context.Context, userI
 
 func (r *discogsCollectionSyncRepository) GetActiveByUserID(ctx context.Context, userID uuid.UUID) ([]models.DiscogsCollectionSync, error) {
 	var syncs []models.DiscogsCollectionSync
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Where("user_id = ? AND status IN (?)", userID, []models.SyncStatus{
 			models.SyncStatusInitiated,
 			models.SyncStatusInProgress,
@@ -85,7 +86,7 @@ func (r *discogsCollectionSyncRepository) GetActiveByUserID(ctx context.Context,
 
 func (r *discogsCollectionSyncRepository) GetPausedByUserID(ctx context.Context, userID uuid.UUID) ([]models.DiscogsCollectionSync, error) {
 	var syncs []models.DiscogsCollectionSync
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Where("user_id = ? AND status = ?", userID, models.SyncStatusPaused).
 		Order("created_at DESC").
 		Find(&syncs).Error
@@ -94,7 +95,7 @@ func (r *discogsCollectionSyncRepository) GetPausedByUserID(ctx context.Context,
 
 func (r *discogsCollectionSyncRepository) GetByStatus(ctx context.Context, status models.SyncStatus) ([]models.DiscogsCollectionSync, error) {
 	var syncs []models.DiscogsCollectionSync
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Preload("User").
 		Where("status = ?", status).
 		Order("created_at ASC").
@@ -103,18 +104,18 @@ func (r *discogsCollectionSyncRepository) GetByStatus(ctx context.Context, statu
 }
 
 func (r *discogsCollectionSyncRepository) Update(ctx context.Context, sync *models.DiscogsCollectionSync) error {
-	return r.db.WithContext(ctx).Save(sync).Error
+	return r.db.SQLWithContext(ctx).Save(sync).Error
 }
 
 func (r *discogsCollectionSyncRepository) UpdateStatus(ctx context.Context, sessionID string, status models.SyncStatus) error {
-	return r.db.WithContext(ctx).
+	return r.db.SQLWithContext(ctx).
 		Model(&models.DiscogsCollectionSync{}).
 		Where("session_id = ?", sessionID).
 		Update("status", status).Error
 }
 
 func (r *discogsCollectionSyncRepository) UpdateProgress(ctx context.Context, sessionID string, completed, failed int) error {
-	return r.db.WithContext(ctx).
+	return r.db.SQLWithContext(ctx).
 		Model(&models.DiscogsCollectionSync{}).
 		Where("session_id = ?", sessionID).
 		Updates(map[string]interface{}{
@@ -124,12 +125,12 @@ func (r *discogsCollectionSyncRepository) UpdateProgress(ctx context.Context, se
 }
 
 func (r *discogsCollectionSyncRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&models.DiscogsCollectionSync{}, id).Error
+	return r.db.SQLWithContext(ctx).Delete(&models.DiscogsCollectionSync{}, id).Error
 }
 
 func (r *discogsCollectionSyncRepository) GetLatestByUserAndType(ctx context.Context, userID uuid.UUID, syncType models.SyncType) (*models.DiscogsCollectionSync, error) {
 	var sync models.DiscogsCollectionSync
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Where("user_id = ? AND sync_type = ?", userID, syncType).
 		Order("created_at DESC").
 		First(&sync).Error
@@ -141,7 +142,7 @@ func (r *discogsCollectionSyncRepository) GetLatestByUserAndType(ctx context.Con
 
 func (r *discogsCollectionSyncRepository) GetWithApiRequests(ctx context.Context, sessionID string) (*models.DiscogsCollectionSync, error) {
 	var sync models.DiscogsCollectionSync
-	err := r.db.WithContext(ctx).
+	err := r.db.SQLWithContext(ctx).
 		Preload("User").
 		Preload("ApiRequests", func(db *gorm.DB) *gorm.DB {
 			return db.Order("created_at ASC")

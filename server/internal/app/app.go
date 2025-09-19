@@ -24,27 +24,23 @@ type App struct {
 	Config     config.Config
 
 	// Services
-	TransactionService             *services.TransactionService
-	ZitadelService                 *services.ZitadelService
-	DiscogsService                 *services.DiscogsService
-	DiscogsParserService           *services.DiscogsParserService
-	DownloadService                *services.DownloadService
-	SchedulerService               *services.SchedulerService
-	XMLProcessingService           *services.XMLProcessingService
-	DiscogsOrchestrationService    services.DiscogsOrchestrationService
-	DiscogsRateLimitService        services.DiscogsRateLimitService
+	TransactionService          *services.TransactionService
+	ZitadelService              *services.ZitadelService
+	DiscogsService              *services.DiscogsService
+	SchedulerService            *services.SchedulerService
+	DiscogsOrchestrationService services.DiscogsOrchestrationService
+	DiscogsRateLimitService     services.DiscogsRateLimitService
 
 	// Repositories
-	UserRepo                    repositories.UserRepository
-	DiscogsDataProcessingRepo   repositories.DiscogsDataProcessingRepository
-	LabelRepo                   repositories.LabelRepository
-	ArtistRepo                  repositories.ArtistRepository
-	MasterRepo                  repositories.MasterRepository
-	ReleaseRepo                 repositories.ReleaseRepository
-	GenreRepo                   repositories.GenreRepository
-	ImageRepo                   repositories.ImageRepository
-	DiscogsApiRequestRepo       repositories.DiscogsApiRequestRepository
-	DiscogsCollectionSyncRepo   repositories.DiscogsCollectionSyncRepository
+	UserRepo                  repositories.UserRepository
+	LabelRepo                 repositories.LabelRepository
+	ArtistRepo                repositories.ArtistRepository
+	MasterRepo                repositories.MasterRepository
+	ReleaseRepo               repositories.ReleaseRepository
+	GenreRepo                 repositories.GenreRepository
+	ImageRepo                 repositories.ImageRepository
+	DiscogsApiRequestRepo     repositories.DiscogsApiRequestRepository
+	DiscogsCollectionSyncRepo repositories.DiscogsCollectionSyncRepository
 
 	// Controllers
 	AuthController authController.AuthControllerInterface
@@ -74,7 +70,6 @@ func New() (*App, error) {
 	}
 	// Initialize repositories
 	userRepo := repositories.New(db)
-	discogsDataProcessingRepo := repositories.NewDiscogsDataProcessingRepository(db)
 	labelRepo := repositories.NewLabelRepository(db)
 	artistRepo := repositories.NewArtistRepository(db)
 	masterRepo := repositories.NewMasterRepository(db)
@@ -86,19 +81,7 @@ func New() (*App, error) {
 
 	// Initialize services
 	discogsService := services.NewDiscogsService()
-	discogsParserService := services.NewDiscogsParserService()
-	downloadService := services.NewDownloadService(config)
 	schedulerService := services.NewSchedulerService()
-	xmlProcessingService := services.NewXMLProcessingService(
-		discogsDataProcessingRepo,
-		labelRepo,
-		artistRepo,
-		masterRepo,
-		releaseRepo,
-		genreRepo,
-		imageRepo,
-		discogsParserService,
-	)
 
 	// Initialize Discogs API proxy services
 	discogsRateLimitService := services.NewDiscogsRateLimitService(db.Cache.General)
@@ -107,13 +90,23 @@ func New() (*App, error) {
 		discogsApiRequestRepo,
 		userRepo,
 		discogsRateLimitService,
-		nil, // websocket manager will be set later
+		nil, // websocket sender will be set after websocket manager is created
 	)
 
-	websocket, err := websockets.New(db, eventBus, config, zitadelService, userRepo, discogsOrchestrationService)
+	websocket, err := websockets.New(
+		db,
+		eventBus,
+		config,
+		zitadelService,
+		userRepo,
+		discogsOrchestrationService,
+	)
 	if err != nil {
 		return &App{}, log.Err("failed to create websocket manager", err)
 	}
+
+	// Now set the websocket sender in the orchestration service
+	discogsOrchestrationService.SetWebSocketSender(websocket)
 
 	// Initialize controllers with repositories and services
 	middleware := middleware.New(db, eventBus, config, userRepo)
@@ -121,37 +114,33 @@ func New() (*App, error) {
 	userController := userController.New(userRepo, discogsService, config)
 
 	// Register all jobs with scheduler
-	if err := jobs.RegisterAllJobs(schedulerService, config, discogsDataProcessingRepo, downloadService, xmlProcessingService); err != nil {
+	if err := jobs.RegisterAllJobs(schedulerService, config); err != nil {
 		return &App{}, log.Err("failed to register jobs", err)
 	}
 
 	app := &App{
-		Database:                       db,
-		Config:                         config,
-		Middleware:                     middleware,
-		TransactionService:             transactionService,
-		ZitadelService:                 zitadelService,
-		DiscogsService:                 discogsService,
-		DiscogsParserService:           discogsParserService,
-		DownloadService:                downloadService,
-		SchedulerService:               schedulerService,
-		XMLProcessingService:           xmlProcessingService,
-		DiscogsOrchestrationService:    discogsOrchestrationService,
-		DiscogsRateLimitService:        discogsRateLimitService,
-		UserRepo:                       userRepo,
-		DiscogsDataProcessingRepo:      discogsDataProcessingRepo,
-		LabelRepo:                      labelRepo,
-		ArtistRepo:                     artistRepo,
-		MasterRepo:                     masterRepo,
-		ReleaseRepo:                    releaseRepo,
-		GenreRepo:                      genreRepo,
-		ImageRepo:                      imageRepo,
-		DiscogsApiRequestRepo:          discogsApiRequestRepo,
-		DiscogsCollectionSyncRepo:      discogsCollectionSyncRepo,
-		AuthController:                 authController,
-		UserController:                 userController,
-		Websocket:                      websocket,
-		EventBus:                       eventBus,
+		Database:                    db,
+		Config:                      config,
+		Middleware:                  middleware,
+		TransactionService:          transactionService,
+		ZitadelService:              zitadelService,
+		DiscogsService:              discogsService,
+		SchedulerService:            schedulerService,
+		DiscogsOrchestrationService: discogsOrchestrationService,
+		DiscogsRateLimitService:     discogsRateLimitService,
+		UserRepo:                    userRepo,
+		LabelRepo:                   labelRepo,
+		ArtistRepo:                  artistRepo,
+		MasterRepo:                  masterRepo,
+		ReleaseRepo:                 releaseRepo,
+		GenreRepo:                   genreRepo,
+		ImageRepo:                   imageRepo,
+		DiscogsApiRequestRepo:       discogsApiRequestRepo,
+		DiscogsCollectionSyncRepo:   discogsCollectionSyncRepo,
+		AuthController:              authController,
+		UserController:              userController,
+		Websocket:                   websocket,
+		EventBus:                    eventBus,
 	}
 
 	// Run database migrations
@@ -186,17 +175,13 @@ func (a *App) validate() error {
 		a.TransactionService,
 		a.ZitadelService,
 		a.DiscogsService,
-		a.DiscogsParserService,
-		a.DownloadService,
 		a.SchedulerService,
-		a.XMLProcessingService,
 		a.DiscogsOrchestrationService,
 		a.DiscogsRateLimitService,
 		a.AuthController,
 		a.UserController,
 		a.Middleware,
 		a.UserRepo,
-		a.DiscogsDataProcessingRepo,
 		a.LabelRepo,
 		a.ArtistRepo,
 		a.MasterRepo,

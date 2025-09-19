@@ -17,6 +17,7 @@ import (
 	"time"
 	"waugzee/config"
 	"waugzee/internal/logger"
+	"waugzee/internal/types"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -68,20 +69,6 @@ type ZitadelService struct {
 	cacheTTL      time.Duration
 }
 
-// TokenInfo represents validated token information
-type TokenInfo struct {
-	UserID          string
-	Email           string
-	Name            string
-	GivenName       string
-	FamilyName      string
-	PreferredName   string
-	EmailVerified   bool
-	Roles           []string
-	ProjectID       string
-	Nonce           string
-	Valid           bool
-}
 
 
 func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
@@ -138,7 +125,7 @@ func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 }
 
 // ValidateIDToken validates an OIDC ID token with proper JWT signature verification
-func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (*TokenInfo, error) {
+func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (*types.TokenInfo, error) {
 	log := zs.log.Function("ValidateIDToken")
 
 	// Parse JWT token with signature verification
@@ -167,23 +154,23 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 		},
 	)
 	if err != nil {
-		return &TokenInfo{Valid: false}, log.Err("JWT signature verification failed", err)
+		return &types.TokenInfo{Valid: false}, log.Err("JWT signature verification failed", err)
 	}
 
 	if !token.Valid {
-		return &TokenInfo{Valid: false}, log.Err("JWT token is invalid", nil)
+		return &types.TokenInfo{Valid: false}, log.Err("JWT token is invalid", nil)
 	}
 
 	// Extract registered claims
 	claims, ok := token.Claims.(*jwt.RegisteredClaims)
 	if !ok {
-		return &TokenInfo{Valid: false}, log.Err("failed to extract JWT claims", nil)
+		return &types.TokenInfo{Valid: false}, log.Err("failed to extract JWT claims", nil)
 	}
 
 	// Verify issuer
 	expectedIssuer := strings.TrimSuffix(zs.issuer, "/")
 	if claims.Issuer != expectedIssuer {
-		return &TokenInfo{Valid: false}, log.Err(
+		return &types.TokenInfo{Valid: false}, log.Err(
 			"invalid issuer",
 			fmt.Errorf("expected: %s, got: %s", expectedIssuer, claims.Issuer),
 		)
@@ -193,7 +180,7 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 	audienceValid := slices.Contains(claims.Audience, zs.clientID)
 
 	if !audienceValid {
-		return &TokenInfo{Valid: false}, log.Err(
+		return &types.TokenInfo{Valid: false}, log.Err(
 			"invalid audience",
 			fmt.Errorf(
 				"expected client ID %s not found in audience %v",
@@ -252,7 +239,7 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 		projectID = customClaims.AzpProjectID
 	}
 
-	return &TokenInfo{
+	return &types.TokenInfo{
 		UserID:        claims.Subject,
 		Email:         customClaims.Email,
 		Name:          displayName,
@@ -268,7 +255,7 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 }
 
 // ValidateToken validates an access token using OIDC introspection
-func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*TokenInfo, error) {
+func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*types.TokenInfo, error) {
 
 	log := zs.log.Function("ValidateToken")
 
@@ -346,7 +333,7 @@ func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*Tok
 	}
 
 	if !introspectResp.Active {
-		return &TokenInfo{Valid: false}, nil
+		return &types.TokenInfo{Valid: false}, nil
 	}
 
 	// Build display name if not provided but we have given/family names
@@ -362,7 +349,7 @@ func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*Tok
 	}
 
 	// Extract user information from introspection response
-	return &TokenInfo{
+	return &types.TokenInfo{
 		UserID:        introspectResp.Sub,
 		Email:         introspectResp.Email,
 		Name:          displayName,
@@ -709,11 +696,11 @@ func (zs *ZitadelService) GetConfig() ZitadelConfig {
 }
 
 // ValidateTokenWithFallback validates a token using JWT-first approach with introspection fallback
-func (zs *ZitadelService) ValidateTokenWithFallback(ctx context.Context, token string) (*TokenInfo, string, error) {
+func (zs *ZitadelService) ValidateTokenWithFallback(ctx context.Context, token string) (*types.TokenInfo, string, error) {
 	log := zs.log.Function("ValidateTokenWithFallback")
 
 	// Validate token with Zitadel - try JWT first, fallback to introspection
-	var tokenInfo *TokenInfo
+	var tokenInfo *types.TokenInfo
 	var err error
 	var validationMethod string
 
