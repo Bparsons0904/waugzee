@@ -140,7 +140,7 @@ func (s *XMLProcessingService) ProcessFileToMap(
 
 			case "master":
 				if rawMaster, ok := entity.RawEntity.(*imports.Master); ok && rawMaster.ID > 0 {
-					if err := s.entityProcessor.ProcessMaster(rawMaster, entity.ProcessingID, buffers); err != nil {
+					if err := s.entityProcessor.ProcessMaster(rawMaster, entity.ProcessingID, buffers, s.batchCoordinator); err != nil {
 						result.Errors = append(result.Errors, err.Error())
 					}
 				}

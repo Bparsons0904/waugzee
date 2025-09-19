@@ -49,7 +49,7 @@ func HashFields(fields map[string]any) string {
 }
 
 // normalizeValue ensures consistent representation of values for hashing
-func normalizeValue(value any) interface{} {
+func normalizeValue(value any) any {
 	if value == nil {
 		return nil
 	}
@@ -57,7 +57,7 @@ func normalizeValue(value any) interface{} {
 	v := reflect.ValueOf(value)
 
 	// Handle pointers
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return nil
 		}
@@ -84,7 +84,7 @@ func normalizeValue(value any) interface{} {
 
 // PrepareHashableFields extracts hashable fields from a struct using reflection
 // This is a helper function for models that want to auto-generate hashable fields
-func PrepareHashableFields(entity any, excludeFields ...string) map[string]interface{} {
+func PrepareHashableFields(entity any, excludeFields ...string) map[string]any {
 	fields := make(map[string]any)
 	excludeMap := make(map[string]bool)
 
@@ -94,7 +94,7 @@ func PrepareHashableFields(entity any, excludeFields ...string) map[string]inter
 	}
 
 	v := reflect.ValueOf(entity)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 
@@ -149,7 +149,7 @@ func shouldSkipField(fieldName string, fieldType reflect.Type) bool {
 	}
 
 	// Skip pointer to struct fields (relationships)
-	if fieldType.Kind() == reflect.Ptr && fieldType.Elem().Kind() == reflect.Struct {
+	if fieldType.Kind() == reflect.Pointer && fieldType.Elem().Kind() == reflect.Struct {
 		return true
 	}
 
@@ -278,4 +278,3 @@ func CategorizeRecordsByNameHash(
 
 	return categories
 }
-

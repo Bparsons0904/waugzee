@@ -18,8 +18,8 @@ import (
 
 // EntityMessage represents a single entity sent through the processing channel
 type EntityMessage struct {
-	Type         string      // "label", "artist", "master", "release"
-	RawEntity    interface{} // *imports.Label, *imports.Artist, *imports.Master, *imports.Release
+	Type         string // "label", "artist", "master", "release"
+	RawEntity    any    // *imports.Label, *imports.Artist, *imports.Master, *imports.Release
 	ProcessingID string
 }
 
@@ -407,16 +407,22 @@ func (s *DiscogsParserService) parseEntityFile(
 	return result, nil
 }
 
-
 func (s *DiscogsParserService) convertDiscogsLabel(discogsLabel *imports.Label) *models.Label {
 	// Skip labels with invalid data
-	if discogsLabel.ID == 0 || len(discogsLabel.Name) == 0 {
+	if discogsLabel.ID == 0 {
+		s.log.Warn("Dropping label due to invalid ID", "discogsID", discogsLabel.ID, "name", discogsLabel.Name, "reason", "invalid ID")
+		return nil
+	}
+
+	if len(discogsLabel.Name) == 0 {
+		s.log.Warn("Dropping label due to empty name", "discogsID", discogsLabel.ID, "name", discogsLabel.Name, "reason", "empty name")
 		return nil
 	}
 
 	// Single trim operation with length check
 	name := strings.TrimSpace(discogsLabel.Name)
 	if len(name) == 0 {
+		s.log.Warn("Dropping label due to empty name after trim", "discogsID", discogsLabel.ID, "name", discogsLabel.Name, "reason", "empty name after trim")
 		return nil
 	}
 
@@ -430,13 +436,20 @@ func (s *DiscogsParserService) convertDiscogsLabel(discogsLabel *imports.Label) 
 
 func (s *DiscogsParserService) convertDiscogsArtist(discogsArtist *imports.Artist) *models.Artist {
 	// Skip artists with invalid data
-	if discogsArtist.ID == 0 || len(discogsArtist.Name) == 0 {
+	if discogsArtist.ID == 0 {
+		s.log.Warn("Dropping artist due to invalid ID", "discogsID", discogsArtist.ID, "name", discogsArtist.Name, "reason", "invalid ID")
+		return nil
+	}
+
+	if len(discogsArtist.Name) == 0 {
+		s.log.Warn("Dropping artist due to empty name", "discogsID", discogsArtist.ID, "name", discogsArtist.Name, "reason", "empty name")
 		return nil
 	}
 
 	// Single trim operation with length check
 	name := strings.TrimSpace(discogsArtist.Name)
 	if len(name) == 0 {
+		s.log.Warn("Dropping artist due to empty name after trim", "discogsID", discogsArtist.ID, "name", discogsArtist.Name, "reason", "empty name after trim")
 		return nil
 	}
 
@@ -451,16 +464,20 @@ func (s *DiscogsParserService) convertDiscogsArtist(discogsArtist *imports.Artis
 	return artist
 }
 
-
 func (s *DiscogsParserService) convertDiscogsMaster(discogsMaster *imports.Master) *models.Master {
-	// Skip masters with invalid data
-	if discogsMaster.ID == 0 || len(discogsMaster.Title) == 0 {
+	if discogsMaster.ID == 0 {
+		s.log.Warn("Dropping master due to invalid ID", "discogsID", discogsMaster.ID, "title", discogsMaster.Title, "reason", "invalid ID")
 		return nil
 	}
 
-	// Single trim operation with length check
+	if len(discogsMaster.Title) == 0 {
+		s.log.Warn("Dropping master due to empty title", "discogsID", discogsMaster.ID, "title", discogsMaster.Title, "reason", "empty title")
+		return nil
+	}
+
 	title := strings.TrimSpace(discogsMaster.Title)
 	if len(title) == 0 {
+		s.log.Warn("Dropping master due to empty title after trim", "discogsID", discogsMaster.ID, "title", discogsMaster.Title, "reason", "empty title after trim")
 		return nil
 	}
 
@@ -486,12 +503,19 @@ func (s *DiscogsParserService) convertDiscogsRelease(
 	discogsRelease *imports.Release,
 ) *models.Release {
 	// Skip releases with invalid data
-	if discogsRelease.ID == 0 || len(discogsRelease.Title) == 0 {
+	if discogsRelease.ID == 0 {
+		s.log.Warn("Dropping release due to invalid ID", "discogsID", discogsRelease.ID, "title", discogsRelease.Title, "reason", "invalid ID")
+		return nil
+	}
+
+	if len(discogsRelease.Title) == 0 {
+		s.log.Warn("Dropping release due to empty title", "discogsID", discogsRelease.ID, "title", discogsRelease.Title, "reason", "empty title")
 		return nil
 	}
 
 	title := strings.TrimSpace(discogsRelease.Title)
 	if len(title) == 0 {
+		s.log.Warn("Dropping release due to empty title after trim", "discogsID", discogsRelease.ID, "title", discogsRelease.Title, "reason", "empty title after trim")
 		return nil
 	}
 
@@ -542,7 +566,20 @@ func (s *DiscogsParserService) convertDiscogsRelease(
 
 	// VINYL-ONLY FILTERING: Skip non-vinyl releases to dramatically reduce processing volume
 	if release.Format != models.FormatVinyl {
+		s.log.Debug("Dropping non-vinyl release", "discogsID", discogsRelease.ID, "title", discogsRelease.Title, "format", release.Format, "reason", "non-vinyl format")
 		return nil
+	}
+
+	// Master ID - Set Discogs ID which matches the FK constraint to masters.discogs_id
+	if discogsRelease.MasterID > 0 {
+		masterID := int64(discogsRelease.MasterID)
+		release.MasterID = &masterID
+	}
+
+	// Label ID - Set Discogs ID which matches the FK constraint to labels.discogs_id
+	if len(discogsRelease.Labels) > 0 && discogsRelease.Labels[0].ID > 0 {
+		labelID := int64(discogsRelease.Labels[0].ID)
+		release.LabelID = &labelID
 	}
 
 	// Track count
@@ -568,15 +605,18 @@ func (s *DiscogsParserService) convertDiscogsRelease(
 }
 
 // generateReleaseJSONBData creates JSONB data for tracks, artists, and genres
-func (s *DiscogsParserService) generateReleaseJSONBData(release *models.Release, discogsRelease *imports.Release) error {
+func (s *DiscogsParserService) generateReleaseJSONBData(
+	release *models.Release,
+	discogsRelease *imports.Release,
+) error {
 	// Generate tracks JSON
-	tracks := make([]map[string]interface{}, 0, len(discogsRelease.TrackList))
+	tracks := make([]map[string]any, 0, len(discogsRelease.TrackList))
 	for _, track := range discogsRelease.TrackList {
 		if track.Title == "" || track.Position == "" {
 			continue // Skip invalid tracks
 		}
 
-		trackData := map[string]interface{}{
+		trackData := map[string]any{
 			"position": strings.TrimSpace(track.Position),
 			"title":    strings.TrimSpace(track.Title),
 		}
@@ -600,13 +640,13 @@ func (s *DiscogsParserService) generateReleaseJSONBData(release *models.Release,
 	}
 
 	// Generate artists JSON
-	artists := make([]map[string]interface{}, 0, len(discogsRelease.Artists))
+	artists := make([]map[string]any, 0, len(discogsRelease.Artists))
 	for _, artist := range discogsRelease.Artists {
 		if artist.ID <= 0 {
 			continue // Skip invalid artists
 		}
 
-		artistData := map[string]interface{}{
+		artistData := map[string]any{
 			"id":   artist.ID,
 			"name": strings.TrimSpace(artist.Name),
 		}
@@ -686,5 +726,3 @@ func (s *DiscogsParserService) parseDurationToSeconds(duration string) int {
 
 	return totalSeconds
 }
-
-

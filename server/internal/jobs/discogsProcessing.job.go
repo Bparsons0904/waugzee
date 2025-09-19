@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
@@ -125,176 +124,125 @@ func (j *DiscogsProcessingJob) processRecord(
 	var totalUpdated int
 	var totalErrors int
 
-	// Prepare for concurrent processing
-	var wg sync.WaitGroup
-	errorChan := make(chan error, len(fileTypes))
-	resultsChan := make(chan *services.ProcessingResult, len(fileTypes))
-
-	// Mutex to protect record updates since multiple goroutines will update ProcessingStats
-	var recordMutex sync.Mutex
-
-	// Process all file types concurrently
+	// Process all file types sequentially to avoid foreign key constraint violations
+	// Order: labels → artists → masters → releases (dependency order)
+	log.Info("Starting sequential file processing to ensure foreign key constraints")
 	for _, fileType := range fileTypes {
-		// Create local copies for goroutine closure
-		ft := fileType
-		filePath := filepath.Join(downloadDir, fmt.Sprintf("%s.xml.gz", ft.name))
+		filePath := filepath.Join(downloadDir, fmt.Sprintf("%s.xml.gz", fileType.name))
 
 		// Check if this file type has already been completed
-		recordMutex.Lock()
 		if record.ProcessingStats == nil {
 			record.ProcessingStats = &models.ProcessingStats{}
 		}
-		if record.ProcessingStats.IsFileProcessingCompleted(ft.name) {
+		if record.ProcessingStats.IsFileProcessingCompleted(fileType.name) {
 			log.Info("File type already processed successfully, skipping",
-				"fileType", ft.name,
+				"fileType", fileType.name,
 				"yearMonth", yearMonth,
-				"status", record.ProcessingStats.GetFileProcessingStatus(ft.name))
-			recordMutex.Unlock()
+				"status", record.ProcessingStats.GetFileProcessingStatus(fileType.name))
 			continue
 		}
 
 		// Check if file exists and is validated
 		if record.ProcessingStats != nil {
-			fileInfo := record.ProcessingStats.GetFileInfo(ft.name)
+			fileInfo := record.ProcessingStats.GetFileInfo(fileType.name)
 			if fileInfo == nil || fileInfo.Status != models.FileDownloadStatusValidated {
 				log.Info("File not available for processing, skipping",
-					"fileType", ft.name,
+					"fileType", fileType.name,
 					"yearMonth", yearMonth)
-				recordMutex.Unlock()
 				continue
 			}
 		}
-		recordMutex.Unlock()
 
 		// Check if file actually exists on disk
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
 			log.Info("File not found on disk, skipping processing",
-				"fileType", ft.name,
+				"fileType", fileType.name,
 				"yearMonth", yearMonth,
 				"filePath", filePath)
 			continue
 		}
 
-		// Start goroutine for this file
-		wg.Add(1)
-		go func(fileType struct {
-			name   string
-			method func(context.Context, string, string) (*services.ProcessingResult, error)
-		}, filePath string,
-		) {
-			defer wg.Done()
+		// Set processing status to indicate we're starting this file
+		if record.ProcessingStats == nil {
+			record.ProcessingStats = &models.ProcessingStats{}
+		}
+		record.ProcessingStats.SetFileProcessingStatus(
+			fileType.name,
+			models.FileProcessingStatusProcessing,
+		)
+		if updateErr := j.repo.Update(ctx, record); updateErr != nil {
+			log.Warn(
+				"failed to update file processing status to processing",
+				"error",
+				updateErr,
+			)
+		}
 
-			// Set processing status to indicate we're starting this file
-			recordMutex.Lock()
+		log.Info("Starting XML processing",
+			"fileType", fileType.name,
+			"yearMonth", yearMonth,
+			"filePath", filePath,
+			"processingStatus", record.ProcessingStats.GetFileProcessingStatus(fileType.name))
+
+		// Process the XML file sequentially
+		result, err := fileType.method(ctx, filePath, record.ID.String())
+		if err != nil {
+			// Update file processing status to failed
 			if record.ProcessingStats == nil {
 				record.ProcessingStats = &models.ProcessingStats{}
 			}
 			record.ProcessingStats.SetFileProcessingStatus(
 				fileType.name,
-				models.FileProcessingStatusProcessing,
+				models.FileProcessingStatusFailed,
 			)
-			if updateErr := j.repo.Update(ctx, record); updateErr != nil {
+
+			// Update overall record with error state
+			errorMsg := err.Error()
+			record.ErrorMessage = &errorMsg
+			if statusErr := record.UpdateStatus(models.ProcessingStatusFailed); statusErr != nil {
 				log.Warn(
-					"failed to update file processing status to processing",
+					"failed to update processing record status to failed",
 					"error",
-					updateErr,
+					statusErr,
 				)
 			}
-			recordMutex.Unlock()
 
-			log.Info("Starting XML processing",
-				"fileType", fileType.name,
-				"yearMonth", yearMonth,
-				"filePath", filePath,
-				"processingStatus", record.ProcessingStats.GetFileProcessingStatus(fileType.name))
-
-			// Process the XML file
-			result, err := fileType.method(ctx, filePath, record.ID.String())
-			if err != nil {
-				// Update file processing status to failed
-				recordMutex.Lock()
-				if record.ProcessingStats == nil {
-					record.ProcessingStats = &models.ProcessingStats{}
-				}
-				record.ProcessingStats.SetFileProcessingStatus(
-					fileType.name,
-					models.FileProcessingStatusFailed,
-				)
-
-				// Update overall record with error state
-				errorMsg := err.Error()
-				record.ErrorMessage = &errorMsg
-				if statusErr := record.UpdateStatus(models.ProcessingStatusFailed); statusErr != nil {
-					log.Warn(
-						"failed to update processing record status to failed",
-						"error",
-						statusErr,
-					)
-				}
-
-				if updateErr := j.repo.Update(ctx, record); updateErr != nil {
-					log.Warn("failed to update processing record with error", "error", updateErr)
-				}
-				recordMutex.Unlock()
-
-				// Send error to channel but don't return to avoid deadlock
-				errorChan <- fmt.Errorf("failed to process XML file %s: %w", fileType.name, err)
-				return
-			}
-
-			// Mark file processing as completed
-			recordMutex.Lock()
-			if record.ProcessingStats == nil {
-				record.ProcessingStats = &models.ProcessingStats{}
-			}
-			record.ProcessingStats.SetFileProcessingStatus(
-				fileType.name,
-				models.FileProcessingStatusCompleted,
-			)
-
-			// Update the record to persist the completion status
 			if updateErr := j.repo.Update(ctx, record); updateErr != nil {
-				log.Warn("failed to update file processing status to completed", "error", updateErr)
+				log.Warn("failed to update processing record with error", "error", updateErr)
 			}
-			recordMutex.Unlock()
 
-			log.Info("XML processing completed",
-				"fileType", fileType.name,
-				"yearMonth", yearMonth,
-				"totalRecords", result.TotalRecords,
-				"processedRecords", result.ProcessedRecords,
-				"insertedRecords", result.InsertedRecords,
-				"updatedRecords", result.UpdatedRecords,
-				"erroredRecords", result.ErroredRecords,
-				"processingStatus", record.ProcessingStats.GetFileProcessingStatus(fileType.name))
+			return fmt.Errorf("failed to process XML file %s: %w", fileType.name, err)
+		}
 
-			log.Info("File cleanup disabled during testing",
-				"fileType", fileType.name,
-				"filePath", filePath)
+		// Mark file processing as completed
+		if record.ProcessingStats == nil {
+			record.ProcessingStats = &models.ProcessingStats{}
+		}
+		record.ProcessingStats.SetFileProcessingStatus(
+			fileType.name,
+			models.FileProcessingStatusCompleted,
+		)
 
-			// Send result to channel
-			resultsChan <- result
-		}(ft, filePath)
-	}
+		// Update the record to persist the completion status
+		if updateErr := j.repo.Update(ctx, record); updateErr != nil {
+			log.Warn("failed to update file processing status to completed", "error", updateErr)
+		}
 
-	// Wait for all goroutines to complete
-	wg.Wait()
-	close(errorChan)
-	close(resultsChan)
+		log.Info("XML processing completed",
+			"fileType", fileType.name,
+			"yearMonth", yearMonth,
+			"totalRecords", result.TotalRecords,
+			"processedRecords", result.ProcessedRecords,
+			"insertedRecords", result.InsertedRecords,
+			"updatedRecords", result.UpdatedRecords,
+			"erroredRecords", result.ErroredRecords,
+			"processingStatus", record.ProcessingStats.GetFileProcessingStatus(fileType.name))
 
-	// Check for errors
-	var processingErrors []error
-	for err := range errorChan {
-		processingErrors = append(processingErrors, err)
-	}
+		log.Info("File cleanup disabled during testing",
+			"fileType", fileType.name,
+			"filePath", filePath)
 
-	// If we have any errors, return the first one (following original behavior)
-	if len(processingErrors) > 0 {
-		return processingErrors[0]
-	}
-
-	// Collect all results
-	for result := range resultsChan {
+		// Accumulate results
 		totalProcessed += result.ProcessedRecords
 		totalInserted += result.InsertedRecords
 		totalUpdated += result.UpdatedRecords

@@ -24,7 +24,7 @@ type Release struct {
 	UpdatedAt   time.Time     `gorm:"autoUpdateTime" json:"updatedAt"`
 	Title       string        `gorm:"type:text;not null;index:idx_releases_title" json:"title" validate:"required"`
 	LabelID     *int64        `gorm:"type:bigint;index:idx_releases_label" json:"labelId,omitempty"`
-	MasterID    *int64        `gorm:"type:bigint;index:idx_releases_master" json:"masterId,omitempty"`
+	MasterID    *int64        `gorm:"type:bigint;index:idx_releases_master;constraint:OnUpdate:CASCADE,OnDelete:SET NULL" json:"masterId,omitempty"`
 	Year        *int          `gorm:"type:int;index:idx_releases_year" json:"year,omitempty"`
 	Country     *string       `gorm:"type:text" json:"country,omitempty"`
 	Format      ReleaseFormat `gorm:"type:text;default:'vinyl';index:idx_releases_format" json:"format"`

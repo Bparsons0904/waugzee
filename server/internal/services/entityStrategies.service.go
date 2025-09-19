@@ -32,6 +32,8 @@ func (ep *EntityProcessor) ProcessLabel(
 	// Convert to model and send to label buffer
 	if convertedLabel := ep.parserService.convertDiscogsLabel(rawLabel); convertedLabel != nil {
 		buffers.Labels.Channel <- convertedLabel
+	} else {
+		ep.log.Warn("Label conversion failed", "discogsID", rawLabel.ID, "processingID", processingID, "reason", "convertDiscogsLabel returned nil")
 	}
 
 	return nil
@@ -46,6 +48,9 @@ func (ep *EntityProcessor) ProcessArtist(
 	if rawArtist == nil || rawArtist.ID <= 0 {
 		return ep.log.Err("invalid artist data", nil, "processingID", processingID)
 	}
+
+	// Send raw artist to artist buffer for processing - the buffer will handle conversion
+	buffers.Artists.Channel <- rawArtist
 
 	// Extract and send Images to image buffer with context
 	for i := range rawArtist.Images {
@@ -65,6 +70,7 @@ func (ep *EntityProcessor) ProcessMaster(
 	rawMaster *imports.Master,
 	processingID string,
 	buffers *ProcessingBuffers,
+	batchCoordinator *BatchCoordinator,
 ) error {
 	if rawMaster == nil || rawMaster.ID <= 0 {
 		return ep.log.Err("invalid master data", nil, "processingID", processingID)
@@ -93,31 +99,31 @@ func (ep *EntityProcessor) ProcessMaster(
 		buffers.Artists.Channel <- artist
 	}
 
-	// Extract and send Master-Genre associations
+	// Store Master-Genre associations for batch processing
 	for _, genre := range rawMaster.Genres {
 		if genre != "" {
-			association := &MasterGenreAssociation{
-				MasterDiscogsID: int64(rawMaster.ID),
-				GenreName:       genre,
-			}
-			buffers.MasterGenres.Channel <- association
+			batchCoordinator.AddMasterGenreAssociation(
+				int64(rawMaster.ID),
+				genre,
+			)
 		}
 	}
 
-	// Extract and send Master-Artist associations
+	// Store Master-Artist associations for batch processing
 	for _, artist := range rawMaster.Artists {
 		if artist.ID > 0 {
-			association := &MasterArtistAssociation{
-				MasterDiscogsID: int64(rawMaster.ID),
-				ArtistDiscogsID: int64(artist.ID),
-			}
-			buffers.MasterArtists.Channel <- association
+			batchCoordinator.AddMasterArtistAssociation(
+				int64(rawMaster.ID),
+				int64(artist.ID),
+			)
 		}
 	}
 
 	// Convert to model and send to master buffer
 	if convertedMaster := ep.parserService.convertDiscogsMaster(rawMaster); convertedMaster != nil {
 		buffers.Masters.Channel <- convertedMaster
+	} else {
+		ep.log.Warn("Master conversion failed", "discogsID", rawMaster.ID, "processingID", processingID, "reason", "convertDiscogsMaster returned nil")
 	}
 
 	return nil
@@ -160,6 +166,8 @@ func (ep *EntityProcessor) ProcessRelease(
 	// Convert to model and send to release buffer
 	if convertedRelease := ep.parserService.convertDiscogsRelease(rawRelease); convertedRelease != nil {
 		buffers.Releases.Channel <- convertedRelease
+	} else {
+		ep.log.Warn("Release conversion failed", "discogsID", rawRelease.ID, "processingID", processingID, "reason", "convertDiscogsRelease returned nil")
 	}
 
 	return nil

@@ -46,7 +46,7 @@ steps:
     image: docker:24-cli
     commands:
       - cd server
-      - docker build -t vim-server:latest .
+      - docker build -t waugzee-server:latest .
     depends_on:
       - build-backend
       - build-migration
@@ -64,7 +64,7 @@ steps:
         from_secret: VITE_ENV
     commands:
       - cd client
-      - docker build -t vim-client:latest
+      - docker build -t waugzee-client:latest
         --build-arg VITE_GENERAL_VERSION="$VITE_GENERAL_VERSION"
         --build-arg VITE_API_URL="$VITE_API_URL"
         --build-arg VITE_WS_URL="$VITE_WS_URL"

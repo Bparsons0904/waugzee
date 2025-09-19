@@ -4,11 +4,19 @@ import (
 	"context"
 	"strconv"
 	"sync"
+	"time"
 	"waugzee/internal/imports"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
 	"waugzee/internal/repositories"
 )
+
+// MasterWithAssociations bundles a master with its associations for atomic processing
+type MasterWithAssociations struct {
+	Master           *models.Master
+	ArtistAssocs     []repositories.MasterArtistAssociation
+	GenreAssocs      map[string]bool // Use map for deduplication
+}
 
 type BatchCoordinator struct {
 	labelRepo   repositories.LabelRepository
@@ -28,7 +36,7 @@ type BatchCoordinator struct {
 	artistMutex  sync.RWMutex
 	labelBatch   map[int64]*models.Label
 	labelMutex   sync.RWMutex
-	masterBatch  map[int64]*models.Master
+	masterBatch  map[int64]*MasterWithAssociations
 	masterMutex  sync.RWMutex
 	releaseBatch map[int64]*models.Release
 	releaseMutex sync.RWMutex
@@ -62,7 +70,7 @@ func NewBatchCoordinator(
 		genreBatch:   make(map[string]*models.Genre),
 		artistBatch:  make(map[int64]*models.Artist),
 		labelBatch:   make(map[int64]*models.Label),
-		masterBatch:  make(map[int64]*models.Master),
+		masterBatch:  make(map[int64]*MasterWithAssociations),
 		releaseBatch: make(map[int64]*models.Release),
 	}
 }
@@ -131,7 +139,18 @@ func (bc *BatchCoordinator) ConvertContextualDiscogsImageToModel(
 func (bc *BatchCoordinator) ConvertDiscogsArtistToModel(
 	discogsArtist *imports.Artist,
 ) *models.Artist {
-	if discogsArtist == nil || discogsArtist.ID <= 0 {
+	if discogsArtist == nil {
+		bc.log.Warn("Dropping artist due to nil input", "reason", "discogsArtist is nil")
+		return nil
+	}
+
+	if discogsArtist.ID <= 0 {
+		bc.log.Warn("Dropping artist due to invalid ID", "discogsID", discogsArtist.ID, "name", discogsArtist.Name, "reason", "invalid ID")
+		return nil
+	}
+
+	if len(discogsArtist.Name) == 0 {
+		bc.log.Warn("Dropping artist due to empty name", "discogsID", discogsArtist.ID, "name", discogsArtist.Name, "reason", "empty name")
 		return nil
 	}
 
@@ -220,7 +239,19 @@ func (bc *BatchCoordinator) AddMasterToBatch(
 	bc.masterMutex.Lock()
 	defer bc.masterMutex.Unlock()
 
-	bc.masterBatch[master.DiscogsID] = master
+	// Create or get existing MasterWithAssociations
+	masterWithAssocs, exists := bc.masterBatch[master.DiscogsID]
+	if !exists {
+		masterWithAssocs = &MasterWithAssociations{
+			Master:       master,
+			ArtistAssocs: make([]repositories.MasterArtistAssociation, 0),
+			GenreAssocs:  make(map[string]bool),
+		}
+		bc.masterBatch[master.DiscogsID] = masterWithAssocs
+	} else {
+		// Update the master in case it was modified
+		masterWithAssocs.Master = master
+	}
 
 	if len(bc.masterBatch) >= 5000 {
 		return bc.flushMasterBatchInternal(ctx)
@@ -241,6 +272,55 @@ func (bc *BatchCoordinator) AddReleaseToBatch(
 		return bc.flushReleaseBatchInternal(ctx)
 	}
 	return nil
+}
+
+func (bc *BatchCoordinator) AddMasterArtistAssociation(
+	masterDiscogsID int64,
+	artistDiscogsID int64,
+) {
+	bc.masterMutex.Lock()
+	defer bc.masterMutex.Unlock()
+
+	// Get or create the master with associations
+	masterWithAssocs, exists := bc.masterBatch[masterDiscogsID]
+	if !exists {
+		// Master doesn't exist yet, create placeholder
+		masterWithAssocs = &MasterWithAssociations{
+			Master:       nil, // Will be set when master is added
+			ArtistAssocs: make([]repositories.MasterArtistAssociation, 0),
+			GenreAssocs:  make(map[string]bool),
+		}
+		bc.masterBatch[masterDiscogsID] = masterWithAssocs
+	}
+
+	// Add the association
+	masterWithAssocs.ArtistAssocs = append(masterWithAssocs.ArtistAssocs, repositories.MasterArtistAssociation{
+		MasterDiscogsID: masterDiscogsID,
+		ArtistDiscogsID: artistDiscogsID,
+	})
+}
+
+func (bc *BatchCoordinator) AddMasterGenreAssociation(
+	masterDiscogsID int64,
+	genreName string,
+) {
+	bc.masterMutex.Lock()
+	defer bc.masterMutex.Unlock()
+
+	// Get or create the master with associations
+	masterWithAssocs, exists := bc.masterBatch[masterDiscogsID]
+	if !exists {
+		// Master doesn't exist yet, create placeholder
+		masterWithAssocs = &MasterWithAssociations{
+			Master:       nil, // Will be set when master is added
+			ArtistAssocs: make([]repositories.MasterArtistAssociation, 0),
+			GenreAssocs:  make(map[string]bool),
+		}
+		bc.masterBatch[masterDiscogsID] = masterWithAssocs
+	}
+
+	// Add the genre (map automatically deduplicates)
+	masterWithAssocs.GenreAssocs[genreName] = true
 }
 
 // Batch flushing methods
@@ -371,19 +451,79 @@ func (bc *BatchCoordinator) flushMasterBatchInternal(
 		return nil
 	}
 
+	// Extract masters for batch processing
 	batch := make([]*models.Master, 0, len(bc.masterBatch))
-	for _, master := range bc.masterBatch {
-		batch = append(batch, master)
+	for _, masterWithAssocs := range bc.masterBatch {
+		if masterWithAssocs.Master != nil {
+			batch = append(batch, masterWithAssocs.Master)
+		}
 	}
 
+	// Insert all masters first
 	err := bc.masterRepo.UpsertBatch(ctx, batch)
 	if err != nil {
 		return log.Err("Failed to upsert master batch", err)
 	}
 
-	bc.masterBatch = make(map[int64]*models.Master)
+	// Ensure all artists are flushed before processing associations
+	if err := bc.FlushArtistBatch(ctx); err != nil {
+		log.Er("Failed to flush artist batch before associations", err)
+	}
+
+	// Small delay to ensure database consistency
+	time.Sleep(50 * time.Millisecond)
+
+	// Process each master's associations immediately after masters and artists are inserted
+	for _, masterWithAssocs := range bc.masterBatch {
+		if masterWithAssocs.Master != nil {
+			if err := bc.flushSingleMasterAssociations(ctx, masterWithAssocs); err != nil {
+				log.Er("Failed to flush associations for master", err, "masterID", masterWithAssocs.Master.DiscogsID)
+				// Continue processing other masters even if one fails
+			}
+		}
+	}
+
+	bc.masterBatch = make(map[int64]*MasterWithAssociations)
 	return nil
 }
+
+func (bc *BatchCoordinator) flushSingleMasterAssociations(
+	ctx context.Context,
+	masterWithAssocs *MasterWithAssociations,
+) error {
+	log := bc.log.Function("flushSingleMasterAssociations")
+
+	// Process master-artist associations
+	if len(masterWithAssocs.ArtistAssocs) > 0 {
+		log.Info("Processing master-artist associations", 
+			"masterID", masterWithAssocs.Master.DiscogsID,
+			"count", len(masterWithAssocs.ArtistAssocs))
+		if err := bc.masterRepo.CreateMasterArtistAssociations(ctx, masterWithAssocs.ArtistAssocs); err != nil {
+			return log.Err("Failed to create master-artist associations", err)
+		}
+	}
+
+	// Process master-genre associations
+	if len(masterWithAssocs.GenreAssocs) > 0 {
+		log.Info("Processing master-genre associations", 
+			"masterID", masterWithAssocs.Master.DiscogsID,
+			"genreCount", len(masterWithAssocs.GenreAssocs))
+		
+		masterIDs := []int64{masterWithAssocs.Master.DiscogsID}
+		genreNames := make([]string, 0, len(masterWithAssocs.GenreAssocs))
+		for genreName := range masterWithAssocs.GenreAssocs {
+			genreNames = append(genreNames, genreName)
+		}
+
+		if err := bc.masterRepo.CreateMasterGenreAssociations(ctx, masterIDs, genreNames); err != nil {
+			return log.Err("Failed to create master-genre associations", err)
+		}
+	}
+
+	return nil
+}
+
+// Note: Old flushMasterAssociations method removed - now using flushSingleMasterAssociations
 
 func (bc *BatchCoordinator) FlushReleaseBatch(ctx context.Context) error {
 	bc.releaseMutex.Lock()
@@ -400,8 +540,29 @@ func (bc *BatchCoordinator) flushReleaseBatchInternal(
 	}
 
 	batch := make([]*models.Release, 0, len(bc.releaseBatch))
+	masterIDCount := 0
+	labelIDCount := 0
+	sampleMasterIDs := make([]int64, 0, 5)
+	sampleLabelIDs := make([]int64, 0, 5)
+
 	for _, release := range bc.releaseBatch {
 		batch = append(batch, release)
+
+		// Count and sample MasterIDs for debugging
+		if release.MasterID != nil {
+			masterIDCount++
+			if len(sampleMasterIDs) < 5 {
+				sampleMasterIDs = append(sampleMasterIDs, *release.MasterID)
+			}
+		}
+
+		// Count and sample LabelIDs for debugging
+		if release.LabelID != nil {
+			labelIDCount++
+			if len(sampleLabelIDs) < 5 {
+				sampleLabelIDs = append(sampleLabelIDs, *release.LabelID)
+			}
+		}
 	}
 
 	err := bc.releaseRepo.UpsertBatch(ctx, batch)
@@ -414,27 +575,50 @@ func (bc *BatchCoordinator) flushReleaseBatchInternal(
 }
 
 // FlushAllBatches flushes any remaining items in all batches
+// CRITICAL: Sequential processing in strict dependency order to avoid foreign key violations
+// Order: Labels → Artists → Masters → Releases
 func (bc *BatchCoordinator) FlushAllBatches(ctx context.Context) error {
-	var err error
+	log := bc.log.Function("FlushAllBatches")
 
-	if flushErr := bc.FlushImageBatch(ctx); flushErr != nil {
-		err = flushErr
-	}
-	if flushErr := bc.FlushGenreBatch(ctx); flushErr != nil {
-		err = flushErr
-	}
-	if flushErr := bc.FlushArtistBatch(ctx); flushErr != nil {
-		err = flushErr
-	}
-	if flushErr := bc.FlushLabelBatch(ctx); flushErr != nil {
-		err = flushErr
-	}
-	if flushErr := bc.FlushMasterBatch(ctx); flushErr != nil {
-		err = flushErr
-	}
-	if flushErr := bc.FlushReleaseBatch(ctx); flushErr != nil {
-		err = flushErr
+	// Step 1: Flush Labels first (no dependencies)
+	log.Info("Step 1: Flushing labels")
+	if err := bc.FlushLabelBatch(ctx); err != nil {
+		log.Er("Failed to flush label batch", err)
+		return err
 	}
 
-	return err
+	// Step 2: Flush Artists (no dependencies)
+	log.Info("Step 2: Flushing artists")
+	if err := bc.FlushArtistBatch(ctx); err != nil {
+		log.Er("Failed to flush artist batch", err)
+		return err
+	}
+
+	// Step 3: Flush Masters (depends on Artists for associations)
+	log.Info("Step 3: Flushing masters")
+	if err := bc.FlushMasterBatch(ctx); err != nil {
+		log.Er("Failed to flush master batch", err)
+		return err
+	}
+
+	// Step 4: Flush Releases (depends on Masters and Labels)
+	log.Info("Step 4: Flushing releases")
+	if err := bc.FlushReleaseBatch(ctx); err != nil {
+		log.Er("Failed to flush release batch", err)
+		return err
+	}
+
+	// Step 5: Flush remaining independent entities
+	log.Info("Step 5: Flushing remaining entities")
+	if err := bc.FlushGenreBatch(ctx); err != nil {
+		log.Er("Failed to flush genre batch", err)
+		return err
+	}
+	if err := bc.FlushImageBatch(ctx); err != nil {
+		log.Er("Failed to flush image batch", err)
+		return err
+	}
+
+	log.Info("All batches flushed successfully")
+	return nil
 }

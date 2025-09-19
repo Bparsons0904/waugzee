@@ -4,8 +4,8 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = []
-  bin = "/tmp/vim-server"
-  cmd = "go build -o /tmp/vim-server cmd/api/main.go"
+  bin = "/tmp/waugzee-server"
+  cmd = "go build -o /tmp/waugzee-server cmd/api/main.go"
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor", "testdata", "node_modules", "data"]
   exclude_file = []
