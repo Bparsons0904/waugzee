@@ -62,6 +62,11 @@ func (m *Manager) unregisterClient(client *Client) {
 
 	delete(m.hub.clients, client.ID)
 
+	// Handle sync disconnection if client was authenticated
+	if client.Status == STATUS_AUTHENTICATED && client.UserID != uuid.Nil {
+		m.handleClientDisconnection(client.UserID)
+	}
+
 	log.Info(
 		"Client unregistered and removed from local storage",
 		"clientID",
@@ -143,6 +148,11 @@ func (m *Manager) promoteClientToAuthenticated(client *Client) {
 	if client.Status != STATUS_AUTHENTICATED {
 		log.Warn("Attempted to promote non-authenticated client", "clientID", client.ID)
 		return
+	}
+
+	// Handle sync reconnection for authenticated clients
+	if client.UserID != uuid.Nil {
+		m.handleClientReconnection(client.UserID)
 	}
 
 	log.Info(

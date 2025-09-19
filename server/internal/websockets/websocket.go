@@ -2,6 +2,7 @@ package websockets
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"time"
 	"waugzee/config"
@@ -16,23 +17,28 @@ import (
 )
 
 const (
-	MESSAGE_TYPE_PING          = "ping"
-	MESSAGE_TYPE_PONG          = "pong"
-	MESSAGE_TYPE_MESSAGE       = "message"
-	MESSAGE_TYPE_BROADCAST     = "broadcast"
-	MESSAGE_TYPE_ERROR         = "error"
-	MESSAGE_TYPE_USER_JOIN     = "user_join"
-	MESSAGE_TYPE_USER_LEAVE    = "user_leave"
-	MESSAGE_TYPE_AUTH_REQUEST  = "auth_request"
-	MESSAGE_TYPE_AUTH_RESPONSE = "auth_response"
-	MESSAGE_TYPE_AUTH_SUCCESS  = "auth_success"
-	MESSAGE_TYPE_AUTH_FAILURE  = "auth_failure"
-	PING_INTERVAL              = 30 * time.Second
-	PONG_TIMEOUT               = 60 * time.Second
-	WRITE_TIMEOUT              = 10 * time.Second
-	AUTH_HANDSHAKE_TIMEOUT     = 10 * time.Second
-	MAX_MESSAGE_SIZE           = 1024 * 1024 // 1 MB
-	SEND_CHANNEL_SIZE          = 64
+	MESSAGE_TYPE_PING                   = "ping"
+	MESSAGE_TYPE_PONG                   = "pong"
+	MESSAGE_TYPE_MESSAGE                = "message"
+	MESSAGE_TYPE_BROADCAST              = "broadcast"
+	MESSAGE_TYPE_ERROR                  = "error"
+	MESSAGE_TYPE_USER_JOIN              = "user_join"
+	MESSAGE_TYPE_USER_LEAVE             = "user_leave"
+	MESSAGE_TYPE_AUTH_REQUEST           = "auth_request"
+	MESSAGE_TYPE_AUTH_RESPONSE          = "auth_response"
+	MESSAGE_TYPE_AUTH_SUCCESS           = "auth_success"
+	MESSAGE_TYPE_AUTH_FAILURE           = "auth_failure"
+	MESSAGE_TYPE_DISCOGS_API_REQUEST    = "discogs_api_request"
+	MESSAGE_TYPE_DISCOGS_API_RESPONSE   = "discogs_api_response"
+	MESSAGE_TYPE_SYNC_PROGRESS          = "sync_progress"
+	MESSAGE_TYPE_SYNC_COMPLETE          = "sync_complete"
+	MESSAGE_TYPE_SYNC_ERROR             = "sync_error"
+	PING_INTERVAL                       = 30 * time.Second
+	PONG_TIMEOUT                        = 60 * time.Second
+	WRITE_TIMEOUT                       = 10 * time.Second
+	AUTH_HANDSHAKE_TIMEOUT              = 10 * time.Second
+	MAX_MESSAGE_SIZE                    = 1024 * 1024 // 1 MB
+	SEND_CHANNEL_SIZE                   = 64
 )
 
 // Channels
@@ -60,13 +66,14 @@ type Client struct {
 }
 
 type Manager struct {
-	hub            *Hub
-	db             database.DB
-	config         config.Config
-	log            logger.Logger
-	eventBus       *events.EventBus
-	zitadelService *services.ZitadelService
-	userRepo       repositories.UserRepository
+	hub                       *Hub
+	db                        database.DB
+	config                    config.Config
+	log                       logger.Logger
+	eventBus                  *events.EventBus
+	zitadelService            *services.ZitadelService
+	userRepo                  repositories.UserRepository
+	discogsOrchestrationSvc   services.DiscogsOrchestrationService
 }
 
 func New(
@@ -75,6 +82,7 @@ func New(
 	config config.Config,
 	zitadelService *services.ZitadelService,
 	userRepo repositories.UserRepository,
+	discogsOrchestrationSvc services.DiscogsOrchestrationService,
 ) (*Manager, error) {
 	log := logger.New("websockets")
 
@@ -85,12 +93,13 @@ func New(
 			unregister: make(chan *Client),
 			clients:    make(map[string]*Client),
 		},
-		db:             db,
-		config:         config,
-		log:            log,
-		eventBus:       eventBus,
-		zitadelService: zitadelService,
-		userRepo:       userRepo,
+		db:                      db,
+		config:                  config,
+		log:                     log,
+		eventBus:                eventBus,
+		zitadelService:          zitadelService,
+		userRepo:                userRepo,
+		discogsOrchestrationSvc: discogsOrchestrationSvc,
 	}
 
 	log.Function("New").Info("Starting websocket hub")
@@ -281,6 +290,8 @@ func (c *Client) routeMessage(message Message) {
 	}
 
 	switch message.Type {
+	case MESSAGE_TYPE_DISCOGS_API_RESPONSE:
+		c.handleDiscogsApiResponse(message)
 	default:
 		log.Warn("Unknown message type", "type", message.Type)
 	}
@@ -565,4 +576,102 @@ func (m *Manager) BroadcastCacheInvalidation(
 		"userCount", len(userIDs),
 		"sentCount", sentCount,
 	)
+}
+
+// handleDiscogsApiResponse processes API responses from clients for Discogs sync
+func (c *Client) handleDiscogsApiResponse(message Message) {
+	log := c.Manager.log.Function("handleDiscogsApiResponse")
+
+	if c.Status != STATUS_AUTHENTICATED {
+		log.Warn("Discogs API response from unauthenticated client", "clientID", c.ID)
+		return
+	}
+
+	// Extract response data
+	requestID, ok := message.Data["requestId"].(string)
+	if !ok {
+		log.Warn("Invalid requestId in Discogs API response", "clientID", c.ID)
+		return
+	}
+
+	status, ok := message.Data["status"].(float64)
+	if !ok {
+		log.Warn("Invalid status in Discogs API response", "clientID", c.ID, "requestID", requestID)
+		return
+	}
+
+	headers, ok := message.Data["headers"].(map[string]interface{})
+	if !ok {
+		log.Warn("Invalid headers in Discogs API response", "clientID", c.ID, "requestID", requestID)
+		return
+	}
+
+	body := message.Data["body"]
+
+	var errorPtr *string
+	if errorMsg, exists := message.Data["error"]; exists {
+		if errorStr, ok := errorMsg.(string); ok {
+			errorPtr = &errorStr
+		}
+	}
+
+	// Convert headers to map[string]string
+	headerMap := make(map[string]string)
+	for k, v := range headers {
+		if strVal, ok := v.(string); ok {
+			headerMap[k] = strVal
+		}
+	}
+
+	// Create API response
+	apiResponse := &services.ApiResponse{
+		RequestID: requestID,
+		Status:    int(status),
+		Headers:   headerMap,
+		Error:     errorPtr,
+	}
+
+	// Marshal body to json.RawMessage
+	if body != nil {
+		if bodyBytes, err := json.Marshal(body); err == nil {
+			apiResponse.Body = json.RawMessage(bodyBytes)
+		}
+	}
+
+	// Process the response
+	if err := c.Manager.discogsOrchestrationSvc.ProcessApiResponse(context.Background(), requestID, apiResponse); err != nil {
+		log.Error("Failed to process Discogs API response", "error", err, "requestID", requestID)
+	} else {
+		log.Info("Discogs API response processed successfully", "requestID", requestID, "status", status)
+	}
+}
+
+// handleClientDisconnection manages sync state when clients disconnect
+func (m *Manager) handleClientDisconnection(userID uuid.UUID) {
+	log := m.log.Function("handleClientDisconnection")
+
+	if m.discogsOrchestrationSvc == nil {
+		return
+	}
+
+	if err := m.discogsOrchestrationSvc.HandleSyncDisconnection(context.Background(), userID); err != nil {
+		log.Error("Failed to handle sync disconnection", "error", err, "userID", userID)
+	} else {
+		log.Info("Sync disconnection handled", "userID", userID)
+	}
+}
+
+// handleClientReconnection manages sync state when clients reconnect
+func (m *Manager) handleClientReconnection(userID uuid.UUID) {
+	log := m.log.Function("handleClientReconnection")
+
+	if m.discogsOrchestrationSvc == nil {
+		return
+	}
+
+	if err := m.discogsOrchestrationSvc.HandleSyncReconnection(context.Background(), userID); err != nil {
+		log.Error("Failed to handle sync reconnection", "error", err, "userID", userID)
+	} else {
+		log.Info("Sync reconnection handled", "userID", userID)
+	}
 }

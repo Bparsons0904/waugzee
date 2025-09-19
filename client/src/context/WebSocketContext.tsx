@@ -26,9 +26,14 @@ export const MessageType = {
   AUTH_SUCCESS: "auth_success",
   AUTH_FAILURE: "auth_failure",
   INVALIDATE_CACHE: "invalidateCache",
+  DISCOGS_API_REQUEST: "discogs_api_request",
+  DISCOGS_API_RESPONSE: "discogs_api_response",
+  SYNC_PROGRESS: "sync_progress",
+  SYNC_COMPLETE: "sync_complete",
+  SYNC_ERROR: "sync_error",
 } as const;
 
-export type ChannelType = "system" | "user";
+export type ChannelType = "system" | "user" | "sync";
 
 export interface WebSocketMessage {
   id: string;
@@ -61,6 +66,9 @@ interface WebSocketContextValue {
   onCacheInvalidation: (
     callback: (resourceType: string, resourceId: string) => void,
   ) => () => void;
+  onSyncMessage: (
+    callback: (message: WebSocketMessage) => void,
+  ) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue>(
@@ -85,6 +93,10 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
   // Cache invalidation callbacks
   const [cacheInvalidationCallbacks, setCacheInvalidationCallbacks] =
     createSignal<Array<(resourceType: string, resourceId: string) => void>>([]);
+
+  // Sync message callbacks
+  const [syncMessageCallbacks, setSyncMessageCallbacks] =
+    createSignal<Array<(message: WebSocketMessage) => void>>([]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const log = (..._args: unknown[]) => {
@@ -152,6 +164,21 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
               ? message.data.reason
               : "Authentication failed",
           );
+          break;
+
+        case MessageType.DISCOGS_API_REQUEST:
+        case MessageType.SYNC_PROGRESS:
+        case MessageType.SYNC_COMPLETE:
+        case MessageType.SYNC_ERROR:
+          // Handle sync-related messages
+          log("Sync message received:", message.type, message);
+          syncMessageCallbacks().forEach((callback) => {
+            try {
+              callback(message);
+            } catch (error) {
+              log("Sync message callback error:", error);
+            }
+          });
           break;
 
         default:
@@ -358,6 +385,19 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     };
   };
 
+  const onSyncMessage = (
+    callback: (message: WebSocketMessage) => void,
+  ) => {
+    setSyncMessageCallbacks((prev) => [...prev, callback]);
+
+    // Return cleanup function
+    return () => {
+      setSyncMessageCallbacks((prev) =>
+        prev.filter((cb) => cb !== callback),
+      );
+    };
+  };
+
   const contextValue: WebSocketContextValue = {
     connectionState,
     isConnected,
@@ -367,6 +407,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     sendMessage,
     reconnect,
     onCacheInvalidation,
+    onSyncMessage,
   };
 
   return (

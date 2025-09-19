@@ -30,17 +30,21 @@ type App struct {
 	DiscogsParserService           *services.DiscogsParserService
 	DownloadService                *services.DownloadService
 	SchedulerService               *services.SchedulerService
-	XMLProcessingService *services.XMLProcessingService
+	XMLProcessingService           *services.XMLProcessingService
+	DiscogsOrchestrationService    services.DiscogsOrchestrationService
+	DiscogsRateLimitService        services.DiscogsRateLimitService
 
 	// Repositories
-	UserRepo                  repositories.UserRepository
-	DiscogsDataProcessingRepo repositories.DiscogsDataProcessingRepository
-	LabelRepo                 repositories.LabelRepository
-	ArtistRepo                repositories.ArtistRepository
-	MasterRepo                repositories.MasterRepository
-	ReleaseRepo               repositories.ReleaseRepository
-	GenreRepo                 repositories.GenreRepository
-	ImageRepo                 repositories.ImageRepository
+	UserRepo                    repositories.UserRepository
+	DiscogsDataProcessingRepo   repositories.DiscogsDataProcessingRepository
+	LabelRepo                   repositories.LabelRepository
+	ArtistRepo                  repositories.ArtistRepository
+	MasterRepo                  repositories.MasterRepository
+	ReleaseRepo                 repositories.ReleaseRepository
+	GenreRepo                   repositories.GenreRepository
+	ImageRepo                   repositories.ImageRepository
+	DiscogsApiRequestRepo       repositories.DiscogsApiRequestRepository
+	DiscogsCollectionSyncRepo   repositories.DiscogsCollectionSyncRepository
 
 	// Controllers
 	AuthController authController.AuthControllerInterface
@@ -77,6 +81,8 @@ func New() (*App, error) {
 	releaseRepo := repositories.NewReleaseRepository(db)
 	genreRepo := repositories.NewGenreRepository(db)
 	imageRepo := repositories.NewImageRepository(db)
+	discogsApiRequestRepo := repositories.NewDiscogsApiRequestRepository(db)
+	discogsCollectionSyncRepo := repositories.NewDiscogsCollectionSyncRepository(db)
 
 	// Initialize services
 	discogsService := services.NewDiscogsService()
@@ -94,7 +100,17 @@ func New() (*App, error) {
 		discogsParserService,
 	)
 
-	websocket, err := websockets.New(db, eventBus, config, zitadelService, userRepo)
+	// Initialize Discogs API proxy services
+	discogsRateLimitService := services.NewDiscogsRateLimitService(db.Cache.General)
+	discogsOrchestrationService := services.NewDiscogsOrchestrationService(
+		discogsCollectionSyncRepo,
+		discogsApiRequestRepo,
+		userRepo,
+		discogsRateLimitService,
+		nil, // websocket manager will be set later
+	)
+
+	websocket, err := websockets.New(db, eventBus, config, zitadelService, userRepo, discogsOrchestrationService)
 	if err != nil {
 		return &App{}, log.Err("failed to create websocket manager", err)
 	}
@@ -119,7 +135,9 @@ func New() (*App, error) {
 		DiscogsParserService:           discogsParserService,
 		DownloadService:                downloadService,
 		SchedulerService:               schedulerService,
-		XMLProcessingService: xmlProcessingService,
+		XMLProcessingService:           xmlProcessingService,
+		DiscogsOrchestrationService:    discogsOrchestrationService,
+		DiscogsRateLimitService:        discogsRateLimitService,
 		UserRepo:                       userRepo,
 		DiscogsDataProcessingRepo:      discogsDataProcessingRepo,
 		LabelRepo:                      labelRepo,
@@ -128,10 +146,21 @@ func New() (*App, error) {
 		ReleaseRepo:                    releaseRepo,
 		GenreRepo:                      genreRepo,
 		ImageRepo:                      imageRepo,
+		DiscogsApiRequestRepo:          discogsApiRequestRepo,
+		DiscogsCollectionSyncRepo:      discogsCollectionSyncRepo,
 		AuthController:                 authController,
 		UserController:                 userController,
 		Websocket:                      websocket,
 		EventBus:                       eventBus,
+	}
+
+	// Run database migrations
+	if err := db.MigrateModels(); err != nil {
+		return &App{}, log.Err("failed to migrate database models", err)
+	}
+
+	if err := db.CreateIndexes(); err != nil {
+		log.Warn("Failed to create additional indexes", "error", err)
 	}
 
 	if err := app.validate(); err != nil {
@@ -161,6 +190,8 @@ func (a *App) validate() error {
 		a.DownloadService,
 		a.SchedulerService,
 		a.XMLProcessingService,
+		a.DiscogsOrchestrationService,
+		a.DiscogsRateLimitService,
 		a.AuthController,
 		a.UserController,
 		a.Middleware,
@@ -172,6 +203,8 @@ func (a *App) validate() error {
 		a.ReleaseRepo,
 		a.GenreRepo,
 		a.ImageRepo,
+		a.DiscogsApiRequestRepo,
+		a.DiscogsCollectionSyncRepo,
 	}
 
 	for _, check := range nilChecks {
