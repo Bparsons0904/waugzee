@@ -82,18 +82,18 @@ func (h *DiscogsHandler) Register() {
 	protected := discogs.Group("/", h.middleware.RequireAuth(h.app.ZitadelService))
 
 	// Sync endpoints
-	protected.Post("/sync-collection", h.InitiateCollectionSync)
-	protected.Get("/sync-status/:sessionId", h.GetSyncStatus)
-	protected.Post("/sync-cancel/:sessionId", h.CancelSync)
-	protected.Post("/sync-resume/:sessionId", h.ResumeSync)
-	protected.Post("/sync-pause/:sessionId", h.PauseSync)
+	protected.Post("/syncCollection", h.InitiateCollectionSync)
+	protected.Get("/syncStatus/:sessionId", h.GetSyncStatus)
+	protected.Post("/syncCancel/:sessionId", h.CancelSync)
+	protected.Post("/syncResume/:sessionId", h.ResumeSync)
+	protected.Post("/syncPause/:sessionId", h.PauseSync)
 
 	// Token management
 	protected.Put("/token", h.UpdateDiscogsToken)
 	protected.Get("/token/validate", h.ValidateDiscogsToken)
 
 	// Rate limit info
-	protected.Get("/rate-limit", h.GetRateLimit)
+	protected.Get("/rateLimit", h.GetRateLimit)
 
 	// Sync history
 	protected.Get("/syncs", h.GetSyncHistory)

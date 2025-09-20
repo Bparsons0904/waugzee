@@ -227,7 +227,7 @@ sequenceDiagram
     participant DB as Database
 
     U->>C: Click "Sync Collection"
-    C->>S: POST /api/discogs/sync-collection
+    C->>S: POST /api/discogs/syncCollection
     S->>DB: Validate user Discogs token
     S->>DB: Create DiscogsCollectionSync session
     S->>S: Determine required API calls
@@ -412,7 +412,7 @@ ALTER TABLE discogs_sync ADD COLUMN IF NOT EXISTS last_rate_limit_check TIMESTAM
 
 **Initiate Collection Sync**:
 ```http
-POST /api/discogs/sync-collection
+POST /api/discogs/syncCollection
 Authorization: Bearer {jwt_token}
 Content-Type: application/json
 
@@ -432,7 +432,7 @@ Response:
 
 **Get Sync Status**:
 ```http
-GET /api/discogs/sync-status/{sessionId}
+GET /api/discogs/syncStatus/{sessionId}
 Authorization: Bearer {jwt_token}
 
 Response:

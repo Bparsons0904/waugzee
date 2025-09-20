@@ -1,6 +1,10 @@
-import { Component, createSignal, onMount } from "solid-js";
+import { Component, createSignal, onMount, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { useAuth } from "@context/AuthContext";
+import { useWebSocket } from "@context/WebSocketContext";
+import { discogsProxyService } from "@services/discogs/discogsProxy.service";
+import { DiscogsTokenModal } from "@components/common/ui/DiscogsTokenModal/DiscogsTokenModal";
+import { useToast } from "@context/ToastContext";
 import styles from "./Dashboard.module.scss";
 import { Button } from "@components/common/ui/Button/Button";
 
@@ -14,7 +18,9 @@ interface DashboardStats {
 const Dashboard: Component = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+  const webSocket = useWebSocket();
+  const toast = useToast();
+
   const [stats, setStats] = createSignal<DashboardStats>({
     totalRecords: 0,
     totalPlays: 0,
@@ -22,9 +28,14 @@ const Dashboard: Component = () => {
     favoriteGenre: "Loading...",
   });
   const [isLoading, setIsLoading] = createSignal(true);
+  const [showTokenModal, setShowTokenModal] = createSignal(false);
+  const [syncing, setSyncing] = createSignal(false);
 
   onMount(async () => {
     try {
+      // Initialize Discogs proxy service with WebSocket
+      discogsProxyService.initialize(webSocket);
+
       // TODO: Replace with actual API call
       await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -80,9 +91,63 @@ const Dashboard: Component = () => {
     },
   ];
 
-  const handleSync = () => {
-    // TODO: Implement collection sync
-    console.log("Syncing collection...");
+  const handleSync = async () => {
+    try {
+      // Check if user has a Discogs token
+      const currentUser = user();
+      if (!currentUser?.discogsToken) {
+        toast.showInfo("Please add your Discogs token to sync your collection");
+        setShowTokenModal(true);
+        return;
+      }
+
+      // Check if WebSocket is ready
+      if (!discogsProxyService.isReady()) {
+        toast.showError("Connection not ready. Please try again in a moment.");
+        return;
+      }
+
+      setSyncing(true);
+      toast.showInfo("Starting collection sync...");
+
+      // Initiate the sync
+      const syncSession = await discogsProxyService.initiateCollectionSync({
+        syncType: 'collection',
+        fullSync: false, // Start with incremental sync
+        pageLimit: 50,   // Reasonable page limit
+      });
+
+      toast.showSuccess(`Collection sync started! Session: ${syncSession.sessionId}`);
+
+      // Set up progress callbacks
+      const cleanupProgress = discogsProxyService.onSyncProgress((progress) => {
+        console.log("Sync progress:", progress);
+        toast.showInfo(`Sync progress: ${progress.percentComplete}%`);
+      });
+
+      const cleanupComplete = discogsProxyService.onSyncComplete((sessionId) => {
+        console.log("Sync completed:", sessionId);
+        toast.showSuccess("Collection sync completed successfully!");
+        setSyncing(false);
+        cleanupProgress();
+        cleanupComplete();
+        cleanupError();
+      });
+
+      const cleanupError = discogsProxyService.onSyncError((sessionId, error) => {
+        console.error("Sync error:", sessionId, error);
+        toast.showError(`Sync failed: ${error}`);
+        setSyncing(false);
+        cleanupProgress();
+        cleanupComplete();
+        cleanupError();
+      });
+
+    } catch (error) {
+      console.error("Failed to start sync:", error);
+      toast.showError(`Failed to start sync: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setSyncing(false);
+    }
   };
 
   return (
@@ -102,7 +167,7 @@ const Dashboard: Component = () => {
           
           <div class={styles.cardGrid}>
             {actionCards.map((card) => (
-              <div 
+              <div
                 class={styles.actionCard}
                 onClick={card.action}
               >
@@ -113,8 +178,9 @@ const Dashboard: Component = () => {
                   variant="primary"
                   size="sm"
                   onClick={card.action}
+                  disabled={card.title === "Sync Collection" && syncing()}
                 >
-                  Get Started
+                  {card.title === "Sync Collection" && syncing() ? "Syncing..." : "Get Started"}
                 </Button>
               </div>
             ))}
@@ -167,6 +233,10 @@ const Dashboard: Component = () => {
           </div>
         </section>
       </div>
+
+      <Show when={showTokenModal()}>
+        <DiscogsTokenModal onClose={() => setShowTokenModal(false)} />
+      </Show>
     </div>
   );
 };

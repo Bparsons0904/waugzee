@@ -232,13 +232,45 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 - **Accessibility**: Proper alt text, ARIA labels, keyboard navigation
 - **Testing**: Comprehensive test coverage for component behavior
 
+### Naming Conventions
+
+**CRITICAL: All naming must follow consistent camelCase/PascalCase standards. NO kebab-case allowed.**
+
+**File Naming:**
+- **Services**: camelCase - `userService.ts`, `apiHooks.ts`, `discogsProxy.service.ts`
+- **Components**: PascalCase - `Modal.tsx`, `Button.tsx`, `HomePage.tsx`
+- **Utilities**: camelCase - `dateUtils.ts`, `formatHelpers.ts`
+- **Types/Interfaces**: PascalCase - `User.ts`, `ApiResponse.ts`
+- **CSS/SCSS**: camelCase - `button.module.scss`, `modal.module.scss`
+
+**Route Naming:**
+- **API Endpoints**: camelCase - `/syncCollection`, `/rateLimit`, `/getUserProfile`
+- **Frontend Routes**: camelCase - `/silentCallback`, `/userDashboard`
+- **NEVER use kebab-case**: ❌ `/sync-collection`, ❌ `/rate-limit`
+
+**Variable & Function Naming:**
+- **Variables**: camelCase - `userName`, `syncStatus`, `isLoading`
+- **Functions**: camelCase - `handleSubmit`, `fetchUserData`, `validateToken`
+- **Constants**: SCREAMING_SNAKE_CASE - `API_BASE_URL`, `MAX_RETRY_ATTEMPTS`
+- **Components**: PascalCase - `UserProfile`, `SyncButton`, `ModalDialog`
+
+**CSS Class Naming:**
+- **CSS Classes**: camelCase - `.userProfile`, `.syncButton`, `.errorMessage`
+- **CSS Variables**: kebab-case (exception) - `--primary-color`, `--font-size-large`
+- **SCSS Mixins**: camelCase - `@mixin buttonStyles`, `@mixin cardLayout`
+
+**Enforcement:**
+- **Code Reviews**: All PRs must follow these naming conventions
+- **Linting**: ESLint and Go linting rules enforce these standards
+- **Immediate Fix Required**: Any kebab-case discovered should be fixed immediately
+- **No Exceptions**: Only CSS variables may use kebab-case due to CSS specification requirements
+
 ### File Structure Guidelines
 
 - **NEVER create index.js/ts files unless absolutely necessary** - Use direct imports instead
 - Index files create confusion and make navigation harder as projects grow
 - Prefer explicit imports like `import { Modal } from "./components/Modal/Modal"`
 - **Component organization**: Each component in own directory with `.tsx` and `.module.scss`
-- **File names should be camelCase or PascalCase** - Use descriptive camelCase for service files and PascalCase for components
 
 ### Reference Repository
 
@@ -353,6 +385,4 @@ This project is currently in **Phase 2: Authentication & User Management**. See 
 ---
 
 **Project Status**: 🚧 **Active Development** - Phase 2: Authentication & User Management
-
-- File names should be camelCase or PascalCase
 

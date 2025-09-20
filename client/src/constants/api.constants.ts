@@ -36,7 +36,7 @@ export const FRONTEND_ROUTES = {
   HOME: '/',
   LOGIN: '/auth/login',
   CALLBACK: '/auth/callback',
-  SILENT_CALLBACK: '/auth/silent-callback',
+  SILENT_CALLBACK: '/auth/silentCallback',
   DASHBOARD: '/dashboard',
   PROFILE: '/profile',
 } as const;

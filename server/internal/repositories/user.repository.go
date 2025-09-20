@@ -11,16 +11,15 @@ import (
 )
 
 const (
-	USER_CACHE_EXPIRY = 7 * 24 * time.Hour // 7 days
+	USER_CACHE_EXPIRY         = 7 * 24 * time.Hour // 7 days
+	USER_CACHE_PREFIX         = "user:"
+	OIDC_MAPPING_CACHE_PREFIX = "oidc:"
 )
 
 type UserRepository interface {
 	GetByID(ctx context.Context, id string) (*User, error)
-	GetByEmail(ctx context.Context, email string) (*User, error)
 	GetByOIDCUserID(ctx context.Context, oidcUserID string) (*User, error)
-	CreateFromOIDC(ctx context.Context, user *User) (*User, error)
 	Update(ctx context.Context, user *User) error
-	Delete(ctx context.Context, id string) error
 	FindOrCreateOIDCUser(ctx context.Context, user *User) (*User, error)
 }
 
@@ -58,49 +57,21 @@ func (r *userRepository) GetByID(ctx context.Context, id string) (*User, error) 
 func (r *userRepository) Update(ctx context.Context, user *User) error {
 	log := r.log.Function("Update")
 
-	db := r.db.SQLWithContext(ctx).Set("waugzee:cache", r.db.Cache.User)
-
-	if err := db.Save(user).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Save(user).Error; err != nil {
 		return log.Err("failed to update user", err, "user", user)
 	}
 
-	return nil
-}
-
-func (r *userRepository) Delete(ctx context.Context, id string) error {
-	log := r.log.Function("Delete")
-
-	// Get user first to clean up OIDC mapping cache
-	var user User
-	if err := r.db.SQLWithContext(ctx).First(&user, "id = ?", id).Error; err == nil {
-		// Clean up OIDC mapping cache if user has OIDC ID
-		if user.OIDCUserID != "" {
-			oidcCacheKey := "oidc:" + user.OIDCUserID
-			if err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).Delete(); err != nil {
-				log.Warn(
-					"failed to remove OIDC mapping from cache",
-					"oidcUserID",
-					user.OIDCUserID,
-					"error",
-					err,
-				)
-			}
-		}
-	}
-
-	if err := r.db.SQLWithContext(ctx).Delete(&User{}, "id = ?", id).Error; err != nil {
-		return log.Err("failed to delete user", err, "id", id)
-	}
-
-	if err := database.NewCacheBuilder(r.db.Cache.User, id).Delete(); err != nil {
-		log.Warn("failed to remove user from cache", "userID", id, "error", err)
+	// Clear user cache after successful update
+	if err := r.clearUserCache(ctx, user); err != nil {
+		log.Warn("failed to clear user cache after update", "userID", user.ID, "error", err)
 	}
 
 	return nil
 }
 
 func (r *userRepository) getCacheByID(ctx context.Context, userID string, user *User) error {
-	found, err := database.NewCacheBuilder(r.db.Cache.User, userID).Get(user)
+	cacheKey := USER_CACHE_PREFIX + userID
+	found, err := database.NewCacheBuilder(r.db.Cache.User, cacheKey).WithContext(ctx).Get(user)
 	if err != nil {
 		return r.log.Function("getCacheByID").
 			Err("failed to get user from cache", err, "userID", userID)
@@ -115,7 +86,8 @@ func (r *userRepository) getCacheByID(ctx context.Context, userID string, user *
 }
 
 func (r *userRepository) addUserToCache(ctx context.Context, user *User) error {
-	if err := database.NewCacheBuilder(r.db.Cache.User, user.ID).
+	cacheKey := USER_CACHE_PREFIX + user.ID.String()
+	if err := database.NewCacheBuilder(r.db.Cache.User, cacheKey).
 		WithStruct(user).
 		WithTTL(USER_CACHE_EXPIRY).
 		WithContext(ctx).
@@ -123,6 +95,32 @@ func (r *userRepository) addUserToCache(ctx context.Context, user *User) error {
 		return r.log.Function("addUserToCache").
 			Err("failed to add user to cache", err, "user", user)
 	}
+	return nil
+}
+
+func (r *userRepository) clearUserCache(ctx context.Context, user *User) error {
+	log := r.log.Function("clearUserCache")
+
+	// Clear primary user cache
+	userCacheKey := USER_CACHE_PREFIX + user.ID.String()
+	if err := database.NewCacheBuilder(r.db.Cache.User, userCacheKey).WithContext(ctx).Delete(); err != nil {
+		log.Warn("failed to clear user cache", "userID", user.ID, "error", err)
+	}
+
+	// Clear OIDC mapping cache if user has OIDC ID
+	if user.OIDCUserID != "" {
+		oidcCacheKey := OIDC_MAPPING_CACHE_PREFIX + user.OIDCUserID
+		if err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).WithContext(ctx).Delete(); err != nil {
+			log.Warn(
+				"failed to clear OIDC mapping cache",
+				"oidcUserID",
+				user.OIDCUserID,
+				"error",
+				err,
+			)
+		}
+	}
+
 	return nil
 }
 
@@ -141,8 +139,8 @@ func (r *userRepository) getDBByID(ctx context.Context, userID string, user *Use
 	return nil
 }
 
-func (r *userRepository) GetByEmail(ctx context.Context, email string) (*User, error) {
-	log := r.log.Function("GetByEmail")
+func (r *userRepository) getByEmail(ctx context.Context, email string) (*User, error) {
+	log := r.log.Function("getByEmail")
 
 	var user User
 	if err := r.db.SQLWithContext(ctx).First(&user, "email = ?", email).Error; err != nil {
@@ -161,8 +159,10 @@ func (r *userRepository) GetByOIDCUserID(ctx context.Context, oidcUserID string)
 
 	// Try to get UUID from OIDC cache first
 	var userUUID string
-	oidcCacheKey := "oidc:" + oidcUserID
-	found, err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).Get(&userUUID)
+	oidcCacheKey := OIDC_MAPPING_CACHE_PREFIX + oidcUserID
+	found, err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).
+		WithContext(ctx).
+		Get(&userUUID)
 	if err == nil && found {
 		// Found UUID in cache, now get user by UUID (which uses primary cache)
 		var cachedUser User
@@ -195,11 +195,11 @@ func (r *userRepository) GetByOIDCUserID(ctx context.Context, oidcUserID string)
 	return &user, nil
 }
 
-func (r *userRepository) CreateFromOIDC(
+func (r *userRepository) createFromOIDC(
 	ctx context.Context,
 	user *User,
 ) (*User, error) {
-	log := r.log.Function("CreateFromOIDC")
+	log := r.log.Function("createFromOIDC")
 
 	// Ensure defaults are set
 	if !user.IsActive {
@@ -219,7 +219,7 @@ func (r *userRepository) CreateFromOIDC(
 	}
 
 	// Cache OIDC ID to UUID mapping for faster future lookups
-	oidcCacheKey := "oidc:" + user.OIDCUserID
+	oidcCacheKey := OIDC_MAPPING_CACHE_PREFIX + user.OIDCUserID
 	if err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).
 		WithStruct(user.ID.String()).
 		WithTTL(USER_CACHE_EXPIRY).
@@ -264,7 +264,7 @@ func (r *userRepository) FindOrCreateOIDCUser(
 
 	// If not found by OIDC ID, try by email (in case user exists but wasn't created via OIDC)
 	if user.Email != nil && *user.Email != "" {
-		existingUser, err := r.GetByEmail(ctx, *user.Email)
+		existingUser, err := r.getByEmail(ctx, *user.Email)
 		if err == nil && !existingUser.IsOIDCUser() {
 			// Link existing user to OIDC
 			existingUser.OIDCUserID = user.OIDCUserID
@@ -295,5 +295,5 @@ func (r *userRepository) FindOrCreateOIDCUser(
 	}
 
 	// Create new OIDC user
-	return r.CreateFromOIDC(ctx, user)
+	return r.createFromOIDC(ctx, user)
 }

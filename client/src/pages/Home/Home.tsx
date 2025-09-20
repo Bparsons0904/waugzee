@@ -1,6 +1,7 @@
 import { Component, createSignal, onMount, createMemo } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { useAuth } from "@context/AuthContext";
+import { useWebSocket } from "@context/WebSocketContext";
 import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import { DiscogsTokenModal } from "@components/common/ui/DiscogsTokenModal";
 import {
@@ -11,6 +12,7 @@ import {
   ActionsSection,
   ActionItem,
 } from "@components/dashboard/ActionsSection/ActionsSection";
+import { discogsProxyService } from "@services/discogs/discogsProxy.service";
 import styles from "./Home.module.scss";
 
 interface DashboardStats {
@@ -23,6 +25,7 @@ interface DashboardStats {
 const Home: Component = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const webSocket = useWebSocket();
 
   const [stats, setStats] = createSignal<DashboardStats>({
     totalRecords: 0,
@@ -32,6 +35,8 @@ const Home: Component = () => {
   });
   const [isLoading, setIsLoading] = createSignal(true);
   const [showTokenModal, setShowTokenModal] = createSignal(false);
+  const [isSyncing, setIsSyncing] = createSignal(false);
+  const [syncStatus, setSyncStatus] = createSignal<string>("");
 
   // const hasDiscogsToken = user()?.discogsToken;
   //
@@ -53,12 +58,53 @@ const Home: Component = () => {
     navigate("/equipment");
   };
 
-  const handleSyncCollection = () => {
+  const handleSyncCollection = async () => {
     if (!user()?.discogsToken) {
       setShowTokenModal(true);
-    } else {
-      // TODO: Implement sync with Discogs
-      console.log("Sync collection functionality not yet implemented");
+      return;
+    }
+
+    try {
+      setIsSyncing(true);
+      setSyncStatus("Starting sync...");
+
+      const syncSession = await discogsProxyService.initiateCollectionSync({
+        syncType: "collection",
+        fullSync: false, // Start with incremental sync
+        pageLimit: 10, // Limit pages for testing
+      });
+
+      setSyncStatus(`Sync started! Session: ${syncSession.sessionId}`);
+      console.log("Collection sync initiated:", syncSession);
+
+      // Set up progress callbacks
+      const unsubscribeProgress = discogsProxyService.onSyncProgress((progress) => {
+        setSyncStatus(`Syncing... ${progress.percentComplete.toFixed(1)}% complete`);
+        console.log("Sync progress:", progress);
+      });
+
+      const unsubscribeComplete = discogsProxyService.onSyncComplete((sessionId) => {
+        setSyncStatus("Sync completed successfully!");
+        setIsSyncing(false);
+        console.log("Sync completed:", sessionId);
+        unsubscribeProgress();
+        unsubscribeComplete();
+        unsubscribeError();
+      });
+
+      const unsubscribeError = discogsProxyService.onSyncError((sessionId, error) => {
+        setSyncStatus(`Sync failed: ${error}`);
+        setIsSyncing(false);
+        console.error("Sync error:", sessionId, error);
+        unsubscribeProgress();
+        unsubscribeComplete();
+        unsubscribeError();
+      });
+
+    } catch (error) {
+      console.error("Failed to start sync:", error);
+      setSyncStatus("Failed to start sync");
+      setIsSyncing(false);
     }
   };
 
@@ -125,10 +171,17 @@ const Home: Component = () => {
     {
       title: "Sync Collection",
       description: user()?.discogsToken
-        ? "Sync your Waugzee collection with your Discogs library."
+        ? isSyncing()
+          ? syncStatus() || "Syncing your collection..."
+          : "Sync your Waugzee collection with your Discogs library."
         : "Connect your Discogs account to sync your collection.",
-      buttonText: user()?.discogsToken ? "Sync Now" : "Connect Discogs",
+      buttonText: user()?.discogsToken
+        ? isSyncing()
+          ? "Syncing..."
+          : "Sync Now"
+        : "Connect Discogs",
       onClick: handleSyncCollection,
+      disabled: isSyncing(),
     },
     {
       title: "View Analytics",
@@ -141,6 +194,9 @@ const Home: Component = () => {
 
   onMount(async () => {
     try {
+      // Initialize the Discogs proxy service with WebSocket context
+      discogsProxyService.initialize(webSocket);
+
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       setStats({

@@ -9,7 +9,13 @@ import { NavBar } from "@components/layout/Navbar/Navbar";
 // import { useAutoCacheInvalidation } from "./services/cacheInvalidation.service";
 
 const App: Component<RouteSectionProps<unknown>> = (props) => {
-  const queryClient = new QueryClient();
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
 
   return (
     <QueryClientProvider client={queryClient}>

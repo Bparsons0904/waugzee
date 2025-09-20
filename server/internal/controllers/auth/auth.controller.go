@@ -301,15 +301,16 @@ func (ac *AuthController) clearUserCacheByOIDC(ctx context.Context, oidcUserID s
 		return err
 	}
 
-	// Clear user cache by UUID
-	if err := database.NewCacheBuilder(ac.db.Cache.User, user.ID.String()).Delete(); err != nil {
+	// Clear user cache by UUID using proper cache key prefix
+	userCacheKey := "user:" + user.ID.String()
+	if err := database.NewCacheBuilder(ac.db.Cache.User, userCacheKey).WithContext(ctx).Delete(); err != nil {
 		log.Warn("failed to remove user from cache", "userID", user.ID, "error", err)
 		return err
 	}
 
-	// Clear OIDC mapping cache
+	// Clear OIDC mapping cache using proper cache key prefix
 	oidcCacheKey := "oidc:" + oidcUserID
-	if err := database.NewCacheBuilder(ac.db.Cache.User, oidcCacheKey).Delete(); err != nil {
+	if err := database.NewCacheBuilder(ac.db.Cache.User, oidcCacheKey).WithContext(ctx).Delete(); err != nil {
 		log.Warn("failed to remove OIDC mapping from cache", "oidcUserID", oidcUserID, "error", err)
 		return err
 	}

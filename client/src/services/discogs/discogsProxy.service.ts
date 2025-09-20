@@ -184,7 +184,7 @@ export class DiscogsProxyService {
     console.log('[DiscogsProxy] Initiating collection sync', request);
 
     try {
-      const response = await api.post<SyncSession>('/discogs/sync-collection', request);
+      const response = await api.post<SyncSession>('/discogs/syncCollection', request);
       console.log('[DiscogsProxy] Sync initiated successfully', response);
       return response;
     } catch (error) {
@@ -200,7 +200,7 @@ export class DiscogsProxyService {
     console.log('[DiscogsProxy] Getting sync status for session', sessionId);
 
     try {
-      const response = await api.get<SyncProgress>(`/discogs/sync-status/${sessionId}`);
+      const response = await api.get<SyncProgress>(`/discogs/syncStatus/${sessionId}`);
       console.log('[DiscogsProxy] Sync status retrieved', response);
       return response;
     } catch (error) {
@@ -216,7 +216,7 @@ export class DiscogsProxyService {
     console.log('[DiscogsProxy] Cancelling sync session', sessionId);
 
     try {
-      await api.post(`/discogs/sync-cancel/${sessionId}`, {});
+      await api.post(`/discogs/syncCancel/${sessionId}`, {});
       console.log('[DiscogsProxy] Sync cancelled successfully');
     } catch (error) {
       console.error('[DiscogsProxy] Failed to cancel sync', error);
@@ -231,7 +231,7 @@ export class DiscogsProxyService {
     console.log('[DiscogsProxy] Pausing sync session', sessionId);
 
     try {
-      await api.post(`/discogs/sync-pause/${sessionId}`, {});
+      await api.post(`/discogs/syncPause/${sessionId}`, {});
       console.log('[DiscogsProxy] Sync paused successfully');
     } catch (error) {
       console.error('[DiscogsProxy] Failed to pause sync', error);
@@ -246,7 +246,7 @@ export class DiscogsProxyService {
     console.log('[DiscogsProxy] Resuming sync session', sessionId);
 
     try {
-      await api.post(`/discogs/sync-resume/${sessionId}`, {});
+      await api.post(`/discogs/syncResume/${sessionId}`, {});
       console.log('[DiscogsProxy] Sync resumed successfully');
     } catch (error) {
       console.error('[DiscogsProxy] Failed to resume sync', error);
@@ -305,7 +305,7 @@ export class DiscogsProxyService {
         limit: number;
         windowReset: string;
         recommendedDelay: string;
-      }>('/discogs/rate-limit');
+      }>('/discogs/rateLimit');
       console.log('[DiscogsProxy] Rate limit info retrieved', response);
       return response;
     } catch (error) {

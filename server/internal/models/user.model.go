@@ -37,6 +37,7 @@ func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
 	return err
 }
 
+
 func (u *User) IsOIDCUser() bool {
 	return u.OIDCUserID != ""
 }
