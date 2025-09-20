@@ -13,8 +13,8 @@ import (
 
 // MasterArtistAssociation represents a specific master-artist association pair
 type MasterArtistAssociation struct {
-	MasterDiscogsID int64
-	ArtistDiscogsID int64
+	MasterID int64
+	ArtistID int64
 }
 
 type MasterRepository interface {
@@ -35,7 +35,7 @@ type MasterRepository interface {
 	) error
 	CreateMasterGenreAssociations(
 		ctx context.Context,
-		masterDiscogsIDs []int64,
+		masterIDs []int64,
 		genreNames []string,
 	) error
 }
@@ -72,7 +72,7 @@ func (r *masterRepository) GetByDiscogsID(ctx context.Context, discogsID int64) 
 	log := r.log.Function("GetByDiscogsID")
 
 	var master Master
-	if err := r.db.SQLWithContext(ctx).First(&master, "discogs_id = ?", discogsID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&master, "id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -126,7 +126,7 @@ func (r *masterRepository) UpsertBatch(ctx context.Context, masters []*Master) e
 
 	discogsIDs := make([]int64, len(masters))
 	for i, master := range masters {
-		discogsIDs[i] = master.DiscogsID
+		discogsIDs[i] = master.ID
 	}
 
 	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, discogsIDs)
@@ -181,14 +181,14 @@ func (r *masterRepository) GetBatchByDiscogsIDs(
 	}
 
 	var masters []*Master
-	if err := r.db.SQLWithContext(ctx).Where("discogs_id IN ?", discogsIDs).Find(&masters).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Where("id IN ?", discogsIDs).Find(&masters).Error; err != nil {
 		return nil, log.Err("failed to get masters by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
 	// Convert to map for O(1) lookup
 	result := make(map[int64]*Master, len(masters))
 	for _, master := range masters {
-		result[master.DiscogsID] = master
+		result[master.ID] = master
 	}
 
 	return result, nil
@@ -205,14 +205,14 @@ func (r *masterRepository) GetHashesByDiscogsIDs(
 	}
 
 	var masters []struct {
-		DiscogsID   int64  `json:"discogsId"`
+		ID   int64  `json:"discogsId"`
 		ContentHash string `json:"contentHash"`
 	}
 
 	if err := r.db.SQLWithContext(ctx).
 		Model(&Master{}).
-		Select("discogs_id, content_hash").
-		Where("discogs_id IN ?", discogsIDs).
+		Select("id, content_hash").
+		Where("id IN ?", discogsIDs).
 		Find(&masters).Error; err != nil {
 		return nil, log.Err(
 			"failed to get master hashes by Discogs IDs",
@@ -224,7 +224,7 @@ func (r *masterRepository) GetHashesByDiscogsIDs(
 
 	result := make(map[int64]string, len(masters))
 	for _, master := range masters {
-		result[master.DiscogsID] = master.ContentHash
+		result[master.ID] = master.ContentHash
 	}
 
 	return result, nil
@@ -276,17 +276,17 @@ func (r *masterRepository) CreateMasterArtistAssociations(
 	artistIDs := make([]int64, len(associations))
 
 	for i, assoc := range associations {
-		masterIDs[i] = assoc.MasterDiscogsID
-		artistIDs[i] = assoc.ArtistDiscogsID
+		masterIDs[i] = assoc.MasterID
+		artistIDs[i] = assoc.ArtistID
 	}
 
 	// Insert exact association pairs with ordering to prevent deadlocks
 	query := `
-		INSERT INTO master_artists (master_discogs_id, artist_discogs_id)
+		INSERT INTO master_artists (master_id, artist_id)
 		SELECT master_id, artist_id
 		FROM unnest($1::bigint[], $2::bigint[]) AS t(master_id, artist_id)
 		ORDER BY master_id, artist_id
-		ON CONFLICT (master_discogs_id, artist_discogs_id) DO NOTHING
+		ON CONFLICT (master_id, artist_id) DO NOTHING
 	`
 
 	result := db.Exec(query, masterIDs, artistIDs)
@@ -301,12 +301,12 @@ func (r *masterRepository) CreateMasterArtistAssociations(
 // CreateMasterGenreAssociations creates many-to-many associations between masters and genres
 func (r *masterRepository) CreateMasterGenreAssociations(
 	ctx context.Context,
-	masterDiscogsIDs []int64,
+	masterIDs []int64,
 	genreNames []string,
 ) error {
 	log := r.log.Function("CreateMasterGenreAssociations")
 
-	if len(masterDiscogsIDs) == 0 || len(genreNames) == 0 {
+	if len(masterIDs) == 0 || len(genreNames) == 0 {
 		return nil
 	}
 
@@ -314,18 +314,18 @@ func (r *masterRepository) CreateMasterGenreAssociations(
 
 	// Build cross-product associations using genre names with ON CONFLICT DO NOTHING
 	query := `
-		INSERT INTO master_genres (master_discogs_id, genre_id)
-		SELECT m.discogs_id, g.id
-		FROM unnest($1::bigint[]) AS m(discogs_id)
+		INSERT INTO master_genres (master_id, genre_id)
+		SELECT m.id, g.id
+		FROM unnest($1::bigint[]) AS m(id)
 		CROSS JOIN genres g
 		WHERE g.name = ANY($2::text[])
-		ON CONFLICT (master_discogs_id, genre_id) DO NOTHING
+		ON CONFLICT (master_id, genre_id) DO NOTHING
 	`
 
-	result := db.Exec(query, masterDiscogsIDs, genreNames)
+	result := db.Exec(query, masterIDs, genreNames)
 	if result.Error != nil {
 		return log.Err("failed to create master-genre associations", result.Error,
-			"masterCount", len(masterDiscogsIDs), "genreCount", len(genreNames))
+			"masterCount", len(masterIDs), "genreCount", len(genreNames))
 	}
 
 	return nil

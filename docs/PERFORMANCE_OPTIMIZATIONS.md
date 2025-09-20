@@ -28,12 +28,12 @@ The Waugzee data processing pipeline has been optimized for **5-10x faster perfo
 
 ```go
 // Before: Separate lookup and insert/update
-existingItems := repo.GetBatchByDiscogsIDs(ctx, discogsIDs)
+existingItems := repo.GetBatchByIDs(ctx, ids)
 // ... separate insert and update logic
 
 // After: Single native UPSERT
 result := db.Clauses(clause.OnConflict{
-    Columns: []clause.Column{{Name: "discogs_id"}},
+    Columns: []clause.Column{{Name: "id"}},
     DoUpdates: clause.AssignmentColumns([]string{...}),
 }).CreateInBatches(items, BATCH_SIZE)
 ```

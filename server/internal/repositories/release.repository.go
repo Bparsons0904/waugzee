@@ -57,7 +57,7 @@ func (r *releaseRepository) GetByDiscogsID(ctx context.Context, discogsID int64)
 	log := r.log.Function("GetByDiscogsID")
 
 	var release Release
-	if err := r.db.SQLWithContext(ctx).Preload("Label").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "discogs_id = ?", discogsID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Preload("Label").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -114,7 +114,7 @@ func (r *releaseRepository) UpsertBatch(
 
 	discogsIDs := make([]int64, len(releases))
 	for i, release := range releases {
-		discogsIDs[i] = release.DiscogsID
+		discogsIDs[i] = release.ID
 	}
 
 	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, discogsIDs)
@@ -175,14 +175,14 @@ func (r *releaseRepository) GetBatchByDiscogsIDs(
 	}
 
 	var releases []*Release
-	if err := r.db.SQLWithContext(ctx).Where("discogs_id IN ?", discogsIDs).Find(&releases).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Where("id IN ?", discogsIDs).Find(&releases).Error; err != nil {
 		return nil, log.Err("failed to get releases by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
 	// Convert to map for O(1) lookup
 	result := make(map[int64]*Release, len(releases))
 	for _, release := range releases {
-		result[release.DiscogsID] = release
+		result[release.ID] = release
 	}
 
 	log.Info(
@@ -206,14 +206,14 @@ func (r *releaseRepository) GetHashesByDiscogsIDs(
 	}
 
 	var releases []struct {
-		DiscogsID   int64  `json:"discogsId"`
+		ID   int64  `json:"discogsId"`
 		ContentHash string `json:"contentHash"`
 	}
 
 	if err := r.db.SQLWithContext(ctx).
 		Model(&Release{}).
-		Select("discogs_id, content_hash").
-		Where("discogs_id IN ?", discogsIDs).
+		Select("id, content_hash").
+		Where("id IN ?", discogsIDs).
 		Find(&releases).Error; err != nil {
 		return nil, log.Err(
 			"failed to get release hashes by Discogs IDs",
@@ -225,7 +225,7 @@ func (r *releaseRepository) GetHashesByDiscogsIDs(
 
 	result := make(map[int64]string, len(releases))
 	for _, release := range releases {
-		result[release.DiscogsID] = release.ContentHash
+		result[release.ID] = release.ContentHash
 	}
 
 	return result, nil

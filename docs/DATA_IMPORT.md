@@ -387,14 +387,14 @@ All repositories follow consistent patterns with:
 ```go
 type EntityRepository interface {
     UpsertBatch(ctx context.Context, entities []*Entity) (int, int, error)
-    GetBatchByDiscogsIDs(ctx context.Context, discogsIDs []int) ([]*Entity, error)
+    GetBatchByIDs(ctx context.Context, ids []int) ([]*Entity, error)
     // ... standard CRUD operations
 }
 ```
 
 **Database Integration:**
 
-- **Batch Upserts**: `ON CONFLICT (discogs_id) DO UPDATE` for all entity types
+- **Batch Upserts**: `ON CONFLICT (id) DO UPDATE` for all entity types
 - **Relationship Handling**: Foreign key management with proper cascade behaviors
 - **Performance Optimized**: No transaction overhead for high-throughput processing
 - **Index Utilization**: Optimized queries using Discogs ID indexes

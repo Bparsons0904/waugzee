@@ -56,7 +56,7 @@ func (r *labelRepository) GetByDiscogsID(ctx context.Context, discogsID int64) (
 	log := r.log.Function("GetByDiscogsID")
 
 	var label Label
-	if err := r.db.SQLWithContext(ctx).First(&label, "discogs_id = ?", discogsID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&label, "id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -110,7 +110,7 @@ func (r *labelRepository) UpsertBatch(ctx context.Context, labels []*Label) erro
 
 	discogsIDs := make([]int64, len(labels))
 	for i, label := range labels {
-		discogsIDs[i] = label.DiscogsID
+		discogsIDs[i] = label.ID
 	}
 
 	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, discogsIDs)
@@ -165,14 +165,14 @@ func (r *labelRepository) GetBatchByDiscogsIDs(
 	}
 
 	var labels []*Label
-	if err := r.db.SQLWithContext(ctx).Where("discogs_id IN ?", discogsIDs).Find(&labels).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Where("id IN ?", discogsIDs).Find(&labels).Error; err != nil {
 		return nil, log.Err("failed to get labels by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
 	// Convert to map for O(1) lookup
 	result := make(map[int64]*Label, len(labels))
 	for _, label := range labels {
-		result[label.DiscogsID] = label
+		result[label.ID] = label
 	}
 
 	log.Info("Retrieved labels by Discogs IDs", "requested", len(discogsIDs), "found", len(result))
@@ -190,14 +190,14 @@ func (r *labelRepository) GetHashesByDiscogsIDs(
 	}
 
 	var labels []struct {
-		DiscogsID   int64  `json:"discogsId"`
+		ID   int64  `json:"discogsId"`
 		ContentHash string `json:"contentHash"`
 	}
 
 	if err := r.db.SQLWithContext(ctx).
 		Model(&Label{}).
-		Select("discogs_id, content_hash").
-		Where("discogs_id IN ?", discogsIDs).
+		Select("id, content_hash").
+		Where("id IN ?", discogsIDs).
 		Find(&labels).Error; err != nil {
 		return nil, log.Err(
 			"failed to get label hashes by Discogs IDs",
@@ -209,7 +209,7 @@ func (r *labelRepository) GetHashesByDiscogsIDs(
 
 	result := make(map[int64]string, len(labels))
 	for _, label := range labels {
-		result[label.DiscogsID] = label.ContentHash
+		result[label.ID] = label.ContentHash
 	}
 
 	return result, nil

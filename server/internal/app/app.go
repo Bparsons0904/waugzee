@@ -143,11 +143,6 @@ func New() (*App, error) {
 		EventBus:                    eventBus,
 	}
 
-	// Run database migrations
-	if err := db.MigrateModels(); err != nil {
-		return &App{}, log.Err("failed to migrate database models", err)
-	}
-
 	if err := db.CreateIndexes(); err != nil {
 		log.Warn("Failed to create additional indexes", "error", err)
 	}

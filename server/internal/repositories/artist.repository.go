@@ -57,7 +57,7 @@ func (r *artistRepository) GetByDiscogsID(ctx context.Context, discogsID int64) 
 	log := r.log.Function("GetByDiscogsID")
 
 	var artist Artist
-	if err := r.db.SQLWithContext(ctx).First(&artist, "discogs_id = ?", discogsID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).First(&artist, "id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -111,7 +111,7 @@ func (r *artistRepository) UpsertBatch(ctx context.Context, artists []*Artist) e
 
 	discogsIDs := make([]int64, len(artists))
 	for i, artist := range artists {
-		discogsIDs[i] = artist.DiscogsID
+		discogsIDs[i] = artist.ID
 	}
 
 	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, discogsIDs)
@@ -162,14 +162,14 @@ func (r *artistRepository) GetBatchByDiscogsIDs(
 	}
 
 	var artists []*Artist
-	if err := r.db.SQLWithContext(ctx).Where("discogs_id IN ?", discogsIDs).Find(&artists).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Where("id IN ?", discogsIDs).Find(&artists).Error; err != nil {
 		return nil, log.Err("failed to get artists by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
 	// Convert to map for O(1) lookup
 	result := make(map[int64]*Artist, len(artists))
 	for _, artist := range artists {
-		result[artist.DiscogsID] = artist
+		result[artist.ID] = artist
 	}
 
 	return result, nil
@@ -186,14 +186,14 @@ func (r *artistRepository) GetHashesByDiscogsIDs(
 	}
 
 	var artists []struct {
-		DiscogsID   int64  `json:"discogsId"`
+		ID   int64  `json:"discogsId"`
 		ContentHash string `json:"contentHash"`
 	}
 
 	if err := r.db.SQLWithContext(ctx).
 		Model(&Artist{}).
-		Select("discogs_id, content_hash").
-		Where("discogs_id IN ?", discogsIDs).
+		Select("id, content_hash").
+		Where("id IN ?", discogsIDs).
 		Find(&artists).Error; err != nil {
 		return nil, log.Err(
 			"failed to get artist hashes by Discogs IDs",
@@ -205,7 +205,7 @@ func (r *artistRepository) GetHashesByDiscogsIDs(
 
 	result := make(map[int64]string, len(artists))
 	for _, artist := range artists {
-		result[artist.DiscogsID] = artist.ContentHash
+		result[artist.ID] = artist.ContentHash
 	}
 
 	return result, nil
@@ -269,9 +269,8 @@ func (r *artistRepository) FindOrCreateByDiscogsID(
 
 	// If not found, create new artist with the DiscogsID
 	newArtist := &Artist{
-		DiscogsID: discogsID,
-		Name:      name,
-		IsActive:  true, // Default to active
+		ID:   discogsID,
+		Name: name,
 	}
 
 	createdArtist, err := r.Create(ctx, newArtist)
@@ -286,6 +285,6 @@ func (r *artistRepository) FindOrCreateByDiscogsID(
 		)
 	}
 
-	log.Info("Created new artist", "name", name, "discogsID", createdArtist.DiscogsID)
+	log.Info("Created new artist", "name", name, "discogsID", createdArtist.ID)
 	return createdArtist, nil
 }
