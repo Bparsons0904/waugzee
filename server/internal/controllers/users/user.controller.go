@@ -44,16 +44,26 @@ func (uc *UserController) UpdateDiscogsToken(
 		return nil, log.ErrMsg("token is required")
 	}
 
-	// Validate token with Discogs API
-	if err := uc.discogsService.ValidateToken(req.Token); err != nil {
+	identity, err := uc.discogsService.GetUserIdentity(req.Token)
+	if err != nil {
 		log.Warn("Invalid Discogs token provided", "userID", user.ID, "error", err)
 		return nil, log.Err("invalid discogs token", err)
 	}
 
 	user.DiscogsToken = &req.Token
+	user.DiscogsUsername = &identity.Username
+
 	if err := uc.userRepo.Update(ctx, user); err != nil {
-		return nil, log.Err("failed to update user with discogs token", err)
+		return nil, log.Err("failed to update user with discogs credentials", err)
 	}
+
+	log.Info(
+		"Discogs credentials updated successfully",
+		"userID",
+		user.ID,
+		"username",
+		identity.Username,
+	)
 
 	return user, nil
 }

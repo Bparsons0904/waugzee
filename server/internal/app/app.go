@@ -27,6 +27,7 @@ type App struct {
 	TransactionService          *services.TransactionService
 	ZitadelService              *services.ZitadelService
 	DiscogsService              *services.DiscogsService
+	DiscogsCredentialsService   *services.DiscogsCredentialsService
 	SchedulerService            *services.SchedulerService
 	DiscogsOrchestrationService services.DiscogsOrchestrationService
 	DiscogsRateLimitService     services.DiscogsRateLimitService
@@ -85,6 +86,11 @@ func New() (*App, error) {
 
 	// Initialize Discogs API proxy services
 	discogsRateLimitService := services.NewDiscogsRateLimitService(db.Cache.General)
+	discogsCredentialsService := services.NewDiscogsCredentialsService(
+		discogsService,
+		userRepo,
+		discogsRateLimitService,
+	)
 	discogsOrchestrationService := services.NewDiscogsOrchestrationService(
 		discogsCollectionSyncRepo,
 		discogsApiRequestRepo,
@@ -125,6 +131,7 @@ func New() (*App, error) {
 		TransactionService:          transactionService,
 		ZitadelService:              zitadelService,
 		DiscogsService:              discogsService,
+		DiscogsCredentialsService:   discogsCredentialsService,
 		SchedulerService:            schedulerService,
 		DiscogsOrchestrationService: discogsOrchestrationService,
 		DiscogsRateLimitService:     discogsRateLimitService,

@@ -87,7 +87,7 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
             onInput={(value) => setToken(value)}
             placeholder="Paste your token here"
             required
-            name="discogs-token"
+            name="discogsToken"
           />
         </div>
 

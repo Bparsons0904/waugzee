@@ -4,6 +4,7 @@ import { useAuth } from "@context/AuthContext";
 import { useWebSocket } from "@context/WebSocketContext";
 import { discogsProxyService } from "@services/discogs/discogsProxy.service";
 import { DiscogsTokenModal } from "@components/common/ui/DiscogsTokenModal/DiscogsTokenModal";
+import { DiscogsFolderSync } from "@components/common/ui/DiscogsFolderSync/DiscogsFolderSync";
 import { useToast } from "@context/ToastContext";
 import styles from "./Dashboard.module.scss";
 import { Button } from "@components/common/ui/Button/Button";
@@ -29,7 +30,6 @@ const Dashboard: Component = () => {
   });
   const [isLoading, setIsLoading] = createSignal(true);
   const [showTokenModal, setShowTokenModal] = createSignal(false);
-  const [syncing, setSyncing] = createSignal(false);
 
   onMount(async () => {
     try {
@@ -37,7 +37,7 @@ const Dashboard: Component = () => {
       discogsProxyService.initialize(webSocket);
 
       // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       setStats({
         totalRecords: 247,
@@ -78,76 +78,37 @@ const Dashboard: Component = () => {
       action: () => navigate("/equipment"),
     },
     {
-      title: "Sync Collection",
-      description: "Sync your collection with your Discogs library.",
+      title: "Sync Folders",
+      description: "Sync your Discogs folders to organize your collection.",
       icon: "🔄",
-      action: () => handleSync(),
+      action: () => handleFolderSync(),
     },
     {
       title: "Analytics",
-      description: "Explore insights about your collection and listening habits.",
+      description:
+        "Explore insights about your collection and listening habits.",
       icon: "📈",
       action: () => navigate("/analytics"),
     },
   ];
 
-  const handleSync = async () => {
-    try {
-      // Check if user has a Discogs token
-      const currentUser = user();
-      if (!currentUser?.discogsToken) {
-        toast.showInfo("Please add your Discogs token to sync your collection");
-        setShowTokenModal(true);
-        return;
-      }
-
-      // Check if WebSocket is ready
-      if (!discogsProxyService.isReady()) {
-        toast.showError("Connection not ready. Please try again in a moment.");
-        return;
-      }
-
-      setSyncing(true);
-      toast.showInfo("Starting collection sync...");
-
-      // Initiate the sync
-      const syncSession = await discogsProxyService.initiateCollectionSync({
-        syncType: 'collection',
-        fullSync: false, // Start with incremental sync
-        pageLimit: 50,   // Reasonable page limit
-      });
-
-      toast.showSuccess(`Collection sync started! Session: ${syncSession.sessionId}`);
-
-      // Set up progress callbacks
-      const cleanupProgress = discogsProxyService.onSyncProgress((progress) => {
-        console.log("Sync progress:", progress);
-        toast.showInfo(`Sync progress: ${progress.percentComplete}%`);
-      });
-
-      const cleanupComplete = discogsProxyService.onSyncComplete((sessionId) => {
-        console.log("Sync completed:", sessionId);
-        toast.showSuccess("Collection sync completed successfully!");
-        setSyncing(false);
-        cleanupProgress();
-        cleanupComplete();
-        cleanupError();
-      });
-
-      const cleanupError = discogsProxyService.onSyncError((sessionId, error) => {
-        console.error("Sync error:", sessionId, error);
-        toast.showError(`Sync failed: ${error}`);
-        setSyncing(false);
-        cleanupProgress();
-        cleanupComplete();
-        cleanupError();
-      });
-
-    } catch (error) {
-      console.error("Failed to start sync:", error);
-      toast.showError(`Failed to start sync: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setSyncing(false);
+  const handleFolderSync = () => {
+    const currentUser = user();
+    if (!currentUser?.discogsToken) {
+      toast.showInfo("Please add your Discogs token to sync your folders");
+      setShowTokenModal(true);
+      return;
     }
+
+    toast.showInfo("Click the 'Sync Now' button below to start folder sync");
+  };
+
+  const handleSyncComplete = (foldersCount: number) => {
+    console.log(`Folder sync completed with ${foldersCount} folders`);
+  };
+
+  const handleSyncError = (error: string) => {
+    console.error("Folder sync failed:", error);
   };
 
   return (
@@ -164,24 +125,34 @@ const Dashboard: Component = () => {
 
         <section class={styles.section}>
           <h2 class={styles.sectionTitle}>Quick Actions</h2>
-          
+
           <div class={styles.cardGrid}>
             {actionCards.map((card) => (
               <div
                 class={styles.actionCard}
-                onClick={card.action}
+                onClick={
+                  card.title === "Sync Folders" ? undefined : card.action
+                }
               >
                 <div class={styles.cardIcon}>{card.icon}</div>
                 <h3 class={styles.cardTitle}>{card.title}</h3>
                 <p class={styles.cardDescription}>{card.description}</p>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={card.action}
-                  disabled={card.title === "Sync Collection" && syncing()}
+
+                <Show
+                  when={card.title === "Sync Folders"}
+                  fallback={
+                    <Button variant="primary" size="sm" onClick={card.action}>
+                      Get Started
+                    </Button>
+                  }
                 >
-                  {card.title === "Sync Collection" && syncing() ? "Syncing..." : "Get Started"}
-                </Button>
+                  <DiscogsFolderSync
+                    variant="primary"
+                    size="sm"
+                    onSyncComplete={handleSyncComplete}
+                    onSyncError={handleSyncError}
+                  />
+                </Show>
               </div>
             ))}
           </div>
@@ -189,7 +160,7 @@ const Dashboard: Component = () => {
 
         <section class={styles.section}>
           <h2 class={styles.sectionTitle}>Collection Overview</h2>
-          
+
           <div class={styles.overviewGrid}>
             <div class={styles.statCard}>
               <div class={styles.statIcon}>💽</div>
@@ -200,7 +171,7 @@ const Dashboard: Component = () => {
                 <p class={styles.statLabel}>Total Records</p>
               </div>
             </div>
-            
+
             <div class={styles.statCard}>
               <div class={styles.statIcon}>▶️</div>
               <div class={styles.statContent}>
@@ -210,7 +181,7 @@ const Dashboard: Component = () => {
                 <p class={styles.statLabel}>Total Plays</p>
               </div>
             </div>
-            
+
             <div class={styles.statCard}>
               <div class={styles.statIcon}>⏱️</div>
               <div class={styles.statContent}>
@@ -220,7 +191,7 @@ const Dashboard: Component = () => {
                 <p class={styles.statLabel}>Listening Time</p>
               </div>
             </div>
-            
+
             <div class={styles.statCard}>
               <div class={styles.statIcon}>🎯</div>
               <div class={styles.statContent}>
