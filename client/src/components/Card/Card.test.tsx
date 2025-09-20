@@ -1,5 +1,7 @@
 import { render } from "@solidjs/testing-library";
 import { Card } from "./Card";
+import { describe, expect, vi } from "vitest";
+import test from "node:test";
 
 describe("Card", () => {
   test("renders children correctly", () => {
@@ -8,7 +10,7 @@ describe("Card", () => {
         <div>Test content</div>
       </Card>
     ));
-    
+
     expect(getByText("Test content")).toBeInTheDocument();
   });
 
@@ -18,7 +20,7 @@ describe("Card", () => {
         <div>Content</div>
       </Card>
     ));
-    
+
     const card = container.firstChild as HTMLElement;
     expect(card.className).toContain("cardLarge");
   });
@@ -29,7 +31,7 @@ describe("Card", () => {
         <div>Content</div>
       </Card>
     ));
-    
+
     const card = container.firstChild as HTMLElement;
     expect(card.className).toContain("custom-class");
   });
@@ -41,9 +43,10 @@ describe("Card", () => {
         <div>Content</div>
       </Card>
     ));
-    
+
     const card = container.firstChild as HTMLElement;
     card.click();
     expect(handleClick).toHaveBeenCalledOnce();
   });
 });
+
