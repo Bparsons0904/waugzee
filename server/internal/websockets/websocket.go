@@ -17,32 +17,25 @@ import (
 	"github.com/google/uuid"
 )
 
-type Service string
+// Type alias for events.Message to avoid conflicts
+type Message = events.Message
 
 const (
-	SYSTEM Service = "system"
-	USER   Service = "user"
-	SYNC   Service = "sync"
-)
-
-type Event string
-
-const (
-	MESSAGE_TYPE_PING Event = "ping"
-	MESSAGE_TYPE_PONG Event = "pong"
-	AUTH_REQUEST      Event = "auth_request"
-	AUTH_RESPONSE     Event = "auth_response"
-	AUTH_SUCCESS      Event = "auth_success"
-	AUTH_FAILURE      Event = "auth_failure"
-	API_REQUEST       Event = "api_request"
-	API_RESPONSE      Event = "api_response"
-	SYNC_PROGRESS     Event = "sync_progress"
-	SYNC_COMPLETE     Event = "sync_complete"
-	SYNC_ERROR        Event = "sync_error"
-	USER_JOIN         Event = "user_join"
-	BROADCAST         Event = "broadcast"
-	SEND              Event = "send"
-	MESSAGE           Event = "message"
+	MESSAGE_TYPE_PING = "ping"
+	MESSAGE_TYPE_PONG = "pong"
+	AUTH_REQUEST      = "auth_request"
+	AUTH_RESPONSE     = "auth_response"
+	AUTH_SUCCESS      = "auth_success"
+	AUTH_FAILURE      = "auth_failure"
+	API_REQUEST       = "api_request"
+	API_RESPONSE      = "api_response"
+	SYNC_PROGRESS     = "sync_progress"
+	SYNC_COMPLETE     = "sync_complete"
+	SYNC_ERROR        = "sync_error"
+	USER_JOIN         = "user_join"
+	BROADCAST         = "broadcast"
+	SEND              = "send"
+	MESSAGE           = "message"
 )
 
 const (
@@ -66,23 +59,6 @@ type ZitadelService interface {
 	ValidateTokenWithFallback(ctx context.Context, token string) (*types.TokenInfo, string, error)
 }
 
-// type Message struct {
-// 	ID        string         `json:"id"`
-// 	Service   Service        `json:"service,omitempty"`
-// 	Event     Event          `json:"event"`
-// 	UserID    string         `json:"userId,omitempty"`
-// 	Payload   map[string]any `json:"payload,omitempty"`
-// 	Timestamp time.Time      `json:"timestamp"`
-// }
-
-// // Implement WebSocketMessage interface
-// func (m *Message) GetID() string               { return m.ID }
-// func (m *Message) GetType() events.MessageType { return m.Type }
-// func (m *Message) GetChannel() events.Channel  { return m.Channel }
-// func (m *Message) GetAction() string           { return m.Action }
-// func (m *Message) GetUserID() string           { return m.UserID }
-// func (m *Message) GetData() map[string]any     { return m.Data }
-// func (m *Message) GetTimestamp() time.Time     { return m.Timestamp }
 
 type Client struct {
 	ID         string
@@ -132,7 +108,6 @@ func New(
 	go manager.hub.run(manager)
 
 	go manager.subscribeToEventBus()
-	go manager.subscribeToCacheInvalidationEvents()
 
 	return manager, nil
 }
@@ -152,9 +127,9 @@ func (m *Manager) HandleWebSocket(c *websocket.Conn) {
 
 	authRequest := Message{
 		ID:        uuid.New().String(),
-		Type:      AUTH_REQUEST,
-		Channel:   "system",
-		Action:    "authenticate",
+		Service:   events.SYSTEM,
+		Event:     AUTH_REQUEST,
+		Payload:   map[string]any{"action": "authenticate"},
 		Timestamp: time.Now(),
 	}
 
@@ -186,10 +161,9 @@ func (m *Manager) HandleWebSocket(c *websocket.Conn) {
 
 			authTimeout := Message{
 				ID:        uuid.New().String(),
-				Type:      AUTH_FAILURE,
-				Channel:   "system",
-				Action:    "authentication_timeout",
-				Data:      map[string]any{"reason": "Authentication timeout"},
+				Service:   events.SYSTEM,
+				Event:     AUTH_FAILURE,
+				Payload:   map[string]any{"action": "authentication_timeout", "reason": "Authentication timeout"},
 				Timestamp: time.Now(),
 			}
 
@@ -267,7 +241,7 @@ func (c *Client) readPump() {
 func (c *Client) routeMessage(message Message) {
 	log := c.Manager.log.Function("routeMessage")
 
-	if message.Type == AUTH_RESPONSE {
+	if message.Event == AUTH_RESPONSE {
 		c.handleAuthResponse(message)
 		return
 	}
@@ -277,26 +251,25 @@ func (c *Client) routeMessage(message Message) {
 			"Blocking message from unauthenticated client",
 			"clientID",
 			c.ID,
-			"messageType",
-			message.Type,
+			"messageEvent",
+			message.Event,
 		)
 		authFailure := Message{
 			ID:        uuid.New().String(),
-			Type:      AUTH_FAILURE,
-			Channel:   "system",
-			Action:    "authentication_required",
-			Data:      map[string]any{"reason": "Authentication required"},
+			Service:   events.SYSTEM,
+			Event:     AUTH_FAILURE,
+			Payload:   map[string]any{"action": "authentication_required", "reason": "Authentication required"},
 			Timestamp: time.Now(),
 		}
 		c.send <- authFailure
 		return
 	}
 
-	switch message.Type {
+	switch message.Event {
 	case API_RESPONSE:
 		c.handleDiscogsApiResponse(message)
 	default:
-		log.Warn("Unknown message type", "type", message.Type)
+		log.Warn("Unknown message event", "event", message.Event)
 	}
 
 	switch message.Service {
@@ -358,10 +331,10 @@ func (c *Client) handleAuthResponse(message Message) {
 
 	authSuccess := Message{
 		ID:        uuid.New().String(),
-		Type:      AUTH_SUCCESS,
-		Channel:   "system",
-		Action:    "authenticated",
-		Data:      map[string]any{"userId": c.UserID.String()},
+		Service:   events.SYSTEM,
+		Event:     AUTH_SUCCESS,
+		UserID:    c.UserID.String(),
+		Payload:   map[string]any{"action": "authenticated", "userId": c.UserID.String()},
 		Timestamp: time.Now(),
 	}
 
@@ -373,10 +346,9 @@ func (c *Client) sendAuthFailure(reason string) {
 
 	authFailure := Message{
 		ID:        uuid.New().String(),
-		Type:      AUTH_FAILURE,
-		Channel:   "system",
-		Action:    "authentication_failed",
-		Data:      map[string]any{"reason": reason},
+		Service:   events.SYSTEM,
+		Event:     AUTH_FAILURE,
+		Payload:   map[string]any{"action": "authentication_failed", "reason": reason},
 		Timestamp: time.Now(),
 	}
 
@@ -449,7 +421,7 @@ func (m *Manager) subscribeToEventBus() {
 	}
 }
 
-func (m *Manager) sendToAuthenticatedClients(message events.Message) {
+func (m *Manager) sendToAuthenticatedClients(message Message) {
 	log := m.log.Function("sendToAuthenticatedClients")
 
 	sent := 0
@@ -467,7 +439,7 @@ func (m *Manager) sendToAuthenticatedClients(message events.Message) {
 	log.Info("Message sent to authenticated clients", "messageID", message.ID, "clientCount", sent)
 }
 
-func (c *Client) handleDiscogsApiResponse(message events.Message) {
+func (c *Client) handleDiscogsApiResponse(message Message) {
 	log := c.Manager.log.Function("handleDiscogsApiResponse")
 
 	if c.Status != STATUS_AUTHENTICATED {

@@ -2,12 +2,15 @@ package syncController
 
 import (
 	"context"
+	"time"
 	"waugzee/config"
 	"waugzee/internal/events"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
+
+	"github.com/google/uuid"
 )
 
 type SyncController struct {
@@ -49,14 +52,19 @@ func (sc *SyncController) HandleSyncRequest(
 
 	log.Info("Processing sync request", "userID", user.ID)
 
-	event := events.Event{
-		Type:    "sync",
-		Channel: "sync",
-		UserID:  &user.ID,
-		Data:    nil,
+	channelEvent := events.ChannelEvent{
+		Event: "sync",
+		Message: events.Message{
+			ID:        uuid.New().String(),
+			Service:   events.SYNC,
+			Event:     "sync",
+			UserID:    user.ID.String(),
+			Payload:   map[string]any{},
+			Timestamp: time.Now(),
+		},
 	}
 
-	sc.eventBus.Publish(events.SEND_CHANNEL, event)
+	sc.eventBus.Publish(events.WEBSOCKET, channelEvent)
 
 	return nil
 }

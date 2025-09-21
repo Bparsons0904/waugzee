@@ -2,7 +2,7 @@ import { Component, createSignal, onMount, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { useAuth } from "@context/AuthContext";
 import { useWebSocket } from "@context/WebSocketContext";
-import { discogsProxyService } from "@services/discogs/discogsProxy.service";
+import { proxyService } from "@services/proxy/proxy.service";
 import { DiscogsTokenModal } from "@components/common/ui/DiscogsTokenModal/DiscogsTokenModal";
 import { DiscogsFolderSync } from "@components/common/ui/DiscogsFolderSync/DiscogsFolderSync";
 import { useToast } from "@context/ToastContext";
@@ -33,8 +33,8 @@ const Dashboard: Component = () => {
 
   onMount(async () => {
     try {
-      // Initialize Discogs proxy service with WebSocket
-      discogsProxyService.initialize(webSocket);
+      // Initialize proxy service with WebSocket
+      proxyService.initialize(webSocket);
 
       // TODO: Replace with actual API call
       await new Promise((resolve) => setTimeout(resolve, 1000));

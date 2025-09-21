@@ -13,7 +13,8 @@ import {
 import { env } from "@services/env.service";
 import { useAuth } from "./AuthContext";
 
-export const MessageType = {
+// Event constants matching server-side implementation
+export const Events = {
   PING: "ping",
   PONG: "pong",
   MESSAGE: "message",
@@ -26,22 +27,22 @@ export const MessageType = {
   AUTH_SUCCESS: "auth_success",
   AUTH_FAILURE: "auth_failure",
   INVALIDATE_CACHE: "invalidateCache",
-  DISCOGS_API_REQUEST: "discogs_api_request",
-  DISCOGS_API_RESPONSE: "discogs_api_response",
+  API_REQUEST: "api_request",
+  API_RESPONSE: "api_response",
   SYNC_PROGRESS: "sync_progress",
   SYNC_COMPLETE: "sync_complete",
   SYNC_ERROR: "sync_error",
 } as const;
 
-export type ChannelType = "system" | "user" | "sync";
+// Service types matching server-side implementation
+export type ServiceType = "system" | "user" | "sync";
 
 export interface WebSocketMessage {
   id: string;
-  type: string;
-  channel: ChannelType;
-  action: string;
+  service?: ServiceType;
+  event: string;
   userId?: string;
-  data?: Record<string, unknown>;
+  payload?: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -123,10 +124,9 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
 
     const authResponse: WebSocketMessage = {
       id: crypto.randomUUID(),
-      type: MessageType.AUTH_RESPONSE,
-      channel: "system",
-      action: "authenticate",
-      data: { token },
+      service: "system",
+      event: Events.AUTH_RESPONSE,
+      payload: { token },
       timestamp: new Date().toISOString(),
     };
 
@@ -143,33 +143,34 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
       log("Received message:", message);
       setLastMessage(event.data);
 
-      switch (message.type) {
-        case MessageType.AUTH_REQUEST:
+      switch (message.event) {
+        case Events.AUTH_REQUEST:
           handleAuthRequest();
           break;
 
-        case MessageType.AUTH_SUCCESS:
+        case Events.AUTH_SUCCESS:
           log("Authentication successful");
           setWsAuthenticated(true);
           setLastError(null);
           break;
 
-        case MessageType.AUTH_FAILURE:
-          log("Authentication failed:", message.data?.reason);
+        case Events.AUTH_FAILURE:
+          log("Authentication failed:", message.payload?.reason);
           setWsAuthenticated(false);
           setLastError(
-            typeof message.data?.reason === "string"
-              ? message.data.reason
+            typeof message.payload?.reason === "string"
+              ? message.payload.reason
               : "Authentication failed",
           );
           break;
 
-        case MessageType.DISCOGS_API_REQUEST:
-        case MessageType.SYNC_PROGRESS:
-        case MessageType.SYNC_COMPLETE:
-        case MessageType.SYNC_ERROR:
+        case Events.API_REQUEST:
+        case Events.API_RESPONSE:
+        case Events.SYNC_PROGRESS:
+        case Events.SYNC_COMPLETE:
+        case Events.SYNC_ERROR:
           // Handle sync-related messages
-          log("Sync message received:", message.type, message);
+          log("Sync message received:", message.event, message);
           syncMessageCallbacks().forEach((callback) => {
             try {
               callback(message);
@@ -181,9 +182,9 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
 
         default:
           // Handle cache invalidation and other message types
-          if (message.action === "invalidateCache" && message.data) {
-            const resourceType = message.data.resourceType as string;
-            const resourceId = message.data.resourceId as string;
+          if (message.payload?.action === "invalidateCache" && message.payload) {
+            const resourceType = message.payload.resourceType as string;
+            const resourceId = message.payload.resourceId as string;
 
             if (resourceType && resourceId) {
               log("Cache invalidation received:", resourceType, resourceId);

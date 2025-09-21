@@ -70,7 +70,7 @@ export class ProxyService {
     }
 
     this.webSocket.onSyncMessage((message: WebSocketMessage) => {
-      if (message.type === "discogs_api_request") {
+      if (message.event === "api_request") {
         this.handleApiRequest(message);
       }
     });
@@ -79,12 +79,12 @@ export class ProxyService {
   private async handleApiRequest(message: WebSocketMessage): Promise<void> {
     console.log("[Proxy] Received API request", message.id);
 
-    if (!message.data || !this.isValidProxyRequest(message.data)) {
+    if (!message.payload || !this.isValidProxyRequest(message.payload)) {
       console.error("[Proxy] Invalid request data");
       return;
     }
 
-    const requestData = message.data as unknown as ProxyRequest;
+    const requestData = message.payload as unknown as ProxyRequest;
     const { requestId, url, method, headers } = requestData;
 
     try {
@@ -176,10 +176,9 @@ export class ProxyService {
 
     const message = {
       id: crypto.randomUUID(),
-      type: "discogs_api_response",
-      channel: "sync",
-      action: "request_complete",
-      data: response,
+      service: "sync" as const,
+      event: "api_response",
+      payload: response,
       timestamp: new Date().toISOString(),
     };
 
