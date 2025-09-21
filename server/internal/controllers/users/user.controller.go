@@ -17,13 +17,13 @@ type UserController struct {
 }
 
 func New(
-	userRepo repositories.UserRepository,
-	discogsService *services.DiscogsService,
+	repos repositories.Repository,
+	services services.Service,
 	config config.Config,
 ) *UserController {
 	return &UserController{
-		userRepo:       userRepo,
-		discogsService: discogsService,
+		userRepo:       repos.User,
+		discogsService: services.Discogs,
 		Config:         config,
 		log:            logger.New("userController"),
 	}

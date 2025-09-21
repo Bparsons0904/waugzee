@@ -40,7 +40,7 @@ func (h *DiscogsHandler) Register() {
 	discogs := h.router.Group("/discogs")
 
 	// Apply authentication middleware to all routes
-	protected := discogs.Group("/", h.middleware.RequireAuth(h.app.ZitadelService))
+	protected := discogs.Group("/", h.middleware.RequireAuth(h.app.Services.Zitadel))
 
 	// Only sync initiation - everything else handled via WebSocket or other services
 	protected.Post("/syncCollection", h.InitiateCollectionSync)

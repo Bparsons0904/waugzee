@@ -23,8 +23,8 @@ type AuthHandler struct {
 func NewAuthHandler(app app.App, router fiber.Router) *AuthHandler {
 	log := logger.New("handlers").File("auth_handler")
 	return &AuthHandler{
-		authController: app.AuthController,
-		zitadelService: app.ZitadelService,
+		authController: app.Controllers.Auth,
+		zitadelService: app.Services.Zitadel,
 		Handler: Handler{
 			log:        log,
 			router:     router,

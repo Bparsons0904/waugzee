@@ -19,8 +19,8 @@ type UserHandler struct {
 func NewUserHandler(app app.App, router fiber.Router) *UserHandler {
 	log := logger.New("handlers").File("user_handler")
 	return &UserHandler{
-		zitadelService: app.ZitadelService,
-		userController: app.UserController,
+		zitadelService: app.Services.Zitadel,
+		userController: app.Controllers.User,
 		Handler: Handler{
 			log:        log,
 			router:     router,

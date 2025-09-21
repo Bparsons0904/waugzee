@@ -25,7 +25,6 @@ const (
 
 var MODELS_TO_MIGRATE = []any{
 	&User{},
-	&Cartridge{},
 	&Stylus{},
 	&Genre{},
 	&Label{},
@@ -33,17 +32,17 @@ var MODELS_TO_MIGRATE = []any{
 	&Image{},
 	&Master{},
 	&Release{},
-	&UserCollection{},
-	&PlaySession{},
-	&Turntable{},
-	&UserPreferences{},
+	&UserRelease{},
+	&PlayHistory{},
+	&CleaningHistory{},
+	&Folder{},
 }
 
 func main() {
 	log := logger.New("migrations")
 	log = log.Function("main")
 
-	config, err := config.InitConfig()
+	config, err := config.New()
 	if err != nil {
 		log.Er("failed to initialize config", err)
 		os.Exit(1)

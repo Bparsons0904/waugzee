@@ -1,23 +1,19 @@
-import { discogsApiService, DiscogsApiRequest, DiscogsApiResponse } from './discogsApi.service';
-import { api } from '@services/api';
-
-// WebSocket message types
-export interface WebSocketMessage {
-  id: string;
-  type: string;
-  channel: 'system' | 'user' | 'sync';
-  action: string;
-  userId?: string;
-  data?: Record<string, unknown>;
-  timestamp: string;
-}
+import { WebSocketMessage } from "@context/WebSocketContext";
+import {
+  discogsApiService,
+  DiscogsApiRequest,
+  DiscogsApiResponse,
+} from "./discogsApi.service";
+import { api } from "@services/api";
 
 export interface WebSocketContextValue {
   connectionState: () => string;
   isConnected: () => boolean;
   isAuthenticated: () => boolean;
   sendMessage: (message: string) => void;
-  onCacheInvalidation: (callback: (resourceType: string, resourceId: string) => void) => () => void;
+  onCacheInvalidation: (
+    callback: (resourceType: string, resourceId: string) => void,
+  ) => () => void;
   onSyncMessage?: (callback: (message: WebSocketMessage) => void) => () => void;
 }
 
@@ -44,58 +40,55 @@ export interface SyncErrorData {
 
 // Type guards for WebSocket message validation
 export function isWebSocketMessage(obj: unknown): obj is WebSocketMessage {
-  if (!obj || typeof obj !== 'object') return false;
-  
+  if (!obj || typeof obj !== "object") return false;
+
   const message = obj as Record<string, unknown>;
   return (
-    typeof message.id === 'string' &&
-    typeof message.type === 'string' &&
-    typeof message.channel === 'string' &&
-    typeof message.action === 'string' &&
-    typeof message.timestamp === 'string' &&
-    (message.userId === undefined || typeof message.userId === 'string') &&
-    (message.data === undefined || (typeof message.data === 'object' && message.data !== null))
+    typeof message.id === "string" &&
+    typeof message.type === "string" &&
+    typeof message.channel === "string" &&
+    typeof message.action === "string" &&
+    typeof message.timestamp === "string" &&
+    (message.userId === undefined || typeof message.userId === "string") &&
+    (message.data === undefined ||
+      (typeof message.data === "object" && message.data !== null))
   );
 }
 
-export function isDiscogsApiRequestData(obj: unknown): obj is DiscogsApiRequestData {
-  if (!obj || typeof obj !== 'object') return false;
-  
+export function isDiscogsApiRequestData(
+  obj: unknown,
+): obj is DiscogsApiRequestData {
+  if (!obj || typeof obj !== "object") return false;
+
   const data = obj as Record<string, unknown>;
   return (
-    typeof data.requestId === 'string' &&
-    typeof data.url === 'string' &&
-    typeof data.method === 'string' &&
-    typeof data.headers === 'object' &&
+    typeof data.requestId === "string" &&
+    typeof data.url === "string" &&
+    typeof data.method === "string" &&
+    typeof data.headers === "object" &&
     data.headers !== null
   );
 }
 
 export function isSyncProgressData(obj: unknown): obj is SyncProgressData {
-  if (!obj || typeof obj !== 'object') return false;
-  
+  if (!obj || typeof obj !== "object") return false;
+
   const data = obj as Record<string, unknown>;
-  return (
-    typeof data.progress === 'object' &&
-    data.progress !== null
-  );
+  return typeof data.progress === "object" && data.progress !== null;
 }
 
 export function isSyncCompleteData(obj: unknown): obj is SyncCompleteData {
-  if (!obj || typeof obj !== 'object') return false;
-  
+  if (!obj || typeof obj !== "object") return false;
+
   const data = obj as Record<string, unknown>;
-  return typeof data.sessionId === 'string';
+  return typeof data.sessionId === "string";
 }
 
 export function isSyncErrorData(obj: unknown): obj is SyncErrorData {
-  if (!obj || typeof obj !== 'object') return false;
-  
+  if (!obj || typeof obj !== "object") return false;
+
   const data = obj as Record<string, unknown>;
-  return (
-    typeof data.sessionId === 'string' &&
-    typeof data.error === 'string'
-  );
+  return typeof data.sessionId === "string" && typeof data.error === "string";
 }
 
 export interface SyncProgress {
@@ -118,7 +111,7 @@ export interface SyncSession {
 }
 
 export interface InitiateSyncRequest {
-  syncType: 'collection' | 'wantlist';
+  syncType: "collection" | "wantlist";
   fullSync: boolean;
   pageLimit?: number;
 }
@@ -135,7 +128,7 @@ export class DiscogsProxyService {
   private isInitialized = false;
 
   constructor() {
-    console.log('[DiscogsProxy] Service created');
+    console.log("[DiscogsProxy] Service created");
   }
 
   /**
@@ -143,7 +136,7 @@ export class DiscogsProxyService {
    */
   initialize(webSocket: WebSocketContextValue): void {
     if (this.isInitialized) {
-      console.warn('[DiscogsProxy] Already initialized');
+      console.warn("[DiscogsProxy] Already initialized");
       return;
     }
 
@@ -151,7 +144,7 @@ export class DiscogsProxyService {
     this.setupMessageHandlers();
     this.isInitialized = true;
 
-    console.log('[DiscogsProxy] Service initialized with WebSocket context');
+    console.log("[DiscogsProxy] Service initialized with WebSocket context");
   }
 
   /**
@@ -164,31 +157,38 @@ export class DiscogsProxyService {
     this.webSocket = null;
     this.isInitialized = false;
 
-    console.log('[DiscogsProxy] Service cleaned up');
+    console.log("[DiscogsProxy] Service cleaned up");
   }
 
   /**
    * Check if the service is ready to handle sync operations
    */
   isReady(): boolean {
-    return this.isInitialized &&
-           this.webSocket !== null &&
-           this.webSocket.isConnected() &&
-           this.webSocket.isAuthenticated();
+    return (
+      this.isInitialized &&
+      this.webSocket !== null &&
+      this.webSocket.isConnected() &&
+      this.webSocket.isAuthenticated()
+    );
   }
 
   /**
    * Initiate a collection sync
    */
-  async initiateCollectionSync(request: InitiateSyncRequest): Promise<SyncSession> {
-    console.log('[DiscogsProxy] Initiating collection sync', request);
+  async initiateCollectionSync(
+    request: InitiateSyncRequest,
+  ): Promise<SyncSession> {
+    console.log("[DiscogsProxy] Initiating collection sync", request);
 
     try {
-      const response = await api.post<SyncSession>('/discogs/syncCollection', request);
-      console.log('[DiscogsProxy] Sync initiated successfully', response);
+      const response = await api.post<SyncSession>(
+        "/discogs/syncCollection",
+        request,
+      );
+      console.log("[DiscogsProxy] Sync initiated successfully", response);
       return response;
     } catch (error) {
-      console.error('[DiscogsProxy] Failed to initiate sync', error);
+      console.error("[DiscogsProxy] Failed to initiate sync", error);
       throw error;
     }
   }
@@ -197,14 +197,16 @@ export class DiscogsProxyService {
    * Get sync status
    */
   async getSyncStatus(sessionId: string): Promise<SyncProgress> {
-    console.log('[DiscogsProxy] Getting sync status for session', sessionId);
+    console.log("[DiscogsProxy] Getting sync status for session", sessionId);
 
     try {
-      const response = await api.get<SyncProgress>(`/discogs/syncStatus/${sessionId}`);
-      console.log('[DiscogsProxy] Sync status retrieved', response);
+      const response = await api.get<SyncProgress>(
+        `/discogs/syncStatus/${sessionId}`,
+      );
+      console.log("[DiscogsProxy] Sync status retrieved", response);
       return response;
     } catch (error) {
-      console.error('[DiscogsProxy] Failed to get sync status', error);
+      console.error("[DiscogsProxy] Failed to get sync status", error);
       throw error;
     }
   }
@@ -213,13 +215,13 @@ export class DiscogsProxyService {
    * Cancel a sync session
    */
   async cancelSync(sessionId: string): Promise<void> {
-    console.log('[DiscogsProxy] Cancelling sync session', sessionId);
+    console.log("[DiscogsProxy] Cancelling sync session", sessionId);
 
     try {
       await api.post(`/discogs/syncCancel/${sessionId}`, {});
-      console.log('[DiscogsProxy] Sync cancelled successfully');
+      console.log("[DiscogsProxy] Sync cancelled successfully");
     } catch (error) {
-      console.error('[DiscogsProxy] Failed to cancel sync', error);
+      console.error("[DiscogsProxy] Failed to cancel sync", error);
       throw error;
     }
   }
@@ -228,13 +230,13 @@ export class DiscogsProxyService {
    * Pause a sync session
    */
   async pauseSync(sessionId: string): Promise<void> {
-    console.log('[DiscogsProxy] Pausing sync session', sessionId);
+    console.log("[DiscogsProxy] Pausing sync session", sessionId);
 
     try {
       await api.post(`/discogs/syncPause/${sessionId}`, {});
-      console.log('[DiscogsProxy] Sync paused successfully');
+      console.log("[DiscogsProxy] Sync paused successfully");
     } catch (error) {
-      console.error('[DiscogsProxy] Failed to pause sync', error);
+      console.error("[DiscogsProxy] Failed to pause sync", error);
       throw error;
     }
   }
@@ -243,13 +245,13 @@ export class DiscogsProxyService {
    * Resume a sync session
    */
   async resumeSync(sessionId: string): Promise<void> {
-    console.log('[DiscogsProxy] Resuming sync session', sessionId);
+    console.log("[DiscogsProxy] Resuming sync session", sessionId);
 
     try {
       await api.post(`/discogs/syncResume/${sessionId}`, {});
-      console.log('[DiscogsProxy] Sync resumed successfully');
+      console.log("[DiscogsProxy] Sync resumed successfully");
     } catch (error) {
-      console.error('[DiscogsProxy] Failed to resume sync', error);
+      console.error("[DiscogsProxy] Failed to resume sync", error);
       throw error;
     }
   }
@@ -257,17 +259,22 @@ export class DiscogsProxyService {
   /**
    * Update user's Discogs token
    */
-  async updateDiscogsToken(token: string): Promise<{ message: string; tokenValid: boolean }> {
-    console.log('[DiscogsProxy] Updating Discogs token');
+  async updateDiscogsToken(
+    token: string,
+  ): Promise<{ message: string; tokenValid: boolean }> {
+    console.log("[DiscogsProxy] Updating Discogs token");
 
     try {
-      const response = await api.put<{ message: string; tokenValid: boolean }>('/discogs/token', {
-        discogsToken: token,
-      });
-      console.log('[DiscogsProxy] Token updated successfully');
+      const response = await api.put<{ message: string; tokenValid: boolean }>(
+        "/discogs/token",
+        {
+          discogsToken: token,
+        },
+      );
+      console.log("[DiscogsProxy] Token updated successfully");
       return response;
     } catch (error) {
-      console.error('[DiscogsProxy] Failed to update token', error);
+      console.error("[DiscogsProxy] Failed to update token", error);
       throw error;
     }
   }
@@ -275,15 +282,21 @@ export class DiscogsProxyService {
   /**
    * Validate user's Discogs token
    */
-  async validateDiscogsToken(): Promise<{ hasToken: boolean; tokenValid: boolean }> {
-    console.log('[DiscogsProxy] Validating Discogs token');
+  async validateDiscogsToken(): Promise<{
+    hasToken: boolean;
+    tokenValid: boolean;
+  }> {
+    console.log("[DiscogsProxy] Validating Discogs token");
 
     try {
-      const response = await api.get<{ hasToken: boolean; tokenValid: boolean }>('/discogs/token/validate');
-      console.log('[DiscogsProxy] Token validation result', response);
+      const response = await api.get<{
+        hasToken: boolean;
+        tokenValid: boolean;
+      }>("/discogs/token/validate");
+      console.log("[DiscogsProxy] Token validation result", response);
       return response;
     } catch (error) {
-      console.error('[DiscogsProxy] Failed to validate token', error);
+      console.error("[DiscogsProxy] Failed to validate token", error);
       throw error;
     }
   }
@@ -297,7 +310,7 @@ export class DiscogsProxyService {
     windowReset: string;
     recommendedDelay: string;
   }> {
-    console.log('[DiscogsProxy] Getting rate limit info');
+    console.log("[DiscogsProxy] Getting rate limit info");
 
     try {
       const response = await api.get<{
@@ -305,11 +318,11 @@ export class DiscogsProxyService {
         limit: number;
         windowReset: string;
         recommendedDelay: string;
-      }>('/discogs/rateLimit');
-      console.log('[DiscogsProxy] Rate limit info retrieved', response);
+      }>("/discogs/rateLimit");
+      console.log("[DiscogsProxy] Rate limit info retrieved", response);
       return response;
     } catch (error) {
-      console.error('[DiscogsProxy] Failed to get rate limit info', error);
+      console.error("[DiscogsProxy] Failed to get rate limit info", error);
       throw error;
     }
   }
@@ -343,17 +356,21 @@ export class DiscogsProxyService {
    */
   private setupMessageHandlers(): void {
     if (!this.webSocket) {
-      console.error('[DiscogsProxy] Cannot setup handlers - no WebSocket context');
+      console.error(
+        "[DiscogsProxy] Cannot setup handlers - no WebSocket context",
+      );
       return;
     }
 
     // Check if the WebSocket context supports sync message handling
     if (!this.webSocket.onSyncMessage) {
-      console.warn('[DiscogsProxy] WebSocket context does not support sync message handling');
+      console.warn(
+        "[DiscogsProxy] WebSocket context does not support sync message handling",
+      );
       return;
     }
 
-    console.log('[DiscogsProxy] Setting up WebSocket message handlers');
+    console.log("[DiscogsProxy] Setting up WebSocket message handlers");
 
     // Register for sync-related messages
     this.webSocket.onSyncMessage((message: WebSocketMessage) => {
@@ -365,32 +382,39 @@ export class DiscogsProxyService {
    * Handle incoming WebSocket messages
    */
   private handleIncomingMessage(message: WebSocketMessage): void {
-    console.log('[DiscogsProxy] Received WebSocket message', message.type, message.action);
+    console.log(
+      "[DiscogsProxy] Received WebSocket message",
+      message.type,
+      message.action,
+    );
 
     try {
       switch (message.type) {
-        case 'discogs_api_request':
+        case "discogs_api_request":
           this.handleApiRequest(message);
           break;
 
-        case 'sync_progress':
+        case "sync_progress":
           this.handleSyncProgress(message);
           break;
 
-        case 'sync_complete':
+        case "sync_complete":
           this.handleSyncComplete(message);
           break;
 
-        case 'sync_error':
+        case "sync_error":
           this.handleSyncError(message);
           break;
 
         default:
-          console.log('[DiscogsProxy] Ignoring unknown message type:', message.type);
+          console.log(
+            "[DiscogsProxy] Ignoring unknown message type:",
+            message.type,
+          );
           break;
       }
     } catch (error) {
-      console.error('[DiscogsProxy] Error handling message:', error, message);
+      console.error("[DiscogsProxy] Error handling message:", error, message);
     }
   }
 
@@ -398,15 +422,18 @@ export class DiscogsProxyService {
    * Handle incoming API request from server
    */
   private async handleApiRequest(message: WebSocketMessage): Promise<void> {
-    console.log('[DiscogsProxy] Received API request from server', message);
+    console.log("[DiscogsProxy] Received API request from server", message);
 
     if (!message.data) {
-      console.error('[DiscogsProxy] API request message missing data');
+      console.error("[DiscogsProxy] API request message missing data");
       return;
     }
 
     if (!isDiscogsApiRequestData(message.data)) {
-      console.error('[DiscogsProxy] Invalid API request data format', message.data);
+      console.error(
+        "[DiscogsProxy] Invalid API request data format",
+        message.data,
+      );
       return;
     }
 
@@ -416,8 +443,13 @@ export class DiscogsProxyService {
     // Validate the request
     const validationError = discogsApiService.validateRequest(request);
     if (validationError) {
-      console.error('[DiscogsProxy] Request validation failed', validationError);
-      this.sendApiResponse(discogsApiService.createErrorResponse(requestId, validationError));
+      console.error(
+        "[DiscogsProxy] Request validation failed",
+        validationError,
+      );
+      this.sendApiResponse(
+        discogsApiService.createErrorResponse(requestId, validationError),
+      );
       return;
     }
 
@@ -428,11 +460,11 @@ export class DiscogsProxyService {
       // Send response back to server
       this.sendApiResponse(response);
     } catch (error) {
-      console.error('[DiscogsProxy] Failed to make API request', error);
+      console.error("[DiscogsProxy] Failed to make API request", error);
 
       const errorResponse = discogsApiService.createErrorResponse(
         requestId,
-        error instanceof Error ? error.message : 'Unknown error'
+        error instanceof Error ? error.message : "Unknown error",
       );
 
       this.sendApiResponse(errorResponse);
@@ -444,22 +476,24 @@ export class DiscogsProxyService {
    */
   private sendApiResponse(response: DiscogsApiResponse): void {
     if (!this.webSocket) {
-      console.error('[DiscogsProxy] Cannot send response - no WebSocket context');
+      console.error(
+        "[DiscogsProxy] Cannot send response - no WebSocket context",
+      );
       return;
     }
 
     const message = {
       id: crypto.randomUUID(),
-      type: 'discogs_api_response',
-      channel: 'sync',
-      action: 'request_complete',
+      type: "discogs_api_response",
+      channel: "sync",
+      action: "request_complete",
       data: response,
       timestamp: new Date().toISOString(),
     };
 
-    console.log('[DiscogsProxy] Sending API response to server', {
+    console.log("[DiscogsProxy] Sending API response to server", {
       requestId: response.requestId,
-      status: response.status
+      status: response.status,
     });
 
     this.webSocket.sendMessage(JSON.stringify(message));
@@ -469,15 +503,18 @@ export class DiscogsProxyService {
    * Handle sync progress updates from server
    */
   private handleSyncProgress(message: WebSocketMessage): void {
-    console.log('[DiscogsProxy] Received sync progress update', message);
+    console.log("[DiscogsProxy] Received sync progress update", message);
 
     if (!message.data) {
-      console.warn('[DiscogsProxy] Sync progress message missing data');
+      console.warn("[DiscogsProxy] Sync progress message missing data");
       return;
     }
 
     if (!isSyncProgressData(message.data)) {
-      console.warn('[DiscogsProxy] Invalid sync progress data format', message.data);
+      console.warn(
+        "[DiscogsProxy] Invalid sync progress data format",
+        message.data,
+      );
       return;
     }
 
@@ -485,16 +522,19 @@ export class DiscogsProxyService {
 
     // Validate that progress has required SyncProgress properties
     if (!this.isValidSyncProgress(progress)) {
-      console.warn('[DiscogsProxy] Progress data does not match SyncProgress interface', progress);
+      console.warn(
+        "[DiscogsProxy] Progress data does not match SyncProgress interface",
+        progress,
+      );
       return;
     }
 
     // Notify all progress callbacks
-    this.progressCallbacks.forEach(callback => {
+    this.progressCallbacks.forEach((callback) => {
       try {
         callback(progress);
       } catch (error) {
-        console.error('[DiscogsProxy] Error in progress callback', error);
+        console.error("[DiscogsProxy] Error in progress callback", error);
       }
     });
   }
@@ -503,20 +543,21 @@ export class DiscogsProxyService {
    * Type guard to validate SyncProgress object
    */
   private isValidSyncProgress(obj: unknown): obj is SyncProgress {
-    if (!obj || typeof obj !== 'object') return false;
+    if (!obj || typeof obj !== "object") return false;
 
     const progress = obj as Record<string, unknown>;
     return (
-      typeof progress.sessionId === 'string' &&
-      typeof progress.status === 'string' &&
-      typeof progress.syncType === 'string' &&
-      typeof progress.totalRequests === 'number' &&
-      typeof progress.completedRequests === 'number' &&
-      typeof progress.failedRequests === 'number' &&
-      typeof progress.percentComplete === 'number' &&
-      typeof progress.startedAt === 'string' &&
-      typeof progress.currentAction === 'string' &&
-      (progress.estimatedTimeLeft === undefined || typeof progress.estimatedTimeLeft === 'string')
+      typeof progress.sessionId === "string" &&
+      typeof progress.status === "string" &&
+      typeof progress.syncType === "string" &&
+      typeof progress.totalRequests === "number" &&
+      typeof progress.completedRequests === "number" &&
+      typeof progress.failedRequests === "number" &&
+      typeof progress.percentComplete === "number" &&
+      typeof progress.startedAt === "string" &&
+      typeof progress.currentAction === "string" &&
+      (progress.estimatedTimeLeft === undefined ||
+        typeof progress.estimatedTimeLeft === "string")
     );
   }
 
@@ -524,26 +565,29 @@ export class DiscogsProxyService {
    * Handle sync completion from server
    */
   private handleSyncComplete(message: WebSocketMessage): void {
-    console.log('[DiscogsProxy] Received sync complete notification', message);
+    console.log("[DiscogsProxy] Received sync complete notification", message);
 
     if (!message.data) {
-      console.warn('[DiscogsProxy] Sync complete message missing data');
+      console.warn("[DiscogsProxy] Sync complete message missing data");
       return;
     }
 
     if (!isSyncCompleteData(message.data)) {
-      console.warn('[DiscogsProxy] Invalid sync complete data format', message.data);
+      console.warn(
+        "[DiscogsProxy] Invalid sync complete data format",
+        message.data,
+      );
       return;
     }
 
     const { sessionId } = message.data;
 
     // Notify all completion callbacks
-    this.completeCallbacks.forEach(callback => {
+    this.completeCallbacks.forEach((callback) => {
       try {
         callback(sessionId);
       } catch (error) {
-        console.error('[DiscogsProxy] Error in complete callback', error);
+        console.error("[DiscogsProxy] Error in complete callback", error);
       }
     });
   }
@@ -552,26 +596,29 @@ export class DiscogsProxyService {
    * Handle sync errors from server
    */
   private handleSyncError(message: WebSocketMessage): void {
-    console.log('[DiscogsProxy] Received sync error notification', message);
+    console.log("[DiscogsProxy] Received sync error notification", message);
 
     if (!message.data) {
-      console.warn('[DiscogsProxy] Sync error message missing data');
+      console.warn("[DiscogsProxy] Sync error message missing data");
       return;
     }
 
     if (!isSyncErrorData(message.data)) {
-      console.warn('[DiscogsProxy] Invalid sync error data format', message.data);
+      console.warn(
+        "[DiscogsProxy] Invalid sync error data format",
+        message.data,
+      );
       return;
     }
 
     const { sessionId, error } = message.data;
 
     // Notify all error callbacks
-    this.errorCallbacks.forEach(callback => {
+    this.errorCallbacks.forEach((callback) => {
       try {
         callback(sessionId, error);
       } catch (callbackError) {
-        console.error('[DiscogsProxy] Error in error callback', callbackError);
+        console.error("[DiscogsProxy] Error in error callback", callbackError);
       }
     });
   }
@@ -579,3 +626,4 @@ export class DiscogsProxyService {
 
 // Export a singleton instance
 export const discogsProxyService = new DiscogsProxyService();
+

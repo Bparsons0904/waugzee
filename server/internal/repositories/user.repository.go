@@ -21,6 +21,7 @@ type UserRepository interface {
 	GetByOIDCUserID(ctx context.Context, oidcUserID string) (*User, error)
 	Update(ctx context.Context, user *User) error
 	FindOrCreateOIDCUser(ctx context.Context, user *User) (*User, error)
+	ClearUserCacheByOIDC(ctx context.Context, oidcUserID string) error
 }
 
 type userRepository struct {
@@ -28,7 +29,7 @@ type userRepository struct {
 	log logger.Logger
 }
 
-func New(db database.DB) UserRepository {
+func NewUserRepository(db database.DB) UserRepository {
 	return &userRepository{
 		db:  db,
 		log: logger.New("userRepository"),
@@ -296,4 +297,38 @@ func (r *userRepository) FindOrCreateOIDCUser(
 
 	// Create new OIDC user
 	return r.createFromOIDC(ctx, user)
+}
+
+// ClearUserCacheByOIDC clears user cache by OIDC user ID
+func (r *userRepository) ClearUserCacheByOIDC(ctx context.Context, oidcUserID string) error {
+	log := r.log.Function("ClearUserCacheByOIDC")
+
+	// Get user from database to find UUID for cache cleanup
+	user, err := r.GetByOIDCUserID(ctx, oidcUserID)
+	if err != nil {
+		log.Warn(
+			"failed to get user for cache cleanup",
+			"error",
+			err.Error(),
+			"oidcUserID",
+			oidcUserID,
+		)
+		return err
+	}
+
+	// Clear user cache by UUID using proper cache key prefix
+	userCacheKey := USER_CACHE_PREFIX + user.ID.String()
+	if err := database.NewCacheBuilder(r.db.Cache.User, userCacheKey).WithContext(ctx).Delete(); err != nil {
+		log.Warn("failed to remove user from cache", "userID", user.ID, "error", err)
+		return err
+	}
+
+	// Clear OIDC mapping cache using proper cache key prefix
+	oidcCacheKey := OIDC_MAPPING_CACHE_PREFIX + oidcUserID
+	if err := database.NewCacheBuilder(r.db.Cache.User, oidcCacheKey).WithContext(ctx).Delete(); err != nil {
+		log.Warn("failed to remove OIDC mapping from cache", "oidcUserID", oidcUserID, "error", err)
+		return err
+	}
+
+	return nil
 }

@@ -65,7 +65,7 @@ func main() {
 	// Start scheduler if enabled
 	if app.Config.SchedulerEnabled {
 		ctx := context.Background()
-		if err := app.SchedulerService.Start(ctx); err != nil {
+		if err := app.Services.Scheduler.Start(ctx); err != nil {
 			log.Er("failed to start scheduler service", err)
 			os.Exit(1)
 		}

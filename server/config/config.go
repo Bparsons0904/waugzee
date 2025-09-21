@@ -34,8 +34,8 @@ type Config struct {
 
 var ConfigInstance Config
 
-func InitConfig() (Config, error) {
-	log := logger.New("config").Function("InitConfig")
+func New() (Config, error) {
+	log := logger.New("config").Function("New")
 	log.Info("Initializing config")
 
 	// Enable automatic environment variable reading first

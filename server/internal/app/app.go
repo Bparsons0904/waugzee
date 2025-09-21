@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"waugzee/config"
+	"waugzee/internal/controllers"
 	"waugzee/internal/database"
 	"waugzee/internal/events"
 	"waugzee/internal/handlers/middleware"
@@ -11,9 +12,6 @@ import (
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
 	"waugzee/internal/websockets"
-
-	authController "waugzee/internal/controllers/auth"
-	userController "waugzee/internal/controllers/users"
 )
 
 type App struct {
@@ -23,29 +21,15 @@ type App struct {
 	EventBus   *events.EventBus
 	Config     config.Config
 
-	// Services
-	TransactionService *services.TransactionService
-	ZitadelService     *services.ZitadelService
-	DiscogsService     *services.DiscogsService
-	SchedulerService   *services.SchedulerService
-
-	// Repositories
-	UserRepo    repositories.UserRepository
-	LabelRepo   repositories.LabelRepository
-	ArtistRepo  repositories.ArtistRepository
-	MasterRepo  repositories.MasterRepository
-	ReleaseRepo repositories.ReleaseRepository
-	GenreRepo   repositories.GenreRepository
-
-	// Controllers
-	AuthController authController.AuthControllerInterface
-	UserController *userController.UserController
+	Services    services.Service
+	Repos       repositories.Repository
+	Controllers controllers.Controllers
 }
 
 func New() (*App, error) {
 	log := logger.New("app").Function("New")
 
-	config, err := config.InitConfig()
+	config, err := config.New()
 	if err != nil {
 		return &App{}, log.Err("failed to initialize config", err)
 	}
@@ -56,110 +40,43 @@ func New() (*App, error) {
 	}
 
 	eventBus := events.New(db.Cache.Events, config)
+	repos := repositories.New(db)
 
-	// Initialize services
-	transactionService := services.NewTransactionService(db)
-	zitadelService, err := services.NewZitadelService(config)
+	servicesComposite, err := services.New(db, config)
 	if err != nil {
-		return &App{}, log.Err("failed to create Zitadel service", err)
+		return &App{}, log.Err("failed to initialize services", err)
 	}
-	// Initialize repositories
-	userRepo := repositories.New(db)
-	labelRepo := repositories.NewLabelRepository(db)
-	artistRepo := repositories.NewArtistRepository(db)
-	masterRepo := repositories.NewMasterRepository(db)
-	releaseRepo := repositories.NewReleaseRepository(db)
-	genreRepo := repositories.NewGenreRepository(db)
-
-	// Initialize services
-	discogsService := services.NewDiscogsService()
-	schedulerService := services.NewSchedulerService()
 
 	websocket, err := websockets.New(
 		db,
 		eventBus,
 		config,
-		zitadelService,
-		userRepo,
+		servicesComposite,
+		repos,
 	)
 	if err != nil {
 		return &App{}, log.Err("failed to create websocket manager", err)
 	}
 
-	// Now set the websocket sender in the orchestration service
+	middleware := middleware.New(db, eventBus, config, repos)
+	controllersComposite := controllers.New(servicesComposite, repos, config)
 
-	// Initialize controllers with repositories and services
-	middleware := middleware.New(db, eventBus, config, userRepo)
-	authController := authController.New(zitadelService, userRepo, db)
-	userController := userController.New(userRepo, discogsService, config)
-
-	// Register all jobs with scheduler
-	if err := jobs.RegisterAllJobs(schedulerService, config); err != nil {
+	if err := jobs.RegisterAllJobs(servicesComposite.Scheduler, config); err != nil {
 		return &App{}, log.Err("failed to register jobs", err)
 	}
 
 	app := &App{
-		Database:           db,
-		Config:             config,
-		Middleware:         middleware,
-		TransactionService: transactionService,
-		ZitadelService:     zitadelService,
-		DiscogsService:     discogsService,
-		SchedulerService:   schedulerService,
-		UserRepo:           userRepo,
-		LabelRepo:          labelRepo,
-		ArtistRepo:         artistRepo,
-		MasterRepo:         masterRepo,
-		ReleaseRepo:        releaseRepo,
-		GenreRepo:          genreRepo,
-		AuthController:     authController,
-		UserController:     userController,
-		Websocket:          websocket,
-		EventBus:           eventBus,
-	}
-
-	if err := app.validate(); err != nil {
-		return &App{}, log.Err("failed to validate app", err)
+		Database:    db,
+		Config:      config,
+		Middleware:  middleware,
+		Services:    servicesComposite,
+		Repos:       repos,
+		Controllers: controllersComposite,
+		Websocket:   websocket,
+		EventBus:    eventBus,
 	}
 
 	return app, nil
-}
-
-func (a *App) validate() error {
-	log := logger.New("app").Function("validate")
-	if a.Database.SQL == nil {
-		return log.ErrMsg("database is nil")
-	}
-
-	if a.Config == (config.Config{}) {
-		return log.ErrMsg("config is nil")
-	}
-
-	nilChecks := []any{
-		a.Websocket,
-		a.EventBus,
-		a.TransactionService,
-		a.ZitadelService,
-		a.DiscogsService,
-		a.SchedulerService,
-		a.AuthController,
-		a.UserController,
-		a.Middleware,
-		a.UserRepo,
-		a.LabelRepo,
-		a.ArtistRepo,
-		a.MasterRepo,
-		a.ReleaseRepo,
-		a.GenreRepo,
-	}
-
-	for _, check := range nilChecks {
-		if check == nil {
-			return log.ErrMsg("nil check failed")
-		}
-	}
-
-	return nil
 }
 
 func (a *App) Close() (err error) {
@@ -169,14 +86,14 @@ func (a *App) Close() (err error) {
 		}
 	}
 
-	if a.SchedulerService != nil {
-		if closeErr := a.SchedulerService.Stop(context.Background()); closeErr != nil {
+	if a.Services.Scheduler != nil {
+		if closeErr := a.Services.Scheduler.Stop(context.Background()); closeErr != nil {
 			err = closeErr
 		}
 	}
 
-	if a.ZitadelService != nil {
-		if closeErr := a.ZitadelService.Close(); closeErr != nil {
+	if a.Services.Zitadel != nil {
+		if closeErr := a.Services.Zitadel.Close(); closeErr != nil {
 			err = closeErr
 		}
 	}

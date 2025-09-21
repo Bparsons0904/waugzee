@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
@@ -15,7 +14,6 @@ import (
 type AuthController struct {
 	zitadelService *services.ZitadelService
 	userRepo       repositories.UserRepository
-	db             database.DB
 	log            logger.Logger
 }
 
@@ -65,14 +63,12 @@ type LogoutResponse struct {
 
 
 func New(
-	zitadelService *services.ZitadelService,
-	userRepo repositories.UserRepository,
-	db database.DB,
+	services services.Service,
+	repos repositories.Repository,
 ) AuthControllerInterface {
 	return &AuthController{
-		zitadelService: zitadelService,
-		userRepo:       userRepo,
-		db:             db,
+		zitadelService: services.Zitadel,
+		userRepo:       repos.User,
 		log:            logger.New("authController"),
 	}
 }
@@ -237,7 +233,7 @@ func (ac *AuthController) LogoutUser(
 
 	// Clear user cache data if we have user info
 	if user != nil {
-		if err := ac.clearUserCacheByOIDC(ctx, user.OIDCUserID); err != nil {
+		if err := ac.userRepo.ClearUserCacheByOIDC(ctx, user.OIDCUserID); err != nil {
 			log.Warn(
 				"failed to clear user cache",
 				"error",
@@ -282,38 +278,4 @@ func (ac *AuthController) LogoutUser(
 	}
 
 	return response, nil
-}
-
-// clearUserCacheByOIDC clears user cache by OIDC user ID
-func (ac *AuthController) clearUserCacheByOIDC(ctx context.Context, oidcUserID string) error {
-	log := ac.log.Function("clearUserCacheByOIDC")
-
-	// Get user from database to find UUID for cache cleanup
-	user, err := ac.userRepo.GetByOIDCUserID(ctx, oidcUserID)
-	if err != nil {
-		log.Warn(
-			"failed to get user for cache cleanup",
-			"error",
-			err.Error(),
-			"oidcUserID",
-			oidcUserID,
-		)
-		return err
-	}
-
-	// Clear user cache by UUID using proper cache key prefix
-	userCacheKey := "user:" + user.ID.String()
-	if err := database.NewCacheBuilder(ac.db.Cache.User, userCacheKey).WithContext(ctx).Delete(); err != nil {
-		log.Warn("failed to remove user from cache", "userID", user.ID, "error", err)
-		return err
-	}
-
-	// Clear OIDC mapping cache using proper cache key prefix
-	oidcCacheKey := "oidc:" + oidcUserID
-	if err := database.NewCacheBuilder(ac.db.Cache.User, oidcCacheKey).WithContext(ctx).Delete(); err != nil {
-		log.Warn("failed to remove OIDC mapping from cache", "oidcUserID", oidcUserID, "error", err)
-		return err
-	}
-
-	return nil
 }

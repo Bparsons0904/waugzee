@@ -1,3 +1,25 @@
 package repositories
 
-type Repository interface{}
+import (
+	"waugzee/internal/database"
+)
+
+type Repository struct {
+	User    UserRepository
+	Artist  ArtistRepository
+	Master  MasterRepository
+	Release ReleaseRepository
+	Genre   GenreRepository
+	Label   LabelRepository
+}
+
+func New(db database.DB) Repository {
+	return Repository{
+		User:    NewUserRepository(db),
+		Artist:  NewArtistRepository(db),
+		Master:  NewMasterRepository(db),
+		Release: NewReleaseRepository(db),
+		Genre:   NewGenreRepository(db),
+		Label:   NewLabelRepository(db),
+	}
+}

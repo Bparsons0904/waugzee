@@ -10,6 +10,7 @@ import (
 	"waugzee/internal/events"
 	"waugzee/internal/logger"
 	"waugzee/internal/repositories"
+	"waugzee/internal/services"
 	"waugzee/internal/types"
 
 	"github.com/gofiber/websocket/v2"
@@ -101,8 +102,8 @@ func New(
 	db database.DB,
 	eventBus *events.EventBus,
 	config config.Config,
-	zitadelService ZitadelService,
-	userRepo repositories.UserRepository,
+	services services.Service,
+	repos repositories.Repository,
 ) (*Manager, error) {
 	log := logger.New("websockets")
 
@@ -117,8 +118,8 @@ func New(
 		config:         config,
 		log:            log,
 		eventBus:       eventBus,
-		zitadelService: zitadelService,
-		userRepo:       userRepo,
+		zitadelService: services.Zitadel,
+		userRepo:       repos.User,
 	}
 
 	log.Function("New").Info("Starting websocket hub")
