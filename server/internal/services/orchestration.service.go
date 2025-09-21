@@ -14,17 +14,11 @@ import (
 )
 
 const (
-	// Cache key patterns
-	APIRequestCacheKeyPattern = "api_request:%s"
-
-	// TTL durations
-	APIRequestTTL = 10 * time.Minute
-
-	// Discogs API configuration
-	DiscogsAPIBaseURL = "https://api.discogs.com"
+	APIRequestCacheKeyPattern = "api_request"
+	APIRequestTTL             = 10 * time.Minute
+	DiscogsAPIBaseURL         = "https://api.discogs.com"
 )
 
-// RequestMetadata stores information about pending API requests
 type RequestMetadata struct {
 	UserID       uuid.UUID `json:"userId"`
 	RequestID    string    `json:"requestId"`
@@ -33,15 +27,12 @@ type RequestMetadata struct {
 	DiscogsToken string    `json:"discogsToken,omitempty"`
 }
 
-// OrchestrationService coordinates API requests between the server and client
-// following the client-as-proxy pattern for Discogs integration
 type OrchestrationService struct {
 	log      logger.Logger
 	eventBus *events.EventBus
 	cache    valkey.Client
 }
 
-// NewOrchestrationService creates a new orchestration service instance
 func NewOrchestrationService(eventBus *events.EventBus, db database.DB) *OrchestrationService {
 	log := logger.New("OrchestrationService")
 	return &OrchestrationService{
@@ -51,8 +42,6 @@ func NewOrchestrationService(eventBus *events.EventBus, db database.DB) *Orchest
 	}
 }
 
-// GetUserFolders initiates a request to get user folders from Discogs
-// This method coordinates the API request through the client-as-proxy pattern
 func (o *OrchestrationService) GetUserFolders(
 	ctx context.Context,
 	user *User,
@@ -71,15 +60,8 @@ func (o *OrchestrationService) GetUserFolders(
 		return "", fmt.Errorf("user does not have a Discogs username")
 	}
 
-	// Generate a unique request ID for tracking
 	requestID := uuid.New().String()
 
-	log.Info("Initiating user folders request",
-		"userID", user.ID,
-		"requestID", requestID,
-		"discogsUsername", *user.DiscogsUsername)
-
-	// Store request metadata in Valkey with TTL
 	metadata := RequestMetadata{
 		UserID:       user.ID,
 		RequestID:    requestID,
@@ -88,9 +70,8 @@ func (o *OrchestrationService) GetUserFolders(
 		DiscogsToken: *user.DiscogsToken,
 	}
 
-	// Store in Valkey with TTL using CacheBuilder
 	if err := database.NewCacheBuilder(o.cache, requestID).
-		WithHashPattern(APIRequestCacheKeyPattern).
+		WithHashPattern("api_request").
 		WithStruct(metadata).
 		WithTTL(APIRequestTTL).
 		WithContext(ctx).
@@ -98,9 +79,11 @@ func (o *OrchestrationService) GetUserFolders(
 		return "", log.Err("failed to store request metadata in cache", err)
 	}
 
-	// Send complete API request instructions to client via EventBus/WebSocket
-	// Provide full URL, method, headers, callback ID, and response service details
-	fullURL := fmt.Sprintf("%s/users/%s/collection/folders", DiscogsAPIBaseURL, *user.DiscogsUsername)
+	fullURL := fmt.Sprintf(
+		"%s/users/%s/collection/folders",
+		DiscogsAPIBaseURL,
+		*user.DiscogsUsername,
+	)
 	message := events.Message{
 		ID:      requestID,
 		Service: events.API,
@@ -113,7 +96,6 @@ func (o *OrchestrationService) GetUserFolders(
 			"method":      "GET",
 			"headers": map[string]string{
 				"Authorization": fmt.Sprintf("Discogs token=%s", *user.DiscogsToken),
-				"User-Agent":    "WaugzeeApp/1.0",
 			},
 			"callbackService": "orchestration",
 			"callbackEvent":   "api_response",
@@ -122,7 +104,6 @@ func (o *OrchestrationService) GetUserFolders(
 	}
 
 	if err := o.eventBus.Publish(events.WEBSOCKET, "user", message); err != nil {
-		// Clean up cache entry if EventBus publish fails
 		_ = database.NewCacheBuilder(o.cache, requestID).
 			WithHashPattern(APIRequestCacheKeyPattern).
 			WithContext(ctx).
@@ -130,23 +111,15 @@ func (o *OrchestrationService) GetUserFolders(
 		return "", log.Err("failed to publish API request event", err)
 	}
 
-	log.Info("User folders request initiated successfully",
-		"userID", user.ID,
-		"requestID", requestID,
-		"discogsUsername", *user.DiscogsUsername)
-
 	return requestID, nil
 }
 
-// HandleAPIResponse processes incoming API responses from clients
-// This method matches responses with stored request metadata and processes the results
 func (o *OrchestrationService) HandleAPIResponse(
 	ctx context.Context,
 	responseData map[string]any,
 ) error {
 	log := o.log.Function("HandleAPIResponse")
 
-	// Extract request ID from response
 	requestID, ok := responseData["requestId"].(string)
 	if !ok || requestID == "" {
 		return log.ErrMsg("missing or invalid requestId in response")
@@ -154,20 +127,22 @@ func (o *OrchestrationService) HandleAPIResponse(
 
 	log.Info("Processing API response", "requestID", requestID)
 
-	// Retrieve request metadata from cache using CacheBuilder
 	var metadata RequestMetadata
 	found, err := database.NewCacheBuilder(o.cache, requestID).
-		WithHashPattern(APIRequestCacheKeyPattern).
+		WithHashPattern("api_request").
 		WithContext(ctx).
 		Get(&metadata)
 	if err != nil {
 		return log.Err("failed to retrieve request metadata from cache", err)
 	}
+
 	if !found {
+		log.Er("Request metadata not found in cache",
+			fmt.Errorf("cache miss"),
+			"requestID", requestID)
 		return fmt.Errorf("request metadata not found or expired for requestID: %s", requestID)
 	}
 
-	// Validate the response matches the request
 	if metadata.RequestID != requestID {
 		return fmt.Errorf(
 			"request ID mismatch: expected %s, received %s",
@@ -176,7 +151,19 @@ func (o *OrchestrationService) HandleAPIResponse(
 		)
 	}
 
-	// Process response based on request type
+	err = database.NewCacheBuilder(o.cache, requestID).
+		WithHashPattern(APIRequestCacheKeyPattern).
+		WithContext(ctx).
+		Delete()
+	if err != nil {
+		log.Er("failed to cleanup cache entry", err, "requestID", requestID)
+	}
+
+	log.Info("API response processed successfully",
+		"requestID", requestID,
+		"requestType", metadata.RequestType,
+		"userID", metadata.UserID)
+
 	switch metadata.RequestType {
 	case "folders":
 		err = o.processFoldersResponse(ctx, metadata, responseData)
@@ -187,19 +174,6 @@ func (o *OrchestrationService) HandleAPIResponse(
 	if err != nil {
 		return log.Err("failed to process response", err, "requestType", metadata.RequestType)
 	}
-
-	// Clean up cache entry after successful processing using CacheBuilder
-	if err := database.NewCacheBuilder(o.cache, requestID).
-		WithHashPattern(APIRequestCacheKeyPattern).
-		WithContext(ctx).
-		Delete(); err != nil {
-		log.Er("failed to cleanup cache entry", err, "requestID", requestID)
-	}
-
-	log.Info("API response processed successfully",
-		"requestID", requestID,
-		"requestType", metadata.RequestType,
-		"userID", metadata.UserID)
 
 	return nil
 }
@@ -231,9 +205,7 @@ func (o *OrchestrationService) processFoldersResponse(
 		"requestID", metadata.RequestID,
 		"foldersData", foldersData)
 
-	// For now, just log the successful response data
 	// TODO: Process and store folder data when folder sync feature is implemented
-	log.Info("Folders response data", "data", foldersData)
 
 	return nil
 }

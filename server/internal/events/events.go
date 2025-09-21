@@ -114,7 +114,6 @@ func (eb *EventBus) Publish(channel Channel, eventTypeOrChannelEvent any, messag
 		)
 	}
 
-	log.Info("Event published", "channel", channel, "event", channelEvent)
 
 	eb.notifyLocalHandlers(channel, channelEvent)
 
@@ -179,12 +178,7 @@ func (eb *EventBus) listenToChannel(channel Channel) {
 				return
 			}
 
-			log.Info(
-				"Received event from valkey",
-				"channel",
-				channel,
-			)
-			eb.notifyLocalHandlers(channel, event)
+					eb.notifyLocalHandlers(channel, event)
 		},
 	)
 	if err != nil {

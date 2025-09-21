@@ -140,8 +140,7 @@ func (m *Manager) BroadcastMessage(message Message) {
 
 	select {
 	case m.hub.broadcast <- message:
-		log.Info("Message sent to broadcast channel", "messageID", message.ID)
-	default:
+		default:
 		log.Warn("Broadcast channel is full, dropping message", "messageID", message.ID)
 	}
 }
@@ -167,8 +166,7 @@ func (c *Client) readPump() {
 	for {
 		var message Message
 		err := c.Connection.ReadJSON(&message)
-		log.Info("Read message", "clientID", c.ID, "message", message)
-		if err != nil {
+			if err != nil {
 			log.Er("failed to read message", err)
 			if websocket.IsUnexpectedCloseError(
 				err,
@@ -202,14 +200,7 @@ func (c *Client) routeMessage(message Message) {
 
 	switch message.Event {
 	case API_RESPONSE:
-		log.Info(
-			"Received API response",
-			"messageID",
-			message.ID,
-			"clientID",
-			c.ID,
-		)
-		c.handleAPIResponse(message)
+			c.handleAPIResponse(message)
 	default:
 		log.Warn("Unknown message event", "event", message.Event)
 	}
@@ -249,8 +240,7 @@ func (c *Client) writePump() {
 			}
 
 		case <-ticker.C:
-			log.Debug("Sending ping", "clientID", c.ID)
-			if err := c.Connection.SetWriteDeadline(time.Now().Add(WRITE_TIMEOUT)); err != nil {
+					if err := c.Connection.SetWriteDeadline(time.Now().Add(WRITE_TIMEOUT)); err != nil {
 				log.Er("failed to set write deadline for ping", err, "clientID", c.ID)
 			}
 			if err := c.Connection.WriteMessage(websocket.PingMessage, nil); err != nil {
@@ -265,8 +255,7 @@ func (m *Manager) subscribeToEventBus() {
 	log.Info("Starting WebSocket events subscription")
 
 	if err := m.eventBus.Subscribe(events.WEBSOCKET, func(event events.ChannelEvent) error {
-		log.Info("Received WebSocket event", "event", event.Event)
-
+	
 		switch event.Event {
 		case "broadcast":
 			m.sendToAuthenticatedClients(event.Message)
@@ -296,7 +285,6 @@ func (m *Manager) sendToAuthenticatedClients(message Message) {
 		}
 	}
 
-	log.Info("Message sent to authenticated clients", "messageID", message.ID, "clientCount", sent)
 }
 
 func (m *Manager) sendToSpecificUser(message Message) {
@@ -331,8 +319,7 @@ func (m *Manager) sendToSpecificUser(message Message) {
 	// Send message to the specific user's client
 	select {
 	case targetClient.send <- message:
-		log.Info("Message sent to specific user", "messageID", message.ID, "userID", message.UserID, "clientID", targetClient.ID)
-	default:
+		default:
 		log.Warn("User's send channel full, dropping message", "messageID", message.ID, "userID", message.UserID, "clientID", targetClient.ID)
 	}
 }
@@ -352,10 +339,6 @@ func (c *Client) handleAPIResponse(message Message) {
 		return
 	}
 
-	log.Info("Processing API response",
-		"messageID", message.ID,
-		"clientID", c.ID,
-		"userID", c.UserID)
 
 	// Pass the response to the orchestration service for processing
 	if err := c.Manager.orchestrationService.HandleAPIResponse(context.Background(), message.Payload); err != nil {
@@ -366,9 +349,5 @@ func (c *Client) handleAPIResponse(message Message) {
 		return
 	}
 
-	log.Info("API response processed successfully",
-		"messageID", message.ID,
-		"clientID", c.ID,
-		"userID", c.UserID)
 }
 

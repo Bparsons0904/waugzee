@@ -283,6 +283,51 @@ func (r *userRepository) GetByOIDCUserID(ctx context.Context, oidcUserID string)
 - **Scalability**: Reduces database load with intelligent caching
 - **Flexibility**: OIDC mapping cache enables efficient auth workflows
 
+### CacheBuilder Usage Pattern
+
+**Rule**: Let CacheBuilder handle key formatting internally - provide base pattern and key separately
+
+**✅ CORRECT Usage**:
+```go
+// Set operation
+if err := database.NewCacheBuilder(cache, requestID).
+    WithHashPattern("api_request").
+    WithStruct(metadata).
+    WithTTL(APIRequestTTL).
+    WithContext(ctx).
+    Set(); err != nil {
+    return err
+}
+
+// Get operation
+var metadata RequestMetadata
+found, err := database.NewCacheBuilder(cache, requestID).
+    WithHashPattern("api_request").
+    WithContext(ctx).
+    Get(&metadata)
+```
+
+**❌ INCORRECT Usage**:
+```go
+// Don't format the key manually
+cacheKey := fmt.Sprintf("api_request:%s", requestID) // ❌ DON'T DO THIS
+if err := database.NewCacheBuilder(cache, cacheKey).
+    WithHashPattern("api_request:%s"). // ❌ DON'T DO THIS
+    Set(); err != nil {
+    return err
+}
+```
+
+**How CacheBuilder Works**:
+- **Input**: `NewCacheBuilder(cache, "12345").WithHashPattern("api_request")`
+- **Internal Processing**: CacheBuilder formats as `"api_request:12345"`
+- **Result**: Consistent key formatting between Set and Get operations
+
+**Key Benefits**:
+- **Consistency**: Identical key formatting across Set/Get operations
+- **Simplicity**: No manual string formatting required
+- **Error Prevention**: Eliminates key mismatch bugs
+
 ## 5. Model Standards
 
 **Role**: Data definitions that are descriptive and minimal
