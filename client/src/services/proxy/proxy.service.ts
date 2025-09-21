@@ -8,7 +8,7 @@ export interface WebSocketContextValue {
   onCacheInvalidation: (
     callback: (resourceType: string, resourceId: string) => void,
   ) => () => void;
-  onSyncMessage?: (callback: (message: WebSocketMessage) => void) => () => void;
+  onApiMessage?: (callback: (message: WebSocketMessage) => void) => () => void;
 }
 
 export interface ProxyRequest {
@@ -64,12 +64,12 @@ export class ProxyService {
   }
 
   private setupMessageHandlers(): void {
-    if (!this.webSocket?.onSyncMessage) {
-      console.warn("[Proxy] WebSocket context does not support sync messages");
+    if (!this.webSocket?.onApiMessage) {
+      console.warn("[Proxy] WebSocket context does not support API messages");
       return;
     }
 
-    this.webSocket.onSyncMessage((message: WebSocketMessage) => {
+    this.webSocket.onApiMessage((message: WebSocketMessage) => {
       if (message.event === "api_request") {
         this.handleApiRequest(message);
       }
@@ -176,7 +176,7 @@ export class ProxyService {
 
     const message = {
       id: crypto.randomUUID(),
-      service: "sync" as const,
+      service: "api" as const,
       event: "api_response",
       payload: response,
       timestamp: new Date().toISOString(),

@@ -29,13 +29,13 @@ export const Events = {
   INVALIDATE_CACHE: "invalidateCache",
   API_REQUEST: "api_request",
   API_RESPONSE: "api_response",
-  SYNC_PROGRESS: "sync_progress",
-  SYNC_COMPLETE: "sync_complete",
-  SYNC_ERROR: "sync_error",
+  API_PROGRESS: "api_progress",
+  API_COMPLETE: "api_complete",
+  API_ERROR: "api_error",
 } as const;
 
 // Service types matching server-side implementation
-export type ServiceType = "system" | "user" | "sync";
+export type ServiceType = "system" | "user" | "api";
 
 export interface WebSocketMessage {
   id: string;
@@ -67,7 +67,7 @@ interface WebSocketContextValue {
   onCacheInvalidation: (
     callback: (resourceType: string, resourceId: string) => void,
   ) => () => void;
-  onSyncMessage: (callback: (message: WebSocketMessage) => void) => () => void;
+  onApiMessage: (callback: (message: WebSocketMessage) => void) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue>(
@@ -93,8 +93,8 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
   const [cacheInvalidationCallbacks, setCacheInvalidationCallbacks] =
     createSignal<Array<(resourceType: string, resourceId: string) => void>>([]);
 
-  // Sync message callbacks
-  const [syncMessageCallbacks, setSyncMessageCallbacks] = createSignal<
+  // API message callbacks
+  const [apiMessageCallbacks, setApiMessageCallbacks] = createSignal<
     Array<(message: WebSocketMessage) => void>
   >([]);
 
@@ -166,16 +166,16 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
 
         case Events.API_REQUEST:
         case Events.API_RESPONSE:
-        case Events.SYNC_PROGRESS:
-        case Events.SYNC_COMPLETE:
-        case Events.SYNC_ERROR:
-          // Handle sync-related messages
-          log("Sync message received:", message.event, message);
-          syncMessageCallbacks().forEach((callback) => {
+        case Events.API_PROGRESS:
+        case Events.API_COMPLETE:
+        case Events.API_ERROR:
+          // Handle API-related messages
+          log("API message received:", message.event, message);
+          apiMessageCallbacks().forEach((callback) => {
             try {
               callback(message);
             } catch (error) {
-              log("Sync message callback error:", error);
+              log("API message callback error:", error);
             }
           });
           break;
@@ -384,12 +384,12 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     };
   };
 
-  const onSyncMessage = (callback: (message: WebSocketMessage) => void) => {
-    setSyncMessageCallbacks((prev) => [...prev, callback]);
+  const onApiMessage = (callback: (message: WebSocketMessage) => void) => {
+    setApiMessageCallbacks((prev) => [...prev, callback]);
 
     // Return cleanup function
     return () => {
-      setSyncMessageCallbacks((prev) => prev.filter((cb) => cb !== callback));
+      setApiMessageCallbacks((prev) => prev.filter((cb) => cb !== callback));
     };
   };
 
@@ -402,7 +402,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     sendMessage,
     reconnect,
     onCacheInvalidation,
-    onSyncMessage,
+    onApiMessage,
   };
 
   return (

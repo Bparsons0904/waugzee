@@ -44,7 +44,7 @@ type Service string
 const (
 	SYSTEM Service = "system"
 	USER   Service = "user"
-	SYNC   Service = "sync"
+	API    Service = "api"
 )
 
 type Message struct {

@@ -53,18 +53,20 @@ func (sc *SyncController) HandleSyncRequest(
 	log.Info("Processing sync request", "userID", user.ID)
 
 	channelEvent := events.ChannelEvent{
-		Event: "sync",
+		Event: "api",
 		Message: events.Message{
 			ID:        uuid.New().String(),
-			Service:   events.SYNC,
-			Event:     "sync",
+			Service:   events.API,
+			Event:     "api",
 			UserID:    user.ID.String(),
 			Payload:   map[string]any{},
 			Timestamp: time.Now(),
 		},
 	}
 
-	sc.eventBus.Publish(events.WEBSOCKET, channelEvent)
+	if err := sc.eventBus.Publish(events.WEBSOCKET, channelEvent); err != nil {
+		return log.Err("failed to publish sync event", err)
+	}
 
 	return nil
 }
