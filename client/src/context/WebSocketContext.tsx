@@ -26,7 +26,6 @@ export const Events = {
   AUTH_RESPONSE: "auth_response",
   AUTH_SUCCESS: "auth_success",
   AUTH_FAILURE: "auth_failure",
-  INVALIDATE_CACHE: "invalidateCache",
   API_REQUEST: "api_request",
   API_RESPONSE: "api_response",
   API_PROGRESS: "api_progress",
@@ -64,10 +63,6 @@ interface WebSocketContextValue {
   lastMessage: () => string;
   sendMessage: (message: object) => void;
   reconnect: () => void;
-  onCacheInvalidation: (
-    callback: (resourceType: string, resourceId: string) => void,
-  ) => () => void;
-  onMessage: (callback: (message: WebSocketMessage) => void) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue>(
@@ -89,14 +84,6 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
   > | null>(null);
   const [wsAuthenticated, setWsAuthenticated] = createSignal<boolean>(false);
 
-  // Cache invalidation callbacks
-  const [cacheInvalidationCallbacks, setCacheInvalidationCallbacks] =
-    createSignal<Array<(resourceType: string, resourceId: string) => void>>([]);
-
-  // Message callbacks
-  const [messageCallbacks, setMessageCallbacks] = createSignal<
-    Array<(message: WebSocketMessage) => void>
-  >([]);
 
   const log = (..._args: unknown[]) => {
     // Debug logging disabled for production
@@ -175,36 +162,8 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
         case Events.API_PROGRESS:
         case Events.API_COMPLETE:
         case Events.API_ERROR:
-          messageCallbacks().forEach((callback) => {
-            try {
-              callback(message);
-            } catch (error) {
-              log("Message callback error:", error);
-            }
-          });
-          break;
-
         default:
-          // Handle cache invalidation and other message types
-          if (
-            message.payload?.action === "invalidateCache" &&
-            message.payload
-          ) {
-            const resourceType = message.payload.resourceType as string;
-            const resourceId = message.payload.resourceId as string;
-
-            if (resourceType && resourceId) {
-              log("Cache invalidation received:", resourceType, resourceId);
-              // Notify all cache invalidation callbacks
-              cacheInvalidationCallbacks().forEach((callback) => {
-                try {
-                  callback(resourceType, resourceId);
-                } catch (error) {
-                  log("Cache invalidation callback error:", error);
-                }
-              });
-            }
-          }
+          // All other messages are handled by services listening to lastMessage()
           break;
       }
     } catch (error) {
@@ -379,27 +338,6 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     });
   });
 
-  const onCacheInvalidation = (
-    callback: (resourceType: string, resourceId: string) => void,
-  ) => {
-    setCacheInvalidationCallbacks((prev) => [...prev, callback]);
-
-    // Return cleanup function
-    return () => {
-      setCacheInvalidationCallbacks((prev) =>
-        prev.filter((cb) => cb !== callback),
-      );
-    };
-  };
-
-  const onMessage = (callback: (message: WebSocketMessage) => void) => {
-    setMessageCallbacks((prev) => [...prev, callback]);
-
-    // Return cleanup function
-    return () => {
-      setMessageCallbacks((prev) => prev.filter((cb) => cb !== callback));
-    };
-  };
 
   const contextValue: WebSocketContextValue = {
     connectionState,
@@ -409,8 +347,6 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     lastMessage,
     sendMessage,
     reconnect,
-    onCacheInvalidation,
-    onMessage,
   };
 
   return (
