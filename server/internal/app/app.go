@@ -24,24 +24,18 @@ type App struct {
 	Config     config.Config
 
 	// Services
-	TransactionService          *services.TransactionService
-	ZitadelService              *services.ZitadelService
-	DiscogsService              *services.DiscogsService
-	DiscogsCredentialsService   *services.DiscogsCredentialsService
-	SchedulerService            *services.SchedulerService
-	DiscogsOrchestrationService services.DiscogsOrchestrationService
-	DiscogsRateLimitService     services.DiscogsRateLimitService
+	TransactionService *services.TransactionService
+	ZitadelService     *services.ZitadelService
+	DiscogsService     *services.DiscogsService
+	SchedulerService   *services.SchedulerService
 
 	// Repositories
-	UserRepo                  repositories.UserRepository
-	LabelRepo                 repositories.LabelRepository
-	ArtistRepo                repositories.ArtistRepository
-	MasterRepo                repositories.MasterRepository
-	ReleaseRepo               repositories.ReleaseRepository
-	GenreRepo                 repositories.GenreRepository
-	ImageRepo                 repositories.ImageRepository
-	DiscogsApiRequestRepo     repositories.DiscogsApiRequestRepository
-	DiscogsCollectionSyncRepo repositories.DiscogsCollectionSyncRepository
+	UserRepo    repositories.UserRepository
+	LabelRepo   repositories.LabelRepository
+	ArtistRepo  repositories.ArtistRepository
+	MasterRepo  repositories.MasterRepository
+	ReleaseRepo repositories.ReleaseRepository
+	GenreRepo   repositories.GenreRepository
 
 	// Controllers
 	AuthController authController.AuthControllerInterface
@@ -76,28 +70,10 @@ func New() (*App, error) {
 	masterRepo := repositories.NewMasterRepository(db)
 	releaseRepo := repositories.NewReleaseRepository(db)
 	genreRepo := repositories.NewGenreRepository(db)
-	imageRepo := repositories.NewImageRepository(db)
-	discogsApiRequestRepo := repositories.NewDiscogsApiRequestRepository(db)
-	discogsCollectionSyncRepo := repositories.NewDiscogsCollectionSyncRepository(db)
 
 	// Initialize services
 	discogsService := services.NewDiscogsService()
 	schedulerService := services.NewSchedulerService()
-
-	// Initialize Discogs API proxy services
-	discogsRateLimitService := services.NewDiscogsRateLimitService(db.Cache.General)
-	discogsCredentialsService := services.NewDiscogsCredentialsService(
-		discogsService,
-		userRepo,
-		discogsRateLimitService,
-	)
-	discogsOrchestrationService := services.NewDiscogsOrchestrationService(
-		discogsCollectionSyncRepo,
-		discogsApiRequestRepo,
-		userRepo,
-		discogsRateLimitService,
-		nil, // websocket sender will be set after websocket manager is created
-	)
 
 	websocket, err := websockets.New(
 		db,
@@ -105,14 +81,12 @@ func New() (*App, error) {
 		config,
 		zitadelService,
 		userRepo,
-		discogsOrchestrationService,
 	)
 	if err != nil {
 		return &App{}, log.Err("failed to create websocket manager", err)
 	}
 
 	// Now set the websocket sender in the orchestration service
-	discogsOrchestrationService.SetWebSocketSender(websocket)
 
 	// Initialize controllers with repositories and services
 	middleware := middleware.New(db, eventBus, config, userRepo)
@@ -125,33 +99,23 @@ func New() (*App, error) {
 	}
 
 	app := &App{
-		Database:                    db,
-		Config:                      config,
-		Middleware:                  middleware,
-		TransactionService:          transactionService,
-		ZitadelService:              zitadelService,
-		DiscogsService:              discogsService,
-		DiscogsCredentialsService:   discogsCredentialsService,
-		SchedulerService:            schedulerService,
-		DiscogsOrchestrationService: discogsOrchestrationService,
-		DiscogsRateLimitService:     discogsRateLimitService,
-		UserRepo:                    userRepo,
-		LabelRepo:                   labelRepo,
-		ArtistRepo:                  artistRepo,
-		MasterRepo:                  masterRepo,
-		ReleaseRepo:                 releaseRepo,
-		GenreRepo:                   genreRepo,
-		ImageRepo:                   imageRepo,
-		DiscogsApiRequestRepo:       discogsApiRequestRepo,
-		DiscogsCollectionSyncRepo:   discogsCollectionSyncRepo,
-		AuthController:              authController,
-		UserController:              userController,
-		Websocket:                   websocket,
-		EventBus:                    eventBus,
-	}
-
-	if err := db.CreateIndexes(); err != nil {
-		log.Warn("Failed to create additional indexes", "error", err)
+		Database:           db,
+		Config:             config,
+		Middleware:         middleware,
+		TransactionService: transactionService,
+		ZitadelService:     zitadelService,
+		DiscogsService:     discogsService,
+		SchedulerService:   schedulerService,
+		UserRepo:           userRepo,
+		LabelRepo:          labelRepo,
+		ArtistRepo:         artistRepo,
+		MasterRepo:         masterRepo,
+		ReleaseRepo:        releaseRepo,
+		GenreRepo:          genreRepo,
+		AuthController:     authController,
+		UserController:     userController,
+		Websocket:          websocket,
+		EventBus:           eventBus,
 	}
 
 	if err := app.validate(); err != nil {
@@ -178,8 +142,6 @@ func (a *App) validate() error {
 		a.ZitadelService,
 		a.DiscogsService,
 		a.SchedulerService,
-		a.DiscogsOrchestrationService,
-		a.DiscogsRateLimitService,
 		a.AuthController,
 		a.UserController,
 		a.Middleware,
@@ -189,9 +151,6 @@ func (a *App) validate() error {
 		a.MasterRepo,
 		a.ReleaseRepo,
 		a.GenreRepo,
-		a.ImageRepo,
-		a.DiscogsApiRequestRepo,
-		a.DiscogsCollectionSyncRepo,
 	}
 
 	for _, check := range nilChecks {

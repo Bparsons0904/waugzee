@@ -1,0 +1,71 @@
+.syncContainer {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.syncButton {
+  // Button styles are handled by the Button component
+  // Additional sync-specific styles can be added here if needed
+}
+
+.statusContainer {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  font-size: $font-size-sm;
+  color: $text-muted;
+}
+
+.loadingSpinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid $border-default;
+  border-top: 2px solid $color-primary-500;
+  border-radius: $border-radius-full;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.statusMessage {
+  font-weight: $font-weight-medium;
+  transition: color $transition-fast $transition-timing-default;
+
+  &.success {
+    color: $color-success-700;
+  }
+
+  &.error {
+    color: $color-error-700;
+  }
+
+  &.loading {
+    color: $text-muted;
+  }
+}
+
+.errorContainer {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  padding: $spacing-sm;
+  background-color: $color-error-50;
+  border: $border-width-thin solid $color-error-100;
+  border-radius: $border-radius-md;
+  font-size: $font-size-sm;
+}
+
+.errorIcon {
+  font-size: $font-size-md;
+  flex-shrink: 0;
+}
+
+.errorMessage {
+  color: $color-error-700;
+  font-weight: $font-weight-medium;
+  word-break: break-word;
+}

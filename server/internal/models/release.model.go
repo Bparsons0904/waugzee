@@ -37,15 +37,13 @@ type Release struct {
 	DateChanged *time.Time    `gorm:"type:timestamptz"                                                                    json:"dateChanged,omitempty"`
 
 	// JSONB column containing embedded display data: tracks, styles, images, videos
+	// Claude we eventually need to properly define these with a struct
 	Data datatypes.JSON `gorm:"type:jsonb" json:"data,omitempty"`
 
-	// Relationships
-	Master          *Master          `gorm:"foreignKey:MasterID"                                                    json:"master,omitempty"`
-	UserCollections []UserCollection `gorm:"foreignKey:ReleaseID"                                                   json:"userCollections,omitempty"`
-	PlaySessions    []PlaySession    `gorm:"foreignKey:ReleaseID"                                                   json:"playSessions,omitempty"`
-	Artists         []Artist         `gorm:"many2many:release_artists;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"artists,omitempty"`
-	Labels          []Label          `gorm:"many2many:release_labels;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"  json:"labels,omitempty"`
-	Genres          []Genre          `gorm:"many2many:release_genres;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"  json:"genres,omitempty"`
+	Master  *Master  `gorm:"foreignKey:MasterID"                                                    json:"master,omitempty"`
+	Artists []Artist `gorm:"many2many:release_artists;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"artists,omitempty"`
+	Labels  []Label  `gorm:"many2many:release_labels;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"  json:"labels,omitempty"`
+	Genres  []Genre  `gorm:"many2many:release_genres;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"  json:"genres,omitempty"`
 }
 
 // For Reference per docs release payload https://www.discogs.com/developers?gad_source=1&gad_campaignid=823995355&gbraid=0AAAAADmy1_qz72zU5htXZz3lK6Y3ullFL&gclid=CjwKCAjwobnGBhBNEiwAu2mpFHcf8cHDn0K2FJBEyUUOfD427IsCWbYaAxZJC0XueuPQU7VwnLvGtBoCGIsQAvD_BwE#page:database,header:database-release

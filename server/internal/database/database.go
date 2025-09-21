@@ -81,7 +81,6 @@ func (s *DB) initializeDB(config config.Config) error {
 		PrepareStmt:                              true,
 		DisableForeignKeyConstraintWhenMigrating: false,
 		SkipDefaultTransaction:                   true,
-		// CreateBatchSize:                          100,
 	}
 
 	return s.initializePostgresDB(gormConfig, config)

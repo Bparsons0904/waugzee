@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Waugzee** is a complete rewrite of the Kleio vinyl record collection management system, built using proven architectural patterns from the project. This represents a fresh start with modern infrastructure, clean architecture, and scalable design patterns.
+**Waugzee** is a vinyl play and cleaning logging application that helps users track when they play and clean their vinyl records. The app leverages users' existing Discogs collections as the data source and implements a client-as-proxy architecture for distributed API rate limiting. This represents a complete rewrite of the Kleio system, focusing on minimal viable features with modern infrastructure and clean architecture.
 
 ## Migration Strategy: Fresh Start Approach
 

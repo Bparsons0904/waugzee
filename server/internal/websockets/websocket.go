@@ -17,28 +17,28 @@ import (
 )
 
 const (
-	MESSAGE_TYPE_PING                   = "ping"
-	MESSAGE_TYPE_PONG                   = "pong"
-	MESSAGE_TYPE_MESSAGE                = "message"
-	MESSAGE_TYPE_BROADCAST              = "broadcast"
-	MESSAGE_TYPE_ERROR                  = "error"
-	MESSAGE_TYPE_USER_JOIN              = "user_join"
-	MESSAGE_TYPE_USER_LEAVE             = "user_leave"
-	MESSAGE_TYPE_AUTH_REQUEST           = "auth_request"
-	MESSAGE_TYPE_AUTH_RESPONSE          = "auth_response"
-	MESSAGE_TYPE_AUTH_SUCCESS           = "auth_success"
-	MESSAGE_TYPE_AUTH_FAILURE           = "auth_failure"
-	MESSAGE_TYPE_DISCOGS_API_REQUEST    = "discogs_api_request"
-	MESSAGE_TYPE_DISCOGS_API_RESPONSE   = "discogs_api_response"
-	MESSAGE_TYPE_SYNC_PROGRESS          = "sync_progress"
-	MESSAGE_TYPE_SYNC_COMPLETE          = "sync_complete"
-	MESSAGE_TYPE_SYNC_ERROR             = "sync_error"
-	PING_INTERVAL                       = 30 * time.Second
-	PONG_TIMEOUT                        = 60 * time.Second
-	WRITE_TIMEOUT                       = 10 * time.Second
-	AUTH_HANDSHAKE_TIMEOUT              = 10 * time.Second
-	MAX_MESSAGE_SIZE                    = 1024 * 1024 // 1 MB
-	SEND_CHANNEL_SIZE                   = 64
+	MESSAGE_TYPE_PING                 = "ping"
+	MESSAGE_TYPE_PONG                 = "pong"
+	MESSAGE_TYPE_MESSAGE              = "message"
+	MESSAGE_TYPE_BROADCAST            = "broadcast"
+	MESSAGE_TYPE_ERROR                = "error"
+	MESSAGE_TYPE_USER_JOIN            = "user_join"
+	MESSAGE_TYPE_USER_LEAVE           = "user_leave"
+	MESSAGE_TYPE_AUTH_REQUEST         = "auth_request"
+	MESSAGE_TYPE_AUTH_RESPONSE        = "auth_response"
+	MESSAGE_TYPE_AUTH_SUCCESS         = "auth_success"
+	MESSAGE_TYPE_AUTH_FAILURE         = "auth_failure"
+	MESSAGE_TYPE_DISCOGS_API_REQUEST  = "discogs_api_request"
+	MESSAGE_TYPE_DISCOGS_API_RESPONSE = "discogs_api_response"
+	MESSAGE_TYPE_SYNC_PROGRESS        = "sync_progress"
+	MESSAGE_TYPE_SYNC_COMPLETE        = "sync_complete"
+	MESSAGE_TYPE_SYNC_ERROR           = "sync_error"
+	PING_INTERVAL                     = 30 * time.Second
+	PONG_TIMEOUT                      = 60 * time.Second
+	WRITE_TIMEOUT                     = 10 * time.Second
+	AUTH_HANDSHAKE_TIMEOUT            = 10 * time.Second
+	MAX_MESSAGE_SIZE                  = 1024 * 1024 // 1 MB
+	SEND_CHANNEL_SIZE                 = 64
 )
 
 // DiscogsOrchestrationService interface to avoid circular imports
@@ -69,13 +69,13 @@ type Message struct {
 }
 
 // Implement WebSocketMessage interface
-func (m *Message) GetID() string                     { return m.ID }
-func (m *Message) GetType() string                   { return m.Type }
-func (m *Message) GetChannel() string               { return m.Channel }
-func (m *Message) GetAction() string                { return m.Action }
-func (m *Message) GetUserID() string                { return m.UserID }
-func (m *Message) GetData() map[string]interface{}  { return m.Data }
-func (m *Message) GetTimestamp() time.Time          { return m.Timestamp }
+func (m *Message) GetID() string                   { return m.ID }
+func (m *Message) GetType() string                 { return m.Type }
+func (m *Message) GetChannel() string              { return m.Channel }
+func (m *Message) GetAction() string               { return m.Action }
+func (m *Message) GetUserID() string               { return m.UserID }
+func (m *Message) GetData() map[string]interface{} { return m.Data }
+func (m *Message) GetTimestamp() time.Time         { return m.Timestamp }
 
 type Client struct {
 	ID         string
@@ -87,14 +87,14 @@ type Client struct {
 }
 
 type Manager struct {
-	hub                       *Hub
-	db                        database.DB
-	config                    config.Config
-	log                       logger.Logger
-	eventBus                  *events.EventBus
-	zitadelService            ZitadelService
-	userRepo                  repositories.UserRepository
-	discogsOrchestrationSvc   DiscogsOrchestrationService
+	hub                     *Hub
+	db                      database.DB
+	config                  config.Config
+	log                     logger.Logger
+	eventBus                *events.EventBus
+	zitadelService          ZitadelService
+	userRepo                repositories.UserRepository
+	discogsOrchestrationSvc DiscogsOrchestrationService
 }
 
 func New(
@@ -103,7 +103,6 @@ func New(
 	config config.Config,
 	zitadelService ZitadelService,
 	userRepo repositories.UserRepository,
-	discogsOrchestrationSvc DiscogsOrchestrationService,
 ) (*Manager, error) {
 	log := logger.New("websockets")
 
@@ -114,13 +113,12 @@ func New(
 			unregister: make(chan *Client),
 			clients:    make(map[string]*Client),
 		},
-		db:                      db,
-		config:                  config,
-		log:                     log,
-		eventBus:                eventBus,
-		zitadelService:          zitadelService,
-		userRepo:                userRepo,
-		discogsOrchestrationSvc: discogsOrchestrationSvc,
+		db:             db,
+		config:         config,
+		log:            log,
+		eventBus:       eventBus,
+		zitadelService: zitadelService,
+		userRepo:       userRepo,
 	}
 
 	log.Function("New").Info("Starting websocket hub")
@@ -175,10 +173,10 @@ func (m *Manager) HandleWebSocket(c *websocket.Conn) {
 	go func() {
 		time.Sleep(AUTH_HANDSHAKE_TIMEOUT)
 		if client.Status == STATUS_UNAUTHENTICATED {
-			log.Warn("Client failed to authenticate within timeout, disconnecting", 
-				"clientID", clientID, 
+			log.Warn("Client failed to authenticate within timeout, disconnecting",
+				"clientID", clientID,
 				"timeout", AUTH_HANDSHAKE_TIMEOUT)
-			
+
 			authTimeout := Message{
 				ID:        uuid.New().String(),
 				Type:      MESSAGE_TYPE_AUTH_FAILURE,
@@ -187,7 +185,7 @@ func (m *Manager) HandleWebSocket(c *websocket.Conn) {
 				Data:      map[string]any{"reason": "Authentication timeout"},
 				Timestamp: time.Now(),
 			}
-			
+
 			select {
 			case client.send <- authTimeout:
 				// Message sent, now close after a brief delay
@@ -195,7 +193,7 @@ func (m *Manager) HandleWebSocket(c *websocket.Conn) {
 			default:
 				// Channel is full or closed, proceed to close immediately
 			}
-			
+
 			if err := c.Close(); err != nil {
 				log.Er("failed to close connection after auth timeout", err, "clientID", clientID)
 			}
@@ -354,9 +352,9 @@ func (c *Client) handleAuthResponse(message Message) {
 	// Get user from database using OIDC User ID
 	user, err := c.Manager.userRepo.GetByOIDCUserID(context.Background(), tokenInfo.UserID)
 	if err != nil {
-		log.Info("WebSocket user not found in database", 
-			"clientID", c.ID, 
-			"oidcUserID", tokenInfo.UserID, 
+		log.Info("WebSocket user not found in database",
+			"clientID", c.ID,
+			"oidcUserID", tokenInfo.UserID,
 			"error", err.Error())
 		c.sendAuthFailure("User not found")
 		return
@@ -366,9 +364,9 @@ func (c *Client) handleAuthResponse(message Message) {
 	c.Status = STATUS_AUTHENTICATED
 	c.UserID = user.ID
 
-	log.Info("WebSocket client authenticated successfully", 
-		"clientID", c.ID, 
-		"userID", user.ID, 
+	log.Info("WebSocket client authenticated successfully",
+		"clientID", c.ID,
+		"userID", user.ID,
 		"email", tokenInfo.Email,
 		"method", validationMethod)
 
@@ -623,7 +621,13 @@ func (c *Client) handleDiscogsApiResponse(message Message) {
 
 	headers, ok := message.Data["headers"].(map[string]interface{})
 	if !ok {
-		log.Warn("Invalid headers in Discogs API response", "clientID", c.ID, "requestID", requestID)
+		log.Warn(
+			"Invalid headers in Discogs API response",
+			"clientID",
+			c.ID,
+			"requestID",
+			requestID,
+		)
 		return
 	}
 
@@ -661,7 +665,13 @@ func (c *Client) handleDiscogsApiResponse(message Message) {
 
 	// Process the response
 	if err := c.Manager.discogsOrchestrationSvc.ProcessApiResponse(context.Background(), requestID, apiResponse); err != nil {
-		_ = log.Error("Failed to process Discogs API response", "error", err, "requestID", requestID)
+		_ = log.Error(
+			"Failed to process Discogs API response",
+			"error",
+			err,
+			"requestID",
+			requestID,
+		)
 	} else {
 		log.Info("Discogs API response processed successfully", "requestID", requestID, "status", status)
 	}
@@ -696,4 +706,3 @@ func (m *Manager) handleClientReconnection(userID uuid.UUID) {
 		log.Info("Sync reconnection handled", "userID", userID)
 	}
 }
-

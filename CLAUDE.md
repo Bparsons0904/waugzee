@@ -15,7 +15,7 @@ This prevents wasted time and ensures accurate implementation.
 
 ## Project Overview
 
-**Waugzee** is a modern vinyl record collection management system built as a fresh implementation using proven architectural patterns. This project represents a complete rewrite of the Kleio system, leveraging the robust foundation from the waugzee project architecture.
+**Waugzee** is a vinyl play and cleaning logging application that helps users track when they play and clean their vinyl records. The app leverages users' existing Discogs collections as the data source and implements a client-as-proxy architecture for distributed API rate limiting. This project represents a complete rewrite of the Kleio system, focusing on minimal viable features with a clean, modern architecture.
 
 ## Project Plan
 
@@ -195,6 +195,24 @@ authInfo := middleware.GetAuthInfo(c)
 controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 ```
 
+## Development Philosophy
+
+### Minimal Implementation Approach
+
+**Core Principle**: Build only what the current implementation needs. Keep implementations minimal while allowing forward-thinking in planning.
+
+**Guidelines**:
+- ✅ **Implement current requirements**: Focus on play logging and cleaning tracking features
+- ✅ **Forward-thinking planning**: Document future features and architecture decisions
+- ❌ **Avoid over-engineering**: Don't build abstractions for future requirements that may never materialize
+- ❌ **No premature optimization**: Implement simple solutions first, optimize when needed
+
+**Examples**:
+- **Good**: Simple play logging with user, release, timestamp, and notes
+- **Good**: Planning for equipment tracking but implementing basic stylus reference first
+- **Avoid**: Complex analytics engines before basic logging is complete
+- **Avoid**: Over-abstracted repository patterns for single-use cases
+
 ## Development Notes
 
 ### Coding Standards
@@ -344,22 +362,36 @@ All environment variables in `.env` at project root, shared between services.
 
 ## Business Domain
 
-### Core Features (To Be Implemented)
+### Core Features (Implemented/In Progress)
 
-1. **Multi-User Collection Management**: User-scoped vinyl record collections
-2. **Discogs Integration**: Automatic collection sync and metadata
-3. **Play Tracking**: Log listening sessions with equipment details
-4. **Equipment Management**: Track turntables, cartridges, and styluses
-5. **Maintenance Tracking**: Record cleaning and maintenance history
-6. **Analytics Dashboard**: Listening patterns and collection insights
+1. **Play Logging**: Track when vinyl records are played with equipment details and notes
+2. **Cleaning Tracking**: Log cleaning sessions including deep cleaning with timestamps and notes
+3. **Discogs Collection Integration**: Use user's existing Discogs collection as the data source via client-as-proxy API pattern
 
-### Data Models (Planned)
+### Architecture: Client-as-Proxy Pattern
 
-- **Users**: Multi-tenant user management via Zitadel
-- **Collections**: User-owned vinyl records with Discogs integration
-- **Equipment**: Turntables, cartridges, styluses with usage tracking
-- **Sessions**: Play sessions linking records, equipment, and user notes
-- **Maintenance**: Cleaning and care records for collection items
+**Key Concept**: Each user makes their own Discogs API calls with their personal token, distributing rate limits across users while the server orchestrates complex sync logic.
+
+**Benefits**:
+- **Distributed Rate Limits**: Each user operates within their own Discogs API quota
+- **Server Orchestration**: Backend manages sync workflows, state persistence, and business logic
+- **Real-time Communication**: WebSocket enables immediate progress updates during sync
+- **Scalability**: Performance scales naturally with user count
+
+**Implementation**:
+- Users provide their own Discogs tokens
+- Frontend makes actual HTTP requests to Discogs API
+- Backend receives responses via WebSocket and processes data
+- Server tracks sync progress and manages database updates
+
+### Data Models (Current Implementation)
+
+- ✅ **Users**: Multi-tenant user management via Zitadel with Discogs token storage
+- ✅ **PlayHistory**: Play sessions linking users, releases, stylus, and play timestamps
+- ✅ **CleaningHistory**: Cleaning records with deep clean flags and user notes
+- ✅ **UserRelease**: User's vinyl collection items synced from Discogs
+- ✅ **Equipment Models**: Stylus tracking for play sessions
+- ✅ **Discogs Data**: Artists, Labels, Masters, Releases from monthly XML processing
 
 ## MCP Tools Usage
 

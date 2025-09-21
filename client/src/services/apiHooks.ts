@@ -39,6 +39,7 @@ export function useApiQuery<T>(
   return useQuery(() => ({
     queryKey,
     queryFn: () => api.get<T>(url, config),
+    // TODO: Move these settings to the global config and reenable
     refetchOnWindowFocus: false,
     // retry: (failureCount, error) => {
     //   // Don't retry on client errors (4xx)
@@ -199,4 +200,3 @@ export function useApiSearch<T>(
     },
   );
 }
-

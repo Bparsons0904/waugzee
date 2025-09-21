@@ -21,23 +21,19 @@ const (
 
 type Stylus struct {
 	BaseUUIDModel
-	UserID                    uuid.UUID        `gorm:"type:uuid;not null;index:idx_styluses_user" json:"userId" validate:"required"`
-	CartridgeID               *uuid.UUID       `gorm:"type:uuid;index:idx_styluses_cartridge" json:"cartridgeId,omitempty"`
-	Brand                     string           `gorm:"type:text;not null" json:"brand" validate:"required"`
-	Model                     string           `gorm:"type:text;not null" json:"model" validate:"required"`
-	Type                      StylusType       `gorm:"type:text;default:'elliptical'" json:"type"`
-	PurchaseDate              *time.Time       `gorm:"type:timestamp" json:"purchaseDate,omitempty"`
-	InstallDate               *time.Time       `gorm:"type:timestamp" json:"installDate,omitempty"`
-	HoursUsed                 *decimal.Decimal `gorm:"type:decimal(8,2);default:0" json:"hoursUsed,omitempty"`
-	RecommendedReplaceHours   *decimal.Decimal `gorm:"type:decimal(8,2)" json:"recommendedReplaceHours,omitempty"`
-	Notes                     *string          `gorm:"type:text" json:"notes,omitempty"`
-	IsActive                  bool             `gorm:"type:bool;default:true;not null" json:"isActive"`
+	UserID                  uuid.UUID        `gorm:"type:uuid;not null;index:idx_styluses_user" json:"userId"                            validate:"required"`
+	CartridgeID             *uuid.UUID       `gorm:"type:uuid;index:idx_styluses_cartridge"     json:"cartridgeId,omitempty"`
+	Brand                   string           `gorm:"type:text;not null"                         json:"brand"                             validate:"required"`
+	Model                   string           `gorm:"type:text;not null"                         json:"model"                             validate:"required"`
+	Type                    StylusType       `gorm:"type:text;default:'elliptical'"             json:"type"`
+	PurchaseDate            *time.Time       `gorm:"type:timestamp"                             json:"purchaseDate,omitempty"`
+	InstallDate             *time.Time       `gorm:"type:timestamp"                             json:"installDate,omitempty"`
+	HoursUsed               *decimal.Decimal `gorm:"type:decimal(8,2);default:0"                json:"hoursUsed,omitempty"`
+	RecommendedReplaceHours *decimal.Decimal `gorm:"type:decimal(8,2)"                          json:"recommendedReplaceHours,omitempty"`
+	Notes                   *string          `gorm:"type:text"                                  json:"notes,omitempty"`
+	IsActive                bool             `gorm:"type:bool;default:true;not null"            json:"isActive"`
 
-	// Relationships
-	User               *User               `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Cartridge          *Cartridge          `gorm:"foreignKey:CartridgeID" json:"cartridge,omitempty"`
-	PlaySessions       []PlaySession       `gorm:"foreignKey:StylusID" json:"playSessions,omitempty"`
-	MaintenanceRecords []MaintenanceRecord `gorm:"foreignKey:StylusID" json:"maintenanceRecords,omitempty"`
+	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
 
 func (s *Stylus) BeforeCreate(tx *gorm.DB) (err error) {
@@ -72,6 +68,3 @@ func (s *Stylus) BeforeUpdate(tx *gorm.DB) (err error) {
 	}
 	return nil
 }
-
-
-
