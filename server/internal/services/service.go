@@ -3,6 +3,7 @@ package services
 import (
 	"waugzee/config"
 	"waugzee/internal/database"
+	"waugzee/internal/events"
 )
 
 type Service struct {
@@ -13,7 +14,7 @@ type Service struct {
 	Orchestration *OrchestrationService
 }
 
-func New(db database.DB, config config.Config) (Service, error) {
+func New(db database.DB, config config.Config, eventBus *events.EventBus) (Service, error) {
 	transactionService := NewTransactionService(db)
 
 	zitadelService, err := NewZitadelService(config)
@@ -23,7 +24,7 @@ func New(db database.DB, config config.Config) (Service, error) {
 
 	discogsService := NewDiscogsService()
 	schedulerService := NewSchedulerService()
-	orchestrationService := NewOrchestrationService()
+	orchestrationService := NewOrchestrationService(eventBus, db)
 
 	return Service{
 		Zitadel:       zitadelService,

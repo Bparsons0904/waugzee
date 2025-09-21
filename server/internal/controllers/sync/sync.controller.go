@@ -2,23 +2,21 @@ package syncController
 
 import (
 	"context"
-	"time"
 	"waugzee/config"
 	"waugzee/internal/events"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
-
-	"github.com/google/uuid"
 )
 
 type SyncController struct {
-	userRepo       repositories.UserRepository
-	discogsService *services.DiscogsService
-	eventBus       *events.EventBus
-	config         config.Config
-	log            logger.Logger
+	userRepo             repositories.UserRepository
+	discogsService       *services.DiscogsService
+	orchestrationService *services.OrchestrationService
+	eventBus             *events.EventBus
+	config               config.Config
+	log                  logger.Logger
 }
 
 type SyncControllerInterface interface {
@@ -32,11 +30,12 @@ func New(
 	config config.Config,
 ) SyncControllerInterface {
 	return &SyncController{
-		userRepo:       repos.User,
-		discogsService: services.Discogs,
-		eventBus:       eventBus,
-		config:         config,
-		log:            logger.New("syncController"),
+		userRepo:             repos.User,
+		discogsService:       services.Discogs,
+		orchestrationService: services.Orchestration,
+		eventBus:             eventBus,
+		config:               config,
+		log:                  logger.New("syncController"),
 	}
 }
 
@@ -46,27 +45,18 @@ func (sc *SyncController) HandleSyncRequest(
 ) error {
 	log := sc.log.Function("HandleSyncRequest")
 
-	if user == nil {
-		return log.ErrMsg("user is required")
+	if user.DiscogsToken == nil || *user.DiscogsToken == "" {
+		return log.ErrMsg("user does not have a Discogs token configured")
 	}
 
-	log.Info("Processing sync request", "userID", user.ID)
-
-	channelEvent := events.ChannelEvent{
-		Event: "api",
-		Message: events.Message{
-			ID:        uuid.New().String(),
-			Service:   events.API,
-			Event:     "api",
-			UserID:    user.ID.String(),
-			Payload:   map[string]any{},
-			Timestamp: time.Now(),
-		},
+	requestID, err := sc.orchestrationService.GetUserFolders(ctx, user)
+	if err != nil {
+		return log.Err("failed to initiate user folders request", err)
 	}
 
-	if err := sc.eventBus.Publish(events.WEBSOCKET, channelEvent); err != nil {
-		return log.Err("failed to publish sync event", err)
-	}
+	log.Info("Sync request initiated successfully",
+		"userID", user.ID,
+		"requestID", requestID)
 
 	return nil
 }

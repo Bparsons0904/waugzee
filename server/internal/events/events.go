@@ -69,12 +69,33 @@ func New(client valkey.Client, config config.Config) *EventBus {
 	}
 }
 
-func (eb *EventBus) Publish(channel Channel, event ChannelEvent) error {
+// Publish supports both old ChannelEvent struct and new individual parameters
+func (eb *EventBus) Publish(channel Channel, eventTypeOrChannelEvent any, message ...Message) error {
 	log := eb.logger.Function("Publish")
 
-	eventData, err := json.Marshal(event)
+	var channelEvent ChannelEvent
+
+	// Handle different parameter combinations
+	switch v := eventTypeOrChannelEvent.(type) {
+	case ChannelEvent:
+		// Legacy usage: Publish(channel, channelEvent)
+		channelEvent = v
+	case string:
+		// New usage: Publish(channel, "eventType", message)
+		if len(message) != 1 {
+			return log.Err("message parameter required when using string event type", nil)
+		}
+		channelEvent = ChannelEvent{
+			Event:   v,
+			Message: message[0],
+		}
+	default:
+		return log.Err("invalid event type parameter", nil)
+	}
+
+	eventData, err := json.Marshal(channelEvent)
 	if err != nil {
-		return log.Err("failed to marshal event", err, "channel", channel, "event", event)
+		return log.Err("failed to marshal event", err, "channel", channel, "event", channelEvent)
 	}
 
 	ctx, cancel := context.WithTimeout(eb.ctx, 5*time.Second)
@@ -89,13 +110,13 @@ func (eb *EventBus) Publish(channel Channel, event ChannelEvent) error {
 			"channel",
 			channel,
 			"event",
-			event,
+			channelEvent,
 		)
 	}
 
-	log.Info("Event published", "channel", channel, "event", event)
+	log.Info("Event published", "channel", channel, "event", channelEvent)
 
-	eb.notifyLocalHandlers(channel, event)
+	eb.notifyLocalHandlers(channel, channelEvent)
 
 	return nil
 }

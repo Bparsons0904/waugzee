@@ -42,7 +42,7 @@ func New() (*App, error) {
 	eventBus := events.New(db.Cache.Events, config)
 	repos := repositories.New(db)
 
-	servicesComposite, err := services.New(db, config)
+	servicesComposite, err := services.New(db, config, eventBus)
 	if err != nil {
 		return &App{}, log.Err("failed to initialize services", err)
 	}

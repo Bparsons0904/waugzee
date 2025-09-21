@@ -56,13 +56,14 @@ type Client struct {
 }
 
 type Manager struct {
-	hub            *Hub
-	db             database.DB
-	config         config.Config
-	log            logger.Logger
-	eventBus       *events.EventBus
-	zitadelService ZitadelService
-	userRepo       repositories.UserRepository
+	hub                  *Hub
+	db                   database.DB
+	config               config.Config
+	log                  logger.Logger
+	eventBus             *events.EventBus
+	zitadelService       ZitadelService
+	userRepo             repositories.UserRepository
+	orchestrationService *services.OrchestrationService
 }
 
 func New(
@@ -81,12 +82,13 @@ func New(
 			unregister: make(chan *Client),
 			clients:    make(map[string]*Client),
 		},
-		db:             db,
-		config:         config,
-		log:            log,
-		eventBus:       eventBus,
-		zitadelService: services.Zitadel,
-		userRepo:       repos.User,
+		db:                   db,
+		config:               config,
+		log:                  log,
+		eventBus:             eventBus,
+		zitadelService:       services.Zitadel,
+		userRepo:             repos.User,
+		orchestrationService: services.Orchestration,
 	}
 
 	log.Function("New").Info("Starting websocket hub")
@@ -206,9 +208,8 @@ func (c *Client) routeMessage(message Message) {
 			message.ID,
 			"clientID",
 			c.ID,
-			"message",
-			message,
 		)
+		c.handleAPIResponse(message)
 	default:
 		log.Warn("Unknown message event", "event", message.Event)
 	}
@@ -260,21 +261,23 @@ func (c *Client) writePump() {
 }
 
 func (m *Manager) subscribeToEventBus() {
-	log := m.log.Function("subscribeToBroadcastEvents")
-	log.Info("Starting broadcast events subscription")
+	log := m.log.Function("subscribeToEventBus")
+	log.Info("Starting WebSocket events subscription")
 
 	if err := m.eventBus.Subscribe(events.WEBSOCKET, func(event events.ChannelEvent) error {
-		log.Info("Received broadcast event", "event", event.Event)
+		log.Info("Received WebSocket event", "event", event.Event)
 
 		switch event.Event {
 		case "broadcast":
 			m.sendToAuthenticatedClients(event.Message)
 		case "user":
-			m.sendToAuthenticatedClients(event.Message)
+			m.sendToSpecificUser(event.Message)
+		default:
+			log.Warn("Unknown WebSocket event type", "event", event.Event)
 		}
 		return nil
 	}); err != nil {
-		log.Er("Failed to subscribe to broadcast events", err)
+		log.Er("Failed to subscribe to WebSocket events", err)
 	}
 }
 
@@ -294,5 +297,78 @@ func (m *Manager) sendToAuthenticatedClients(message Message) {
 	}
 
 	log.Info("Message sent to authenticated clients", "messageID", message.ID, "clientCount", sent)
+}
+
+func (m *Manager) sendToSpecificUser(message Message) {
+	log := m.log.Function("sendToSpecificUser")
+
+	if message.UserID == "" {
+		log.Warn("Cannot send to specific user: UserID is empty", "messageID", message.ID)
+		return
+	}
+
+	// Parse UserID from string
+	userID, err := uuid.Parse(message.UserID)
+	if err != nil {
+		log.Er("Invalid UserID format", err, "messageID", message.ID, "userID", message.UserID)
+		return
+	}
+
+	// Find the client for this specific user
+	var targetClient *Client
+	for _, client := range m.hub.clients {
+		if client.Status == STATUS_AUTHENTICATED && client.UserID == userID {
+			targetClient = client
+			break
+		}
+	}
+
+	if targetClient == nil {
+		log.Warn("User not found or not connected", "messageID", message.ID, "userID", message.UserID)
+		return
+	}
+
+	// Send message to the specific user's client
+	select {
+	case targetClient.send <- message:
+		log.Info("Message sent to specific user", "messageID", message.ID, "userID", message.UserID, "clientID", targetClient.ID)
+	default:
+		log.Warn("User's send channel full, dropping message", "messageID", message.ID, "userID", message.UserID, "clientID", targetClient.ID)
+	}
+}
+
+// handleAPIResponse processes API responses from the client and routes them to the orchestration service
+func (c *Client) handleAPIResponse(message Message) {
+	log := c.Manager.log.Function("handleAPIResponse")
+
+	if c.Status != STATUS_AUTHENTICATED {
+		log.Warn("Received API response from unauthenticated client", "clientID", c.ID)
+		return
+	}
+
+	// Validate that the message contains valid payload
+	if message.Payload == nil {
+		log.Warn("API response missing payload", "messageID", message.ID, "clientID", c.ID)
+		return
+	}
+
+	log.Info("Processing API response",
+		"messageID", message.ID,
+		"clientID", c.ID,
+		"userID", c.UserID)
+
+	// Pass the response to the orchestration service for processing
+	if err := c.Manager.orchestrationService.HandleAPIResponse(context.Background(), message.Payload); err != nil {
+		log.Er("Failed to process API response", err,
+			"messageID", message.ID,
+			"clientID", c.ID,
+			"userID", c.UserID)
+		return
+	}
+
+	log.Info("API response processed successfully",
+		"messageID", message.ID,
+		"clientID", c.ID,
+		"userID", c.UserID)
 }
 
