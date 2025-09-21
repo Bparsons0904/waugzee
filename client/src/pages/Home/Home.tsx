@@ -12,8 +12,10 @@ import {
   ActionsSection,
   ActionItem,
 } from "@components/dashboard/ActionsSection/ActionsSection";
-import { discogsProxyService } from "@services/discogs/discogsProxy.service";
+import { syncService } from "@services/sync.service";
+import { useToast } from "@context/ToastContext";
 import styles from "./Home.module.scss";
+import { proxyService } from "@services/proxy/proxy.service";
 
 interface DashboardStats {
   totalRecords: number;
@@ -26,6 +28,7 @@ const Home: Component = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const webSocket = useWebSocket();
+  const toast = useToast();
 
   const [stats, setStats] = createSignal<DashboardStats>({
     totalRecords: 0,
@@ -36,6 +39,7 @@ const Home: Component = () => {
   const [isLoading, setIsLoading] = createSignal(true);
   const [showTokenModal, setShowTokenModal] = createSignal(false);
   const [syncStatus, setSyncStatus] = createSignal<string>("");
+  const [isSyncing, setIsSyncing] = createSignal(false);
 
   // const hasDiscogsToken = user()?.discogsToken;
   //
@@ -63,8 +67,22 @@ const Home: Component = () => {
       return;
     }
 
-    // Placeholder for simplified sync functionality
-    setSyncStatus("Sync functionality will be available soon with the new simplified architecture");
+    setIsSyncing(true);
+    setSyncStatus("Initiating collection sync...");
+
+    try {
+      const response = await syncService.initiateCollectionSync();
+
+      setSyncStatus(response.message);
+      toast.showSuccess("Collection sync started successfully!");
+      console.log("Sync response:", response);
+    } catch (error) {
+      console.error("Sync failed:", error);
+      setSyncStatus("Sync failed. Please try again.");
+      toast.showError("Failed to start collection sync. Please try again.");
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleTokenModalClose = () => {
@@ -130,13 +148,16 @@ const Home: Component = () => {
     {
       title: "Sync Collection",
       description: user()?.discogsToken
-        ? syncStatus() || "Sync your Waugzee collection with your Discogs library."
+        ? syncStatus() ||
+          "Sync your Waugzee collection with your Discogs library."
         : "Connect your Discogs account to sync your collection.",
       buttonText: user()?.discogsToken
-        ? "Sync Coming Soon"
+        ? isSyncing()
+          ? "Syncing..."
+          : "Sync Collection"
         : "Connect Discogs",
       onClick: handleSyncCollection,
-      disabled: false,
+      disabled: isSyncing(),
     },
     {
       title: "View Analytics",
@@ -150,7 +171,7 @@ const Home: Component = () => {
   onMount(async () => {
     try {
       // Initialize the Discogs proxy service with WebSocket context
-      discogsProxyService.initialize(webSocket);
+      proxyService.initialize(webSocket);
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
 

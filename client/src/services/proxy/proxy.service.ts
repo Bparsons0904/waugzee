@@ -27,17 +27,17 @@ export interface ProxyResponse {
   error?: string;
 }
 
-export class DiscogsProxyService {
+export class ProxyService {
   private webSocket: WebSocketContextValue | null = null;
   private isInitialized = false;
 
   constructor() {
-    console.log("[DiscogsProxy] Service created");
+    console.log("[Proxy] Service created");
   }
 
   initialize(webSocket: WebSocketContextValue): void {
     if (this.isInitialized) {
-      console.warn("[DiscogsProxy] Already initialized");
+      console.warn("[Proxy] Already initialized");
       return;
     }
 
@@ -45,13 +45,13 @@ export class DiscogsProxyService {
     this.setupMessageHandlers();
     this.isInitialized = true;
 
-    console.log("[DiscogsProxy] Service initialized");
+    console.log("[Proxy] Service initialized");
   }
 
   cleanup(): void {
     this.webSocket = null;
     this.isInitialized = false;
-    console.log("[DiscogsProxy] Service cleaned up");
+    console.log("[Proxy] Service cleaned up");
   }
 
   isReady(): boolean {
@@ -65,7 +65,7 @@ export class DiscogsProxyService {
 
   private setupMessageHandlers(): void {
     if (!this.webSocket?.onSyncMessage) {
-      console.warn("[DiscogsProxy] WebSocket context does not support sync messages");
+      console.warn("[Proxy] WebSocket context does not support sync messages");
       return;
     }
 
@@ -77,10 +77,10 @@ export class DiscogsProxyService {
   }
 
   private async handleApiRequest(message: WebSocketMessage): Promise<void> {
-    console.log("[DiscogsProxy] Received API request", message.id);
+    console.log("[Proxy] Received API request", message.id);
 
     if (!message.data || !this.isValidProxyRequest(message.data)) {
-      console.error("[DiscogsProxy] Invalid request data");
+      console.error("[Proxy] Invalid request data");
       return;
     }
 
@@ -88,10 +88,15 @@ export class DiscogsProxyService {
     const { requestId, url, method, headers } = requestData;
 
     try {
-      const response = await this.makeHttpRequest(requestId, url, method, headers);
+      const response = await this.makeHttpRequest(
+        requestId,
+        url,
+        method,
+        headers,
+      );
       this.sendResponse(response);
     } catch (error) {
-      console.error("[DiscogsProxy] Request failed", error);
+      console.error("[Proxy] Request failed", error);
       this.sendResponse({
         requestId,
         status: 0,
@@ -118,9 +123,9 @@ export class DiscogsProxyService {
     requestId: string,
     url: string,
     method: string,
-    headers: Record<string, string>
+    headers: Record<string, string>,
   ): Promise<ProxyResponse> {
-    console.log(`[DiscogsProxy] Making ${method} request to ${url}`);
+    console.log(`[Proxy] Making ${method} request to ${url}`);
 
     const response = await fetch(url, {
       method,
@@ -135,9 +140,9 @@ export class DiscogsProxyService {
 
     // Get response body
     let body: unknown;
-    const contentType = response.headers.get('content-type');
+    const contentType = response.headers.get("content-type");
 
-    if (contentType && contentType.includes('application/json')) {
+    if (contentType && contentType.includes("application/json")) {
       body = await response.json();
     } else {
       body = await response.text();
@@ -152,9 +157,9 @@ export class DiscogsProxyService {
 
     if (!response.ok) {
       result.error = `HTTP ${response.status}: ${response.statusText}`;
-      console.error(`[DiscogsProxy] Request failed:`, result.error);
+      console.error(`[Proxy] Request failed:`, result.error);
     } else {
-      console.log(`[DiscogsProxy] Request completed successfully`, {
+      console.log(`[Proxy] Request completed successfully`, {
         requestId,
         status: response.status,
       });
@@ -165,7 +170,7 @@ export class DiscogsProxyService {
 
   private sendResponse(response: ProxyResponse): void {
     if (!this.webSocket) {
-      console.error("[DiscogsProxy] Cannot send response - no WebSocket");
+      console.error("[Proxy] Cannot send response - no WebSocket");
       return;
     }
 
@@ -178,9 +183,10 @@ export class DiscogsProxyService {
       timestamp: new Date().toISOString(),
     };
 
-    console.log("[DiscogsProxy] Sending response", response.requestId);
+    console.log("[Proxy] Sending response", response.requestId);
     this.webSocket.sendMessage(JSON.stringify(message));
   }
 }
 
-export const discogsProxyService = new DiscogsProxyService();
+export const proxyService = new ProxyService();
+

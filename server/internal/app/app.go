@@ -59,7 +59,7 @@ func New() (*App, error) {
 	}
 
 	middleware := middleware.New(db, eventBus, config, repos)
-	controllersComposite := controllers.New(servicesComposite, repos, config)
+	controllersComposite := controllers.New(servicesComposite, repos, eventBus, config)
 
 	if err := jobs.RegisterAllJobs(servicesComposite.Scheduler, config); err != nil {
 		return &App{}, log.Err("failed to register jobs", err)

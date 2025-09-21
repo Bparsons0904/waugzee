@@ -66,9 +66,7 @@ interface WebSocketContextValue {
   onCacheInvalidation: (
     callback: (resourceType: string, resourceId: string) => void,
   ) => () => void;
-  onSyncMessage: (
-    callback: (message: WebSocketMessage) => void,
-  ) => () => void;
+  onSyncMessage: (callback: (message: WebSocketMessage) => void) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue>(
@@ -95,14 +93,14 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     createSignal<Array<(resourceType: string, resourceId: string) => void>>([]);
 
   // Sync message callbacks
-  const [syncMessageCallbacks, setSyncMessageCallbacks] =
-    createSignal<Array<(message: WebSocketMessage) => void>>([]);
+  const [syncMessageCallbacks, setSyncMessageCallbacks] = createSignal<
+    Array<(message: WebSocketMessage) => void>
+  >([]);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const log = (..._args: unknown[]) => {
     // Debug logging disabled for production
     // if (debug) {
-    //   console.log(`[WebSocket] ${_args[0]}`, ..._args.slice(1));
+    console.log(`[WebSocket] ${_args[0]}`, ..._args.slice(1));
     // }
   };
 
@@ -385,16 +383,12 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     };
   };
 
-  const onSyncMessage = (
-    callback: (message: WebSocketMessage) => void,
-  ) => {
+  const onSyncMessage = (callback: (message: WebSocketMessage) => void) => {
     setSyncMessageCallbacks((prev) => [...prev, callback]);
 
     // Return cleanup function
     return () => {
-      setSyncMessageCallbacks((prev) =>
-        prev.filter((cb) => cb !== callback),
-      );
+      setSyncMessageCallbacks((prev) => prev.filter((cb) => cb !== callback));
     };
   };
 

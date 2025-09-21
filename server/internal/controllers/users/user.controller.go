@@ -16,11 +16,15 @@ type UserController struct {
 	log            logger.Logger
 }
 
+type UserControllerInterface interface {
+	UpdateDiscogsToken(ctx context.Context, user *User, req UpdateDiscogsTokenRequest) (*User, error)
+}
+
 func New(
 	repos repositories.Repository,
 	services services.Service,
 	config config.Config,
-) *UserController {
+) UserControllerInterface {
 	return &UserController{
 		userRepo:       repos.User,
 		discogsService: services.Discogs,

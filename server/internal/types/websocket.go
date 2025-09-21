@@ -9,17 +9,17 @@ import (
 
 // TokenInfo represents validated token information
 type TokenInfo struct {
-	UserID          string
-	Email           string
-	Name            string
-	GivenName       string
-	FamilyName      string
-	PreferredName   string
-	EmailVerified   bool
-	Roles           []string
-	ProjectID       string
-	Nonce           string
-	Valid           bool
+	UserID        string
+	Email         string
+	Name          string
+	GivenName     string
+	FamilyName    string
+	PreferredName string
+	EmailVerified bool
+	Roles         []string
+	ProjectID     string
+	Nonce         string
+	Valid         bool
 }
 
 // ApiResponse represents API response data for Discogs operations
@@ -38,7 +38,7 @@ type WebSocketMessage interface {
 	GetChannel() string
 	GetAction() string
 	GetUserID() string
-	GetData() map[string]interface{}
+	GetData() map[string]any
 	GetTimestamp() time.Time
 }
 
@@ -49,20 +49,21 @@ type WebSocketSender interface {
 
 // WebSocketMessageImpl implements the WebSocketMessage interface
 type WebSocketMessageImpl struct {
-	ID        string                 `json:"id"`
-	Type      string                 `json:"type"`
-	Channel   string                 `json:"channel"`
-	Action    string                 `json:"action"`
-	UserID    string                 `json:"userId,omitempty"`
-	Data      map[string]interface{} `json:"data,omitempty"`
-	Timestamp time.Time              `json:"timestamp"`
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	Channel   string         `json:"channel"`
+	Action    string         `json:"action"`
+	UserID    string         `json:"userId,omitempty"`
+	Data      map[string]any `json:"data,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
 }
 
 // Implement WebSocketMessage interface
-func (m *WebSocketMessageImpl) GetID() string                     { return m.ID }
-func (m *WebSocketMessageImpl) GetType() string                   { return m.Type }
-func (m *WebSocketMessageImpl) GetChannel() string               { return m.Channel }
-func (m *WebSocketMessageImpl) GetAction() string                { return m.Action }
-func (m *WebSocketMessageImpl) GetUserID() string                { return m.UserID }
-func (m *WebSocketMessageImpl) GetData() map[string]interface{}  { return m.Data }
-func (m *WebSocketMessageImpl) GetTimestamp() time.Time          { return m.Timestamp }
+func (m *WebSocketMessageImpl) GetID() string           { return m.ID }
+func (m *WebSocketMessageImpl) GetType() string         { return m.Type }
+func (m *WebSocketMessageImpl) GetChannel() string      { return m.Channel }
+func (m *WebSocketMessageImpl) GetAction() string       { return m.Action }
+func (m *WebSocketMessageImpl) GetUserID() string       { return m.UserID }
+func (m *WebSocketMessageImpl) GetData() map[string]any { return m.Data }
+func (m *WebSocketMessageImpl) GetTimestamp() time.Time { return m.Timestamp }
+

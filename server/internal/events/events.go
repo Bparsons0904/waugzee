@@ -3,20 +3,53 @@ package events
 import (
 	"context"
 	"encoding/json"
-	"waugzee/config"
-	"waugzee/internal/logger"
 	"sync"
 	"time"
+	"waugzee/config"
+	"waugzee/internal/logger"
 
 	"github.com/google/uuid"
 	"github.com/valkey-io/valkey-go"
 )
 
+type Channel string
+
+func (c Channel) String() string {
+	return string(c)
+}
+
+const (
+	BROADCAST_CHANNEL Channel = "broadcast"
+	SEND_CHANNEL      Channel = "send"
+)
+
+type MessageType string
+
+const (
+	PING          MessageType = "ping"
+	PONG          MessageType = "pong"
+	MESSAGE       MessageType = "message"
+	BROADCAST     MessageType = "broadcast"
+	SEND          MessageType = "send"
+	ERROR         MessageType = "error"
+	USER_JOIN     MessageType = "user_join"
+	USER_LEAVE    MessageType = "user_leave"
+	AUTH_REQUEST  MessageType = "auth_request"
+	AUTH_RESPONSE MessageType = "auth_response"
+	AUTH_SUCCESS  MessageType = "auth_success"
+	AUTH_FAILURE  MessageType = "auth_failure"
+	API_REQUEST   MessageType = "api_request"
+	API_RESPONSE  MessageType = "api_response"
+	SYNC_PROGRESS MessageType = "sync_progress"
+	SYNC_COMPLETE MessageType = "sync_complete"
+	SYNC_ERROR    MessageType = "sync_error"
+)
+
 type Event struct {
 	ID        string         `json:"id"`
-	Type      string         `json:"type"`
-	Channel   string         `json:"channel"`
-	UserID    string         `json:"userId,omitempty"`
+	Type      MessageType    `json:"type"`
+	Channel   Channel        `json:"channel"`
+	UserID    *uuid.UUID     `json:"userId,omitempty"`
 	Data      map[string]any `json:"data"`
 	Timestamp time.Time      `json:"timestamp"`
 }
@@ -27,7 +60,7 @@ type EventBus struct {
 	client   valkey.Client
 	logger   logger.Logger
 	config   config.Config
-	handlers map[string][]EventHandler
+	handlers map[Channel][]EventHandler
 	mutex    sync.RWMutex
 	ctx      context.Context
 	cancel   context.CancelFunc
@@ -40,13 +73,13 @@ func New(client valkey.Client, config config.Config) *EventBus {
 		client:   client,
 		logger:   logger.New("EventBus"),
 		config:   config,
-		handlers: make(map[string][]EventHandler),
+		handlers: make(map[Channel][]EventHandler),
 		ctx:      ctx,
 		cancel:   cancel,
 	}
 }
 
-func (eb *EventBus) Publish(channel string, event Event) error {
+func (eb *EventBus) Publish(channel Channel, event Event) error {
 	log := eb.logger.Function("Publish")
 
 	if event.ID == "" {
@@ -69,7 +102,7 @@ func (eb *EventBus) Publish(channel string, event Event) error {
 	ctx, cancel := context.WithTimeout(eb.ctx, 5*time.Second)
 	defer cancel()
 
-	err = eb.client.Do(ctx, eb.client.B().Publish().Channel(channel).Message(string(eventData)).Build()).
+	err = eb.client.Do(ctx, eb.client.B().Publish().Channel(channel.String()).Message(string(eventData)).Build()).
 		Error()
 	if err != nil {
 		return log.Err(
@@ -90,7 +123,7 @@ func (eb *EventBus) Publish(channel string, event Event) error {
 	return nil
 }
 
-func (eb *EventBus) Subscribe(channel string, handler EventHandler) error {
+func (eb *EventBus) Subscribe(channel Channel, handler EventHandler) error {
 	log := eb.logger.Function("Subscribe")
 
 	eb.mutex.Lock()
@@ -105,7 +138,7 @@ func (eb *EventBus) Subscribe(channel string, handler EventHandler) error {
 	return nil
 }
 
-func (eb *EventBus) notifyLocalHandlers(channel string, event Event) {
+func (eb *EventBus) notifyLocalHandlers(channel Channel, event Event) {
 	log := eb.logger.Function("notifyLocalHandlers")
 
 	eb.mutex.RLock()
@@ -134,7 +167,7 @@ func (eb *EventBus) notifyLocalHandlers(channel string, event Event) {
 	}
 }
 
-func (eb *EventBus) listenToChannel(channel string) {
+func (eb *EventBus) listenToChannel(channel Channel) {
 	log := eb.logger.Function("listenToChannel")
 
 	ctx, cancel := context.WithCancel(eb.ctx)
@@ -144,7 +177,7 @@ func (eb *EventBus) listenToChannel(channel string) {
 
 	err := eb.client.Receive(
 		ctx,
-		eb.client.B().Subscribe().Channel(channel).Build(),
+		eb.client.B().Subscribe().Channel(channel.String()).Build(),
 		func(msg valkey.PubSubMessage) {
 			var event Event
 			if err := json.Unmarshal([]byte(msg.Message), &event); err != nil {
@@ -178,25 +211,11 @@ func (eb *EventBus) Close() error {
 	return nil
 }
 
-// Convenience methods for common event types
-func (eb *EventBus) PublishUserLogin(userID string, userData map[string]any) error {
-	return eb.Publish("user.login", Event{
-		Type:   "user_login",
-		UserID: userID,
-		Data:   userData,
-	})
-}
-
-func (eb *EventBus) PublishUserLogout(userID string) error {
-	return eb.Publish("user.logout", Event{
-		Type:   "user_logout",
-		UserID: userID,
-		Data:   map[string]any{},
-	})
-}
-
-
-func (eb *EventBus) PublishCacheInvalidation(resourceType string, resourceID string, userIDs []string) error {
+func (eb *EventBus) PublishCacheInvalidation(
+	resourceType string,
+	resourceID string,
+	userIDs []string,
+) error {
 	return eb.Publish("cache.invalidation", Event{
 		Type: "cache_invalidation",
 		Data: map[string]any{
@@ -206,4 +225,3 @@ func (eb *EventBus) PublishCacheInvalidation(resourceType string, resourceID str
 		},
 	})
 }
-

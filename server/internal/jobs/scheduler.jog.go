@@ -6,8 +6,6 @@ import (
 	"waugzee/internal/services"
 )
 
-// RegisterAllJobs registers all jobs with the scheduler service
-// Currently no jobs are implemented - scheduler infrastructure is in place for future use
 func RegisterAllJobs(
 	schedulerService *services.SchedulerService,
 	config config.Config,

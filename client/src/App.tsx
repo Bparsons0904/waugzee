@@ -3,7 +3,7 @@ import { Component } from "solid-js";
 import { AuthProvider } from "./context/AuthContext";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { WebSocketProvider } from "@context/WebSocketContext";
-// import { ToastProvider } from "./context/ToastContext";
+import { ToastProvider } from "./context/ToastContext";
 import { RouteSectionProps } from "@solidjs/router";
 import { NavBar } from "@components/layout/Navbar/Navbar";
 // import { useAutoCacheInvalidation } from "./services/cacheInvalidation.service";
@@ -19,15 +19,15 @@ const App: Component<RouteSectionProps<unknown>> = (props) => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* <ToastProvider> */}
-      <AuthProvider>
-        <WebSocketProvider>
-          {/* <CacheInvalidationProvider /> */}
-          <NavBar />
-          <main class="content">{props.children}</main>
-        </WebSocketProvider>
-      </AuthProvider>
-      {/* </ToastProvider> */}
+      <ToastProvider>
+        <AuthProvider>
+          <WebSocketProvider>
+            {/* <CacheInvalidationProvider /> */}
+            <NavBar />
+            <main class="content">{props.children}</main>
+          </WebSocketProvider>
+        </AuthProvider>
+      </ToastProvider>
     </QueryClientProvider>
   );
 };

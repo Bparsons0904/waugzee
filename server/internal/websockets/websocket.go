@@ -18,28 +18,36 @@ import (
 )
 
 const (
-	MESSAGE_TYPE_PING                 = "ping"
-	MESSAGE_TYPE_PONG                 = "pong"
-	MESSAGE_TYPE_MESSAGE              = "message"
-	MESSAGE_TYPE_BROADCAST            = "broadcast"
-	MESSAGE_TYPE_ERROR                = "error"
-	MESSAGE_TYPE_USER_JOIN            = "user_join"
-	MESSAGE_TYPE_USER_LEAVE           = "user_leave"
-	MESSAGE_TYPE_AUTH_REQUEST         = "auth_request"
-	MESSAGE_TYPE_AUTH_RESPONSE        = "auth_response"
-	MESSAGE_TYPE_AUTH_SUCCESS         = "auth_success"
-	MESSAGE_TYPE_AUTH_FAILURE         = "auth_failure"
-	MESSAGE_TYPE_DISCOGS_API_REQUEST  = "discogs_api_request"
-	MESSAGE_TYPE_DISCOGS_API_RESPONSE = "discogs_api_response"
-	MESSAGE_TYPE_SYNC_PROGRESS        = "sync_progress"
-	MESSAGE_TYPE_SYNC_COMPLETE        = "sync_complete"
-	MESSAGE_TYPE_SYNC_ERROR           = "sync_error"
-	PING_INTERVAL                     = 30 * time.Second
-	PONG_TIMEOUT                      = 60 * time.Second
-	WRITE_TIMEOUT                     = 10 * time.Second
-	AUTH_HANDSHAKE_TIMEOUT            = 10 * time.Second
-	MAX_MESSAGE_SIZE                  = 1024 * 1024 // 1 MB
-	SEND_CHANNEL_SIZE                 = 64
+	MESSAGE_TYPE_PING    = events.PING
+	MESSAGE_TYPE_PONG    = events.PONG
+	MESSAGE_TYPE_MESSAGE = events.MESSAGE
+	AUTH_REQUEST         = events.AUTH_REQUEST
+	AUTH_RESPONSE        = events.AUTH_RESPONSE
+	AUTH_SUCCESS         = events.AUTH_SUCCESS
+	AUTH_FAILURE         = events.AUTH_FAILURE
+	API_REQUEST          = events.API_REQUEST
+	API_RESPONSE         = events.API_RESPONSE
+	SYNC_PROGRESS        = events.SYNC_PROGRESS
+	SYNC_COMPLETE        = events.SYNC_COMPLETE
+	SYNC_ERROR           = events.SYNC_ERROR
+	USER_JOIN            = events.USER_JOIN
+	BROADCAST            = events.BROADCAST
+	SEND                 = events.SEND
+	MESSAGE              = events.MESSAGE
+)
+
+const (
+	BROADCAST_CHANNEL = events.BROADCAST_CHANNEL
+	SEND_CHANNEL      = events.SEND_CHANNEL
+)
+
+const (
+	PING_INTERVAL          = 30 * time.Second
+	PONG_TIMEOUT           = 60 * time.Second
+	WRITE_TIMEOUT          = 10 * time.Second
+	AUTH_HANDSHAKE_TIMEOUT = 10 * time.Second
+	MAX_MESSAGE_SIZE       = 1024 * 1024 // 1 MB
+	SEND_CHANNEL_SIZE      = 64
 )
 
 // DiscogsOrchestrationService interface to avoid circular imports
@@ -54,29 +62,24 @@ type ZitadelService interface {
 	ValidateTokenWithFallback(ctx context.Context, token string) (*types.TokenInfo, string, error)
 }
 
-// Channels
-const (
-	BROADCAST_CHANNEL = "broadcast"
-)
-
 type Message struct {
-	ID        string                 `json:"id"`
-	Type      string                 `json:"type"`
-	Channel   string                 `json:"channel,omitempty"`
-	Action    string                 `json:"action,omitempty"`
-	UserID    string                 `json:"userId,omitempty"`
-	Data      map[string]interface{} `json:"data,omitempty"`
-	Timestamp time.Time              `json:"timestamp"`
+	ID        string             `json:"id"`
+	Type      events.MessageType `json:"type"`
+	Channel   events.Channel     `json:"channel,omitempty"`
+	Action    string             `json:"action,omitempty"`
+	UserID    string             `json:"userId,omitempty"`
+	Data      map[string]any     `json:"data,omitempty"`
+	Timestamp time.Time          `json:"timestamp"`
 }
 
 // Implement WebSocketMessage interface
-func (m *Message) GetID() string                   { return m.ID }
-func (m *Message) GetType() string                 { return m.Type }
-func (m *Message) GetChannel() string              { return m.Channel }
-func (m *Message) GetAction() string               { return m.Action }
-func (m *Message) GetUserID() string               { return m.UserID }
-func (m *Message) GetData() map[string]interface{} { return m.Data }
-func (m *Message) GetTimestamp() time.Time         { return m.Timestamp }
+func (m *Message) GetID() string               { return m.ID }
+func (m *Message) GetType() events.MessageType { return m.Type }
+func (m *Message) GetChannel() events.Channel  { return m.Channel }
+func (m *Message) GetAction() string           { return m.Action }
+func (m *Message) GetUserID() string           { return m.UserID }
+func (m *Message) GetData() map[string]any     { return m.Data }
+func (m *Message) GetTimestamp() time.Time     { return m.Timestamp }
 
 type Client struct {
 	ID         string
@@ -125,7 +128,7 @@ func New(
 	log.Function("New").Info("Starting websocket hub")
 	go manager.hub.run(manager)
 
-	go manager.subscribeToBroadcastEvents()
+	go manager.subscribeToEventBus()
 	go manager.subscribeToCacheInvalidationEvents()
 
 	return manager, nil
@@ -146,7 +149,7 @@ func (m *Manager) HandleWebSocket(c *websocket.Conn) {
 
 	authRequest := Message{
 		ID:        uuid.New().String(),
-		Type:      MESSAGE_TYPE_AUTH_REQUEST,
+		Type:      AUTH_REQUEST,
 		Channel:   "system",
 		Action:    "authenticate",
 		Timestamp: time.Now(),
@@ -180,7 +183,7 @@ func (m *Manager) HandleWebSocket(c *websocket.Conn) {
 
 			authTimeout := Message{
 				ID:        uuid.New().String(),
-				Type:      MESSAGE_TYPE_AUTH_FAILURE,
+				Type:      AUTH_FAILURE,
 				Channel:   "system",
 				Action:    "authentication_timeout",
 				Data:      map[string]any{"reason": "Authentication timeout"},
@@ -222,7 +225,7 @@ func (m *Manager) BroadcastUserLogin(userID string, userData map[string]any) {
 
 	message := Message{
 		ID:        uuid.New().String(),
-		Type:      MESSAGE_TYPE_USER_JOIN,
+		Type:      USER_JOIN,
 		Channel:   "system",
 		Action:    "user_login",
 		UserID:    userID,
@@ -284,7 +287,7 @@ func (c *Client) readPump() {
 func (c *Client) routeMessage(message Message) {
 	log := c.Manager.log.Function("routeMessage")
 
-	if message.Type == MESSAGE_TYPE_AUTH_RESPONSE {
+	if message.Type == AUTH_RESPONSE {
 		c.handleAuthResponse(message)
 		return
 	}
@@ -299,7 +302,7 @@ func (c *Client) routeMessage(message Message) {
 		)
 		authFailure := Message{
 			ID:        uuid.New().String(),
-			Type:      MESSAGE_TYPE_AUTH_FAILURE,
+			Type:      AUTH_FAILURE,
 			Channel:   "system",
 			Action:    "authentication_required",
 			Data:      map[string]any{"reason": "Authentication required"},
@@ -310,7 +313,7 @@ func (c *Client) routeMessage(message Message) {
 	}
 
 	switch message.Type {
-	case MESSAGE_TYPE_DISCOGS_API_RESPONSE:
+	case API_RESPONSE:
 		c.handleDiscogsApiResponse(message)
 	default:
 		log.Warn("Unknown message type", "type", message.Type)
@@ -375,7 +378,7 @@ func (c *Client) handleAuthResponse(message Message) {
 
 	authSuccess := Message{
 		ID:        uuid.New().String(),
-		Type:      MESSAGE_TYPE_AUTH_SUCCESS,
+		Type:      AUTH_SUCCESS,
 		Channel:   "system",
 		Action:    "authenticated",
 		Data:      map[string]any{"userId": c.UserID.String()},
@@ -390,7 +393,7 @@ func (c *Client) sendAuthFailure(reason string) {
 
 	authFailure := Message{
 		ID:        uuid.New().String(),
-		Type:      MESSAGE_TYPE_AUTH_FAILURE,
+		Type:      AUTH_FAILURE,
 		Channel:   "system",
 		Action:    "authentication_failed",
 		Data:      map[string]any{"reason": reason},
@@ -445,11 +448,16 @@ func (c *Client) writePump() {
 	}
 }
 
-func (m *Manager) subscribeToBroadcastEvents() {
+func (m *Manager) subscribeToEventBus() {
 	log := m.log.Function("subscribeToBroadcastEvents")
 	log.Info("Starting broadcast events subscription")
 
-	err := m.eventBus.Subscribe(BROADCAST_CHANNEL, func(event events.Event) error {
+	if err := m.eventBus.Subscribe(events.BROADCAST_CHANNEL, func(event events.Event) error {
+		if event.ID == "" {
+			id := uuid.New().String()
+			event.ID = id
+		}
+
 		log.Info(
 			"Received broadcast event",
 			"eventID",
@@ -461,17 +469,50 @@ func (m *Manager) subscribeToBroadcastEvents() {
 		)
 
 		m.sendToAuthenticatedClients(Message{
-			ID:        uuid.New().String(),
-			Type:      MESSAGE_TYPE_BROADCAST,
+			ID:        event.ID,
+			Type:      BROADCAST,
 			Channel:   "system",
 			Action:    "broadcast",
 			Data:      event.Data,
 			Timestamp: time.Now(),
 		})
 		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		log.Er("Failed to subscribe to broadcast events", err)
+	}
+
+	if err := m.eventBus.Subscribe(events.SEND_CHANNEL, func(event events.Event) error {
+		slog.Info("Received send event", "eventID", event.ID, "eventType", event.Type, "data", event.Data)
+		if event.ID == "" {
+			id := uuid.New().String()
+			event.ID = id
+		}
+		log.Info(
+			"Received send event",
+			"eventID",
+			event.ID,
+			"eventType",
+			event.Type,
+			"data",
+			event.Data,
+		)
+
+		if event.Channel == "" {
+		}
+
+		m.sendMessageToUser(
+			*event.UserID,
+			Message{
+				ID:        event.ID,
+				Type:      SEND,
+				Channel:   "sync",
+				Action:    "send",
+				Data:      event.Data,
+				Timestamp: time.Now(),
+			})
+		return nil
+	}); err != nil {
+		log.Er("Failed to subscribe to send events", err)
 	}
 }
 
@@ -517,7 +558,7 @@ func (m *Manager) subscribeToCacheInvalidationEvents() {
 			return nil
 		}
 
-		userIDsInterface, ok := event.Data["userIds"].([]interface{})
+		userIDsInterface, ok := event.Data["userIds"].([]any)
 		if !ok {
 			log.Warn("Invalid userIds in cache invalidation event", "eventID", event.ID)
 			return nil
@@ -558,10 +599,10 @@ func (m *Manager) BroadcastCacheInvalidation(
 
 	message := Message{
 		ID:      uuid.New().String(),
-		Type:    MESSAGE_TYPE_MESSAGE,
+		Type:    MESSAGE,
 		Channel: "user",
 		Action:  "invalidateCache",
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"resourceType": resourceType,
 			"resourceId":   resourceID,
 		},
@@ -584,7 +625,7 @@ func (m *Manager) BroadcastCacheInvalidation(
 			continue
 		}
 
-		m.SendMessageToUser(userUUID, &message)
+		m.sendMessageToUser(userUUID, message)
 		sentCount++
 	}
 
@@ -620,7 +661,7 @@ func (c *Client) handleDiscogsApiResponse(message Message) {
 		return
 	}
 
-	headers, ok := message.Data["headers"].(map[string]interface{})
+	headers, ok := message.Data["headers"].(map[string]any)
 	if !ok {
 		log.Warn(
 			"Invalid headers in Discogs API response",
