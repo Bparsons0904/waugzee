@@ -164,7 +164,7 @@ func (m *Manager) promoteClientToAuthenticated(client *Client) {
 	)
 }
 
-func (m *Manager) sendMessageToUser(userID uuid.UUID, message Message) {
+func (m *Manager) SendMessageToUser(userID uuid.UUID, message Message) {
 	log := m.log.Function("SendMessageToUser")
 
 	m.hub.mutex.RLock()

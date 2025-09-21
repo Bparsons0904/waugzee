@@ -2,7 +2,6 @@ package websockets
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"time"
 	"waugzee/config"
@@ -23,10 +22,6 @@ type Message = events.Message
 const (
 	MESSAGE_TYPE_PING = "ping"
 	MESSAGE_TYPE_PONG = "pong"
-	AUTH_REQUEST      = "auth_request"
-	AUTH_RESPONSE     = "auth_response"
-	AUTH_SUCCESS      = "auth_success"
-	AUTH_FAILURE      = "auth_failure"
 	API_REQUEST       = "api_request"
 	API_RESPONSE      = "api_response"
 	API_PROGRESS      = "api_progress"
@@ -39,12 +34,11 @@ const (
 )
 
 const (
-	PING_INTERVAL          = 30 * time.Second
-	PONG_TIMEOUT           = 60 * time.Second
-	WRITE_TIMEOUT          = 10 * time.Second
-	AUTH_HANDSHAKE_TIMEOUT = 10 * time.Second
-	MAX_MESSAGE_SIZE       = 1024 * 1024 // 1 MB
-	SEND_CHANNEL_SIZE      = 64
+	PING_INTERVAL     = 30 * time.Second
+	PONG_TIMEOUT      = 60 * time.Second
+	WRITE_TIMEOUT     = 10 * time.Second
+	MAX_MESSAGE_SIZE  = 1024 * 1024 // 1 MB
+	SEND_CHANNEL_SIZE = 64
 )
 
 // DiscogsOrchestrationService interface to avoid circular imports
@@ -58,7 +52,6 @@ type DiscogsOrchestrationService interface {
 type ZitadelService interface {
 	ValidateTokenWithFallback(ctx context.Context, token string) (*types.TokenInfo, string, error)
 }
-
 
 type Client struct {
 	ID         string
@@ -125,23 +118,12 @@ func (m *Manager) HandleWebSocket(c *websocket.Conn) {
 		send:       make(chan Message, SEND_CHANNEL_SIZE),
 	}
 
-	authRequest := Message{
-		ID:        uuid.New().String(),
-		Service:   events.SYSTEM,
-		Event:     AUTH_REQUEST,
-		Payload:   map[string]any{"action": "authenticate"},
-		Timestamp: time.Now(),
-	}
-
-	if err := c.WriteJSON(authRequest); err != nil {
-		log.Er("failed to send auth request", err)
+	if err := client.sendAuthRequest(); err != nil {
 		if err := c.Close(); err != nil {
 			log.Er("failed to close connection", err)
 		}
 		return
 	}
-
-	log.Info("Auth request sent to client", "clientID", clientID)
 	m.hub.register <- client
 	defer func() {
 		log.Info("Client disconnected in the defer", "clientID", clientID)
@@ -151,35 +133,8 @@ func (m *Manager) HandleWebSocket(c *websocket.Conn) {
 		}
 	}()
 
-	// Start auth timeout goroutine
-	go func() {
-		time.Sleep(AUTH_HANDSHAKE_TIMEOUT)
-		if client.Status == STATUS_UNAUTHENTICATED {
-			log.Warn("Client failed to authenticate within timeout, disconnecting",
-				"clientID", clientID,
-				"timeout", AUTH_HANDSHAKE_TIMEOUT)
-
-			authTimeout := Message{
-				ID:        uuid.New().String(),
-				Service:   events.SYSTEM,
-				Event:     AUTH_FAILURE,
-				Payload:   map[string]any{"action": "authentication_timeout", "reason": "Authentication timeout"},
-				Timestamp: time.Now(),
-			}
-
-			select {
-			case client.send <- authTimeout:
-				// Message sent, now close after a brief delay
-				time.Sleep(100 * time.Millisecond)
-			default:
-				// Channel is full or closed, proceed to close immediately
-			}
-
-			if err := c.Close(); err != nil {
-				log.Er("failed to close connection after auth timeout", err, "clientID", clientID)
-			}
-		}
-	}()
+	// Start auth timeout
+	client.startAuthTimeout()
 
 	go client.readPump()
 	client.writePump()
@@ -247,27 +202,21 @@ func (c *Client) routeMessage(message Message) {
 	}
 
 	if c.Status == STATUS_UNAUTHENTICATED {
-		log.Warn(
-			"Blocking message from unauthenticated client",
-			"clientID",
-			c.ID,
-			"messageEvent",
-			message.Event,
-		)
-		authFailure := Message{
-			ID:        uuid.New().String(),
-			Service:   events.SYSTEM,
-			Event:     AUTH_FAILURE,
-			Payload:   map[string]any{"action": "authentication_required", "reason": "Authentication required"},
-			Timestamp: time.Now(),
-		}
-		c.send <- authFailure
+		c.handleUnauthenticatedMessage(message)
 		return
 	}
 
 	switch message.Event {
 	case API_RESPONSE:
-		c.handleDiscogsApiResponse(message)
+		log.Info(
+			"Received API response",
+			"messageID",
+			message.ID,
+			"clientID",
+			c.ID,
+			"message",
+			message,
+		)
 	default:
 		log.Warn("Unknown message event", "event", message.Event)
 	}
@@ -278,88 +227,6 @@ func (c *Client) routeMessage(message Message) {
 	case "user":
 		slog.Info("User message", "messageID", message.ID, "clientID", c.ID, "message", message)
 	}
-}
-
-func (c *Client) handleAuthResponse(message Message) {
-	log := c.Manager.log.Function("handleAuthResponse")
-
-	if c.Status != STATUS_UNAUTHENTICATED {
-		log.Warn("Auth response from already authenticated client", "clientID", c.ID)
-		return
-	}
-
-	token, ok := message.Payload["token"].(string)
-	if !ok || token == "" {
-		log.Warn("Invalid token in auth response", "clientID", c.ID)
-		c.sendAuthFailure("Invalid token format")
-		return
-	}
-
-	// Validate token using the consolidated method
-	tokenInfo, validationMethod, err := c.Manager.zitadelService.ValidateTokenWithFallback(
-		context.Background(),
-		token,
-	)
-	if err != nil {
-		log.Info("WebSocket token validation failed", "clientID", c.ID, "error", err.Error())
-		c.sendAuthFailure("Authentication failed")
-		return
-	}
-
-	// Get user from database using OIDC User ID
-	user, err := c.Manager.userRepo.GetByOIDCUserID(context.Background(), tokenInfo.UserID)
-	if err != nil {
-		log.Info("WebSocket user not found in database",
-			"clientID", c.ID,
-			"oidcUserID", tokenInfo.UserID,
-			"error", err.Error())
-		c.sendAuthFailure("User not found")
-		return
-	}
-
-	// Set client as authenticated with the validated user
-	c.Status = STATUS_AUTHENTICATED
-	c.UserID = user.ID
-
-	log.Info("WebSocket client authenticated successfully",
-		"clientID", c.ID,
-		"userID", user.ID,
-		"email", tokenInfo.Email,
-		"method", validationMethod)
-
-	c.Manager.promoteClientToAuthenticated(c)
-
-	authSuccess := Message{
-		ID:        uuid.New().String(),
-		Service:   events.SYSTEM,
-		Event:     AUTH_SUCCESS,
-		UserID:    c.UserID.String(),
-		Payload:   map[string]any{"action": "authenticated", "userId": c.UserID.String()},
-		Timestamp: time.Now(),
-	}
-
-	c.send <- authSuccess
-}
-
-func (c *Client) sendAuthFailure(reason string) {
-	log := c.Manager.log.Function("sendAuthFailure")
-
-	authFailure := Message{
-		ID:        uuid.New().String(),
-		Service:   events.SYSTEM,
-		Event:     AUTH_FAILURE,
-		Payload:   map[string]any{"action": "authentication_failed", "reason": reason},
-		Timestamp: time.Now(),
-	}
-
-	c.send <- authFailure
-
-	log.Info("Auth failure sent, closing connection", "clientID", c.ID, "reason", reason)
-
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		_ = c.Connection.Close()
-	}()
 }
 
 func (c *Client) writePump() {
@@ -410,11 +277,9 @@ func (m *Manager) subscribeToEventBus() {
 		switch event.Event {
 		case "broadcast":
 			m.sendToAuthenticatedClients(event.Message)
-
 		case "user":
 			m.sendToAuthenticatedClients(event.Message)
 		}
-
 		return nil
 	}); err != nil {
 		log.Er("Failed to subscribe to broadcast events", err)
@@ -439,86 +304,6 @@ func (m *Manager) sendToAuthenticatedClients(message Message) {
 	log.Info("Message sent to authenticated clients", "messageID", message.ID, "clientCount", sent)
 }
 
-func (c *Client) handleDiscogsApiResponse(message Message) {
-	log := c.Manager.log.Function("handleDiscogsApiResponse")
-
-	if c.Status != STATUS_AUTHENTICATED {
-		log.Warn("Discogs API response from unauthenticated client", "clientID", c.ID)
-		return
-	}
-
-	// Extract response data
-	requestID, ok := message.Payload["requestId"].(string)
-	if !ok {
-		log.Warn("Invalid requestId in Discogs API response", "clientID", c.ID)
-		return
-	}
-
-	status, ok := message.Payload["status"].(float64)
-	if !ok {
-		log.Warn("Invalid status in Discogs API response", "clientID", c.ID, "requestID", requestID)
-		return
-	}
-
-	headers, ok := message.Payload["headers"].(map[string]any)
-	if !ok {
-		log.Warn(
-			"Invalid headers in Discogs API response",
-			"clientID",
-			c.ID,
-			"requestID",
-			requestID,
-		)
-		return
-	}
-
-	body := message.Payload["body"]
-
-	var errorPtr *string
-	if errorMsg, exists := message.Payload["error"]; exists {
-		if errorStr, ok := errorMsg.(string); ok {
-			errorPtr = &errorStr
-		}
-	}
-
-	// Convert headers to map[string]string
-	headerMap := make(map[string]string)
-	for k, v := range headers {
-		if strVal, ok := v.(string); ok {
-			headerMap[k] = strVal
-		}
-	}
-
-	// Create API response
-	apiResponse := &types.ApiResponse{
-		RequestID: requestID,
-		Status:    int(status),
-		Headers:   headerMap,
-		Error:     errorPtr,
-	}
-
-	// Marshal body to json.RawMessage
-	if body != nil {
-		if bodyBytes, err := json.Marshal(body); err == nil {
-			apiResponse.Body = json.RawMessage(bodyBytes)
-		}
-	}
-
-	// Process the response
-	if err := c.Manager.discogsOrchestrationSvc.ProcessApiResponse(context.Background(), requestID, apiResponse); err != nil {
-		_ = log.Error(
-			"Failed to process Discogs API response",
-			"error",
-			err,
-			"requestID",
-			requestID,
-		)
-	} else {
-		log.Info("Discogs API response processed successfully", "requestID", requestID, "status", status)
-	}
-}
-
-// handleClientDisconnection manages sync state when clients disconnect
 func (m *Manager) handleClientDisconnection(userID uuid.UUID) {
 	log := m.log.Function("handleClientDisconnection")
 
@@ -533,7 +318,6 @@ func (m *Manager) handleClientDisconnection(userID uuid.UUID) {
 	}
 }
 
-// handleClientReconnection manages sync state when clients reconnect
 func (m *Manager) handleClientReconnection(userID uuid.UUID) {
 	log := m.log.Function("handleClientReconnection")
 
