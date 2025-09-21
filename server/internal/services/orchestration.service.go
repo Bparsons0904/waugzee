@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	APIRequestCacheKeyPattern = "api_request"
-	APIRequestTTL             = 10 * time.Minute
-	DiscogsAPIBaseURL         = "https://api.discogs.com"
+	API_HASH          = "api_request"
+	APIRequestTTL     = 10 * time.Minute
+	DiscogsAPIBaseURL = "https://api.discogs.com"
 )
 
 type RequestMetadata struct {
@@ -71,7 +71,7 @@ func (o *OrchestrationService) GetUserFolders(
 	}
 
 	if err := database.NewCacheBuilder(o.cache, requestID).
-		WithHashPattern("api_request").
+		WithHashPattern(API_HASH).
 		WithStruct(metadata).
 		WithTTL(APIRequestTTL).
 		WithContext(ctx).
@@ -105,7 +105,7 @@ func (o *OrchestrationService) GetUserFolders(
 
 	if err := o.eventBus.Publish(events.WEBSOCKET, "user", message); err != nil {
 		_ = database.NewCacheBuilder(o.cache, requestID).
-			WithHashPattern(APIRequestCacheKeyPattern).
+			WithHashPattern(API_HASH).
 			WithContext(ctx).
 			Delete()
 		return "", log.Err("failed to publish API request event", err)
@@ -129,7 +129,7 @@ func (o *OrchestrationService) HandleAPIResponse(
 
 	var metadata RequestMetadata
 	found, err := database.NewCacheBuilder(o.cache, requestID).
-		WithHashPattern("api_request").
+		WithHashPattern(API_HASH).
 		WithContext(ctx).
 		Get(&metadata)
 	if err != nil {
@@ -152,7 +152,7 @@ func (o *OrchestrationService) HandleAPIResponse(
 	}
 
 	err = database.NewCacheBuilder(o.cache, requestID).
-		WithHashPattern(APIRequestCacheKeyPattern).
+		WithHashPattern(API_HASH).
 		WithContext(ctx).
 		Delete()
 	if err != nil {

@@ -6,6 +6,7 @@ import { WebSocketProvider } from "@context/WebSocketContext";
 import { ToastProvider } from "./context/ToastContext";
 import { RouteSectionProps } from "@solidjs/router";
 import { NavBar } from "@components/layout/Navbar/Navbar";
+import { ProxyService } from "@components/ProxyService";
 // import { useAutoCacheInvalidation } from "./services/cacheInvalidation.service";
 
 const App: Component<RouteSectionProps<unknown>> = (props) => {
@@ -22,6 +23,7 @@ const App: Component<RouteSectionProps<unknown>> = (props) => {
       <ToastProvider>
         <AuthProvider>
           <WebSocketProvider>
+            <ProxyService />
             {/* <CacheInvalidationProvider /> */}
             <NavBar />
             <main class="content">{props.children}</main>

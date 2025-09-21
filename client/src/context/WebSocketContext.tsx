@@ -12,13 +12,6 @@ import {
 } from "@solid-primitives/websocket";
 import { env } from "@services/env.service";
 import { useAuth } from "./AuthContext";
-import { externalApiService } from "@services/externalApi.service";
-import {
-  DiscogsApiRequestPayload,
-  DiscogsApiResponsePayload,
-  ApiRequestMessage,
-  ApiResponseMessage,
-} from "src/types/DiscogsApiProxy";
 
 // Event constants matching server-side implementation
 export const Events = {
@@ -69,12 +62,12 @@ interface WebSocketContextValue {
   isAuthenticated: () => boolean;
   lastError: () => string | null;
   lastMessage: () => string;
-  sendMessage: (message: string) => void;
+  sendMessage: (message: object) => void;
   reconnect: () => void;
   onCacheInvalidation: (
     callback: (resourceType: string, resourceId: string) => void,
   ) => () => void;
-  onApiMessage: (callback: (message: WebSocketMessage) => void) => () => void;
+  onMessage: (callback: (message: WebSocketMessage) => void) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue>(
@@ -100,8 +93,8 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
   const [cacheInvalidationCallbacks, setCacheInvalidationCallbacks] =
     createSignal<Array<(resourceType: string, resourceId: string) => void>>([]);
 
-  // API message callbacks
-  const [apiMessageCallbacks, setApiMessageCallbacks] = createSignal<
+  // Message callbacks
+  const [messageCallbacks, setMessageCallbacks] = createSignal<
     Array<(message: WebSocketMessage) => void>
   >([]);
 
@@ -144,86 +137,6 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     }
   };
 
-  const handleApiRequest = async (message: ApiRequestMessage) => {
-    const requestId = message.payload?.requestId || "unknown";
-    log("Handling API request:", requestId, message.payload?.url);
-
-    // Extract payload with fallbacks
-    const payload = message.payload;
-    if (!payload) {
-      log("Invalid API request: missing payload");
-      return;
-    }
-
-    const {
-      url,
-      method,
-      headers,
-      callbackService,
-      callbackEvent,
-      requestType,
-      body
-    } = payload;
-
-    // Helper function to send response
-    const sendResponse = (responsePayload: DiscogsApiResponsePayload) => {
-      const responseMessage: ApiResponseMessage = {
-        id: crypto.randomUUID(),
-        service: callbackService,
-        event: callbackEvent,
-        payload: responsePayload,
-        timestamp: new Date().toISOString(),
-      };
-
-      const ws = wsInstance();
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(responseMessage));
-        return true;
-      } else {
-        log("Cannot send response: WebSocket not open");
-        return false;
-      }
-    };
-
-    try {
-      // Validate the API request payload
-      externalApiService.validateApiRequestPayload(payload);
-
-      // Make the external HTTP request using our service
-      const response = await externalApiService.makeRequest({
-        url,
-        method,
-        headers,
-        body,
-        timeout: 30000, // 30 second timeout for external APIs
-      });
-
-      // Create success response
-      const responsePayload: DiscogsApiResponsePayload = {
-        requestId,
-        requestType,
-        data: response.data,
-      };
-
-      if (sendResponse(responsePayload)) {
-        log("API response sent:", requestId, response.status);
-      }
-    } catch (error) {
-      log("API request failed:", requestId, error);
-
-      // Create error response
-      const errorPayload: DiscogsApiResponsePayload = {
-        requestId,
-        requestType,
-        error: externalApiService.formatError(error),
-      };
-
-      if (sendResponse(errorPayload)) {
-        log("API error response sent:", requestId);
-      }
-    }
-  };
-
   const handleMessage = (event: MessageEvent) => {
     try {
       const message: WebSocketMessage = JSON.parse(event.data);
@@ -258,33 +171,25 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
           break;
 
         case Events.API_REQUEST:
-          // Handle API request by making external HTTP call
-          log("API request received:", message);
-          try {
-            handleApiRequest(message as unknown as ApiRequestMessage);
-          } catch (error) {
-            log("Error handling API request:", error);
-          }
-          break;
-
         case Events.API_RESPONSE:
         case Events.API_PROGRESS:
         case Events.API_COMPLETE:
         case Events.API_ERROR:
-          // Handle API-related messages
-          log("API message received:", message.event, message);
-          apiMessageCallbacks().forEach((callback) => {
+          messageCallbacks().forEach((callback) => {
             try {
               callback(message);
             } catch (error) {
-              log("API message callback error:", error);
+              log("Message callback error:", error);
             }
           });
           break;
 
         default:
           // Handle cache invalidation and other message types
-          if (message.payload?.action === "invalidateCache" && message.payload) {
+          if (
+            message.payload?.action === "invalidateCache" &&
+            message.payload
+          ) {
             const resourceType = message.payload.resourceType as string;
             const resourceId = message.payload.resourceId as string;
 
@@ -398,7 +303,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
 
   const isWebSocketAuthenticated = () => wsAuthenticated();
 
-  const sendMessage = (message: string) => {
+  const sendMessage = (message: object) => {
     if (!message) {
       log("Cannot send message: Message is empty");
       setLastError("Cannot send message: Message is empty");
@@ -426,7 +331,8 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     }
 
     try {
-      ws.send(message);
+      const messageString = JSON.stringify(message);
+      ws.send(messageString);
       log("Message sent:", message);
     } catch (error) {
       log("Failed to send message:", error);
@@ -486,12 +392,12 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     };
   };
 
-  const onApiMessage = (callback: (message: WebSocketMessage) => void) => {
-    setApiMessageCallbacks((prev) => [...prev, callback]);
+  const onMessage = (callback: (message: WebSocketMessage) => void) => {
+    setMessageCallbacks((prev) => [...prev, callback]);
 
     // Return cleanup function
     return () => {
-      setApiMessageCallbacks((prev) => prev.filter((cb) => cb !== callback));
+      setMessageCallbacks((prev) => prev.filter((cb) => cb !== callback));
     };
   };
 
@@ -504,7 +410,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     sendMessage,
     reconnect,
     onCacheInvalidation,
-    onApiMessage,
+    onMessage,
   };
 
   return (

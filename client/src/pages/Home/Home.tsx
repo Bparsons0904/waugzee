@@ -1,7 +1,6 @@
 import { Component, createSignal, onMount, createMemo } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { useAuth } from "@context/AuthContext";
-import { useWebSocket } from "@context/WebSocketContext";
 import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import { DiscogsTokenModal } from "@components/common/ui/DiscogsTokenModal";
 import {
@@ -15,7 +14,6 @@ import {
 import { syncService } from "@services/sync.service";
 import { useToast } from "@context/ToastContext";
 import styles from "./Home.module.scss";
-import { proxyService } from "@services/proxy/proxy.service";
 
 interface DashboardStats {
   totalRecords: number;
@@ -27,7 +25,6 @@ interface DashboardStats {
 const Home: Component = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const webSocket = useWebSocket();
   const toast = useToast();
 
   const [stats, setStats] = createSignal<DashboardStats>({
@@ -170,9 +167,6 @@ const Home: Component = () => {
 
   onMount(async () => {
     try {
-      // Initialize the Discogs proxy service with WebSocket context
-      proxyService.initialize(webSocket);
-
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       setStats({
