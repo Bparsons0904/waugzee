@@ -41,13 +41,6 @@ const (
 	SEND_CHANNEL_SIZE = 64
 )
 
-// DiscogsOrchestrationService interface to avoid circular imports
-type DiscogsOrchestrationService interface {
-	ProcessApiResponse(ctx context.Context, requestID string, response *types.ApiResponse) error
-	HandleSyncDisconnection(ctx context.Context, userID uuid.UUID) error
-	HandleSyncReconnection(ctx context.Context, userID uuid.UUID) error
-}
-
 // ZitadelService interface to avoid circular imports
 type ZitadelService interface {
 	ValidateTokenWithFallback(ctx context.Context, token string) (*types.TokenInfo, string, error)
@@ -63,14 +56,13 @@ type Client struct {
 }
 
 type Manager struct {
-	hub                     *Hub
-	db                      database.DB
-	config                  config.Config
-	log                     logger.Logger
-	eventBus                *events.EventBus
-	zitadelService          ZitadelService
-	userRepo                repositories.UserRepository
-	discogsOrchestrationSvc DiscogsOrchestrationService
+	hub            *Hub
+	db             database.DB
+	config         config.Config
+	log            logger.Logger
+	eventBus       *events.EventBus
+	zitadelService ZitadelService
+	userRepo       repositories.UserRepository
 }
 
 func New(
@@ -304,30 +296,3 @@ func (m *Manager) sendToAuthenticatedClients(message Message) {
 	log.Info("Message sent to authenticated clients", "messageID", message.ID, "clientCount", sent)
 }
 
-func (m *Manager) handleClientDisconnection(userID uuid.UUID) {
-	log := m.log.Function("handleClientDisconnection")
-
-	if m.discogsOrchestrationSvc == nil {
-		return
-	}
-
-	if err := m.discogsOrchestrationSvc.HandleSyncDisconnection(context.Background(), userID); err != nil {
-		_ = log.Error("Failed to handle sync disconnection", "error", err, "userID", userID)
-	} else {
-		log.Info("Sync disconnection handled", "userID", userID)
-	}
-}
-
-func (m *Manager) handleClientReconnection(userID uuid.UUID) {
-	log := m.log.Function("handleClientReconnection")
-
-	if m.discogsOrchestrationSvc == nil {
-		return
-	}
-
-	if err := m.discogsOrchestrationSvc.HandleSyncReconnection(context.Background(), userID); err != nil {
-		_ = log.Error("Failed to handle sync reconnection", "error", err, "userID", userID)
-	} else {
-		log.Info("Sync reconnection handled", "userID", userID)
-	}
-}

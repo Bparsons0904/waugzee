@@ -6,10 +6,11 @@ import (
 )
 
 type Service struct {
-	Zitadel     *ZitadelService
-	Discogs     *DiscogsService
-	Transaction *TransactionService
-	Scheduler   *SchedulerService
+	Zitadel       *ZitadelService
+	Discogs       *DiscogsService
+	Transaction   *TransactionService
+	Scheduler     *SchedulerService
+	Orchestration *OrchestrationService
 }
 
 func New(db database.DB, config config.Config) (Service, error) {
@@ -22,11 +23,14 @@ func New(db database.DB, config config.Config) (Service, error) {
 
 	discogsService := NewDiscogsService()
 	schedulerService := NewSchedulerService()
+	orchestrationService := NewOrchestrationService()
 
 	return Service{
-		Zitadel:     zitadelService,
-		Discogs:     discogsService,
-		Transaction: transactionService,
-		Scheduler:   schedulerService,
+		Zitadel:       zitadelService,
+		Discogs:       discogsService,
+		Transaction:   transactionService,
+		Scheduler:     schedulerService,
+		Orchestration: orchestrationService,
 	}, nil
 }
+

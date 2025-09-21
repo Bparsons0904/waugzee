@@ -10,11 +10,11 @@ import (
 
 // Authentication-related constants
 const (
-	AUTH_REQUEST              = "auth_request"
-	AUTH_RESPONSE             = "auth_response"
-	AUTH_SUCCESS              = "auth_success"
-	AUTH_FAILURE              = "auth_failure"
-	AUTH_HANDSHAKE_TIMEOUT    = 10 * time.Second
+	AUTH_REQUEST           = "auth_request"
+	AUTH_RESPONSE          = "auth_response"
+	AUTH_SUCCESS           = "auth_success"
+	AUTH_FAILURE           = "auth_failure"
+	AUTH_HANDSHAKE_TIMEOUT = 10 * time.Second
 )
 
 // startAuthTimeout initiates the authentication timeout for a client
@@ -29,10 +29,13 @@ func (c *Client) startAuthTimeout() {
 				"timeout", AUTH_HANDSHAKE_TIMEOUT)
 
 			authTimeout := Message{
-				ID:        uuid.New().String(),
-				Service:   events.SYSTEM,
-				Event:     AUTH_FAILURE,
-				Payload:   map[string]any{"action": "authentication_timeout", "reason": "Authentication timeout"},
+				ID:      uuid.New().String(),
+				Service: events.SYSTEM,
+				Event:   AUTH_FAILURE,
+				Payload: map[string]any{
+					"action": "authentication_timeout",
+					"reason": "Authentication timeout",
+				},
 				Timestamp: time.Now(),
 			}
 
@@ -98,8 +101,6 @@ func (c *Client) handleAuthResponse(message Message) {
 		"userID", user.ID,
 		"email", tokenInfo.Email,
 		"method", validationMethod)
-
-	c.Manager.promoteClientToAuthenticated(c)
 
 	authSuccess := Message{
 		ID:        uuid.New().String(),
@@ -169,10 +170,13 @@ func (c *Client) handleUnauthenticatedMessage(message Message) {
 	)
 
 	authFailure := Message{
-		ID:        uuid.New().String(),
-		Service:   events.SYSTEM,
-		Event:     AUTH_FAILURE,
-		Payload:   map[string]any{"action": "authentication_required", "reason": "Authentication required"},
+		ID:      uuid.New().String(),
+		Service: events.SYSTEM,
+		Event:   AUTH_FAILURE,
+		Payload: map[string]any{
+			"action": "authentication_required",
+			"reason": "Authentication required",
+		},
 		Timestamp: time.Now(),
 	}
 	c.send <- authFailure
