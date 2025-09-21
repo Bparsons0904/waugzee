@@ -35,7 +35,6 @@ const Home: Component = () => {
   });
   const [isLoading, setIsLoading] = createSignal(true);
   const [showTokenModal, setShowTokenModal] = createSignal(false);
-  const [isSyncing, setIsSyncing] = createSignal(false);
   const [syncStatus, setSyncStatus] = createSignal<string>("");
 
   // const hasDiscogsToken = user()?.discogsToken;
@@ -64,48 +63,8 @@ const Home: Component = () => {
       return;
     }
 
-    try {
-      setIsSyncing(true);
-      setSyncStatus("Starting sync...");
-
-      const syncSession = await discogsProxyService.initiateCollectionSync({
-        syncType: "collection",
-        fullSync: false, // Start with incremental sync
-        pageLimit: 10, // Limit pages for testing
-      });
-
-      setSyncStatus(`Sync started! Session: ${syncSession.sessionId}`);
-      console.log("Collection sync initiated:", syncSession);
-
-      // Set up progress callbacks
-      const unsubscribeProgress = discogsProxyService.onSyncProgress((progress) => {
-        setSyncStatus(`Syncing... ${progress.percentComplete.toFixed(1)}% complete`);
-        console.log("Sync progress:", progress);
-      });
-
-      const unsubscribeComplete = discogsProxyService.onSyncComplete((sessionId) => {
-        setSyncStatus("Sync completed successfully!");
-        setIsSyncing(false);
-        console.log("Sync completed:", sessionId);
-        unsubscribeProgress();
-        unsubscribeComplete();
-        unsubscribeError();
-      });
-
-      const unsubscribeError = discogsProxyService.onSyncError((sessionId, error) => {
-        setSyncStatus(`Sync failed: ${error}`);
-        setIsSyncing(false);
-        console.error("Sync error:", sessionId, error);
-        unsubscribeProgress();
-        unsubscribeComplete();
-        unsubscribeError();
-      });
-
-    } catch (error) {
-      console.error("Failed to start sync:", error);
-      setSyncStatus("Failed to start sync");
-      setIsSyncing(false);
-    }
+    // Placeholder for simplified sync functionality
+    setSyncStatus("Sync functionality will be available soon with the new simplified architecture");
   };
 
   const handleTokenModalClose = () => {
@@ -171,17 +130,13 @@ const Home: Component = () => {
     {
       title: "Sync Collection",
       description: user()?.discogsToken
-        ? isSyncing()
-          ? syncStatus() || "Syncing your collection..."
-          : "Sync your Waugzee collection with your Discogs library."
+        ? syncStatus() || "Sync your Waugzee collection with your Discogs library."
         : "Connect your Discogs account to sync your collection.",
       buttonText: user()?.discogsToken
-        ? isSyncing()
-          ? "Syncing..."
-          : "Sync Now"
+        ? "Sync Coming Soon"
         : "Connect Discogs",
       onClick: handleSyncCollection,
-      disabled: isSyncing(),
+      disabled: false,
     },
     {
       title: "View Analytics",
