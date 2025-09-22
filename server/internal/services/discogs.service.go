@@ -37,6 +37,55 @@ type DiscogsFoldersResponse struct {
 	StatusText string             `json:"statusText"`
 }
 
+type DiscogsPagination struct {
+	Page    int                    `json:"page"`
+	Pages   int                    `json:"pages"`
+	Items   int                    `json:"items"`
+	PerPage int                    `json:"per_page"`
+	URLs    map[string]string      `json:"urls"`
+}
+
+type DiscogsFolderReleaseItem struct {
+	ID         int64  `json:"id"`
+	InstanceID int    `json:"instance_id"`
+	FolderID   int    `json:"folder_id"`
+	Rating     int    `json:"rating"`
+	Notes      string `json:"notes"`
+	BasicInformation struct {
+		ID      int64  `json:"id"`
+		Title   string `json:"title"`
+		Year    int    `json:"year"`
+		Formats []struct {
+			Name         string   `json:"name"`
+			Qty          string   `json:"qty"`
+			Descriptions []string `json:"descriptions"`
+		} `json:"formats"`
+		Artists []struct {
+			ID   int64  `json:"id"`
+			Name string `json:"name"`
+		} `json:"artists"`
+		Labels []struct {
+			ID   int64  `json:"id"`
+			Name string `json:"name"`
+		} `json:"labels"`
+		Genres []string `json:"genres"`
+		Styles []string `json:"styles"`
+		Thumb  string   `json:"thumb"`
+	} `json:"basic_information"`
+	DateAdded string `json:"date_added"`
+}
+
+type DiscogsFolderReleasesData struct {
+	Releases   []DiscogsFolderReleaseItem `json:"releases"`
+	Pagination DiscogsPagination          `json:"pagination"`
+}
+
+type DiscogsFolderReleasesResponse struct {
+	Data       DiscogsFolderReleasesData `json:"data"`
+	Status     int                       `json:"status"`
+	StatusText string                    `json:"statusText"`
+}
+
 func NewDiscogsService() *DiscogsService {
 	log := logger.New("DiscogsService")
 	return &DiscogsService{

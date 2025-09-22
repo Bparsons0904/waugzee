@@ -13,6 +13,7 @@ type Repository struct {
 	Genre             GenreRepository
 	Label             LabelRepository
 	Folder            FolderRepository
+	UserRelease       UserReleaseRepository
 }
 
 func New(db database.DB) Repository {
@@ -25,5 +26,6 @@ func New(db database.DB) Repository {
 		Genre:             NewGenreRepository(),
 		Label:             NewLabelRepository(),
 		Folder:            NewFolderRepository(),
+		UserRelease:       NewUserReleaseRepository(),
 	}
 }

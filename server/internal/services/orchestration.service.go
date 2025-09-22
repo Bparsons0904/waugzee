@@ -101,7 +101,7 @@ func (o *OrchestrationService) HandleAPIResponse(
 		WithContext(ctx).
 		Delete()
 	if err != nil {
-		log.Er("failed to cleanup cache entry", err, "requestID", requestID)
+		log.Err("failed to cleanup cache entry", err, "requestID", requestID)
 	}
 
 	log.Info("API response processed successfully",
@@ -112,6 +112,8 @@ func (o *OrchestrationService) HandleAPIResponse(
 	switch metadata.RequestType {
 	case "folders":
 		err = o.foldersService.ProcessFoldersResponse(ctx, metadata, responseData)
+	case "folder_releases":
+		err = o.foldersService.ProcessFolderReleasesResponse(ctx, metadata, responseData)
 	default:
 		return log.ErrMsg("unknown request type: " + metadata.RequestType)
 	}
@@ -132,7 +134,7 @@ func processDiscogsAPIResponse[T any](
 ) (*T, error) {
 	// Check if response contains error
 	if errorMsg, exists := responseData["error"]; exists {
-		log.Er("API request failed", fmt.Errorf("%v", errorMsg),
+		log.Err("API request failed", fmt.Errorf("%v", errorMsg),
 			"responseType", responseType,
 			"userID", metadata.UserID,
 			"requestID", metadata.RequestID)

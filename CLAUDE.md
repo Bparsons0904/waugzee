@@ -42,6 +42,51 @@ When writing or fixing tests, follow these principles:
 - **Test behavior, not implementation**: Focus on what the code should do, not how it does it
 - **Mock at service boundaries**: Mock database interfaces, external APIs, and other services rather than internal function calls
 
+## Go Backend Standards
+
+**CRITICAL: These patterns must be followed consistently to avoid architectural debt.**
+
+### Database Operations
+
+- **GORM Auto-Migration Only**: Never create manual SQL migrations - GORM's AutoMigrate handles all schema changes
+- **Model Changes**: Update GORM models and run migration command - the system handles the rest
+- **No Manual Schema**: SQL migrations are only for data transformations, not schema changes
+
+### Repository Pattern
+
+- **No Business Logic in Repositories**: Repositories handle ONLY database operations (CRUD)
+- **Service Layer for Business Logic**: All business decisions happen in services, not repositories
+- **Minimal Repository Methods**: Only create repository methods that are actually needed for current tasks
+- **Single Responsibility**: Each repository method should have one clear database operation purpose
+
+### Cache Operations
+
+- **Use CacheBuilder Pattern**: Always use `database.NewCacheBuilder(cache, key)` - never construct cache keys manually
+- **Hash Pattern**: Provide only the hash name to `WithHashPattern()` - the builder constructs the full hash
+- **Never Manual Keys**: The builder handles all key construction and formatting
+- **Example**: `WithHashPattern("api_request")` not `WithHashPattern("api_request:specific_key")`
+
+### Service Architecture
+
+- **Business Logic in Services**: Services contain all business decisions and orchestration
+- **Repository Delegation**: Services call specific repository methods for data operations
+- **No Cross-Service Business Logic**: Keep business logic within the appropriate service boundary
+- **Clear Separation**: Services determine WHAT to do, repositories determine HOW to store/retrieve
+
+### Common Anti-Patterns to Avoid
+
+❌ **Manual SQL migrations for schema changes**
+❌ **Business logic in repository methods**
+❌ **Manually constructed cache keys**
+❌ **Repository methods with complex business decisions**
+❌ **Creating repository methods "just in case"**
+
+✅ **GORM model updates + AutoMigrate**
+✅ **Business logic in service layer**
+✅ **CacheBuilder for all cache operations**
+✅ **Simple, focused repository methods**
+✅ **Create methods only when needed**
+
 ## Technology Stack
 
 ### Backend (Go)
