@@ -89,7 +89,6 @@ const makeExternalRequest = async <T = unknown,>(
       data: response.data,
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers as Record<string, string>,
     };
   } catch (error) {
     throw handleExternalApiError(error as AxiosError);
@@ -275,7 +274,6 @@ export function ProxyService() {
         {
           status: response.status,
           statusText: response.statusText,
-          headers: response.headers,
           data: response.data,
         },
       );

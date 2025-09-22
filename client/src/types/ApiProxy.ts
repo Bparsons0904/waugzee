@@ -76,5 +76,4 @@ export interface ExternalHttpResponse<T = unknown> {
   data: T;
   status: number;
   statusText: string;
-  headers: Record<string, string>;
 }
