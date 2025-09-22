@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"waugzee/config"
+	"waugzee/internal/database"
 	"waugzee/internal/events"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
@@ -22,10 +23,11 @@ func New(
 	repos repositories.Repository,
 	eventBus *events.EventBus,
 	config config.Config,
+	db database.DB,
 ) Controllers {
 	return Controllers{
-		User: userController.New(repos, services, config),
-		Auth: authController.New(services, repos),
+		User: userController.New(repos, services, config, db),
+		Auth: authController.New(services, repos, db),
 		Sync: syncController.New(repos, services, eventBus, config),
 	}
 }

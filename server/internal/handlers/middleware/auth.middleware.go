@@ -60,7 +60,7 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 		}
 
 		// Fetch user from database using OIDC User ID
-		user, err := m.userRepo.GetByOIDCUserID(c.Context(), tokenInfo.UserID)
+		user, err := m.userRepo.GetByOIDCUserID(c.Context(), m.DB.SQL, tokenInfo.UserID)
 		if err != nil {
 			log.Info(
 				"user not found in database",

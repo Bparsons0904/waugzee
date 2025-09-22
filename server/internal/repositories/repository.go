@@ -12,16 +12,18 @@ type Repository struct {
 	Release           ReleaseRepository
 	Genre             GenreRepository
 	Label             LabelRepository
+	Folder            FolderRepository
 }
 
 func New(db database.DB) Repository {
 	return Repository{
-		User:              NewUserRepository(db),
-		UserConfiguration: NewUserConfigurationRepository(db),
-		Artist:            NewArtistRepository(db),
-		Master:            NewMasterRepository(db),
-		Release:           NewReleaseRepository(db),
-		Genre:             NewGenreRepository(db),
-		Label:             NewLabelRepository(db),
+		User:              NewUserRepository(db), // User repo needs cache for caching
+		UserConfiguration: NewUserConfigurationRepository(),
+		Artist:            NewArtistRepository(),
+		Master:            NewMasterRepository(),
+		Release:           NewReleaseRepository(),
+		Genre:             NewGenreRepository(),
+		Label:             NewLabelRepository(),
+		Folder:            NewFolderRepository(),
 	}
 }

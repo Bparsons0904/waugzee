@@ -82,7 +82,7 @@ func (c *Client) handleAuthResponse(message Message) {
 	}
 
 	// Get user from database using OIDC User ID
-	user, err := c.Manager.userRepo.GetByOIDCUserID(context.Background(), tokenInfo.UserID)
+	user, err := c.Manager.userRepo.GetByOIDCUserID(context.Background(), c.Manager.db.SQL, tokenInfo.UserID)
 	if err != nil {
 		log.Info("WebSocket user not found in database",
 			"clientID", c.ID,

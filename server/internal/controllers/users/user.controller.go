@@ -3,6 +3,7 @@ package userController
 import (
 	"context"
 	"waugzee/config"
+	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
@@ -13,6 +14,7 @@ type UserController struct {
 	userRepo       repositories.UserRepository
 	userConfigRepo repositories.UserConfigurationRepository
 	discogsService *services.DiscogsService
+	db             database.DB
 	Config         config.Config
 	log            logger.Logger
 }
@@ -25,11 +27,13 @@ func New(
 	repos repositories.Repository,
 	services services.Service,
 	config config.Config,
+	db database.DB,
 ) UserControllerInterface {
 	return &UserController{
 		userRepo:       repos.User,
 		userConfigRepo: repos.UserConfiguration,
 		discogsService: services.Discogs,
+		db:             db,
 		Config:         config,
 		log:            logger.New("userController"),
 	}
@@ -63,7 +67,7 @@ func (uc *UserController) UpdateDiscogsToken(
 		DiscogsUsername: &identity.Username,
 	}
 
-	if err := uc.userConfigRepo.CreateOrUpdate(ctx, config); err != nil {
+	if err := uc.userConfigRepo.CreateOrUpdate(ctx, uc.db.SQL, config); err != nil {
 		return nil, log.Err("failed to update user configuration with discogs credentials", err)
 	}
 

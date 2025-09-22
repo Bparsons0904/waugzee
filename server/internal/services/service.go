@@ -4,6 +4,7 @@ import (
 	"waugzee/config"
 	"waugzee/internal/database"
 	"waugzee/internal/events"
+	"waugzee/internal/repositories"
 )
 
 type Service struct {
@@ -16,6 +17,7 @@ type Service struct {
 
 func New(db database.DB, config config.Config, eventBus *events.EventBus) (Service, error) {
 	transactionService := NewTransactionService(db)
+	repos := repositories.New(db)
 
 	zitadelService, err := NewZitadelService(config)
 	if err != nil {
@@ -24,7 +26,7 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 
 	discogsService := NewDiscogsService()
 	schedulerService := NewSchedulerService()
-	orchestrationService := NewOrchestrationService(eventBus, db)
+	orchestrationService := NewOrchestrationService(eventBus, repos, transactionService)
 
 	return Service{
 		Zitadel:       zitadelService,

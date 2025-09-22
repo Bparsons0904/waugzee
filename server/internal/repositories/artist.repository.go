@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"context"
-	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/utils"
@@ -12,32 +11,30 @@ import (
 )
 
 type ArtistRepository interface {
-	GetByID(ctx context.Context, id string) (*Artist, error)
-	GetByDiscogsID(ctx context.Context, discogsID int64) (*Artist, error)
-	Create(ctx context.Context, artist *Artist) (*Artist, error)
-	Update(ctx context.Context, artist *Artist) error
-	Delete(ctx context.Context, id string) error
-	UpsertBatch(ctx context.Context, artists []*Artist) error
-	GetBatchByDiscogsIDs(ctx context.Context, discogsIDs []int64) (map[int64]*Artist, error)
-	GetHashesByDiscogsIDs(ctx context.Context, discogsIDs []int64) (map[int64]string, error)
-	InsertBatch(ctx context.Context, artists []*Artist) error
-	UpdateBatch(ctx context.Context, artists []*Artist) error
-	FindOrCreateByDiscogsID(ctx context.Context, discogsID int64, name string) (*Artist, error)
+	GetByID(ctx context.Context, tx *gorm.DB, id string) (*Artist, error)
+	GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Artist, error)
+	Create(ctx context.Context, tx *gorm.DB, artist *Artist) (*Artist, error)
+	Update(ctx context.Context, tx *gorm.DB, artist *Artist) error
+	Delete(ctx context.Context, tx *gorm.DB, id string) error
+	UpsertBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error
+	GetBatchByDiscogsIDs(ctx context.Context, tx *gorm.DB, discogsIDs []int64) (map[int64]*Artist, error)
+	GetHashesByDiscogsIDs(ctx context.Context, tx *gorm.DB, discogsIDs []int64) (map[int64]string, error)
+	InsertBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error
+	UpdateBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error
+	FindOrCreateByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64, name string) (*Artist, error)
 }
 
 type artistRepository struct {
-	db  database.DB
 	log logger.Logger
 }
 
-func NewArtistRepository(db database.DB) ArtistRepository {
+func NewArtistRepository() ArtistRepository {
 	return &artistRepository{
-		db:  db,
 		log: logger.New("artistRepository"),
 	}
 }
 
-func (r *artistRepository) GetByID(ctx context.Context, id string) (*Artist, error) {
+func (r *artistRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (*Artist, error) {
 	log := r.log.Function("GetByID")
 
 	artistID, err := uuid.Parse(id)
@@ -46,18 +43,18 @@ func (r *artistRepository) GetByID(ctx context.Context, id string) (*Artist, err
 	}
 
 	var artist Artist
-	if err := r.db.SQLWithContext(ctx).First(&artist, "id = ?", artistID).Error; err != nil {
+	if err := tx.WithContext(ctx).First(&artist, "id = ?", artistID).Error; err != nil {
 		return nil, log.Err("failed to get artist by ID", err, "id", id)
 	}
 
 	return &artist, nil
 }
 
-func (r *artistRepository) GetByDiscogsID(ctx context.Context, discogsID int64) (*Artist, error) {
+func (r *artistRepository) GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Artist, error) {
 	log := r.log.Function("GetByDiscogsID")
 
 	var artist Artist
-	if err := r.db.SQLWithContext(ctx).First(&artist, "id = ?", discogsID).Error; err != nil {
+	if err := tx.WithContext(ctx).First(&artist, "id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -67,27 +64,27 @@ func (r *artistRepository) GetByDiscogsID(ctx context.Context, discogsID int64) 
 	return &artist, nil
 }
 
-func (r *artistRepository) Create(ctx context.Context, artist *Artist) (*Artist, error) {
+func (r *artistRepository) Create(ctx context.Context, tx *gorm.DB, artist *Artist) (*Artist, error) {
 	log := r.log.Function("Create")
 
-	if err := r.db.SQLWithContext(ctx).Create(artist).Error; err != nil {
+	if err := tx.WithContext(ctx).Create(artist).Error; err != nil {
 		return nil, log.Err("failed to create artist", err, "artist", artist)
 	}
 
 	return artist, nil
 }
 
-func (r *artistRepository) Update(ctx context.Context, artist *Artist) error {
+func (r *artistRepository) Update(ctx context.Context, tx *gorm.DB, artist *Artist) error {
 	log := r.log.Function("Update")
 
-	if err := r.db.SQLWithContext(ctx).Save(artist).Error; err != nil {
+	if err := tx.WithContext(ctx).Save(artist).Error; err != nil {
 		return log.Err("failed to update artist", err, "artist", artist)
 	}
 
 	return nil
 }
 
-func (r *artistRepository) Delete(ctx context.Context, id string) error {
+func (r *artistRepository) Delete(ctx context.Context, tx *gorm.DB, id string) error {
 	log := r.log.Function("Delete")
 
 	artistID, err := uuid.Parse(id)
@@ -95,14 +92,14 @@ func (r *artistRepository) Delete(ctx context.Context, id string) error {
 		return log.Err("failed to parse artist ID", err, "id", id)
 	}
 
-	if err := r.db.SQLWithContext(ctx).Delete(&Artist{}, "id = ?", artistID).Error; err != nil {
+	if err := tx.WithContext(ctx).Delete(&Artist{}, "id = ?", artistID).Error; err != nil {
 		return log.Err("failed to delete artist", err, "id", id)
 	}
 
 	return nil
 }
 
-func (r *artistRepository) UpsertBatch(ctx context.Context, artists []*Artist) error {
+func (r *artistRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error {
 	log := r.log.Function("UpsertBatch")
 
 	if len(artists) == 0 {
@@ -114,7 +111,7 @@ func (r *artistRepository) UpsertBatch(ctx context.Context, artists []*Artist) e
 		discogsIDs[i] = artist.ID
 	}
 
-	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, discogsIDs)
+	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, tx, discogsIDs)
 	if err != nil {
 		_ = log.Err("failed to get existing hashes", err, "count", len(discogsIDs))
 	}
@@ -131,7 +128,7 @@ func (r *artistRepository) UpsertBatch(ctx context.Context, artists []*Artist) e
 		for i, record := range categories.Insert {
 			insertArtists[i] = record.(*Artist)
 		}
-		err = r.InsertBatch(ctx, insertArtists)
+		err = r.InsertBatch(ctx, tx, insertArtists)
 		if err != nil {
 			return log.Err("failed to insert artist batch", err, "count", len(insertArtists))
 		}
@@ -142,7 +139,7 @@ func (r *artistRepository) UpsertBatch(ctx context.Context, artists []*Artist) e
 		for i, record := range categories.Update {
 			updateArtists[i] = record.(*Artist)
 		}
-		err = r.UpdateBatch(ctx, updateArtists)
+		err = r.UpdateBatch(ctx, tx, updateArtists)
 		if err != nil {
 			return log.Err("failed to update artist batch", err, "count", len(updateArtists))
 		}
@@ -153,6 +150,7 @@ func (r *artistRepository) UpsertBatch(ctx context.Context, artists []*Artist) e
 
 func (r *artistRepository) GetBatchByDiscogsIDs(
 	ctx context.Context,
+	tx *gorm.DB,
 	discogsIDs []int64,
 ) (map[int64]*Artist, error) {
 	log := r.log.Function("GetBatchByDiscogsIDs")
@@ -162,7 +160,7 @@ func (r *artistRepository) GetBatchByDiscogsIDs(
 	}
 
 	var artists []*Artist
-	if err := r.db.SQLWithContext(ctx).Where("id IN ?", discogsIDs).Find(&artists).Error; err != nil {
+	if err := tx.WithContext(ctx).Where("id IN ?", discogsIDs).Find(&artists).Error; err != nil {
 		return nil, log.Err("failed to get artists by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
@@ -177,6 +175,7 @@ func (r *artistRepository) GetBatchByDiscogsIDs(
 
 func (r *artistRepository) GetHashesByDiscogsIDs(
 	ctx context.Context,
+	tx *gorm.DB,
 	discogsIDs []int64,
 ) (map[int64]string, error) {
 	log := r.log.Function("GetHashesByDiscogsIDs")
@@ -190,7 +189,7 @@ func (r *artistRepository) GetHashesByDiscogsIDs(
 		ContentHash string `json:"contentHash"`
 	}
 
-	if err := r.db.SQLWithContext(ctx).
+	if err := tx.WithContext(ctx).
 		Model(&Artist{}).
 		Select("id, content_hash").
 		Where("id IN ?", discogsIDs).
@@ -211,28 +210,28 @@ func (r *artistRepository) GetHashesByDiscogsIDs(
 	return result, nil
 }
 
-func (r *artistRepository) InsertBatch(ctx context.Context, artists []*Artist) error {
+func (r *artistRepository) InsertBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error {
 	log := r.log.Function("InsertBatch")
 
 	if len(artists) == 0 {
 		return nil
 	}
 
-	if err := r.db.SQLWithContext(ctx).Create(&artists).Error; err != nil {
+	if err := tx.WithContext(ctx).Create(&artists).Error; err != nil {
 		return log.Err("failed to insert artist batch", err, "count", len(artists))
 	}
 
 	return nil
 }
 
-func (r *artistRepository) UpdateBatch(ctx context.Context, artists []*Artist) error {
+func (r *artistRepository) UpdateBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error {
 	log := r.log.Function("UpdateBatch")
 
 	if len(artists) == 0 {
 		return nil
 	}
 
-	if err := r.db.SQLWithContext(ctx).Save(&artists).Error; err != nil {
+	if err := tx.WithContext(ctx).Save(&artists).Error; err != nil {
 		return log.Err("failed to update artist batch", err, "count", len(artists))
 	}
 
@@ -241,6 +240,7 @@ func (r *artistRepository) UpdateBatch(ctx context.Context, artists []*Artist) e
 
 func (r *artistRepository) FindOrCreateByDiscogsID(
 	ctx context.Context,
+	tx *gorm.DB,
 	discogsID int64,
 	name string,
 ) (*Artist, error) {
@@ -258,7 +258,7 @@ func (r *artistRepository) FindOrCreateByDiscogsID(
 	}
 
 	// First, try to find existing artist by Discogs ID
-	artist, err := r.GetByDiscogsID(ctx, discogsID)
+	artist, err := r.GetByDiscogsID(ctx, tx, discogsID)
 	if err != nil {
 		return nil, log.Err("failed to get artist by Discogs ID", err, "discogsID", discogsID)
 	}
@@ -273,7 +273,7 @@ func (r *artistRepository) FindOrCreateByDiscogsID(
 		Name: name,
 	}
 
-	createdArtist, err := r.Create(ctx, newArtist)
+	createdArtist, err := r.Create(ctx, tx, newArtist)
 	if err != nil {
 		return nil, log.Err(
 			"failed to create new artist",

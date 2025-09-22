@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
+
+	"gorm.io/gorm"
 )
 
 // TransactionService handles database transactions using context injection
@@ -21,14 +23,15 @@ func NewTransactionService(db database.DB) *TransactionService {
 }
 
 // Execute runs the provided function within a database transaction
-// The function receives a context with the transaction injected
+// The function receives a context and the transaction DB instance
 // Automatically handles commit/rollback based on function result
 // Panics are converted to errors unless rollback fails (which crashes service for data safety)
 func (ts *TransactionService) Execute(
 	ctx context.Context,
-	fn func(context.Context) error,
+	fn func(context.Context, *gorm.DB) error,
 ) (err error) {
 	log := ts.log.Function("Execute")
+	log.Info("Executing transaction")
 
 	// Begin transaction
 	tx := ts.db.SQLWithContext(ctx).Begin()
@@ -60,6 +63,15 @@ func (ts *TransactionService) Execute(
 		}
 	}()
 
+	// Execute the function with the transaction
+	if err = fn(ctx, tx); err != nil {
+		if rollbackErr := tx.Rollback().Error; rollbackErr != nil {
+			log.Er("CRITICAL: failed to rollback after function error", rollbackErr, "originalError", err)
+			return fmt.Errorf("transaction rollback failed: %w (original error: %v)", rollbackErr, err)
+		}
+		return err
+	}
+
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
 		return log.Err("failed to commit transaction", err)
@@ -72,8 +84,7 @@ func (ts *TransactionService) Execute(
 // ExecuteInTransaction is an alias for Execute for backward compatibility
 func (ts *TransactionService) ExecuteInTransaction(
 	ctx context.Context,
-	fn func(context.Context) error,
+	fn func(context.Context, *gorm.DB) error,
 ) error {
 	return ts.Execute(ctx, fn)
 }
-

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
@@ -14,6 +15,7 @@ import (
 type AuthController struct {
 	zitadelService *services.ZitadelService
 	userRepo       repositories.UserRepository
+	db             database.DB
 	log            logger.Logger
 }
 
@@ -65,10 +67,12 @@ type LogoutResponse struct {
 func New(
 	services services.Service,
 	repos repositories.Repository,
+	db database.DB,
 ) AuthControllerInterface {
 	return &AuthController{
 		zitadelService: services.Zitadel,
 		userRepo:       repos.User,
+		db:             db,
 		log:            logger.New("authController"),
 	}
 }
@@ -140,7 +144,7 @@ func (ac *AuthController) getOrCreateOIDCUser(
 		user.OIDCProjectID = &tokenInfo.ProjectID
 	}
 
-	user, err := ac.userRepo.FindOrCreateOIDCUser(ctx, user)
+	user, err := ac.userRepo.FindOrCreateOIDCUser(ctx, ac.db.SQL, user)
 	if err != nil {
 		log.Info(
 			"failed to find or create OIDC user",

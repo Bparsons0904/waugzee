@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"context"
-	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/utils"
@@ -12,31 +11,29 @@ import (
 )
 
 type LabelRepository interface {
-	GetByID(ctx context.Context, id string) (*Label, error)
-	GetByDiscogsID(ctx context.Context, discogsID int64) (*Label, error)
-	Create(ctx context.Context, label *Label) (*Label, error)
-	Update(ctx context.Context, label *Label) error
-	Delete(ctx context.Context, id string) error
-	UpsertBatch(ctx context.Context, labels []*Label) error
-	GetBatchByDiscogsIDs(ctx context.Context, discogsIDs []int64) (map[int64]*Label, error)
-	GetHashesByDiscogsIDs(ctx context.Context, discogsIDs []int64) (map[int64]string, error)
-	InsertBatch(ctx context.Context, labels []*Label) error
-	UpdateBatch(ctx context.Context, labels []*Label) error
+	GetByID(ctx context.Context, tx *gorm.DB, id string) (*Label, error)
+	GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Label, error)
+	Create(ctx context.Context, tx *gorm.DB, label *Label) (*Label, error)
+	Update(ctx context.Context, tx *gorm.DB, label *Label) error
+	Delete(ctx context.Context, tx *gorm.DB, id string) error
+	UpsertBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error
+	GetBatchByDiscogsIDs(ctx context.Context, tx *gorm.DB, discogsIDs []int64) (map[int64]*Label, error)
+	GetHashesByDiscogsIDs(ctx context.Context, tx *gorm.DB, discogsIDs []int64) (map[int64]string, error)
+	InsertBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error
+	UpdateBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error
 }
 
 type labelRepository struct {
-	db  database.DB
 	log logger.Logger
 }
 
-func NewLabelRepository(db database.DB) LabelRepository {
+func NewLabelRepository() LabelRepository {
 	return &labelRepository{
-		db:  db,
 		log: logger.New("labelRepository"),
 	}
 }
 
-func (r *labelRepository) GetByID(ctx context.Context, id string) (*Label, error) {
+func (r *labelRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (*Label, error) {
 	log := r.log.Function("GetByID")
 
 	labelID, err := uuid.Parse(id)
@@ -45,18 +42,18 @@ func (r *labelRepository) GetByID(ctx context.Context, id string) (*Label, error
 	}
 
 	var label Label
-	if err := r.db.SQLWithContext(ctx).First(&label, "id = ?", labelID).Error; err != nil {
+	if err := tx.WithContext(ctx).First(&label, "id = ?", labelID).Error; err != nil {
 		return nil, log.Err("failed to get label by ID", err, "id", id)
 	}
 
 	return &label, nil
 }
 
-func (r *labelRepository) GetByDiscogsID(ctx context.Context, discogsID int64) (*Label, error) {
+func (r *labelRepository) GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Label, error) {
 	log := r.log.Function("GetByDiscogsID")
 
 	var label Label
-	if err := r.db.SQLWithContext(ctx).First(&label, "id = ?", discogsID).Error; err != nil {
+	if err := tx.WithContext(ctx).First(&label, "id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -66,27 +63,27 @@ func (r *labelRepository) GetByDiscogsID(ctx context.Context, discogsID int64) (
 	return &label, nil
 }
 
-func (r *labelRepository) Create(ctx context.Context, label *Label) (*Label, error) {
+func (r *labelRepository) Create(ctx context.Context, tx *gorm.DB, label *Label) (*Label, error) {
 	log := r.log.Function("Create")
 
-	if err := r.db.SQLWithContext(ctx).Create(label).Error; err != nil {
+	if err := tx.WithContext(ctx).Create(label).Error; err != nil {
 		return nil, log.Err("failed to create label", err, "label", label)
 	}
 
 	return label, nil
 }
 
-func (r *labelRepository) Update(ctx context.Context, label *Label) error {
+func (r *labelRepository) Update(ctx context.Context, tx *gorm.DB, label *Label) error {
 	log := r.log.Function("Update")
 
-	if err := r.db.SQLWithContext(ctx).Save(label).Error; err != nil {
+	if err := tx.WithContext(ctx).Save(label).Error; err != nil {
 		return log.Err("failed to update label", err, "label", label)
 	}
 
 	return nil
 }
 
-func (r *labelRepository) Delete(ctx context.Context, id string) error {
+func (r *labelRepository) Delete(ctx context.Context, tx *gorm.DB, id string) error {
 	log := r.log.Function("Delete")
 
 	labelID, err := uuid.Parse(id)
@@ -94,14 +91,14 @@ func (r *labelRepository) Delete(ctx context.Context, id string) error {
 		return log.Err("failed to parse label ID", err, "id", id)
 	}
 
-	if err := r.db.SQLWithContext(ctx).Delete(&Label{}, "id = ?", labelID).Error; err != nil {
+	if err := tx.WithContext(ctx).Delete(&Label{}, "id = ?", labelID).Error; err != nil {
 		return log.Err("failed to delete label", err, "id", id)
 	}
 
 	return nil
 }
 
-func (r *labelRepository) UpsertBatch(ctx context.Context, labels []*Label) error {
+func (r *labelRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
 	log := r.log.Function("UpsertBatch")
 
 	if len(labels) == 0 {
@@ -113,7 +110,7 @@ func (r *labelRepository) UpsertBatch(ctx context.Context, labels []*Label) erro
 		discogsIDs[i] = label.ID
 	}
 
-	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, discogsIDs)
+	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, tx, discogsIDs)
 	if err != nil {
 		return log.Err("failed to get existing hashes", err, "count", len(discogsIDs))
 	}
@@ -129,7 +126,7 @@ func (r *labelRepository) UpsertBatch(ctx context.Context, labels []*Label) erro
 		for i, record := range categories.Insert {
 			insertLabels[i] = record.(*Label)
 		}
-		err = r.InsertBatch(ctx, insertLabels)
+		err = r.InsertBatch(ctx, tx, insertLabels)
 		if err != nil {
 			return log.Err("failed to insert label batch", err, "count", len(insertLabels))
 		}
@@ -140,7 +137,7 @@ func (r *labelRepository) UpsertBatch(ctx context.Context, labels []*Label) erro
 		for i, record := range categories.Update {
 			updateLabels[i] = record.(*Label)
 		}
-		err = r.UpdateBatch(ctx, updateLabels)
+		err = r.UpdateBatch(ctx, tx, updateLabels)
 		if err != nil {
 			return log.Err(
 				"failed to update label batch",
@@ -156,6 +153,7 @@ func (r *labelRepository) UpsertBatch(ctx context.Context, labels []*Label) erro
 
 func (r *labelRepository) GetBatchByDiscogsIDs(
 	ctx context.Context,
+	tx *gorm.DB,
 	discogsIDs []int64,
 ) (map[int64]*Label, error) {
 	log := r.log.Function("GetBatchByDiscogsIDs")
@@ -165,7 +163,7 @@ func (r *labelRepository) GetBatchByDiscogsIDs(
 	}
 
 	var labels []*Label
-	if err := r.db.SQLWithContext(ctx).Where("id IN ?", discogsIDs).Find(&labels).Error; err != nil {
+	if err := tx.WithContext(ctx).Where("id IN ?", discogsIDs).Find(&labels).Error; err != nil {
 		return nil, log.Err("failed to get labels by Discogs IDs", err, "count", len(discogsIDs))
 	}
 
@@ -181,6 +179,7 @@ func (r *labelRepository) GetBatchByDiscogsIDs(
 
 func (r *labelRepository) GetHashesByDiscogsIDs(
 	ctx context.Context,
+	tx *gorm.DB,
 	discogsIDs []int64,
 ) (map[int64]string, error) {
 	log := r.log.Function("GetHashesByDiscogsIDs")
@@ -194,7 +193,7 @@ func (r *labelRepository) GetHashesByDiscogsIDs(
 		ContentHash string `json:"contentHash"`
 	}
 
-	if err := r.db.SQLWithContext(ctx).
+	if err := tx.WithContext(ctx).
 		Model(&Label{}).
 		Select("id, content_hash").
 		Where("id IN ?", discogsIDs).
@@ -215,28 +214,28 @@ func (r *labelRepository) GetHashesByDiscogsIDs(
 	return result, nil
 }
 
-func (r *labelRepository) InsertBatch(ctx context.Context, labels []*Label) error {
+func (r *labelRepository) InsertBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
 	log := r.log.Function("InsertBatch")
 
 	if len(labels) == 0 {
 		return nil
 	}
 
-	if err := r.db.SQLWithContext(ctx).Create(&labels).Error; err != nil {
+	if err := tx.WithContext(ctx).Create(&labels).Error; err != nil {
 		return log.Err("failed to insert label batch", err, "count", len(labels))
 	}
 
 	return nil
 }
 
-func (r *labelRepository) UpdateBatch(ctx context.Context, labels []*Label) error {
+func (r *labelRepository) UpdateBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
 	log := r.log.Function("UpdateBatch")
 
 	if len(labels) == 0 {
 		return nil
 	}
 
-	if err := r.db.SQLWithContext(ctx).Save(&labels).Error; err != nil {
+	if err := tx.WithContext(ctx).Save(&labels).Error; err != nil {
 		return log.Err("failed to update label batch", err, "count", len(labels))
 	}
 

@@ -9,9 +9,11 @@ import (
 	"waugzee/internal/events"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
+	"waugzee/internal/repositories"
 
 	"github.com/google/uuid"
 	"github.com/valkey-io/valkey-go"
+	"gorm.io/gorm"
 )
 
 const (
@@ -29,17 +31,25 @@ type RequestMetadata struct {
 }
 
 type OrchestrationService struct {
-	log      logger.Logger
-	eventBus *events.EventBus
-	cache    valkey.Client
+	log                logger.Logger
+	eventBus           *events.EventBus
+	cache              valkey.Client
+	repos              repositories.Repository
+	transactionService *TransactionService
 }
 
-func NewOrchestrationService(eventBus *events.EventBus, db database.DB) *OrchestrationService {
+func NewOrchestrationService(
+	eventBus *events.EventBus,
+	repos repositories.Repository,
+	transactionService *TransactionService,
+) *OrchestrationService {
 	log := logger.New("OrchestrationService")
 	return &OrchestrationService{
-		log:      log,
-		eventBus: eventBus,
-		cache:    db.Cache.General,
+		log:                log,
+		eventBus:           eventBus,
+		cache:              transactionService.db.Cache.General,
+		repos:              repos,
+		transactionService: transactionService,
 	}
 }
 
@@ -50,15 +60,16 @@ func (o *OrchestrationService) GetUserFolders(
 	log := o.log.Function("GetUserFolders")
 
 	if user == nil {
-		return "", fmt.Errorf("user cannot be nil")
+		return "", log.ErrMsg("user cannot be nil")
 	}
 
-	if user.Configuration == nil || user.Configuration.DiscogsToken == nil || *user.Configuration.DiscogsToken == "" {
-		return "", fmt.Errorf("user does not have a Discogs token")
+	if user.Configuration == nil || user.Configuration.DiscogsToken == nil ||
+		*user.Configuration.DiscogsToken == "" {
+		return "", log.ErrMsg("user does not have a Discogs token")
 	}
 
 	if user.Configuration.DiscogsUsername == nil || *user.Configuration.DiscogsUsername == "" {
-		return "", fmt.Errorf("user does not have a Discogs username")
+		return "", log.ErrMsg("user does not have a Discogs username")
 	}
 
 	requestID := uuid.New().String()
@@ -138,18 +149,15 @@ func (o *OrchestrationService) HandleAPIResponse(
 	}
 
 	if !found {
-		log.Er("Request metadata not found in cache",
-			fmt.Errorf("cache miss"),
-			"requestID", requestID)
-		return fmt.Errorf("request metadata not found or expired for requestID: %s", requestID)
+		return log.ErrMsg("request metadata not found or expired for requestID: " + requestID)
 	}
 
 	if metadata.RequestID != requestID {
-		return fmt.Errorf(
+		return log.ErrMsg(fmt.Sprintf(
 			"request ID mismatch: expected %s, received %s",
 			metadata.RequestID,
 			requestID,
-		)
+		))
 	}
 
 	err = database.NewCacheBuilder(o.cache, requestID).
@@ -169,12 +177,102 @@ func (o *OrchestrationService) HandleAPIResponse(
 	case "folders":
 		err = o.processFoldersResponse(ctx, metadata, responseData)
 	default:
-		return fmt.Errorf("unknown request type: %s", metadata.RequestType)
+		return log.ErrMsg("unknown request type: " + metadata.RequestType)
 	}
 
 	if err != nil {
 		return log.Err("failed to process response", err, "requestType", metadata.RequestType)
 	}
+
+	return nil
+}
+
+// processDiscogsAPIResponse is a generic function to handle common Discogs API response patterns
+func processDiscogsAPIResponse[T any](
+	log logger.Logger,
+	responseData map[string]any,
+	metadata RequestMetadata,
+	responseType string,
+) (*T, error) {
+	// Check if response contains error
+	if errorMsg, exists := responseData["error"]; exists {
+		log.Er("API request failed", fmt.Errorf("%v", errorMsg),
+			"responseType", responseType,
+			"userID", metadata.UserID,
+			"requestID", metadata.RequestID)
+		return nil, fmt.Errorf("API request failed: %v", errorMsg)
+	}
+
+	// Extract data from response
+	data, exists := responseData["data"]
+	if !exists {
+		return nil, log.ErrMsg(fmt.Sprintf("missing data field in %s response", responseType))
+	}
+
+	// Marshal and unmarshal to target type
+	dataJSON, err := json.Marshal(data)
+	if err != nil {
+		return nil, log.Err("failed to marshal response data", err, "responseType", responseType)
+	}
+
+	var result T
+	if err := json.Unmarshal(dataJSON, &result); err != nil {
+		return nil, log.Err("failed to unmarshal response", err, "responseType", responseType)
+	}
+
+	return &result, nil
+}
+
+// extractFolderSyncData extracts business logic for processing folder sync data
+func (o *OrchestrationService) extractFolderSyncData(
+	folders []*Folder,
+) (keepDiscogIDs []int, allFolderDiscogID *int) {
+	keepDiscogIDs = make([]int, 0, len(folders))
+	for _, folder := range folders {
+		if folder.DiscogID != nil {
+			keepDiscogIDs = append(keepDiscogIDs, *folder.DiscogID)
+			// Find the "All" folder and remember its DiscogID for later retrieval
+			if folder.Name == "All" {
+				allFolderDiscogID = folder.DiscogID
+			}
+		}
+	}
+	return keepDiscogIDs, allFolderDiscogID
+}
+
+// updateUserConfigWithAllFolder updates user configuration with the "All" folder as selected
+func (o *OrchestrationService) updateUserConfigWithAllFolder(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+	allFolderDiscogID int,
+) error {
+	log := o.log.Function("updateUserConfigWithAllFolder")
+
+	// Retrieve the "All" folder from database with its proper ID
+	allFolder, err := o.repos.Folder.GetFolderByDiscogID(
+		ctx,
+		tx,
+		userID,
+		allFolderDiscogID,
+	)
+	if err != nil {
+		return log.Err("failed to retrieve All folder from database", err)
+	}
+
+	userConfig, err := o.repos.UserConfiguration.GetByUserID(ctx, tx, userID)
+	if err != nil {
+		return log.Err("failed to get user configuration", err)
+	}
+
+	userConfig.SelectedFolderID = &allFolder.ID
+	if err = o.repos.UserConfiguration.Update(ctx, tx, userConfig); err != nil {
+		return log.Err("failed to update user configuration with selected folder", err)
+	}
+
+	log.Info("Updated user configuration with All folder as selected",
+		"userID", userID,
+		"selectedFolderID", allFolder.ID)
 
 	return nil
 }
@@ -187,30 +285,11 @@ func (o *OrchestrationService) processFoldersResponse(
 ) error {
 	log := o.log.Function("processFoldersResponse")
 
-	// Check if response contains error
-	if errorMsg, exists := responseData["error"]; exists {
-		log.Er("Folders API request failed", fmt.Errorf("%v", errorMsg),
-			"userID", metadata.UserID,
-			"requestID", metadata.RequestID)
-		return nil // Don't return error as this is an expected API failure
-	}
-
-	// Extract folders data from response
-	foldersData, exists := responseData["data"]
-	if !exists {
-		return log.ErrMsg("missing data field in folders response")
-	}
-
-	// Marshal the folders data to JSON for parsing
-	foldersJSON, err := json.Marshal(foldersData)
+	// Use generic response processor
+	discogsFoldersResponse, err := processDiscogsAPIResponse[DiscogsFoldersResponse](
+		log, responseData, metadata, "folders")
 	if err != nil {
-		return log.Err("failed to marshal folders data", err)
-	}
-
-	// Parse the JSON into our DiscogsFoldersResponse struct
-	var discogsFoldersResponse DiscogsFoldersResponse
-	if err := json.Unmarshal(foldersJSON, &discogsFoldersResponse); err != nil {
-		return log.Err("failed to unmarshal folders response", err)
+		return nil // Don't return error as this is an expected API failure
 	}
 
 	// Convert Discogs folder items to our Folder model
@@ -230,16 +309,44 @@ func (o *OrchestrationService) processFoldersResponse(
 	log.Info("Successfully parsed folders data",
 		"userID", metadata.UserID,
 		"requestID", metadata.RequestID,
-		"foldersCount", len(folders),
-		"folders", folders)
+		"foldersCount", len(folders))
 
-	// TODO: Save folders to database using repository
-	for _, folder := range folders {
-		log.Info("Folder parsed",
-			"discogID", folder.DiscogID,
-			"name", folder.Name,
-			"count", folder.Count)
+	// Extract sync data BEFORE transaction
+	keepDiscogIDs, allFolderDiscogID := o.extractFolderSyncData(folders)
+
+	// Execute transaction with minimal scope - only database operations
+	err = o.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
+		log.Info("Upserting folders to database",
+			"userID", metadata.UserID,
+			"folderCount", len(folders))
+
+		// Upsert all folders
+		if err = o.repos.Folder.UpsertFolders(txCtx, tx, metadata.UserID, folders); err != nil {
+			return log.Err("failed to upsert folders", err)
+		}
+
+		// Delete orphan folders not in the current sync
+		if err = o.repos.Folder.DeleteOrphanFolders(txCtx, tx, metadata.UserID, keepDiscogIDs); err != nil {
+			return log.Err("failed to delete orphan folders", err)
+		}
+
+		// Update user configuration with "All" folder as selected folder if found
+		if allFolderDiscogID != nil {
+			return o.updateUserConfigWithAllFolder(txCtx, tx, metadata.UserID, *allFolderDiscogID)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return log.Err("failed to save folders to database", err,
+			"userID", metadata.UserID,
+			"requestID", metadata.RequestID)
 	}
+
+	log.Info("Successfully saved folders to database",
+		"userID", metadata.UserID,
+		"requestID", metadata.RequestID,
+		"foldersCount", len(folders))
 
 	return nil
 }
