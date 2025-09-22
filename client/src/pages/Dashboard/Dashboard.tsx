@@ -88,7 +88,7 @@ const Dashboard: Component = () => {
 
   const handleFolderSync = () => {
     const currentUser = user();
-    if (!currentUser?.discogsToken) {
+    if (!currentUser?.configuration?.discogsToken) {
       toast.showInfo("Please add your Discogs token to sync your folders");
       setShowTokenModal(true);
       return;

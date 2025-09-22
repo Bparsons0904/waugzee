@@ -20,6 +20,23 @@ type DiscogsIdentityResponse struct {
 	Email    string `json:"email"`
 }
 
+type DiscogsFolderItem struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Count       int    `json:"count"`
+	ResourceURL string `json:"resource_url"`
+}
+
+type DiscogsFoldersData struct {
+	Folders []DiscogsFolderItem `json:"folders"`
+}
+
+type DiscogsFoldersResponse struct {
+	Data       DiscogsFoldersData `json:"data"`
+	Status     int                `json:"status"`
+	StatusText string             `json:"statusText"`
+}
+
 func NewDiscogsService() *DiscogsService {
 	log := logger.New("DiscogsService")
 	return &DiscogsService{

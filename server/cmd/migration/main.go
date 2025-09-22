@@ -29,13 +29,13 @@ var MODELS_TO_MIGRATE = []any{
 	&Genre{},
 	&Label{},
 	&Artist{},
-	&Image{},
 	&Master{},
 	&Release{},
 	&UserRelease{},
 	&PlayHistory{},
 	&CleaningHistory{},
 	&Folder{},
+	&UserConfiguration{},
 }
 
 func main() {

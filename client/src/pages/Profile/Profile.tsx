@@ -29,7 +29,7 @@ const Profile: Component = () => {
           </p>
           <p>
             <strong>Discogs Token:</strong>{" "}
-            {user()?.discogsToken ? "Connected" : "Not connected"}
+            {user()?.configuration?.discogsToken ? "Connected" : "Not connected"}
           </p>
         </div>
       </div>

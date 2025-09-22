@@ -11,6 +11,7 @@ import (
 
 type UserController struct {
 	userRepo       repositories.UserRepository
+	userConfigRepo repositories.UserConfigurationRepository
 	discogsService *services.DiscogsService
 	Config         config.Config
 	log            logger.Logger
@@ -27,6 +28,7 @@ func New(
 ) UserControllerInterface {
 	return &UserController{
 		userRepo:       repos.User,
+		userConfigRepo: repos.UserConfiguration,
 		discogsService: services.Discogs,
 		Config:         config,
 		log:            logger.New("userController"),
@@ -54,12 +56,19 @@ func (uc *UserController) UpdateDiscogsToken(
 		return nil, log.Err("invalid discogs token", err)
 	}
 
-	user.DiscogsToken = &req.Token
-	user.DiscogsUsername = &identity.Username
-
-	if err := uc.userRepo.Update(ctx, user); err != nil {
-		return nil, log.Err("failed to update user with discogs credentials", err)
+	// Create or update user configuration
+	config := &UserConfiguration{
+		UserID:          user.ID,
+		DiscogsToken:    &req.Token,
+		DiscogsUsername: &identity.Username,
 	}
+
+	if err := uc.userConfigRepo.CreateOrUpdate(ctx, config); err != nil {
+		return nil, log.Err("failed to update user configuration with discogs credentials", err)
+	}
+
+	// Update user's configuration relationship
+	user.Configuration = config
 
 	log.Info(
 		"Discogs credentials updated successfully",

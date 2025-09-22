@@ -1,13 +1,12 @@
 package models
 
 import (
-	"time"
-
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type UserRelease struct {
+	BaseUUIDModel
 	UserID     uuid.UUID      `gorm:"type:uuid;primaryKey,idx_user_folder" json:"userId"`
 	User       User           `gorm:"foreignKey:UserID"                    json:"user"`
 	ReleaseID  uuid.UUID      `gorm:"type:uuid;primaryKey"                 json:"releaseId"`
@@ -17,8 +16,5 @@ type UserRelease struct {
 	Rating     int            `gorm:"type:int"                             json:"rating"`
 	Notes      string         `gorm:"type:text"                            json:"notes"`
 	Active     bool           `gorm:"type:bool;default:true"               json:"active"`
-	AddedAt    time.Time      `gorm:"autoCreateTime"                       json:"addedAt"`
-	UpdatedAt  time.Time      `gorm:"autoUpdateTime"                       json:"updatedAt"`
-	DeletedAt  gorm.DeletedAt `gorm:"index"                                json:"deletedAt"`
+	DeletedAt  gorm.DeletedAt `gorm:"index"                                json:"-"`
 }
-

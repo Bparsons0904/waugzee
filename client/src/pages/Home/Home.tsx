@@ -59,7 +59,7 @@ const Home: Component = () => {
   };
 
   const handleSyncCollection = async () => {
-    if (!user()?.discogsToken) {
+    if (!user()?.configuration?.discogsToken) {
       setShowTokenModal(true);
       return;
     }
@@ -144,11 +144,11 @@ const Home: Component = () => {
     },
     {
       title: "Sync Collection",
-      description: user()?.discogsToken
+      description: user()?.configuration?.discogsToken
         ? syncStatus() ||
           "Sync your Waugzee collection with your Discogs library."
         : "Connect your Discogs account to sync your collection.",
-      buttonText: user()?.discogsToken
+      buttonText: user()?.configuration?.discogsToken
         ? isSyncing()
           ? "Syncing..."
           : "Sync Collection"
@@ -195,7 +195,7 @@ const Home: Component = () => {
           class={styles.primaryButton}
           onClick={() => setShowTokenModal(true)}
         >
-          {user()?.discogsToken ? "Update Discogs Token" : "Connect Discogs"}
+          {user()?.configuration?.discogsToken ? "Update Discogs Token" : "Connect Discogs"}
         </button>
       </div>
 

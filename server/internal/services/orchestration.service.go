@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 	"waugzee/internal/database"
@@ -52,11 +53,11 @@ func (o *OrchestrationService) GetUserFolders(
 		return "", fmt.Errorf("user cannot be nil")
 	}
 
-	if user.DiscogsToken == nil || *user.DiscogsToken == "" {
+	if user.Configuration == nil || user.Configuration.DiscogsToken == nil || *user.Configuration.DiscogsToken == "" {
 		return "", fmt.Errorf("user does not have a Discogs token")
 	}
 
-	if user.DiscogsUsername == nil || *user.DiscogsUsername == "" {
+	if user.Configuration.DiscogsUsername == nil || *user.Configuration.DiscogsUsername == "" {
 		return "", fmt.Errorf("user does not have a Discogs username")
 	}
 
@@ -67,7 +68,7 @@ func (o *OrchestrationService) GetUserFolders(
 		RequestID:    requestID,
 		RequestType:  "folders",
 		Timestamp:    time.Now(),
-		DiscogsToken: *user.DiscogsToken,
+		DiscogsToken: *user.Configuration.DiscogsToken,
 	}
 
 	if err := database.NewCacheBuilder(o.cache, requestID).
@@ -82,7 +83,7 @@ func (o *OrchestrationService) GetUserFolders(
 	fullURL := fmt.Sprintf(
 		"%s/users/%s/collection/folders",
 		DiscogsAPIBaseURL,
-		*user.DiscogsUsername,
+		*user.Configuration.DiscogsUsername,
 	)
 	message := events.Message{
 		ID:      requestID,
@@ -95,7 +96,7 @@ func (o *OrchestrationService) GetUserFolders(
 			"url":         fullURL,
 			"method":      "GET",
 			"headers": map[string]string{
-				"Authorization": fmt.Sprintf("Discogs token=%s", *user.DiscogsToken),
+				"Authorization": fmt.Sprintf("Discogs token=%s", *user.Configuration.DiscogsToken),
 			},
 			"callbackService": "orchestration",
 			"callbackEvent":   "api_response",
@@ -200,12 +201,45 @@ func (o *OrchestrationService) processFoldersResponse(
 		return log.ErrMsg("missing data field in folders response")
 	}
 
-	log.Info("Successfully received folders data",
+	// Marshal the folders data to JSON for parsing
+	foldersJSON, err := json.Marshal(foldersData)
+	if err != nil {
+		return log.Err("failed to marshal folders data", err)
+	}
+
+	// Parse the JSON into our DiscogsFoldersResponse struct
+	var discogsFoldersResponse DiscogsFoldersResponse
+	if err := json.Unmarshal(foldersJSON, &discogsFoldersResponse); err != nil {
+		return log.Err("failed to unmarshal folders response", err)
+	}
+
+	// Convert Discogs folder items to our Folder model
+	folders := make([]*Folder, 0, len(discogsFoldersResponse.Data.Folders))
+	for _, discogsFolder := range discogsFoldersResponse.Data.Folders {
+		log.Info("Processing folder", "discogID", discogsFolder)
+		folder := &Folder{
+			DiscogID:    &discogsFolder.ID,
+			UserID:      metadata.UserID,
+			Name:        discogsFolder.Name,
+			Count:       discogsFolder.Count,
+			ResourceURL: discogsFolder.ResourceURL,
+		}
+		folders = append(folders, folder)
+	}
+
+	log.Info("Successfully parsed folders data",
 		"userID", metadata.UserID,
 		"requestID", metadata.RequestID,
-		"foldersData", foldersData)
+		"foldersCount", len(folders),
+		"folders", folders)
 
-	// TODO: Process and store folder data when folder sync feature is implemented
+	// TODO: Save folders to database using repository
+	for _, folder := range folders {
+		log.Info("Folder parsed",
+			"discogID", folder.DiscogID,
+			"name", folder.Name,
+			"count", folder.Count)
+	}
 
 	return nil
 }

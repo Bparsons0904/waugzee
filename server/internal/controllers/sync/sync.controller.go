@@ -45,7 +45,7 @@ func (sc *SyncController) HandleSyncRequest(
 ) error {
 	log := sc.log.Function("HandleSyncRequest")
 
-	if user.DiscogsToken == nil || *user.DiscogsToken == "" {
+	if user.Configuration == nil || user.Configuration.DiscogsToken == nil || *user.Configuration.DiscogsToken == "" {
 		return log.ErrMsg("user does not have a Discogs token configured")
 	}
 

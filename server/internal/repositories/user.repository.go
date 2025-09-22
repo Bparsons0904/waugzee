@@ -133,7 +133,7 @@ func (r *userRepository) getDBByID(ctx context.Context, userID string, user *Use
 		return log.Err("failed to parse userID", err, "userID", userID)
 	}
 
-	if err := r.db.SQLWithContext(ctx).First(user, "id = ?", id).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Preload("Configuration").First(user, "id = ?", id).Error; err != nil {
 		return log.Err("failed to get user by id", err, "id", userID)
 	}
 
@@ -175,7 +175,7 @@ func (r *userRepository) GetByOIDCUserID(ctx context.Context, oidcUserID string)
 
 	// Cache miss, query database
 	var user User
-	if err := r.db.SQLWithContext(ctx).First(&user, "oidc_user_id = ?", oidcUserID).Error; err != nil {
+	if err := r.db.SQLWithContext(ctx).Preload("Configuration").First(&user, "oidc_user_id = ?", oidcUserID).Error; err != nil {
 		return nil, log.Err("failed to get user by OIDC user ID", err, "oidcUserID", oidcUserID)
 	}
 
