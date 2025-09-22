@@ -170,7 +170,7 @@ func (s *DB) Close() (err error) {
 }
 
 func (s *DB) SQLWithContext(ctx context.Context) *gorm.DB {
-	return s.SQL.WithContext(ctx)
+	return s.SQL.WithContext(ctx).Set("db_instance", *s)
 }
 
 func (s *DB) FlushAllCaches() error {

@@ -25,6 +25,7 @@ const (
 
 var MODELS_TO_MIGRATE = []any{
 	&User{},
+	&Folder{},
 	&Stylus{},
 	&Genre{},
 	&Label{},
@@ -34,7 +35,6 @@ var MODELS_TO_MIGRATE = []any{
 	&UserRelease{},
 	&PlayHistory{},
 	&CleaningHistory{},
-	&Folder{},
 	&UserConfiguration{},
 }
 
