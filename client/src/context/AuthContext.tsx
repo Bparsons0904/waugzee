@@ -383,6 +383,20 @@ export function AuthProvider(props: { children: JSX.Element }) {
     console.info("Logout initiated");
 
     try {
+      try {
+        if (authState.token) {
+          await api.post(AUTH_ENDPOINTS.LOGOUT, {
+            access_token: authState.token,
+          });
+          console.debug("Backend logout completed successfully");
+        }
+      } catch (backendError) {
+        console.warn(
+          "Backend logout failed, continuing with OIDC logout:",
+          backendError,
+        );
+      }
+
       if (!authState.oidcInitialized) {
         console.warn(
           "OIDC service not initialized, performing local logout only",
@@ -391,7 +405,6 @@ export function AuthProvider(props: { children: JSX.Element }) {
         return;
       }
 
-      // Try OIDC logout first
       try {
         await oidcService.signOut();
         console.debug("OIDC signOut completed successfully");
@@ -407,7 +420,6 @@ export function AuthProvider(props: { children: JSX.Element }) {
         }
       }
 
-      // Always perform local logout regardless of OIDC result
       performLocalLogout();
     } catch (error) {
       console.error(

@@ -38,6 +38,9 @@ func (r *userRepository) Update(ctx context.Context, tx *gorm.DB, user *User) er
 	log := r.log.Function("Update")
 
 	if err := tx.WithContext(ctx).Save(user).Error; err != nil {
+		if err = r.ClearUserCacheByOIDC(ctx, user.OIDCUserID); err != nil {
+			log.Warn("failed to clear user cache after update", "userID", user.ID, "error", err)
+		}
 		return log.Err("failed to update user", err, "user", user)
 	}
 
@@ -77,7 +80,11 @@ func (r *userRepository) addUserToCache(ctx context.Context, user *User) error {
 	return nil
 }
 
-func (r *userRepository) GetByOIDCUserID(ctx context.Context, tx *gorm.DB, oidcUserID string) (*User, error) {
+func (r *userRepository) GetByOIDCUserID(
+	ctx context.Context,
+	tx *gorm.DB,
+	oidcUserID string,
+) (*User, error) {
 	log := r.log.Function("GetByOIDCUserID")
 
 	var cachedUser User

@@ -15,11 +15,11 @@ type Master struct {
 	UpdatedAt time.Time `gorm:"autoUpdateTime"                                           json:"updatedAt"`
 	Title     string    `gorm:"type:text;not null;index:idx_masters_title"               json:"title"                 validate:"required"`
 	// Claude Change to MainReleaseID
-	MainReleaseID *int `gorm:"type:int"                                                 json:"mainRelease,omitempty"`
+	MainReleaseID *int64 `gorm:"type:bigint"                                               json:"mainRelease,omitempty"`
 	// Claude add MainReleaseResourceURL
 	MainReleaseResourceURL *string `gorm:"type:text" json:"mainReleaseResourceUrl,omitempty"`
 	// Claude add Most Recent ReleaseID
-	MostRecentReleaseID *int `gorm:"type:int" json:"mostRecentReleaseId,omitempty"`
+	MostRecentReleaseID *int64 `gorm:"type:bigint" json:"mostRecentReleaseId,omitempty"`
 	// Claude add MostRecentReleaseResourceURL
 	MostRecentReleaseResourceURL *string `gorm:"type:text" json:"mostRecentReleaseResourceUrl,omitempty"`
 	Year        *int   `gorm:"type:int;index:idx_masters_year"                          json:"year,omitempty"`

@@ -207,10 +207,20 @@ func (ac *AuthController) LogoutUser(
 ) (*LogoutResponse, error) {
 	log := ac.log.Function("LogoutUser")
 
-	var userID string
+	var oidcUserID string
 	if user != nil {
-		userID = user.OIDCUserID
-		log.Info("processing logout request", "userID", userID, "dbUserID", user.ID)
+		log.Info("processing logout request", "dbUserID", user.ID)
+	}
+
+	// Get OIDC User ID from the access token since cached user may not have it
+	if req.AccessToken != "" {
+		tokenInfo, _, err := ac.zitadelService.ValidateTokenWithFallback(ctx, req.AccessToken)
+		if err != nil {
+			log.Warn("failed to validate access token during logout", "error", err.Error())
+		} else {
+			oidcUserID = tokenInfo.UserID
+			log.Info("extracted OIDC user ID from token", "oidcUserID", oidcUserID)
+		}
 	}
 
 	var revokedTokens []string
@@ -235,19 +245,21 @@ func (ac *AuthController) LogoutUser(
 		}
 	}
 
-	// Clear user cache data if we have user info
-	if user != nil {
-		if err := ac.userRepo.ClearUserCacheByOIDC(ctx, user.OIDCUserID); err != nil {
+	// Clear user cache data using OIDC User ID from token
+	if oidcUserID != "" {
+		if err := ac.userRepo.ClearUserCacheByOIDC(ctx, oidcUserID); err != nil {
 			log.Warn(
 				"failed to clear user cache",
 				"error",
 				err.Error(),
 				"oidcUserID",
-				user.OIDCUserID,
+				oidcUserID,
 			)
 		} else {
-			log.Info("user cache cleared successfully", "oidcUserID", user.OIDCUserID)
+			log.Info("user cache cleared successfully", "oidcUserID", oidcUserID)
 		}
+	} else {
+		log.Warn("no OIDC user ID available for cache clearing")
 	}
 
 	// Generate logout URL
@@ -265,8 +277,8 @@ func (ac *AuthController) LogoutUser(
 		log.Info("logout URL generated successfully")
 	}
 
-	if userID != "" {
-		log.Info("user logout completed", "userID", userID, "revokedTokens", len(revokedTokens))
+	if oidcUserID != "" {
+		log.Info("user logout completed", "oidcUserID", oidcUserID, "revokedTokens", len(revokedTokens))
 	}
 
 	response := &LogoutResponse{

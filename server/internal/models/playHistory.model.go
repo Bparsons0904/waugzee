@@ -10,7 +10,7 @@ type PlayHistory struct {
 	BaseUUIDModel
 	UserID    uuid.UUID  `gorm:"type:uuid;not null;index" json:"userId"`
 	User      User       `gorm:"foreignKey:UserID"        json:"user"`
-	ReleaseID uuid.UUID  `gorm:"type:uuid;not null;index" json:"releaseId"`
+	ReleaseID int64      `gorm:"type:bigint;not null;index" json:"releaseId"`
 	Release   Release    `gorm:"foreignKey:ReleaseID"     json:"release"`
 	StylusID  *uuid.UUID `gorm:"type:uuid"                json:"stylusId"`
 	Stylus    *Stylus    `gorm:"foreignKey:StylusID"      json:"stylus"`
