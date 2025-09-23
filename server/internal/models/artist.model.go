@@ -9,12 +9,13 @@ import (
 )
 
 type Artist struct {
-	ID          int64     `gorm:"type:bigint;primaryKey;not null"                          json:"discogsId"   validate:"required,gt=0"`
-	CreatedAt   time.Time `gorm:"autoCreateTime"                                           json:"createdAt"`
-	UpdatedAt   time.Time `gorm:"autoUpdateTime"                                           json:"updatedAt"`
-	Name        string    `gorm:"type:text;not null;index:idx_artists_name"                json:"name"        validate:"required"`
-	Profile     string    `gorm:"type:text;not null;index:idx_artists_profile"             json:"profile"     validate:"required"`
-	ContentHash string    `gorm:"type:varchar(64);not null;index:idx_artists_content_hash" json:"contentHash"`
+	ID          int64      `gorm:"type:bigint;primaryKey;not null"                          json:"discogsId"   validate:"required,gt=0"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime"                                           json:"createdAt"`
+	UpdatedAt   time.Time  `gorm:"autoUpdateTime"                                           json:"updatedAt"`
+	Name        string     `gorm:"type:text;not null;index:idx_artists_name"                json:"name"        validate:"required"`
+	Profile     string     `gorm:"type:text;not null;index:idx_artists_profile"             json:"profile"     validate:"required"`
+	ContentHash string     `gorm:"type:varchar(64);not null;index:idx_artists_content_hash" json:"contentHash"`
+	LastSynced  *time.Time `gorm:"type:timestamptz"                                         json:"lastSynced,omitempty"`
 
 	ReleaseURL  *string        `gorm:"type:text"  json:"releaseUrl,omitempty"`
 	ResourceURL *string        `gorm:"type:text"  json:"resourceUrl,omitempty"`
@@ -133,9 +134,11 @@ func (a *Artist) BeforeUpdate(tx *gorm.DB) (err error) {
 func (a *Artist) GetHashableFields() map[string]interface{} {
 	return map[string]interface{}{
 		"Name":        a.Name,
+		"Profile":     a.Profile,
 		"ReleaseURL":  a.ReleaseURL,
 		"ResourceURL": a.ResourceURL,
 		"Data":        a.Data,
+		"LastSynced":  a.LastSynced,
 	}
 }
 

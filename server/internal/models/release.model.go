@@ -18,6 +18,11 @@ const (
 	FormatOther    ReleaseFormat = "other"
 )
 
+type Data struct {
+	Styles []string `json:"styles"`
+	Genres []string `json:"genres"`
+}
+
 type Release struct {
 	ID          int64         `gorm:"type:bigint;primaryKey;not null"                                                     json:"discogsId"             validate:"required,gt=0"`
 	CreatedAt   time.Time     `gorm:"autoCreateTime"                                                                      json:"createdAt"`
@@ -35,6 +40,9 @@ type Release struct {
 	URI         *string       `gorm:"type:text"                                                                           json:"uri,omitempty"`
 	DateAdded   *time.Time    `gorm:"type:timestamptz"                                                                    json:"dateAdded,omitempty"`
 	DateChanged *time.Time    `gorm:"type:timestamptz"                                                                    json:"dateChanged,omitempty"`
+	LastSynced  *time.Time    `gorm:"type:timestamptz"                                                                    json:"lastSynced,omitempty"`
+	Thumb       *string       `gorm:"type:text"                                                                           json:"thumb,omitempty"`
+	CoverImage  *string       `gorm:"type:text"                                                                           json:"coverImage,omitempty"`
 
 	// JSONB column containing embedded display data: tracks, styles, images, videos
 	// Claude we eventually need to properly define these with a struct
@@ -269,6 +277,9 @@ func (r *Release) GetHashableFields() map[string]interface{} {
 		"URI":         r.URI,
 		"DateAdded":   r.DateAdded,
 		"DateChanged": r.DateChanged,
+		"LastSynced":  r.LastSynced,
+		"Thumb":       r.Thumb,
+		"CoverImage":  r.CoverImage,
 		"Data":        r.Data,
 	}
 }

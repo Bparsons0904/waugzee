@@ -9,22 +9,22 @@ import (
 )
 
 type Label struct {
-	// Claude change to ID
-	ID         int64    `gorm:"type:bigint;primaryKey;not null" json:"discogsId" validate:"required,gt=0"`
-	Profile    *string  `gorm:"type:text" json:"profile,omitempty"`
-	ResourceURL *string `gorm:"type:text" json:"resourceUrl,omitempty"`
-	URI        *string  `gorm:"type:text" json:"uri,omitempty"`
+	ID          int64   `gorm:"type:bigint;primaryKey;not null" json:"discogsId"             validate:"required,gt=0"`
+	Profile     *string `gorm:"type:text"                       json:"profile,omitempty"`
+	ResourceURL *string `gorm:"type:text"                       json:"resourceUrl,omitempty"`
+	URI         *string `gorm:"type:text"                       json:"uri,omitempty"`
 
-	CreatedAt   time.Time `gorm:"autoCreateTime"                                          json:"createdAt"`
-	UpdatedAt   time.Time `gorm:"autoUpdateTime"                                          json:"updatedAt"`
-	Name        string    `gorm:"type:text;not null;index:idx_labels_name"                json:"name"        validate:"required"`
+	CreatedAt   time.Time      `gorm:"autoCreateTime"                                          json:"createdAt"`
+	UpdatedAt   time.Time      `gorm:"autoUpdateTime"                                          json:"updatedAt"`
+	Name        string         `gorm:"type:text;not null;index:idx_labels_name"                json:"name"                 validate:"required"`
 	ContentHash string         `gorm:"type:varchar(64);not null;index:idx_labels_content_hash" json:"contentHash"`
-	Data        datatypes.JSON `gorm:"type:jsonb" json:"data,omitempty"`
+	LastSynced  *time.Time     `gorm:"type:timestamptz"                                        json:"lastSynced,omitempty"`
+	Data        datatypes.JSON `gorm:"type:jsonb"                                              json:"data,omitempty"`
 
 	// Relationships
-	Releases   []Release `gorm:"foreignKey:LabelID" json:"releases,omitempty"`
-	SubLabels  []Label   `gorm:"many2many:label_sublabels;joinForeignKey:ParentLabelID;joinReferences:SubLabelID" json:"subLabels,omitempty"`
-	ParentLabels []Label `gorm:"many2many:label_sublabels;joinForeignKey:SubLabelID;joinReferences:ParentLabelID" json:"parentLabels,omitempty"`
+	Releases     []Release `gorm:"foreignKey:LabelID"                                                               json:"releases,omitempty"`
+	SubLabels    []Label   `gorm:"many2many:label_sublabels;joinForeignKey:ParentLabelID;joinReferences:SubLabelID" json:"subLabels,omitempty"`
+	ParentLabels []Label   `gorm:"many2many:label_sublabels;joinForeignKey:SubLabelID;joinReferences:ParentLabelID" json:"parentLabels,omitempty"`
 }
 
 // For reference only, from Discogs api docs
@@ -107,6 +107,7 @@ func (l *Label) GetHashableFields() map[string]interface{} {
 		"ResourceURL": l.ResourceURL,
 		"URI":         l.URI,
 		"Data":        l.Data,
+		"LastSynced":  l.LastSynced,
 	}
 }
 

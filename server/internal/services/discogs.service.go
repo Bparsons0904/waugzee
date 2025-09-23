@@ -56,25 +56,31 @@ type DiscogsFolderReleaseItem struct {
 	Rating           int           `json:"rating"`
 	Notes            []DiscogsNote `json:"notes"`
 	BasicInformation struct {
-		ID      int64  `json:"id"`
-		Title   string `json:"title"`
-		Year    int    `json:"year"`
-		Formats []struct {
+		ID          int64  `json:"id"`
+		MasterID    int64  `json:"master_id"`
+		MasterURL   string `json:"master_url"`
+		ResourceURL string `json:"resource_url"`
+		Title       string `json:"title"`
+		Year        int    `json:"year"`
+		Thumb       string `json:"thumb"`
+		CoverImage  string `json:"cover_image"`
+		Formats     []struct {
 			Name         string   `json:"name"`
 			Qty          string   `json:"qty"`
 			Descriptions []string `json:"descriptions"`
 		} `json:"formats"`
 		Artists []struct {
-			ID   int64  `json:"id"`
-			Name string `json:"name"`
+			ID          int64  `json:"id"`
+			Name        string `json:"name"`
+			ResourceURL string `json:"resource_url"`
 		} `json:"artists"`
 		Labels []struct {
-			ID   int64  `json:"id"`
-			Name string `json:"name"`
+			ID          int64  `json:"id"`
+			Name        string `json:"name"`
+			ResourceURL string `json:"resource_url"`
 		} `json:"labels"`
 		Genres []string `json:"genres"`
 		Styles []string `json:"styles"`
-		Thumb  string   `json:"thumb"`
 	} `json:"basic_information"`
 	DateAdded string `json:"date_added"`
 }

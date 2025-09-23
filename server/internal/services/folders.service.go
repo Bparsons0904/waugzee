@@ -23,11 +23,12 @@ const (
 )
 
 type FoldersService struct {
-	log                logger.Logger
-	eventBus           *events.EventBus
-	repos              repositories.Repository
-	db                 database.DB
-	transactionService *TransactionService
+	log                         logger.Logger
+	eventBus                    *events.EventBus
+	repos                       repositories.Repository
+	db                          database.DB
+	transactionService          *TransactionService
+	folderDataExtractionService *FolderDataExtractionService
 }
 
 func NewFoldersService(
@@ -35,14 +36,16 @@ func NewFoldersService(
 	repos repositories.Repository,
 	db database.DB,
 	transactionService *TransactionService,
+	folderDataExtractionService *FolderDataExtractionService,
 ) *FoldersService {
 	log := logger.New("FoldersService")
 	return &FoldersService{
-		log:                log,
-		eventBus:           eventBus,
-		repos:              repos,
-		db:                 db,
-		transactionService: transactionService,
+		log:                         log,
+		eventBus:                    eventBus,
+		repos:                       repos,
+		db:                          db,
+		transactionService:          transactionService,
+		folderDataExtractionService: folderDataExtractionService,
 	}
 }
 
@@ -75,7 +78,7 @@ func (f *FoldersService) RequestUserFolders(
 		DiscogsToken: *user.Configuration.DiscogsToken,
 	}
 
-	if err := database.NewCacheBuilder(f.db.Cache.General, requestID).
+	if err := database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
 		WithHashPattern(API_HASH).
 		WithStruct(metadata).
 		WithTTL(APIRequestTTL).
@@ -109,7 +112,7 @@ func (f *FoldersService) RequestUserFolders(
 	}
 
 	if err := f.eventBus.Publish(events.WEBSOCKET, "user", message); err != nil {
-		_ = database.NewCacheBuilder(f.db.Cache.General, requestID).
+		_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
 			WithHashPattern(API_HASH).
 			WithContext(ctx).
 			Delete()
@@ -274,7 +277,7 @@ func (f *FoldersService) RequestFolderReleases(
 		DiscogsToken: *user.Configuration.DiscogsToken,
 	}
 
-	if err := database.NewCacheBuilder(f.db.Cache.General, requestID).
+	if err := database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
 		WithHashPattern(API_HASH).
 		WithStruct(metadata).
 		WithTTL(APIRequestTTL).
@@ -313,7 +316,7 @@ func (f *FoldersService) RequestFolderReleases(
 	}
 
 	if err := f.eventBus.Publish(events.WEBSOCKET, "user", message); err != nil {
-		_ = database.NewCacheBuilder(f.db.Cache.General, requestID).
+		_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
 			WithHashPattern(API_HASH).
 			WithContext(ctx).
 			Delete()
@@ -363,7 +366,7 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 
 	// Get current sync state from cache
 	var syncState CollectionSyncState
-	found, err := database.NewCacheBuilder(f.db.Cache.General, metadata.UserID.String()).
+	found, err := database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).
 		WithHashPattern(COLLECTION_SYNC_HASH).
 		WithContext(ctx).
 		Get(&syncState)
@@ -400,6 +403,26 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		// Convert notes to JSON
 		notesJSON, _ := json.Marshal(discogsRelease.Notes)
 
+		// Parse DateAdded from Discogs API response
+		var dateAdded time.Time
+		if discogsRelease.DateAdded != "" {
+			// Try to parse the date_added field from Discogs API
+			var parsedDate time.Time
+			if parsedDate, err = time.Parse(time.RFC3339, discogsRelease.DateAdded); err == nil {
+				dateAdded = parsedDate
+			} else {
+				// Fallback to current time if parsing fails
+				log.Warn("Failed to parse DateAdded from Discogs API, using current time",
+					"dateAdded", discogsRelease.DateAdded,
+					"instanceID", discogsRelease.InstanceID,
+					"error", err)
+				dateAdded = time.Now()
+			}
+		} else {
+			// If no date_added in response, use current time
+			dateAdded = time.Now()
+		}
+
 		userRelease := &UserRelease{
 			UserID:     metadata.UserID,
 			ReleaseID:  releaseID, // Use the Discogs release ID directly
@@ -407,11 +430,14 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 			FolderID:   folderID,
 			Rating:     discogsRelease.Rating,
 			Notes:      datatypes.JSON(notesJSON),
+			DateAdded:  dateAdded,
 			Active:     true,
 		}
 
 		// Add to merged releases (overwrite if exists - latest folder wins)
 		syncState.MergedReleases[discogsRelease.InstanceID] = userRelease
+		// Store original data for data extraction
+		syncState.OriginalReleases[discogsRelease.InstanceID] = discogsRelease
 		missingReleaseIDs = append(missingReleaseIDs, releaseID)
 	}
 
@@ -447,7 +473,7 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 				DiscogsToken: metadata.DiscogsToken,
 			}
 
-			if err = database.NewCacheBuilder(f.db.Cache.General, requestID).
+			if err = database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
 				WithHashPattern(API_HASH).
 				WithStruct(requestMetadata).
 				WithTTL(APIRequestTTL).
@@ -518,24 +544,86 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 
 		// Execute only the database operations in transaction
 		err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
-			return f.executeSyncOperations(txCtx, tx, metadata.UserID, operations)
+			if err = f.executeSyncOperations(txCtx, tx, metadata.UserID, operations); err != nil {
+				return err
+			}
+
+			// Extract basic information from folder releases for immediate data population
+			folderReleases := make([]DiscogsFolderReleaseItem, 0, len(syncState.OriginalReleases))
+			for _, originalRelease := range syncState.OriginalReleases {
+				folderReleases = append(folderReleases, originalRelease)
+			}
+
+			if len(folderReleases) > 0 {
+				if err = f.folderDataExtractionService.ExtractBasicInformation(txCtx, tx, folderReleases); err != nil {
+					log.Warn("Failed to extract basic information", "error", err)
+					// Don't fail the sync for data extraction errors
+				}
+			}
+
+			return nil
 		})
 		if err != nil {
 			return log.Err("failed to execute differential sync", err)
 		}
 
 		// Clean up sync state
-		_ = database.NewCacheBuilder(f.db.Cache.General, metadata.UserID.String()).
+		_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).
 			WithHashPattern(COLLECTION_SYNC_HASH).
 			WithContext(ctx).
 			Delete()
 
-		log.Info("Collection sync completed successfully",
+		// TODO: TESTING - Early escape before full data sync to test basic data extraction
+		// Remove this early return after testing to enable full data sync
+		log.Info("Collection sync completed successfully (TESTING MODE - full data sync disabled)",
 			"userID", metadata.UserID,
 			"totalReleases", len(syncState.MergedReleases))
+		return nil
+
+		// After sync completion, identify records needing full data
+		releaseIDs := make([]int64, 0, len(syncState.MergedReleases))
+		for _, userRelease := range syncState.MergedReleases {
+			releaseIDs = append(releaseIDs, userRelease.ReleaseID)
+		}
+
+		// Get records needing full data sync
+		needingFullData, err := f.folderDataExtractionService.GetRecordsNeedingFullData(
+			ctx,
+			f.db.SQLWithContext(ctx),
+			releaseIDs,
+		)
+		if err != nil {
+			log.Warn("Failed to identify records needing full data", "error", err)
+		} else if len(needingFullData) > 0 {
+			// Send WebSocket message to client with list of IDs to fetch
+			message := events.Message{
+				ID:      uuid.New().String(),
+				Service: events.SYSTEM,
+				Event:   "sync_trigger_full_data",
+				UserID:  metadata.UserID.String(),
+				Payload: map[string]any{
+					"releaseIDs": needingFullData,
+					"message":    "Additional release data needs to be fetched",
+				},
+				Timestamp: time.Now(),
+			}
+
+			if err = f.eventBus.Publish(events.WEBSOCKET, "user", message); err != nil {
+				log.Warn("Failed to publish sync trigger message", "error", err)
+			} else {
+				log.Info("Triggered client-side full data sync",
+					"userID", metadata.UserID,
+					"releaseCount", len(needingFullData))
+			}
+		}
+
+		log.Info("Collection sync completed successfully",
+			"userID", metadata.UserID,
+			"totalReleases", len(syncState.MergedReleases),
+			"needingFullData", len(needingFullData))
 	} else {
 		// Update sync state in cache
-		err = database.NewCacheBuilder(f.db.Cache.General, metadata.UserID.String()).
+		err = database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).
 			WithHashPattern(COLLECTION_SYNC_HASH).
 			WithStruct(syncState).
 			WithTTL(30 * time.Minute).
@@ -628,7 +716,7 @@ func (f *FoldersService) queueMissingReleases(
 		"queued_at":  time.Now().Unix(),
 	}
 
-	err := database.NewCacheBuilder(f.db.Cache.General, userID.String()).
+	err := database.NewCacheBuilder(f.db.Cache.ClientAPI, userID.String()).
 		WithHashPattern(RELEASE_QUEUE_HASH).
 		WithStruct(queueData).
 		WithTTL(24 * time.Hour). // 24 hour TTL
@@ -657,8 +745,9 @@ type CollectionSyncState struct {
 	UserID           uuid.UUID
 	TotalFolders     int
 	ProcessedFolders int
-	MergedReleases   map[int]*UserRelease // key: InstanceID
-	CompletedFolders map[int]bool         // key: FolderID
+	MergedReleases   map[int]*UserRelease             // key: InstanceID
+	OriginalReleases map[int]DiscogsFolderReleaseItem // key: InstanceID - for data extraction
+	CompletedFolders map[int]bool                     // key: FolderID
 	SyncComplete     bool
 }
 
@@ -696,12 +785,13 @@ func (f *FoldersService) SyncAllUserFolders(
 		TotalFolders:     len(syncFolders),
 		ProcessedFolders: 0,
 		MergedReleases:   make(map[int]*UserRelease),
+		OriginalReleases: make(map[int]DiscogsFolderReleaseItem),
 		CompletedFolders: make(map[int]bool),
 		SyncComplete:     false,
 	}
 
 	// Store sync state in cache for tracking across API responses
-	err = database.NewCacheBuilder(f.db.Cache.General, user.ID.String()).
+	err = database.NewCacheBuilder(f.db.Cache.ClientAPI, user.ID.String()).
 		WithHashPattern(COLLECTION_SYNC_HASH).
 		WithStruct(syncState).
 		WithTTL(30 * time.Minute). // 30 min timeout for sync
@@ -758,15 +848,17 @@ func (f *FoldersService) analyzeDifferentialSync(
 	// Find creates and updates
 	for instanceID, mergedRelease := range mergedReleases {
 		if currentRelease, exists := currentReleases[instanceID]; exists {
-			// Check if folder changed (update needed)
+			// Check if folder, rating, notes, or dateAdded changed (update needed)
 			if currentRelease.FolderID != mergedRelease.FolderID ||
 				currentRelease.Rating != mergedRelease.Rating ||
-				!bytes.Equal(currentRelease.Notes, mergedRelease.Notes) {
-				// Update existing record with new folder/rating/notes
+				!bytes.Equal(currentRelease.Notes, mergedRelease.Notes) ||
+				!currentRelease.DateAdded.Equal(mergedRelease.DateAdded) {
+				// Update existing record with new folder/rating/notes/dateAdded
 				updatedRelease := *currentRelease
 				updatedRelease.FolderID = mergedRelease.FolderID
 				updatedRelease.Rating = mergedRelease.Rating
 				updatedRelease.Notes = mergedRelease.Notes
+				updatedRelease.DateAdded = mergedRelease.DateAdded
 				operations.Update = append(operations.Update, updatedRelease)
 			}
 			// Remove from current map so we can find deletes

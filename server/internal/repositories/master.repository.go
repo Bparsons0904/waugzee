@@ -39,6 +39,9 @@ type MasterRepository interface {
 		masterIDs []int64,
 		genreNames []string,
 	) error
+	// Individual association methods
+	AssociateArtists(ctx context.Context, tx *gorm.DB, master *Master, artists []*Artist) error
+	AssociateGenres(ctx context.Context, tx *gorm.DB, master *Master, genres []*Genre) error
 }
 
 type masterRepository struct {
@@ -325,6 +328,38 @@ func (r *masterRepository) CreateMasterGenreAssociations(
 	if result.Error != nil {
 		return log.Err("failed to create master-genre associations", result.Error,
 			"masterCount", len(masterIDs), "genreCount", len(genreNames))
+	}
+
+	return nil
+}
+
+func (r *masterRepository) AssociateArtists(ctx context.Context, tx *gorm.DB, master *Master, artists []*Artist) error {
+	log := r.log.Function("AssociateArtists")
+
+	if len(artists) == 0 {
+		return nil
+	}
+
+	if err := tx.WithContext(ctx).Model(master).Association("Artists").Append(artists); err != nil {
+		return log.Err("failed to associate artists with master", err,
+			"masterID", master.ID,
+			"artistCount", len(artists))
+	}
+
+	return nil
+}
+
+func (r *masterRepository) AssociateGenres(ctx context.Context, tx *gorm.DB, master *Master, genres []*Genre) error {
+	log := r.log.Function("AssociateGenres")
+
+	if len(genres) == 0 {
+		return nil
+	}
+
+	if err := tx.WithContext(ctx).Model(master).Association("Genres").Append(genres); err != nil {
+		return log.Err("failed to associate genres with master", err,
+			"masterID", master.ID,
+			"genreCount", len(genres))
 	}
 
 	return nil

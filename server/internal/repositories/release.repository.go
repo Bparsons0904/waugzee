@@ -21,7 +21,10 @@ type ReleaseRepository interface {
 	GetHashesByDiscogsIDs(ctx context.Context, tx *gorm.DB, discogsIDs []int64) (map[int64]string, error)
 	InsertBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
 	UpdateBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
-	// Note: Release associations removed - use Master-level relationships instead
+	// Association methods
+	AssociateArtists(ctx context.Context, tx *gorm.DB, release *Release, artists []*Artist) error
+	AssociateLabels(ctx context.Context, tx *gorm.DB, release *Release, labels []*Label) error
+	AssociateGenres(ctx context.Context, tx *gorm.DB, release *Release, genres []*Genre) error
 }
 
 type releaseRepository struct {
@@ -43,7 +46,7 @@ func (r *releaseRepository) GetByID(ctx context.Context, tx *gorm.DB, id string)
 	}
 
 	var release Release
-	if err := tx.WithContext(ctx).Preload("Label").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "id = ?", releaseID).Error; err != nil {
+	if err := tx.WithContext(ctx).Preload("Labels").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "id = ?", releaseID).Error; err != nil {
 		return nil, log.Err("failed to get release by ID", err, "id", id)
 	}
 
@@ -54,7 +57,7 @@ func (r *releaseRepository) GetByDiscogsID(ctx context.Context, tx *gorm.DB, dis
 	log := r.log.Function("GetByDiscogsID")
 
 	var release Release
-	if err := tx.WithContext(ctx).Preload("Label").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "id = ?", discogsID).Error; err != nil {
+	if err := tx.WithContext(ctx).Preload("Labels").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "id = ?", discogsID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
@@ -254,6 +257,54 @@ func (r *releaseRepository) UpdateBatch(ctx context.Context, tx *gorm.DB, releas
 
 	if err := tx.WithContext(ctx).Save(&releases).Error; err != nil {
 		return log.Err("failed to update release batch", err, "count", len(releases))
+	}
+
+	return nil
+}
+
+func (r *releaseRepository) AssociateArtists(ctx context.Context, tx *gorm.DB, release *Release, artists []*Artist) error {
+	log := r.log.Function("AssociateArtists")
+
+	if len(artists) == 0 {
+		return nil
+	}
+
+	if err := tx.WithContext(ctx).Model(release).Association("Artists").Append(artists); err != nil {
+		return log.Err("failed to associate artists with release", err,
+			"releaseID", release.ID,
+			"artistCount", len(artists))
+	}
+
+	return nil
+}
+
+func (r *releaseRepository) AssociateLabels(ctx context.Context, tx *gorm.DB, release *Release, labels []*Label) error {
+	log := r.log.Function("AssociateLabels")
+
+	if len(labels) == 0 {
+		return nil
+	}
+
+	if err := tx.WithContext(ctx).Model(release).Association("Labels").Append(labels); err != nil {
+		return log.Err("failed to associate labels with release", err,
+			"releaseID", release.ID,
+			"labelCount", len(labels))
+	}
+
+	return nil
+}
+
+func (r *releaseRepository) AssociateGenres(ctx context.Context, tx *gorm.DB, release *Release, genres []*Genre) error {
+	log := r.log.Function("AssociateGenres")
+
+	if len(genres) == 0 {
+		return nil
+	}
+
+	if err := tx.WithContext(ctx).Model(release).Association("Genres").Append(genres); err != nil {
+		return log.Err("failed to associate genres with release", err,
+			"releaseID", release.ID,
+			"genreCount", len(genres))
 	}
 
 	return nil

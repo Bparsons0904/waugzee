@@ -9,21 +9,17 @@ import (
 )
 
 type Master struct {
-	// Claude change to ID
-	ID int64     `gorm:"type:bigint;primaryKey;not null"                          json:"discogsId"             validate:"required,gt=0"`
-	CreatedAt time.Time `gorm:"autoCreateTime"                                           json:"createdAt"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime"                                           json:"updatedAt"`
-	Title     string    `gorm:"type:text;not null;index:idx_masters_title"               json:"title"                 validate:"required"`
-	// Claude Change to MainReleaseID
-	MainReleaseID *int64 `gorm:"type:bigint"                                               json:"mainRelease,omitempty"`
-	// Claude add MainReleaseResourceURL
-	MainReleaseResourceURL *string `gorm:"type:text" json:"mainReleaseResourceUrl,omitempty"`
-	// Claude add Most Recent ReleaseID
-	MostRecentReleaseID *int64 `gorm:"type:bigint" json:"mostRecentReleaseId,omitempty"`
-	// Claude add MostRecentReleaseResourceURL
-	MostRecentReleaseResourceURL *string `gorm:"type:text" json:"mostRecentReleaseResourceUrl,omitempty"`
-	Year        *int   `gorm:"type:int;index:idx_masters_year"                          json:"year,omitempty"`
-	ContentHash string `gorm:"type:varchar(64);not null;index:idx_masters_content_hash" json:"contentHash"`
+	ID                           int64      `gorm:"type:bigint;primaryKey;not null"                          json:"discogsId"                              validate:"required,gt=0"`
+	CreatedAt                    time.Time  `gorm:"autoCreateTime"                                           json:"createdAt"`
+	UpdatedAt                    time.Time  `gorm:"autoUpdateTime"                                           json:"updatedAt"`
+	Title                        string     `gorm:"type:text;not null;index:idx_masters_title"               json:"title"                                  validate:"required"`
+	LastSynced                   *time.Time `gorm:"type:timestamptz"                                         json:"lastSynced,omitempty"`
+	MainReleaseID                *int64     `gorm:"type:bigint"                                              json:"mainRelease,omitempty"`
+	MainReleaseResourceURL       *string    `gorm:"type:text"                                                json:"mainReleaseResourceUrl,omitempty"`
+	MostRecentReleaseID          *int64     `gorm:"type:bigint"                                              json:"mostRecentReleaseId,omitempty"`
+	MostRecentReleaseResourceURL *string    `gorm:"type:text"                                                json:"mostRecentReleaseResourceUrl,omitempty"`
+	Year                         *int       `gorm:"type:int;index:idx_masters_year"                          json:"year,omitempty"`
+	ContentHash                  string     `gorm:"type:varchar(64);not null;index:idx_masters_content_hash" json:"contentHash"`
 
 	// Claude add Data - Images, Videos
 	Data datatypes.JSON `gorm:"type:jsonb" json:"data,omitempty"`
@@ -190,13 +186,14 @@ func (m *Master) BeforeUpdate(tx *gorm.DB) (err error) {
 // Hashable interface implementation
 func (m *Master) GetHashableFields() map[string]any {
 	return map[string]any{
-		"Title":                          m.Title,
-		"MainReleaseID":                  m.MainReleaseID,
-		"MainReleaseResourceURL":         m.MainReleaseResourceURL,
-		"MostRecentReleaseID":            m.MostRecentReleaseID,
-		"MostRecentReleaseResourceURL":   m.MostRecentReleaseResourceURL,
-		"Year":                           m.Year,
-		"Data":                           m.Data,
+		"Title":                        m.Title,
+		"MainReleaseID":                m.MainReleaseID,
+		"MainReleaseResourceURL":       m.MainReleaseResourceURL,
+		"MostRecentReleaseID":          m.MostRecentReleaseID,
+		"MostRecentReleaseResourceURL": m.MostRecentReleaseResourceURL,
+		"Year":                         m.Year,
+		"Data":                         m.Data,
+		"LastSynced":                   m.LastSynced,
 	}
 }
 

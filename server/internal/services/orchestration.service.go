@@ -44,11 +44,12 @@ func NewOrchestrationService(
 	transactionService *TransactionService,
 ) *OrchestrationService {
 	log := logger.New("OrchestrationService")
-	foldersService := NewFoldersService(eventBus, repos, db, transactionService)
+	folderDataExtractionService := NewFolderDataExtractionService(repos)
+	foldersService := NewFoldersService(eventBus, repos, db, transactionService, folderDataExtractionService)
 	return &OrchestrationService{
 		log:                log,
 		eventBus:           eventBus,
-		cache:              transactionService.db.Cache.General,
+		cache:              transactionService.db.Cache.ClientAPI,
 		repos:              repos,
 		transactionService: transactionService,
 		foldersService:     foldersService,

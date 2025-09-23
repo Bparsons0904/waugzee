@@ -8,11 +8,12 @@ import (
 )
 
 type Service struct {
-	Zitadel       *ZitadelService
-	Discogs       *DiscogsService
-	Transaction   *TransactionService
-	Scheduler     *SchedulerService
-	Orchestration *OrchestrationService
+	Zitadel              *ZitadelService
+	Discogs              *DiscogsService
+	Transaction          *TransactionService
+	Scheduler            *SchedulerService
+	Orchestration        *OrchestrationService
+	FolderDataExtraction *FolderDataExtractionService
 }
 
 func New(db database.DB, config config.Config, eventBus *events.EventBus) (Service, error) {
@@ -27,12 +28,14 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 	discogsService := NewDiscogsService()
 	schedulerService := NewSchedulerService()
 	orchestrationService := NewOrchestrationService(eventBus, repos, db, transactionService)
+	folderDataExtractionService := NewFolderDataExtractionService(repos)
 
 	return Service{
-		Zitadel:       zitadelService,
-		Discogs:       discogsService,
-		Transaction:   transactionService,
-		Scheduler:     schedulerService,
-		Orchestration: orchestrationService,
+		Zitadel:              zitadelService,
+		Discogs:              discogsService,
+		Transaction:          transactionService,
+		Scheduler:            schedulerService,
+		Orchestration:        orchestrationService,
+		FolderDataExtraction: folderDataExtractionService,
 	}, nil
 }
