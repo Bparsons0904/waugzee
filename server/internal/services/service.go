@@ -15,6 +15,7 @@ type Service struct {
 	Orchestration        *OrchestrationService
 	FolderDataExtraction *FolderDataExtractionService
 	DiscogsRateLimiter   *DiscogsRateLimiterService
+	Download             *DownloadService
 }
 
 func New(db database.DB, config config.Config, eventBus *events.EventBus) (Service, error) {
@@ -31,6 +32,7 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 	discogsRateLimiterService := NewDiscogsRateLimiterService(db.Cache.ClientAPI)
 	orchestrationService := NewOrchestrationService(eventBus, repos, db, transactionService, discogsRateLimiterService)
 	folderDataExtractionService := NewFolderDataExtractionService(repos)
+	downloadService := NewDownloadService(config)
 
 	return Service{
 		Zitadel:              zitadelService,
@@ -40,5 +42,6 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 		Orchestration:        orchestrationService,
 		FolderDataExtraction: folderDataExtractionService,
 		DiscogsRateLimiter:   discogsRateLimiterService,
+		Download:             downloadService,
 	}, nil
 }

@@ -25,9 +25,10 @@ type Cache struct {
 }
 
 type DB struct {
-	SQL   *gorm.DB
-	Cache Cache
-	log   logger.Logger
+	SQL     *gorm.DB
+	Primary *gorm.DB
+	Cache   Cache
+	log     logger.Logger
 }
 
 func New(config config.Config) (DB, error) {
@@ -136,6 +137,7 @@ func (s *DB) initializePostgresDB(gormConfig *gorm.Config, config config.Config)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	s.SQL = db
+	s.Primary = db // Alias for repository compatibility
 
 	return nil
 }

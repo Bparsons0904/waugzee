@@ -36,6 +36,7 @@ var MODELS_TO_MIGRATE = []any{
 	&PlayHistory{},
 	&CleaningHistory{},
 	&UserConfiguration{},
+	&DiscogsDataProcessing{},
 }
 
 func main() {

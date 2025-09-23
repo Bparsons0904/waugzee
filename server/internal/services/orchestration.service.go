@@ -84,7 +84,7 @@ func (o *OrchestrationService) SyncUserFoldersAndCollection(
 
 
 	// Step 1: Request folder discovery (async - will trigger folder processing)
-	requestID, err := o.foldersService.RequestUserFolders(ctx, user)
+	_, err := o.foldersService.RequestUserFolders(ctx, user)
 	if err != nil {
 		return log.Err("failed to initiate folder discovery", err)
 	}
