@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 	"waugzee/internal/database"
 	"waugzee/internal/events"
@@ -41,10 +40,11 @@ type OrchestrationService struct {
 func NewOrchestrationService(
 	eventBus *events.EventBus,
 	repos repositories.Repository,
+	db database.DB,
 	transactionService *TransactionService,
 ) *OrchestrationService {
 	log := logger.New("OrchestrationService")
-	foldersService := NewFoldersService(eventBus, repos, transactionService)
+	foldersService := NewFoldersService(eventBus, repos, db, transactionService)
 	return &OrchestrationService{
 		log:                log,
 		eventBus:           eventBus,
@@ -60,6 +60,49 @@ func (o *OrchestrationService) GetUserFolders(
 	user *User,
 ) (string, error) {
 	return o.foldersService.RequestUserFolders(ctx, user)
+}
+
+// SyncUserFoldersAndCollection performs comprehensive sync: discovers folders then syncs collection
+func (o *OrchestrationService) SyncUserFoldersAndCollection(
+	ctx context.Context,
+	user *User,
+) error {
+	log := o.log.Function("SyncUserFoldersAndCollection")
+
+	if user == nil {
+		return log.ErrMsg("user cannot be nil")
+	}
+
+	if user.Configuration == nil || user.Configuration.DiscogsToken == nil ||
+		*user.Configuration.DiscogsToken == "" {
+		return log.ErrMsg("user does not have a Discogs token configured")
+	}
+
+	log.Info("Starting comprehensive sync (folders + collection)",
+		"userID", user.ID)
+
+	// Step 1: Request folder discovery (async - will trigger folder processing)
+	requestID, err := o.foldersService.RequestUserFolders(ctx, user)
+	if err != nil {
+		return log.Err("failed to initiate folder discovery", err)
+	}
+
+	log.Info("Folder discovery initiated",
+		"userID", user.ID,
+		"requestID", requestID)
+
+	// Step 2: Start collection sync for all user folders
+	// This will process folders 1+ and coordinate with folder responses
+	err = o.foldersService.SyncAllUserFolders(ctx, user)
+	if err != nil {
+		return log.Err("failed to initiate collection sync", err)
+	}
+
+	log.Info("Comprehensive sync initiated successfully",
+		"userID", user.ID,
+		"foldersRequestID", requestID)
+
+	return nil
 }
 
 func (o *OrchestrationService) HandleAPIResponse(
@@ -89,11 +132,7 @@ func (o *OrchestrationService) HandleAPIResponse(
 	}
 
 	if metadata.RequestID != requestID {
-		return log.ErrMsg(fmt.Sprintf(
-			"request ID mismatch: expected %s, received %s",
-			metadata.RequestID,
-			requestID,
-		))
+		return log.ErrMsg("request ID mismatch: expected " + metadata.RequestID + ", received " + requestID)
 	}
 
 	err = database.NewCacheBuilder(o.cache, requestID).
@@ -101,7 +140,7 @@ func (o *OrchestrationService) HandleAPIResponse(
 		WithContext(ctx).
 		Delete()
 	if err != nil {
-		log.Err("failed to cleanup cache entry", err, "requestID", requestID)
+		log.Er("failed to cleanup cache entry", err, "requestID", requestID)
 	}
 
 	log.Info("API response processed successfully",
@@ -134,17 +173,17 @@ func processDiscogsAPIResponse[T any](
 ) (*T, error) {
 	// Check if response contains error
 	if errorMsg, exists := responseData["error"]; exists {
-		log.Err("API request failed", fmt.Errorf("%v", errorMsg),
+		return nil, log.Error("API request failed",
 			"responseType", responseType,
 			"userID", metadata.UserID,
-			"requestID", metadata.RequestID)
-		return nil, fmt.Errorf("API request failed: %v", errorMsg)
+			"requestID", metadata.RequestID,
+			"error", errorMsg)
 	}
 
 	// Extract data from response
 	data, exists := responseData["data"]
 	if !exists {
-		return nil, log.ErrMsg(fmt.Sprintf("missing data field in %s response", responseType))
+		return nil, log.ErrMsg("missing data field in " + responseType + " response")
 	}
 
 	// Marshal and unmarshal to target type
@@ -160,4 +199,3 @@ func processDiscogsAPIResponse[T any](
 
 	return &result, nil
 }
-

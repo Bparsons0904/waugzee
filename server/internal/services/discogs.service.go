@@ -2,7 +2,6 @@ package services
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 	"waugzee/internal/logger"
@@ -38,19 +37,24 @@ type DiscogsFoldersResponse struct {
 }
 
 type DiscogsPagination struct {
-	Page    int                    `json:"page"`
-	Pages   int                    `json:"pages"`
-	Items   int                    `json:"items"`
-	PerPage int                    `json:"per_page"`
-	URLs    map[string]string      `json:"urls"`
+	Page    int               `json:"page"`
+	Pages   int               `json:"pages"`
+	Items   int               `json:"items"`
+	PerPage int               `json:"per_page"`
+	URLs    map[string]string `json:"urls"`
+}
+
+type DiscogsNote struct {
+	FieldID int    `json:"field_id"`
+	Value   string `json:"value"`
 }
 
 type DiscogsFolderReleaseItem struct {
-	ID         int64  `json:"id"`
-	InstanceID int    `json:"instance_id"`
-	FolderID   int    `json:"folder_id"`
-	Rating     int    `json:"rating"`
-	Notes      string `json:"notes"`
+	ID               int64         `json:"id"`
+	InstanceID       int           `json:"instance_id"`
+	FolderID         int           `json:"folder_id"`
+	Rating           int           `json:"rating"`
+	Notes            []DiscogsNote `json:"notes"`
 	BasicInformation struct {
 		ID      int64  `json:"id"`
 		Title   string `json:"title"`
@@ -101,7 +105,7 @@ func (d *DiscogsService) GetUserIdentity(token string) (*DiscogsIdentityResponse
 	log := d.log.Function("GetUserIdentity")
 
 	if token == "" {
-		return nil, fmt.Errorf("token cannot be empty")
+		return nil, log.ErrMsg("token cannot be empty")
 	}
 
 	req, err := http.NewRequest("GET", d.baseURL+"/oauth/identity", nil)
@@ -125,12 +129,11 @@ func (d *DiscogsService) GetUserIdentity(token string) (*DiscogsIdentityResponse
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		log.Warn("Invalid Discogs token provided")
-		return nil, fmt.Errorf("invalid token")
+		return nil, log.ErrMsg("invalid token")
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		_ = log.Error("Discogs API error", "statusCode", resp.StatusCode)
-		return nil, fmt.Errorf("discogs API error: %d", resp.StatusCode)
+		return nil, log.Error("Discogs API error", "statusCode", resp.StatusCode)
 	}
 
 	var identity DiscogsIdentityResponse
@@ -139,10 +142,15 @@ func (d *DiscogsService) GetUserIdentity(token string) (*DiscogsIdentityResponse
 	}
 
 	if identity.ID == 0 {
-		_ = log.Error("Invalid response from Discogs API", "identity", identity)
-		return nil, fmt.Errorf("invalid response from Discogs API")
+		return nil, log.Error("Invalid response from Discogs API", "identity", identity)
 	}
 
-	log.Info("Successfully retrieved Discogs user identity", "userID", identity.ID, "username", identity.Username)
+	log.Info(
+		"Successfully retrieved Discogs user identity",
+		"userID",
+		identity.ID,
+		"username",
+		identity.Username,
+	)
 	return &identity, nil
 }

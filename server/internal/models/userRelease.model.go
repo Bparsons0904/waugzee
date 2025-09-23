@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -14,7 +15,7 @@ type UserRelease struct {
 	InstanceID int            `gorm:"type:int;not null;uniqueIndex:idx_user_instance"  json:"instanceId"`
 	FolderID   int            `gorm:"type:int;not null;index:idx_user_folder"          json:"folderId"`
 	Rating     int            `gorm:"type:int"                                         json:"rating"`
-	Notes      string         `gorm:"type:text"                                        json:"notes"`
+	Notes      datatypes.JSON `gorm:"type:jsonb"                                       json:"notes"`
 	Active     bool           `gorm:"type:bool;default:true"                           json:"active"`
 	DeletedAt  gorm.DeletedAt `gorm:"index"                                            json:"-"`
 }

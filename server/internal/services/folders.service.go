@@ -1,9 +1,10 @@
 package services
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 	"waugzee/internal/database"
 	"waugzee/internal/events"
@@ -12,7 +13,7 @@ import (
 	"waugzee/internal/repositories"
 
 	"github.com/google/uuid"
-	"github.com/valkey-io/valkey-go"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -24,22 +25,23 @@ const (
 type FoldersService struct {
 	log                logger.Logger
 	eventBus           *events.EventBus
-	cache              valkey.Client
 	repos              repositories.Repository
+	db                 database.DB
 	transactionService *TransactionService
 }
 
 func NewFoldersService(
 	eventBus *events.EventBus,
 	repos repositories.Repository,
+	db database.DB,
 	transactionService *TransactionService,
 ) *FoldersService {
 	log := logger.New("FoldersService")
 	return &FoldersService{
 		log:                log,
 		eventBus:           eventBus,
-		cache:              transactionService.db.Cache.General,
 		repos:              repos,
+		db:                 db,
 		transactionService: transactionService,
 	}
 }
@@ -73,7 +75,7 @@ func (f *FoldersService) RequestUserFolders(
 		DiscogsToken: *user.Configuration.DiscogsToken,
 	}
 
-	if err := database.NewCacheBuilder(f.cache, requestID).
+	if err := database.NewCacheBuilder(f.db.Cache.General, requestID).
 		WithHashPattern(API_HASH).
 		WithStruct(metadata).
 		WithTTL(APIRequestTTL).
@@ -107,7 +109,7 @@ func (f *FoldersService) RequestUserFolders(
 	}
 
 	if err := f.eventBus.Publish(events.WEBSOCKET, "user", message); err != nil {
-		_ = database.NewCacheBuilder(f.cache, requestID).
+		_ = database.NewCacheBuilder(f.db.Cache.General, requestID).
 			WithHashPattern(API_HASH).
 			WithContext(ctx).
 			Delete()
@@ -272,7 +274,7 @@ func (f *FoldersService) RequestFolderReleases(
 		DiscogsToken: *user.Configuration.DiscogsToken,
 	}
 
-	if err := database.NewCacheBuilder(f.cache, requestID).
+	if err := database.NewCacheBuilder(f.db.Cache.General, requestID).
 		WithHashPattern(API_HASH).
 		WithStruct(metadata).
 		WithTTL(APIRequestTTL).
@@ -311,7 +313,7 @@ func (f *FoldersService) RequestFolderReleases(
 	}
 
 	if err := f.eventBus.Publish(events.WEBSOCKET, "user", message); err != nil {
-		_ = database.NewCacheBuilder(f.cache, requestID).
+		_ = database.NewCacheBuilder(f.db.Cache.General, requestID).
 			WithHashPattern(API_HASH).
 			WithContext(ctx).
 			Delete()
@@ -340,31 +342,28 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		return nil // Don't return error as this is an expected API failure
 	}
 
+	// Try to get folderID from request data first
 	folderIDRaw, exists := responseData["folderID"]
 	if !exists {
-		return log.ErrMsg("missing folderID in response data")
+		// Fallback: extract folder_id from first release in the response
+		if discogsFolderReleasesResponse != nil &&
+			len(discogsFolderReleasesResponse.Data.Releases) > 0 {
+			folderIDRaw = discogsFolderReleasesResponse.Data.Releases[0].FolderID
+		} else {
+			return log.ErrMsg("missing folderID in response data and no releases to extract from")
+		}
 	}
 
-	var folderID int
-	switch v := folderIDRaw.(type) {
-	case int:
-		folderID = v
-	case float64:
-		folderID = int(v)
-	case string:
-		folderID, err = strconv.Atoi(v)
-		if err != nil {
-			return log.Err("invalid folderID format", err, "folderID", v)
-		}
-	default:
-		return log.ErrMsg("invalid folderID type")
+	folderID, ok := folderIDRaw.(int)
+	if !ok {
+		return log.ErrMsg("folderID is not an integer")
 	}
 
 	missingReleaseIDs := make([]int64, 0)
 
 	// Get current sync state from cache
 	var syncState CollectionSyncState
-	found, err := database.NewCacheBuilder(f.cache, metadata.UserID.String()).
+	found, err := database.NewCacheBuilder(f.db.Cache.General, metadata.UserID.String()).
 		WithHashPattern(COLLECTION_SYNC_HASH).
 		WithContext(ctx).
 		Get(&syncState)
@@ -373,7 +372,12 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 	}
 	if !found {
 		// No active sync state - process as individual folder (legacy mode)
-		return f.processIndividualFolder(ctx, metadata, responseData, folderID, discogsFolderReleasesResponse)
+		return f.processIndividualFolder(
+			ctx,
+			metadata,
+			folderID,
+			discogsFolderReleasesResponse,
+		)
 	}
 
 	// Accumulate releases to sync state instead of immediate DB writes
@@ -393,13 +397,16 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 			continue
 		}
 
+		// Convert notes to JSON
+		notesJSON, _ := json.Marshal(discogsRelease.Notes)
+
 		userRelease := &UserRelease{
 			UserID:     metadata.UserID,
 			ReleaseID:  releaseID, // Use the Discogs release ID directly
 			InstanceID: discogsRelease.InstanceID,
 			FolderID:   folderID,
 			Rating:     discogsRelease.Rating,
-			Notes:      discogsRelease.Notes,
+			Notes:      datatypes.JSON(notesJSON),
 			Active:     true,
 		}
 
@@ -408,10 +415,87 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		missingReleaseIDs = append(missingReleaseIDs, releaseID)
 	}
 
-	// Mark this folder as processed if this was the last page
-	if discogsFolderReleasesResponse.Data.Pagination.Page >= discogsFolderReleasesResponse.Data.Pagination.Pages {
+	// Check if this folder has more pages to process
+	currentPage := discogsFolderReleasesResponse.Data.Pagination.Page
+	totalPages := discogsFolderReleasesResponse.Data.Pagination.Pages
+
+	log.Info("Processed folder page",
+		"userID", metadata.UserID,
+		"folderID", folderID,
+		"currentPage", currentPage,
+		"totalPages", totalPages,
+		"releasesInPage", len(discogsFolderReleasesResponse.Data.Releases))
+
+	if currentPage < totalPages {
+		// Check if there's a next URL in pagination
+		if nextURL, exists := discogsFolderReleasesResponse.Data.Pagination.URLs["next"]; exists &&
+			nextURL != "" {
+			log.Info("Requesting next page using pagination URL",
+				"userID", metadata.UserID,
+				"folderID", folderID,
+				"currentPage", currentPage,
+				"nextURL", nextURL)
+
+			// Create API request using the next URL from pagination
+			requestID := uuid.New().String()
+
+			requestMetadata := RequestMetadata{
+				UserID:       metadata.UserID,
+				RequestID:    requestID,
+				RequestType:  "folder_releases",
+				Timestamp:    time.Now(),
+				DiscogsToken: metadata.DiscogsToken,
+			}
+
+			if err = database.NewCacheBuilder(f.db.Cache.General, requestID).
+				WithHashPattern(API_HASH).
+				WithStruct(requestMetadata).
+				WithTTL(APIRequestTTL).
+				WithContext(ctx).
+				Set(); err != nil {
+				log.Warn("Failed to store pagination request metadata", "error", err)
+				return nil
+			}
+
+			message := events.Message{
+				ID:      requestID,
+				Service: events.API,
+				Event:   "api_request",
+				UserID:  metadata.UserID.String(),
+				Payload: map[string]any{
+					"requestId":   requestID,
+					"requestType": "folder_releases",
+					"folderID":    folderID,
+					"page":        currentPage + 1,
+					"url":         nextURL,
+					"method":      "GET",
+					"headers": map[string]string{
+						"Authorization": fmt.Sprintf("Discogs token=%s", metadata.DiscogsToken),
+					},
+					"callbackService": "orchestration",
+					"callbackEvent":   "api_response",
+				},
+				Timestamp: time.Now(),
+			}
+
+			if err = f.eventBus.Publish(events.WEBSOCKET, "user", message); err != nil {
+				log.Warn("Failed to publish pagination request", "error", err)
+			}
+		} else {
+			log.Warn("Next page expected but no next URL found in pagination",
+				"userID", metadata.UserID,
+				"folderID", folderID,
+				"currentPage", currentPage)
+		}
+	} else {
+		// Mark this folder as completed - all pages processed
 		syncState.CompletedFolders[folderID] = true
 		syncState.ProcessedFolders = len(syncState.CompletedFolders)
+
+		log.Info("Folder completed - all pages processed",
+			"userID", metadata.UserID,
+			"folderID", folderID,
+			"totalPages", totalPages)
 	}
 
 	// Check if all folders are complete
@@ -421,19 +505,19 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 			"userID", metadata.UserID,
 			"totalReleases", len(syncState.MergedReleases))
 
-		// Execute differential sync
+		// Analyze what changes need to be made (business logic - outside transaction)
+		var operations *SyncCollectionOperations
+		operations, err = f.analyzeDifferentialSync(
+			ctx,
+			metadata.UserID,
+			syncState.MergedReleases,
+		)
+		if err != nil {
+			return log.Err("failed to analyze differential sync", err)
+		}
+
+		// Execute only the database operations in transaction
 		err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
-			// First, ensure all Release records exist
-			err := f.ensureReleaseRecordsExist(txCtx, tx, syncState.MergedReleases)
-			if err != nil {
-				return log.Err("failed to ensure release records exist", err)
-			}
-
-			operations, err := f.analyzeDifferentialSync(txCtx, tx, metadata.UserID, syncState.MergedReleases)
-			if err != nil {
-				return log.Err("failed to analyze differential sync", err)
-			}
-
 			return f.executeSyncOperations(txCtx, tx, metadata.UserID, operations)
 		})
 		if err != nil {
@@ -441,7 +525,7 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		}
 
 		// Clean up sync state
-		_ = database.NewCacheBuilder(f.cache, metadata.UserID.String()).
+		_ = database.NewCacheBuilder(f.db.Cache.General, metadata.UserID.String()).
 			WithHashPattern(COLLECTION_SYNC_HASH).
 			WithContext(ctx).
 			Delete()
@@ -451,10 +535,10 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 			"totalReleases", len(syncState.MergedReleases))
 	} else {
 		// Update sync state in cache
-		err = database.NewCacheBuilder(f.cache, metadata.UserID.String()).
+		err = database.NewCacheBuilder(f.db.Cache.General, metadata.UserID.String()).
 			WithHashPattern(COLLECTION_SYNC_HASH).
 			WithStruct(syncState).
-			WithTTL(30*time.Minute).
+			WithTTL(30 * time.Minute).
 			WithContext(ctx).
 			Set()
 		if err != nil {
@@ -486,7 +570,6 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 func (f *FoldersService) processIndividualFolder(
 	ctx context.Context,
 	metadata RequestMetadata,
-	responseData map[string]any,
 	folderID int,
 	discogsFolderReleasesResponse *DiscogsFolderReleasesResponse,
 ) error {
@@ -540,15 +623,15 @@ func (f *FoldersService) queueMissingReleases(
 	}
 
 	// Queue missing releases using CacheBuilder pattern
-	queueData := map[string]interface{}{
+	queueData := map[string]any{
 		"releaseIDs": releaseIDs,
 		"queued_at":  time.Now().Unix(),
 	}
 
-	err := database.NewCacheBuilder(f.cache, userID.String()).
+	err := database.NewCacheBuilder(f.db.Cache.General, userID.String()).
 		WithHashPattern(RELEASE_QUEUE_HASH).
 		WithStruct(queueData).
-		WithTTL(24*time.Hour). // 24 hour TTL
+		WithTTL(24 * time.Hour). // 24 hour TTL
 		WithContext(ctx).
 		Set()
 	if err != nil {
@@ -586,7 +669,7 @@ func (f *FoldersService) SyncAllUserFolders(
 	log := f.log.Function("SyncAllUserFolders")
 
 	// First, get user's folders to determine which ones to sync (skip folder 0)
-	folders, err := f.repos.Folder.GetUserFolders(ctx, nil, user.ID)
+	folders, err := f.repos.Folder.GetUserFolders(ctx, f.db.SQLWithContext(ctx), user.ID)
 	if err != nil {
 		return log.Err("failed to get user folders", err)
 	}
@@ -618,10 +701,10 @@ func (f *FoldersService) SyncAllUserFolders(
 	}
 
 	// Store sync state in cache for tracking across API responses
-	err = database.NewCacheBuilder(f.cache, user.ID.String()).
+	err = database.NewCacheBuilder(f.db.Cache.General, user.ID.String()).
 		WithHashPattern(COLLECTION_SYNC_HASH).
 		WithStruct(syncState).
-		WithTTL(30*time.Minute). // 30 min timeout for sync
+		WithTTL(30 * time.Minute). // 30 min timeout for sync
 		WithContext(ctx).
 		Set()
 	if err != nil {
@@ -651,14 +734,17 @@ func (f *FoldersService) SyncAllUserFolders(
 
 func (f *FoldersService) analyzeDifferentialSync(
 	ctx context.Context,
-	tx *gorm.DB,
 	userID uuid.UUID,
 	mergedReleases map[int]*UserRelease,
 ) (*SyncCollectionOperations, error) {
 	log := f.log.Function("analyzeDifferentialSync")
 
 	// Get current state from database
-	currentReleases, err := f.repos.UserRelease.GetExistingByUser(ctx, tx, userID)
+	currentReleases, err := f.repos.UserRelease.GetExistingByUser(
+		ctx,
+		f.db.SQLWithContext(ctx),
+		userID,
+	)
 	if err != nil {
 		return nil, log.Err("failed to get existing user releases", err)
 	}
@@ -675,7 +761,7 @@ func (f *FoldersService) analyzeDifferentialSync(
 			// Check if folder changed (update needed)
 			if currentRelease.FolderID != mergedRelease.FolderID ||
 				currentRelease.Rating != mergedRelease.Rating ||
-				currentRelease.Notes != mergedRelease.Notes {
+				!bytes.Equal(currentRelease.Notes, mergedRelease.Notes) {
 				// Update existing record with new folder/rating/notes
 				updatedRelease := *currentRelease
 				updatedRelease.FolderID = mergedRelease.FolderID
@@ -703,60 +789,6 @@ func (f *FoldersService) analyzeDifferentialSync(
 		"deletes", len(operations.Delete))
 
 	return operations, nil
-}
-
-func (f *FoldersService) ensureReleaseRecordsExist(
-	ctx context.Context,
-	tx *gorm.DB,
-	mergedReleases map[int]*UserRelease,
-) error {
-	log := f.log.Function("ensureReleaseRecordsExist")
-
-	if len(mergedReleases) == 0 {
-		return nil
-	}
-
-	// Collect all unique release IDs
-	releaseIDSet := make(map[int64]bool)
-	for _, userRelease := range mergedReleases {
-		releaseIDSet[userRelease.ReleaseID] = true
-	}
-
-	releaseIDs := make([]int64, 0, len(releaseIDSet))
-	for releaseID := range releaseIDSet {
-		releaseIDs = append(releaseIDs, releaseID)
-	}
-
-	// Get existing releases
-	existingReleases, err := f.repos.Release.GetBatchByDiscogsIDs(ctx, tx, releaseIDs)
-	if err != nil {
-		return log.Err("failed to get existing releases", err)
-	}
-
-	// Create placeholder releases for missing ones
-	missingReleases := make([]*Release, 0)
-	for _, releaseID := range releaseIDs {
-		if _, exists := existingReleases[releaseID]; !exists {
-			// Create minimal placeholder release
-			release := &Release{
-				ID:     releaseID,
-				Title:  "Unknown Release", // Will be updated when full release data is processed
-				Format: FormatVinyl,       // Default to vinyl
-			}
-			missingReleases = append(missingReleases, release)
-		}
-	}
-
-	// Insert missing releases
-	if len(missingReleases) > 0 {
-		err = f.repos.Release.InsertBatch(ctx, tx, missingReleases)
-		if err != nil {
-			return log.Err("failed to insert missing releases", err, "count", len(missingReleases))
-		}
-		log.Info("Created placeholder releases", "count", len(missingReleases))
-	}
-
-	return nil
 }
 
 func (f *FoldersService) executeSyncOperations(

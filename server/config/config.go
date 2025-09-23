@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"waugzee/internal/logger"
 
 	"github.com/spf13/viper"
@@ -102,9 +101,8 @@ func GetConfig() Config {
 
 func validateConfig(config Config, log logger.Logger) error {
 	if config.ServerPort <= 0 {
-		return log.Err(
+		return log.Error(
 			"Fatal error: invalid server port",
-			fmt.Errorf("invalid port: %d", config.ServerPort),
 			"port", config.ServerPort,
 		)
 	}

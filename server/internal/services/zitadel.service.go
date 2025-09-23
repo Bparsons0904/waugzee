@@ -69,15 +69,14 @@ type ZitadelService struct {
 	cacheTTL      time.Duration
 }
 
-
-
 func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 	log := logger.New("ZitadelService")
 
 	// Require Zitadel configuration
 	if cfg.ZitadelInstanceURL == "" || cfg.ZitadelClientID == "" {
-		return nil, log.Err("Zitadel configuration required but not provided", 
-			fmt.Errorf("missing ZitadelInstanceURL or ZitadelClientID"))
+		return nil, log.ErrMsg(
+			"Zitadel configuration required but not provided: missing ZitadelInstanceURL or ZitadelClientID",
+		)
 	}
 
 	// Parse private key if available (for machine-to-machine authentication)
@@ -125,7 +124,10 @@ func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 }
 
 // ValidateIDToken validates an OIDC ID token with proper JWT signature verification
-func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (*types.TokenInfo, error) {
+func (zs *ZitadelService) ValidateIDToken(
+	ctx context.Context,
+	idToken string,
+) (*types.TokenInfo, error) {
 	log := zs.log.Function("ValidateIDToken")
 
 	// Parse JWT token with signature verification
@@ -135,19 +137,21 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 		func(token *jwt.Token) (any, error) {
 			// Validate algorithm
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				return nil, log.ErrMsg(
+					"unexpected signing method: " + fmt.Sprintf("%v", token.Header["alg"]),
+				)
 			}
 
 			// Get key ID from header
 			kidHeader, ok := token.Header["kid"].(string)
 			if !ok {
-				return nil, fmt.Errorf("missing or invalid 'kid' in JWT header")
+				return nil, log.ErrMsg("missing or invalid 'kid' in JWT header")
 			}
 
 			// Get public key for verification
 			publicKey, err := zs.getPublicKeyForToken(ctx, kidHeader)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get public key: %w", err)
+				return nil, log.Err("failed to get public key", err)
 			}
 
 			return publicKey, nil
@@ -170,41 +174,42 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 	// Verify issuer
 	expectedIssuer := strings.TrimSuffix(zs.issuer, "/")
 	if claims.Issuer != expectedIssuer {
-		return &types.TokenInfo{Valid: false}, log.Err(
-			"invalid issuer",
-			fmt.Errorf("expected: %s, got: %s", expectedIssuer, claims.Issuer),
-		)
+		return &types.TokenInfo{
+				Valid: false,
+			}, log.ErrMsg(
+				"invalid issuer: expected " + expectedIssuer + ", got " + claims.Issuer,
+			)
 	}
 
 	// Verify audience (client ID)
 	audienceValid := slices.Contains(claims.Audience, zs.clientID)
 
 	if !audienceValid {
-		return &types.TokenInfo{Valid: false}, log.Err(
-			"invalid audience",
-			fmt.Errorf(
-				"expected client ID %s not found in audience %v",
-				zs.clientID,
-				claims.Audience,
-			),
-		)
+		return &types.TokenInfo{
+				Valid: false,
+			}, log.ErrMsg(
+				"invalid audience: expected client ID " + zs.clientID + " not found in audience " + fmt.Sprintf(
+					"%v",
+					claims.Audience,
+				),
+			)
 	}
 
 	// Parse custom claims for user info (need to parse the original token again for custom claims)
 	var customClaims struct {
 		jwt.RegisteredClaims
-		Email           string   `json:"email"`
-		Name            string   `json:"name"`
-		GivenName       string   `json:"given_name"`
-		FamilyName      string   `json:"family_name"`
-		PreferredName   string   `json:"preferred_username"`
-		EmailVerified   bool     `json:"email_verified"`
-		Nonce           string   `json:"nonce"`
+		Email         string `json:"email"`
+		Name          string `json:"name"`
+		GivenName     string `json:"given_name"`
+		FamilyName    string `json:"family_name"`
+		PreferredName string `json:"preferred_username"`
+		EmailVerified bool   `json:"email_verified"`
+		Nonce         string `json:"nonce"`
 		// Zitadel specific claims
-		Roles           []string `json:"urn:zitadel:iam:org:project:roles"`
-		ProjectID       string   `json:"urn:zitadel:iam:org:project:id"`
+		Roles     []string `json:"urn:zitadel:iam:org:project:roles"`
+		ProjectID string   `json:"urn:zitadel:iam:org:project:id"`
 		// Alternative project ID location
-		AzpProjectID    string   `json:"azp"`
+		AzpProjectID string `json:"azp"`
 	}
 
 	// Parse again with custom claims struct
@@ -255,8 +260,10 @@ func (zs *ZitadelService) ValidateIDToken(ctx context.Context, idToken string) (
 }
 
 // ValidateToken validates an access token using OIDC introspection
-func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*types.TokenInfo, error) {
-
+func (zs *ZitadelService) ValidateToken(
+	ctx context.Context,
+	token string,
+) (*types.TokenInfo, error) {
 	log := zs.log.Function("ValidateToken")
 
 	// Create introspection request
@@ -308,24 +315,24 @@ func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*typ
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, log.Err("introspection request failed",
-			fmt.Errorf("status code: %d", resp.StatusCode),
+		return nil, log.Error("introspection request failed",
+			"statusCode", resp.StatusCode,
 			"responseBody", string(body))
 	}
 
 	var introspectResp struct {
-		Active        bool     `json:"active"`
-		Sub           string   `json:"sub"`
-		Email         string   `json:"email"`
-		Name          string   `json:"name"`
-		GivenName     string   `json:"given_name"`
-		FamilyName    string   `json:"family_name"`
-		PreferredName string   `json:"preferred_username"`
-		EmailVerified bool     `json:"email_verified"`
+		Active        bool   `json:"active"`
+		Sub           string `json:"sub"`
+		Email         string `json:"email"`
+		Name          string `json:"name"`
+		GivenName     string `json:"given_name"`
+		FamilyName    string `json:"family_name"`
+		PreferredName string `json:"preferred_username"`
+		EmailVerified bool   `json:"email_verified"`
 		// Zitadel specific claims
-		Roles         []string `json:"urn:zitadel:iam:org:project:roles"`
-		ProjectID     string   `json:"urn:zitadel:iam:org:project:id"`
-		AzpProjectID  string   `json:"azp"`
+		Roles        []string `json:"urn:zitadel:iam:org:project:roles"`
+		ProjectID    string   `json:"urn:zitadel:iam:org:project:id"`
+		AzpProjectID string   `json:"azp"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&introspectResp); err != nil {
@@ -363,13 +370,8 @@ func (zs *ZitadelService) ValidateToken(ctx context.Context, token string) (*typ
 	}, nil
 }
 
-
-
-
-
 // getOIDCDiscovery fetches and caches the OIDC discovery document
 func (zs *ZitadelService) getOIDCDiscovery(ctx context.Context) (*OIDCDiscovery, error) {
-
 	log := zs.log.Function("getOIDCDiscovery")
 
 	// Check cache first
@@ -400,8 +402,8 @@ func (zs *ZitadelService) getOIDCDiscovery(ctx context.Context) (*OIDCDiscovery,
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, log.Err("OIDC discovery request failed",
-			fmt.Errorf("status code: %d", resp.StatusCode))
+		return nil, log.Error("OIDC discovery request failed",
+			"statusCode", resp.StatusCode)
 	}
 
 	var discovery OIDCDiscovery
@@ -411,8 +413,9 @@ func (zs *ZitadelService) getOIDCDiscovery(ctx context.Context) (*OIDCDiscovery,
 
 	// Validate discovery document
 	if discovery.Issuer != strings.TrimSuffix(zs.issuer, "/") {
-		return nil, log.Err("invalid issuer in discovery document",
-			fmt.Errorf("expected: %s, got: %s", zs.issuer, discovery.Issuer))
+		return nil, log.ErrMsg(
+			"invalid issuer in discovery document: expected " + zs.issuer + ", got " + discovery.Issuer,
+		)
 	}
 
 	if discovery.JWKS_URI == "" {
@@ -431,7 +434,6 @@ func (zs *ZitadelService) getOIDCDiscovery(ctx context.Context) (*OIDCDiscovery,
 
 // getJWKS fetches and caches the JSON Web Key Set
 func (zs *ZitadelService) getJWKS(ctx context.Context) (*JWKSet, error) {
-
 	log := zs.log.Function("getJWKS")
 
 	// Check cache first
@@ -466,8 +468,8 @@ func (zs *ZitadelService) getJWKS(ctx context.Context) (*JWKSet, error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, log.Err("JWKS request failed",
-			fmt.Errorf("status code: %d", resp.StatusCode))
+		return nil, log.Error("JWKS request failed",
+			"statusCode", resp.StatusCode)
 	}
 
 	var jwks JWKSet
@@ -494,7 +496,6 @@ func (zs *ZitadelService) getPublicKeyForToken(
 	ctx context.Context,
 	kidHeader string,
 ) (*rsa.PublicKey, error) {
-
 	log := zs.log.Function("getPublicKeyForToken")
 
 	// Get JWKS
@@ -513,14 +514,12 @@ func (zs *ZitadelService) getPublicKeyForToken(
 	}
 
 	if targetJWK == nil {
-		return nil, log.Err("no matching key found",
-			fmt.Errorf("kid: %s not found in JWKS", kidHeader))
+		return nil, log.ErrMsg("no matching key found: kid " + kidHeader + " not found in JWKS")
 	}
 
 	// Validate key type
 	if targetJWK.Kty != "RSA" {
-		return nil, log.Err("unsupported key type",
-			fmt.Errorf("expected RSA, got: %s", targetJWK.Kty))
+		return nil, log.ErrMsg("unsupported key type: expected RSA, got " + targetJWK.Kty)
 	}
 
 	// Decode RSA public key components
@@ -540,8 +539,7 @@ func (zs *ZitadelService) getPublicKeyForToken(
 
 	// Validate RSA exponent fits in int (prevent overflow on 32-bit systems)
 	if !e.IsInt64() || e.Int64() > int64(^uint(0)>>1) {
-		return nil, log.Err("RSA exponent too large",
-			fmt.Errorf("exponent: %s", e.String()))
+		return nil, log.ErrMsg("RSA exponent too large: " + e.String())
 	}
 
 	// Create RSA public key
@@ -554,10 +552,8 @@ func (zs *ZitadelService) getPublicKeyForToken(
 	return publicKey, nil
 }
 
-
 // RevokeToken revokes an access or refresh token with Zitadel
 func (zs *ZitadelService) RevokeToken(ctx context.Context, token string, tokenType string) error {
-
 	log := zs.log.Function("RevokeToken")
 
 	// Get OIDC discovery to find revocation endpoint
@@ -567,7 +563,9 @@ func (zs *ZitadelService) RevokeToken(ctx context.Context, token string, tokenTy
 	}
 
 	if discovery.RevocationEndpoint == "" {
-		return log.Err("revocation endpoint not available", fmt.Errorf("revocation_endpoint not found in OIDC discovery"))
+		return log.ErrMsg(
+			"revocation endpoint not available: revocation_endpoint not found in OIDC discovery",
+		)
 	}
 
 	// Prepare form data for revocation request
@@ -622,18 +620,26 @@ func (zs *ZitadelService) RevokeToken(ctx context.Context, token string, tokenTy
 	// or invalid tokens (to prevent token scanning attacks)
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return log.Err("token revocation request failed",
-			fmt.Errorf("status code: %d", resp.StatusCode),
+		return log.Error("token revocation request failed",
+			"statusCode", resp.StatusCode,
 			"responseBody", string(body))
 	}
 
-	log.Info("token revocation successful", "tokenType", tokenType, "endpoint", discovery.RevocationEndpoint)
+	log.Info(
+		"token revocation successful",
+		"tokenType",
+		tokenType,
+		"endpoint",
+		discovery.RevocationEndpoint,
+	)
 	return nil
 }
 
 // GetLogoutURL generates the OIDC logout URL using the end_session_endpoint
-func (zs *ZitadelService) GetLogoutURL(ctx context.Context, idTokenHint, postLogoutRedirectURI, state string) (string, error) {
-
+func (zs *ZitadelService) GetLogoutURL(
+	ctx context.Context,
+	idTokenHint, postLogoutRedirectURI, state string,
+) (string, error) {
 	log := zs.log.Function("GetLogoutURL")
 
 	// Get OIDC discovery to find end session endpoint
@@ -643,7 +649,9 @@ func (zs *ZitadelService) GetLogoutURL(ctx context.Context, idTokenHint, postLog
 	}
 
 	if discovery.EndSessionEndpoint == "" {
-		return "", log.Err("end session endpoint not available", fmt.Errorf("end_session_endpoint not found in OIDC discovery"))
+		return "", log.ErrMsg(
+			"end session endpoint not available: end_session_endpoint not found in OIDC discovery",
+		)
 	}
 
 	// Build logout URL with query parameters
@@ -653,7 +661,7 @@ func (zs *ZitadelService) GetLogoutURL(ctx context.Context, idTokenHint, postLog
 	}
 
 	params := url.Values{}
-	
+
 	// Add ID token hint if provided (recommended for better UX)
 	if idTokenHint != "" {
 		params.Set("id_token_hint", idTokenHint)
@@ -671,7 +679,7 @@ func (zs *ZitadelService) GetLogoutURL(ctx context.Context, idTokenHint, postLog
 
 	logoutURL.RawQuery = params.Encode()
 
-	log.Info("logout URL generated successfully", 
+	log.Info("logout URL generated successfully",
 		"endpoint", discovery.EndSessionEndpoint,
 		"hasIdToken", idTokenHint != "",
 		"hasRedirectURI", postLogoutRedirectURI != "")
@@ -696,7 +704,10 @@ func (zs *ZitadelService) GetConfig() ZitadelConfig {
 }
 
 // ValidateTokenWithFallback validates a token using JWT-first approach with introspection fallback
-func (zs *ZitadelService) ValidateTokenWithFallback(ctx context.Context, token string) (*types.TokenInfo, string, error) {
+func (zs *ZitadelService) ValidateTokenWithFallback(
+	ctx context.Context,
+	token string,
+) (*types.TokenInfo, string, error) {
 	log := zs.log.Function("ValidateTokenWithFallback")
 
 	// Validate token with Zitadel - try JWT first, fallback to introspection
@@ -708,7 +719,7 @@ func (zs *ZitadelService) ValidateTokenWithFallback(ctx context.Context, token s
 		// Try JWT validation first (local, fast)
 		tokenInfo, err = zs.ValidateIDToken(ctx, token)
 		validationMethod = "JWT"
-		
+
 		// If JWT validation fails due to token format/type, fallback to introspection
 		if err != nil {
 			log.Debug("JWT validation failed, falling back to introspection", "error", err.Error())
@@ -723,12 +734,12 @@ func (zs *ZitadelService) ValidateTokenWithFallback(ctx context.Context, token s
 
 	if err != nil {
 		log.Info("token validation failed", "method", validationMethod, "error", err.Error())
-		return nil, "", fmt.Errorf("token validation failed: %w", err)
+		return nil, "", log.Err("token validation failed", err)
 	}
 
 	if !tokenInfo.Valid {
 		log.Info("token is not active", "method", validationMethod)
-		return nil, "", fmt.Errorf("token is not active")
+		return nil, "", log.ErrMsg("token is not active")
 	}
 
 	log.Info(
@@ -754,11 +765,10 @@ func isJWTToken(token string) bool {
 
 // generateJWTAssertion creates a JWT assertion for machine-to-machine authentication
 func (zs *ZitadelService) generateJWTAssertion() (string, error) {
-	if zs.privateKey == nil {
-		return "", fmt.Errorf("private key not configured")
-	}
-
 	log := zs.log.Function("generateJWTAssertion")
+	if zs.privateKey == nil {
+		return "", log.ErrMsg("private key not configured")
+	}
 
 	now := time.Now()
 	claims := jwt.RegisteredClaims{

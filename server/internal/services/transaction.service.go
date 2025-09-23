@@ -42,7 +42,7 @@ func (ts *TransactionService) Execute(
 	// Handle panics with intelligent rollback
 	defer func() {
 		if r := recover(); r != nil {
-			panicErr := fmt.Errorf("panic during transaction: %v", r)
+			panicErr := log.ErrMsg("panic during transaction: " + fmt.Sprintf("%v", r))
 			log.Er("panic during transaction, rolling back", panicErr)
 
 			if rollbackErr := tx.Rollback().Error; rollbackErr != nil {
@@ -67,7 +67,7 @@ func (ts *TransactionService) Execute(
 	if err = fn(ctx, tx); err != nil {
 		if rollbackErr := tx.Rollback().Error; rollbackErr != nil {
 			log.Er("CRITICAL: failed to rollback after function error", rollbackErr, "originalError", err)
-			return fmt.Errorf("transaction rollback failed: %w (original error: %v)", rollbackErr, err)
+			return log.Error("transaction rollback failed", "rollbackError", rollbackErr, "originalError", err)
 		}
 		return err
 	}

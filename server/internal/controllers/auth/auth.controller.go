@@ -2,7 +2,6 @@ package authController
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
@@ -153,7 +152,7 @@ func (ac *AuthController) getOrCreateOIDCUser(
 			"oidcUserID",
 			tokenInfo.UserID,
 		)
-		return nil, fmt.Errorf("failed to create user session")
+		return nil, log.ErrMsg("failed to create user session")
 	}
 
 	return user, nil
@@ -169,12 +168,12 @@ func (ac *AuthController) HandleOIDCCallback(
 	tokenInfo, err := ac.zitadelService.ValidateIDToken(ctx, req.IDToken)
 	if err != nil {
 		log.Info("ID token validation failed", "error", err.Error())
-		return nil, fmt.Errorf("authentication failed")
+		return nil, log.ErrMsg("authentication failed")
 	}
 
 	if !tokenInfo.Valid {
 		log.Info("ID token is invalid")
-		return nil, fmt.Errorf("authentication failed")
+		return nil, log.ErrMsg("authentication failed")
 	}
 
 	// Find or create user from OIDC claims
@@ -187,7 +186,7 @@ func (ac *AuthController) HandleOIDCCallback(
 			"oidcUserID",
 			tokenInfo.UserID,
 		)
-		return nil, fmt.Errorf("authentication failed")
+		return nil, log.ErrMsg("authentication failed")
 	}
 
 	log.Info("OIDC token callback successful", "userID", user.ID, "email", user.Email)

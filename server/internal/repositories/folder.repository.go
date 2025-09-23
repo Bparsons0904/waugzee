@@ -56,7 +56,7 @@ func (r *folderRepository) UpsertFolders(
 		folder.UserID = userID
 	}
 
-	if err := tx.WithContext(ctx).Debug().
+	if err := tx.WithContext(ctx).
 		Clauses(clause.OnConflict{
 			Columns: []clause.Column{
 				{Name: "discog_id"},

@@ -49,14 +49,14 @@ func (sc *SyncController) HandleSyncRequest(
 		return log.ErrMsg("user does not have a Discogs token configured")
 	}
 
-	requestID, err := sc.orchestrationService.GetUserFolders(ctx, user)
+	// Use comprehensive sync that handles both folder discovery and collection sync
+	err := sc.orchestrationService.SyncUserFoldersAndCollection(ctx, user)
 	if err != nil {
-		return log.Err("failed to initiate user folders request", err)
+		return log.Err("failed to initiate comprehensive sync", err)
 	}
 
-	log.Info("Sync request initiated successfully",
-		"userID", user.ID,
-		"requestID", requestID)
+	log.Info("Comprehensive sync request initiated successfully",
+		"userID", user.ID)
 
 	return nil
 }

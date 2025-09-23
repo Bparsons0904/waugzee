@@ -26,7 +26,7 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 
 	discogsService := NewDiscogsService()
 	schedulerService := NewSchedulerService()
-	orchestrationService := NewOrchestrationService(eventBus, repos, transactionService)
+	orchestrationService := NewOrchestrationService(eventBus, repos, db, transactionService)
 
 	return Service{
 		Zitadel:       zitadelService,
@@ -36,4 +36,3 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 		Orchestration: orchestrationService,
 	}, nil
 }
-
