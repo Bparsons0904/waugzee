@@ -82,8 +82,6 @@ func (o *OrchestrationService) SyncUserFoldersAndCollection(
 		return log.ErrMsg("user does not have a Discogs token configured")
 	}
 
-	log.Info("Starting comprehensive sync (folders + collection)",
-		"userID", user.ID)
 
 	// Step 1: Request folder discovery (async - will trigger folder processing)
 	requestID, err := o.foldersService.RequestUserFolders(ctx, user)
@@ -91,9 +89,6 @@ func (o *OrchestrationService) SyncUserFoldersAndCollection(
 		return log.Err("failed to initiate folder discovery", err)
 	}
 
-	log.Info("Folder discovery initiated",
-		"userID", user.ID,
-		"requestID", requestID)
 
 	// Step 2: Start collection sync for all user folders
 	// This will process folders 1+ and coordinate with folder responses
@@ -102,9 +97,6 @@ func (o *OrchestrationService) SyncUserFoldersAndCollection(
 		return log.Err("failed to initiate collection sync", err)
 	}
 
-	log.Info("Comprehensive sync initiated successfully",
-		"userID", user.ID,
-		"foldersRequestID", requestID)
 
 	return nil
 }
@@ -120,7 +112,6 @@ func (o *OrchestrationService) HandleAPIResponse(
 		return log.ErrMsg("missing or invalid requestId in response")
 	}
 
-	log.Info("Processing API response", "requestID", requestID)
 
 	var metadata RequestMetadata
 	found, err := database.NewCacheBuilder(o.cache, requestID).
@@ -147,10 +138,6 @@ func (o *OrchestrationService) HandleAPIResponse(
 		log.Er("failed to cleanup cache entry", err, "requestID", requestID)
 	}
 
-	log.Info("API response processed successfully",
-		"requestID", requestID,
-		"requestType", metadata.RequestType,
-		"userID", metadata.UserID)
 
 	switch metadata.RequestType {
 	case "folders":

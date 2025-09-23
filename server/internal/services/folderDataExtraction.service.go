@@ -38,7 +38,6 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 		return nil
 	}
 
-	log.Info("Starting basic information extraction", "releaseCount", len(folderReleases))
 
 	// Collect all entities to process
 	artists := make([]*Artist, 0)
@@ -183,35 +182,30 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 
 	// Use batch operations for efficient database operations
 	if len(artists) > 0 {
-		log.Info("Upserting artists", "count", len(artists))
 		if err := f.repos.Artist.UpsertBatch(ctx, tx, artists); err != nil {
 			return log.Err("failed to upsert artists", err)
 		}
 	}
 
 	if len(labels) > 0 {
-		log.Info("Upserting labels", "count", len(labels))
 		if err := f.repos.Label.UpsertBatch(ctx, tx, labels); err != nil {
 			return log.Err("failed to upsert labels", err)
 		}
 	}
 
 	if len(genres) > 0 {
-		log.Info("Upserting genres", "count", len(genres))
 		if err := f.repos.Genre.UpsertBatch(ctx, tx, genres); err != nil {
 			return log.Err("failed to upsert genres", err)
 		}
 	}
 
 	if len(masters) > 0 {
-		log.Info("Upserting masters", "count", len(masters))
 		if err := f.repos.Master.UpsertBatch(ctx, tx, masters); err != nil {
 			return log.Err("failed to upsert masters", err)
 		}
 	}
 
 	if len(releases) > 0 {
-		log.Info("Upserting releases", "count", len(releases))
 		if err := f.repos.Release.UpsertBatch(ctx, tx, releases); err != nil {
 			return log.Err("failed to upsert releases", err)
 		}
@@ -227,12 +221,6 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 		return log.Err("failed to create master associations", err)
 	}
 
-	log.Info("Basic information extraction completed successfully",
-		"artists", len(artists),
-		"labels", len(labels),
-		"genres", len(genres),
-		"releases", len(releases),
-		"masters", len(masters))
 
 	return nil
 }
@@ -325,7 +313,6 @@ func (f *FolderDataExtractionService) createReleaseAssociations(
 		}
 	}
 
-	log.Info("Release associations created successfully")
 	return nil
 }
 
@@ -359,9 +346,6 @@ func (f *FolderDataExtractionService) GetRecordsNeedingFullData(
 		needingFullData[i] = release.ID
 	}
 
-	log.Info("Identified records needing full data",
-		"totalChecked", len(releaseIDs),
-		"needingFullData", len(needingFullData))
 
 	return needingFullData, nil
 }
@@ -469,6 +453,5 @@ func (f *FolderDataExtractionService) createMasterAssociations(
 		}
 	}
 
-	log.Info("Master associations created successfully")
 	return nil
 }

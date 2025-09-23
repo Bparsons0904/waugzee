@@ -150,7 +150,6 @@ func (f *FoldersService) ProcessFoldersResponse(
 
 	folders := make([]*Folder, 0, len(discogsFoldersResponse.Data.Folders))
 	for _, discogsFolder := range discogsFoldersResponse.Data.Folders {
-		log.Info("Processing folder", "discogID", discogsFolder)
 		folder := &Folder{
 			DiscogID:    &discogsFolder.ID,
 			UserID:      metadata.UserID,
@@ -161,17 +160,10 @@ func (f *FoldersService) ProcessFoldersResponse(
 		folders = append(folders, folder)
 	}
 
-	log.Info("Successfully parsed folders data",
-		"userID", metadata.UserID,
-		"requestID", metadata.RequestID,
-		"foldersCount", len(folders))
 
 	keepDiscogIDs, _ := f.extractFolderSyncData(folders)
 
 	err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
-		log.Info("Upserting folders to database",
-			"userID", metadata.UserID,
-			"folderCount", len(folders))
 
 		if err = f.repos.Folder.UpsertFolders(txCtx, tx, metadata.UserID, folders); err != nil {
 			return log.Err("failed to upsert folders", err)
@@ -190,10 +182,6 @@ func (f *FoldersService) ProcessFoldersResponse(
 			"requestID", metadata.RequestID)
 	}
 
-	log.Info("Successfully saved folders to database",
-		"userID", metadata.UserID,
-		"requestID", metadata.RequestID,
-		"foldersCount", len(folders))
 
 	return nil
 }
@@ -227,9 +215,6 @@ func (f *FoldersService) updateUserConfigWithUncategorizedFolderIfNotSet(
 
 	// Only set the default folder if user doesn't already have a selected folder
 	if userConfig.SelectedFolderID != nil {
-		log.Info("User already has a selected folder, skipping update",
-			"userID", userID,
-			"existingSelectedFolderID", *userConfig.SelectedFolderID)
 		return nil
 	}
 
@@ -240,9 +225,6 @@ func (f *FoldersService) updateUserConfigWithUncategorizedFolderIfNotSet(
 		return log.Err("failed to update user configuration with selected folder", err)
 	}
 
-	log.Info("Updated user configuration with Uncategorized folder as selected",
-		"userID", userID,
-		"selectedFolderID", uncategorizedFolderID)
 
 	return nil
 }
@@ -346,11 +328,6 @@ func (f *FoldersService) RequestFolderReleases(
 		return "", log.Err("failed to publish API request event", err)
 	}
 
-	log.Info("Requested folder releases",
-		"userID", user.ID,
-		"folderID", folderID,
-		"page", page,
-		"requestID", requestID)
 
 	return requestID, nil
 }
@@ -408,10 +385,6 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 
 	// Accumulate releases to sync state instead of immediate DB writes
 	for _, discogsRelease := range discogsFolderReleasesResponse.Data.Releases {
-		log.Info("Accumulating folder release to sync state",
-			"releaseID", discogsRelease.ID,
-			"instanceID", discogsRelease.InstanceID,
-			"folderID", folderID)
 
 		releaseID := discogsRelease.ID
 		if releaseID == 0 && discogsRelease.BasicInformation.ID != 0 {
@@ -468,22 +441,11 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 	currentPage := discogsFolderReleasesResponse.Data.Pagination.Page
 	totalPages := discogsFolderReleasesResponse.Data.Pagination.Pages
 
-	log.Info("Processed folder page",
-		"userID", metadata.UserID,
-		"folderID", folderID,
-		"currentPage", currentPage,
-		"totalPages", totalPages,
-		"releasesInPage", len(discogsFolderReleasesResponse.Data.Releases))
 
 	if currentPage < totalPages {
 		// Check if there's a next URL in pagination
 		if nextURL, exists := discogsFolderReleasesResponse.Data.Pagination.URLs["next"]; exists &&
 			nextURL != "" {
-			log.Info("Requesting next page using pagination URL",
-				"userID", metadata.UserID,
-				"folderID", folderID,
-				"currentPage", currentPage,
-				"nextURL", nextURL)
 
 			// Create API request using the next URL from pagination
 			requestID := uuid.New().String()
@@ -552,18 +514,11 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		syncState.CompletedFolders[folderID] = true
 		syncState.ProcessedFolders = len(syncState.CompletedFolders)
 
-		log.Info("Folder completed - all pages processed",
-			"userID", metadata.UserID,
-			"folderID", folderID,
-			"totalPages", totalPages)
 	}
 
 	// Check if all folders are complete
 	if syncState.ProcessedFolders >= syncState.TotalFolders {
 		syncState.SyncComplete = true
-		log.Info("All folders processed, executing differential sync",
-			"userID", metadata.UserID,
-			"totalReleases", len(syncState.MergedReleases))
 
 		// Analyze what changes need to be made (business logic - outside transaction)
 		var operations *SyncCollectionOperations
@@ -667,12 +622,6 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 			log.Warn("Failed to update sync state", "error", err)
 		}
 
-		log.Info("Folder processing accumulated",
-			"userID", metadata.UserID,
-			"folderID", folderID,
-			"processedFolders", syncState.ProcessedFolders,
-			"totalFolders", syncState.TotalFolders,
-			"releasesInPage", len(discogsFolderReleasesResponse.Data.Releases))
 	}
 
 	// Queue missing releases for processing
@@ -697,10 +646,6 @@ func (f *FoldersService) processIndividualFolder(
 ) error {
 	log := f.log.Function("processIndividualFolder")
 
-	log.Info("Processing individual folder (not part of collection sync)",
-		"userID", metadata.UserID,
-		"folderID", folderID,
-		"releasesCount", len(discogsFolderReleasesResponse.Data.Releases))
 
 	// TODO: Implement individual folder processing
 	// For now, just log that we received the data
@@ -725,10 +670,6 @@ func (f *FoldersService) processIndividualFolder(
 		}
 	}
 
-	log.Info("Individual folder processed",
-		"userID", metadata.UserID,
-		"folderID", folderID,
-		"queuedReleases", len(missingReleaseIDs))
 
 	return nil
 }
@@ -760,9 +701,6 @@ func (f *FoldersService) queueMissingReleases(
 		return log.Err("failed to queue releases for processing", err)
 	}
 
-	log.Info("Queued missing releases for processing",
-		"userID", userID,
-		"releaseCount", len(releaseIDs))
 
 	return nil
 }
@@ -809,9 +747,6 @@ func (f *FoldersService) SyncAllUserFolders(
 		return log.ErrMsg("no folders to sync (only found folder 0 or no folders)")
 	}
 
-	log.Info("Starting collection sync for folders 1+",
-		"userID", user.ID,
-		"totalFolders", len(syncFolders))
 
 	// Initialize sync state
 	syncState := &CollectionSyncState{
@@ -849,9 +784,6 @@ func (f *FoldersService) SyncAllUserFolders(
 		}
 	}
 
-	log.Info("Collection sync initiated",
-		"userID", user.ID,
-		"foldersRequested", len(syncFolders))
 
 	return nil
 }
@@ -908,11 +840,6 @@ func (f *FoldersService) analyzeDifferentialSync(
 		operations.Delete = append(operations.Delete, instanceID)
 	}
 
-	log.Info("Differential sync analysis complete",
-		"userID", userID,
-		"creates", len(operations.Create),
-		"updates", len(operations.Update),
-		"deletes", len(operations.Delete))
 
 	return operations, nil
 }
@@ -956,11 +883,6 @@ func (f *FoldersService) executeSyncOperations(
 		}
 	}
 
-	log.Info("Sync operations executed successfully",
-		"userID", userID,
-		"created", len(operations.Create),
-		"updated", len(operations.Update),
-		"deleted", len(operations.Delete))
 
 	return nil
 }

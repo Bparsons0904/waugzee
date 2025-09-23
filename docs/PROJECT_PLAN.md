@@ -144,26 +144,36 @@ After analyzing both the current Kleio (in messy migration state) and the robust
 - ✅ **Data validation and conversion** - Robust error handling and data transformation
 - ✅ **Processing workflow management** - Status tracking and retry mechanisms
 
-**Current Status (2025-09-14)**:
+**Service Architecture Changes (2025-09-18)**:
 
-- 🟡 **Discogs XML Processing**: Core infrastructure complete, working on data validation issues
-- 🟡 **Artists Processing**: ✅ 9.17M records processed successfully
-- 🟡 **Labels Processing**: ✅ Working with optimized performance
-- 🔴 **Masters Processing**: Data format investigation needed (XML structure mismatch)
-- 🔴 **Releases Processing**: Pending masters resolution
+- 🔴 **Discogs XML Processing**: **REMOVED** in commit `02c86d771694e921df277420366f0c66e7ff6a8b` - "remove unneded files"
+  - **Rationale**: Full XML dump processing proved complex and resource-intensive
+  - **Files Removed**:
+    - `server/internal/services/simplifiedParser.service.go` (167 lines)
+    - Significantly reduced `server/internal/services/discogsParser.service.go` (530+ lines)
+    - Modified XML processing and dependency injection
+  - **Impact**: Eliminated monthly XML dump processing workflow
+  - **Alternative Approach**: Considering client-as-proxy pattern for collection sync
+
+**Current Status (2025-09-18)**:
+
+- 🔴 **Discogs Data Processing**: Removed - evaluating alternative approaches
+- ✅ **Core Models**: Artist, Label, Master, Release models remain for future use
+- ✅ **Repository Layer**: Interface-based repositories preserved
+- 🟡 **Collection Sync**: Pivoting to user-driven collection import via Discogs API
 
 **In Progress**:
 
-- [ ] Resolve masters XML parsing issues
-- [ ] Complete releases processing implementation
+- [ ] Evaluate client-as-proxy collection sync approach
+- [ ] Implement user collection import from Discogs API
 - [ ] Add collection sync logic for user data
 - [ ] Implement play tracking system
 - [ ] Add equipment management features
 
 **Deliverables**:
 
-- ✅ Working Discogs data import (partial - 3/4 entity types)
-- 🟡 Collection sync functionality (in progress)
+- 🔴 ~~Working Discogs data import~~ (removed - pivoting to client-as-proxy)
+- 🟡 Collection sync functionality (redesigning approach)
 - [ ] Play logging system
 - [ ] Equipment tracking
 
