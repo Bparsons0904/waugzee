@@ -29,12 +29,13 @@ type RequestMetadata struct {
 }
 
 type OrchestrationService struct {
-	log                logger.Logger
-	eventBus           *events.EventBus
-	cache              valkey.Client
-	repos              repositories.Repository
-	transactionService *TransactionService
-	foldersService     *FoldersService
+	log                   logger.Logger
+	eventBus              *events.EventBus
+	cache                 valkey.Client
+	repos                 repositories.Repository
+	transactionService    *TransactionService
+	foldersService        *FoldersService
+	discogsRateLimiter    *DiscogsRateLimiterService
 }
 
 func NewOrchestrationService(
@@ -42,17 +43,19 @@ func NewOrchestrationService(
 	repos repositories.Repository,
 	db database.DB,
 	transactionService *TransactionService,
+	discogsRateLimiter *DiscogsRateLimiterService,
 ) *OrchestrationService {
 	log := logger.New("OrchestrationService")
 	folderDataExtractionService := NewFolderDataExtractionService(repos)
-	foldersService := NewFoldersService(eventBus, repos, db, transactionService, folderDataExtractionService)
+	foldersService := NewFoldersService(eventBus, repos, db, transactionService, folderDataExtractionService, discogsRateLimiter)
 	return &OrchestrationService{
-		log:                log,
-		eventBus:           eventBus,
-		cache:              transactionService.db.Cache.ClientAPI,
-		repos:              repos,
-		transactionService: transactionService,
-		foldersService:     foldersService,
+		log:                   log,
+		eventBus:              eventBus,
+		cache:                 transactionService.db.Cache.ClientAPI,
+		repos:                 repos,
+		transactionService:    transactionService,
+		foldersService:        foldersService,
+		discogsRateLimiter:    discogsRateLimiter,
 	}
 }
 

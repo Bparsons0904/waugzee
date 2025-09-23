@@ -29,6 +29,7 @@ type FoldersService struct {
 	db                          database.DB
 	transactionService          *TransactionService
 	folderDataExtractionService *FolderDataExtractionService
+	discogsRateLimiter          *DiscogsRateLimiterService
 }
 
 func NewFoldersService(
@@ -37,6 +38,7 @@ func NewFoldersService(
 	db database.DB,
 	transactionService *TransactionService,
 	folderDataExtractionService *FolderDataExtractionService,
+	discogsRateLimiter *DiscogsRateLimiterService,
 ) *FoldersService {
 	log := logger.New("FoldersService")
 	return &FoldersService{
@@ -46,6 +48,7 @@ func NewFoldersService(
 		db:                          db,
 		transactionService:          transactionService,
 		folderDataExtractionService: folderDataExtractionService,
+		discogsRateLimiter:          discogsRateLimiter,
 	}
 }
 
@@ -85,6 +88,16 @@ func (f *FoldersService) RequestUserFolders(
 		WithContext(ctx).
 		Set(); err != nil {
 		return "", log.Err("failed to store request metadata in cache", err)
+	}
+
+	// Check rate limit before making API request
+	if err := f.discogsRateLimiter.CheckUserRateLimit(ctx, user.ID); err != nil {
+		// Clean up cache entry since we can't proceed
+		_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
+			WithHashPattern(API_HASH).
+			WithContext(ctx).
+			Delete()
+		return "", log.Err("rate limit check failed", err)
 	}
 
 	fullURL := fmt.Sprintf(
@@ -286,6 +299,16 @@ func (f *FoldersService) RequestFolderReleases(
 		return "", log.Err("failed to store request metadata in cache", err)
 	}
 
+	// Check rate limit before making API request
+	if err := f.discogsRateLimiter.CheckUserRateLimit(ctx, user.ID); err != nil {
+		// Clean up cache entry since we can't proceed
+		_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
+			WithHashPattern(API_HASH).
+			WithContext(ctx).
+			Delete()
+		return "", log.Err("rate limit check failed", err)
+	}
+
 	fullURL := fmt.Sprintf(
 		"%s/users/%s/collection/folders/%d/releases?page=%d&per_page=100",
 		DiscogsAPIBaseURL,
@@ -483,6 +506,17 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 				return nil
 			}
 
+			// Check rate limit before making pagination API request
+			if err = f.discogsRateLimiter.CheckUserRateLimit(ctx, metadata.UserID); err != nil {
+				// Clean up cache entry since we can't proceed
+				_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
+					WithHashPattern(API_HASH).
+					WithContext(ctx).
+					Delete()
+				log.Warn("Rate limit check failed for pagination request", "error", err)
+				return nil
+			}
+
 			message := events.Message{
 				ID:      requestID,
 				Service: events.API,
@@ -575,52 +609,52 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 
 		// TODO: TESTING - Early escape before full data sync to test basic data extraction
 		// Remove this early return after testing to enable full data sync
-		log.Info("Collection sync completed successfully (TESTING MODE - full data sync disabled)",
-			"userID", metadata.UserID,
-			"totalReleases", len(syncState.MergedReleases))
-		return nil
-
-		// After sync completion, identify records needing full data
-		releaseIDs := make([]int64, 0, len(syncState.MergedReleases))
-		for _, userRelease := range syncState.MergedReleases {
-			releaseIDs = append(releaseIDs, userRelease.ReleaseID)
-		}
-
-		// Get records needing full data sync
-		needingFullData, err := f.folderDataExtractionService.GetRecordsNeedingFullData(
-			ctx,
-			f.db.SQLWithContext(ctx),
-			releaseIDs,
-		)
-		if err != nil {
-			log.Warn("Failed to identify records needing full data", "error", err)
-		} else if len(needingFullData) > 0 {
-			// Send WebSocket message to client with list of IDs to fetch
-			message := events.Message{
-				ID:      uuid.New().String(),
-				Service: events.SYSTEM,
-				Event:   "sync_trigger_full_data",
-				UserID:  metadata.UserID.String(),
-				Payload: map[string]any{
-					"releaseIDs": needingFullData,
-					"message":    "Additional release data needs to be fetched",
-				},
-				Timestamp: time.Now(),
-			}
-
-			if err = f.eventBus.Publish(events.WEBSOCKET, "user", message); err != nil {
-				log.Warn("Failed to publish sync trigger message", "error", err)
-			} else {
-				log.Info("Triggered client-side full data sync",
-					"userID", metadata.UserID,
-					"releaseCount", len(needingFullData))
-			}
-		}
-
-		log.Info("Collection sync completed successfully",
-			"userID", metadata.UserID,
-			"totalReleases", len(syncState.MergedReleases),
-			"needingFullData", len(needingFullData))
+		// log.Info("Collection sync completed successfully (TESTING MODE - full data sync disabled)",
+		// 	"userID", metadata.UserID,
+		// 	"totalReleases", len(syncState.MergedReleases))
+		// return nil
+		//
+		// // After sync completion, identify records needing full data
+		// releaseIDs := make([]int64, 0, len(syncState.MergedReleases))
+		// for _, userRelease := range syncState.MergedReleases {
+		// 	releaseIDs = append(releaseIDs, userRelease.ReleaseID)
+		// }
+		//
+		// // Get records needing full data sync
+		// needingFullData, err := f.folderDataExtractionService.GetRecordsNeedingFullData(
+		// 	ctx,
+		// 	f.db.SQLWithContext(ctx),
+		// 	releaseIDs,
+		// )
+		// if err != nil {
+		// 	log.Warn("Failed to identify records needing full data", "error", err)
+		// } else if len(needingFullData) > 0 {
+		// 	// Send WebSocket message to client with list of IDs to fetch
+		// 	message := events.Message{
+		// 		ID:      uuid.New().String(),
+		// 		Service: events.SYSTEM,
+		// 		Event:   "sync_trigger_full_data",
+		// 		UserID:  metadata.UserID.String(),
+		// 		Payload: map[string]any{
+		// 			"releaseIDs": needingFullData,
+		// 			"message":    "Additional release data needs to be fetched",
+		// 		},
+		// 		Timestamp: time.Now(),
+		// 	}
+		//
+		// 	if err = f.eventBus.Publish(events.WEBSOCKET, "user", message); err != nil {
+		// 		log.Warn("Failed to publish sync trigger message", "error", err)
+		// 	} else {
+		// 		log.Info("Triggered client-side full data sync",
+		// 			"userID", metadata.UserID,
+		// 			"releaseCount", len(needingFullData))
+		// 	}
+		// }
+		//
+		// log.Info("Collection sync completed successfully",
+		// 	"userID", metadata.UserID,
+		// 	"totalReleases", len(syncState.MergedReleases),
+		// 	"needingFullData", len(needingFullData))
 	} else {
 		// Update sync state in cache
 		err = database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).

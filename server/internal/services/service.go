@@ -14,6 +14,7 @@ type Service struct {
 	Scheduler            *SchedulerService
 	Orchestration        *OrchestrationService
 	FolderDataExtraction *FolderDataExtractionService
+	DiscogsRateLimiter   *DiscogsRateLimiterService
 }
 
 func New(db database.DB, config config.Config, eventBus *events.EventBus) (Service, error) {
@@ -27,7 +28,8 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 
 	discogsService := NewDiscogsService()
 	schedulerService := NewSchedulerService()
-	orchestrationService := NewOrchestrationService(eventBus, repos, db, transactionService)
+	discogsRateLimiterService := NewDiscogsRateLimiterService(db.Cache.ClientAPI)
+	orchestrationService := NewOrchestrationService(eventBus, repos, db, transactionService, discogsRateLimiterService)
 	folderDataExtractionService := NewFolderDataExtractionService(repos)
 
 	return Service{
@@ -37,5 +39,6 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 		Scheduler:            schedulerService,
 		Orchestration:        orchestrationService,
 		FolderDataExtraction: folderDataExtractionService,
+		DiscogsRateLimiter:   discogsRateLimiterService,
 	}, nil
 }

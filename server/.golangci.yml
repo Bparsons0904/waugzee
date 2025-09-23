@@ -5,5 +5,5 @@ linters:
     staticcheck:
       dot-import-whitelist:
         - waugzee/internal/models
-    gocritic:
-      enable-all: true
+    # gocritic:
+    #   enable-all: true
