@@ -56,7 +56,7 @@ type Release struct {
 
 type Master struct {
 	XMLName     xml.Name     `xml:"master"`
-	ID          int          `xml:"id"`
+	ID          int64        `xml:"id,attr"`
 	MainRelease int          `xml:"main_release"`
 	Title       string       `xml:"title"`
 	Year        int          `xml:"year"`

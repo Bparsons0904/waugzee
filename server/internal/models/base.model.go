@@ -14,6 +14,12 @@ type BaseUUIDModel struct {
 	DeletedAt gorm.DeletedAt `                                             json:"deletedAt"`
 }
 
+type BaseDiscogModel struct {
+	ID        int64     `gorm:"type:bigint;primaryKey" json:"id"`
+	CreatedAt time.Time `gorm:"autoCreateTime"         json:"createdAt"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime"         json:"updatedAt"`
+}
+
 type BaseModel struct {
 	ID        int64          `gorm:"type:bigint;primaryKey;autoIncrement" json:"id"`
 	CreatedAt time.Time      `gorm:"autoCreateTime"                       json:"createdAt"`

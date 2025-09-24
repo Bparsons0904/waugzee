@@ -72,6 +72,7 @@ func ProcessXMLEntities[TXMLType any, TModelType any](
 			config.ElementName,
 			xmlChan,
 			0, // No limit = 0
+			// 50_000, // No limit = 0
 			processingLog,
 		)
 		if err != nil {
@@ -139,7 +140,7 @@ func (s *DiscogsXMLParserService) convertXMLLabelToModel(xmlLabel types.Label) *
 	uri := fmt.Sprintf(DISCOG_URL, "labels", xmlLabel.ID)
 
 	return &models.Label{
-		BaseModel: models.BaseModel{
+		BaseDiscogModel: models.BaseDiscogModel{
 			ID: xmlLabel.ID,
 		},
 		Profile:     &xmlLabel.Profile,
@@ -156,7 +157,7 @@ func (s *DiscogsXMLParserService) convertXMLArtistToModel(xmlArtist types.Artist
 	releasesURL := uri + "/releases"
 
 	return &models.Artist{
-		BaseModel: models.BaseModel{
+		BaseDiscogModel: models.BaseDiscogModel{
 			ID: xmlArtist.ID,
 		},
 		Name:        xmlArtist.Name,
@@ -164,6 +165,38 @@ func (s *DiscogsXMLParserService) convertXMLArtistToModel(xmlArtist types.Artist
 		ResourceURL: resourceURL,
 		ReleasesURL: releasesURL,
 		Uri:         uri,
+	}
+}
+
+// convertXMLMasterToModel converts XML Master to database Master model
+func (s *DiscogsXMLParserService) convertXMLMasterToModel(xmlMaster types.Master) *models.Master {
+	resourceURL := fmt.Sprintf(DISCOG_API_URL, "masters", xmlMaster.ID)
+	uri := fmt.Sprintf(DISCOG_URL, "master", xmlMaster.ID)
+
+	var mainReleaseID *int64
+	var mainReleaseResourceURL *string
+	if xmlMaster.MainRelease > 0 {
+		id := int64(xmlMaster.MainRelease)
+		mainReleaseID = &id
+		url := fmt.Sprintf(DISCOG_API_URL, "releases", xmlMaster.MainRelease)
+		mainReleaseResourceURL = &url
+	}
+
+	var year *int
+	if xmlMaster.Year > 0 {
+		year = &xmlMaster.Year
+	}
+
+	return &models.Master{
+		BaseDiscogModel: models.BaseDiscogModel{
+			ID: xmlMaster.ID,
+		},
+		Title:                  xmlMaster.Title,
+		Year:                   year,
+		MainReleaseID:          mainReleaseID,
+		MainReleaseResourceURL: mainReleaseResourceURL,
+		Uri:                    uri,
+		ResourceURL:            resourceURL,
 	}
 }
 
@@ -197,19 +230,35 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 	// }
 
 	// Process artists using the abstracted entity processor
-	artistsFilePath := filepath.Join(downloadDir, "artists.xml.gz")
-	artistsConfig := EntityProcessorConfig[types.Artist, models.Artist]{
-		FilePath:       artistsFilePath,
-		ElementName:    "artist",
-		EntityTypeName: "artists",
+	// artistsFilePath := filepath.Join(downloadDir, "artists.xml.gz")
+	// artistsConfig := EntityProcessorConfig[types.Artist, models.Artist]{
+	// 	FilePath:       artistsFilePath,
+	// 	ElementName:    "artist",
+	// 	EntityTypeName: "artists",
+	// 	ChannelSize:    5000,
+	// 	BatchSize:      2500,
+	// 	ConvertFunc:    s.convertXMLArtistToModel,
+	// 	UpsertFunc:     s.repos.Artist.UpsertBatch,
+	// }
+	//
+	// if err := ProcessXMLEntities(ctx, artistsConfig, s.db, log); err != nil {
+	// 	return log.Err("failed to process artists", err)
+	// }
+
+	// Process masters using the abstracted entity processor
+	mastersFilePath := filepath.Join(downloadDir, "masters.xml.gz")
+	mastersConfig := EntityProcessorConfig[types.Master, models.Master]{
+		FilePath:       mastersFilePath,
+		ElementName:    "master",
+		EntityTypeName: "masters",
 		ChannelSize:    5000,
-		BatchSize:      2500,
-		ConvertFunc:    s.convertXMLArtistToModel,
-		UpsertFunc:     s.repos.Artist.UpsertBatch,
+		BatchSize:      5000,
+		ConvertFunc:    s.convertXMLMasterToModel,
+		UpsertFunc:     s.repos.Master.UpsertBatch,
 	}
 
-	if err := ProcessXMLEntities(ctx, artistsConfig, s.db, log); err != nil {
-		return log.Err("failed to process artists", err)
+	if err := ProcessXMLEntities(ctx, mastersConfig, s.db, log); err != nil {
+		return log.Err("failed to process masters", err)
 	}
 
 	// Example 3: Parse releases using generics
@@ -320,7 +369,7 @@ func ParseXMLGeneric[T any](
 			select {
 			case resultChan <- entity:
 				entityCount++
-				if entityCount%1000 == 0 {
+				if entityCount%100_000 == 0 {
 					log.Info(
 						"Parsing progress",
 						"entitiesParsed",

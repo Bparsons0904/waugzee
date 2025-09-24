@@ -1,11 +1,7 @@
 package models
 
-import (
-	"gorm.io/gorm"
-)
-
 type Artist struct {
-	BaseModel
+	BaseDiscogModel
 	Name        string `gorm:"type:text" json:"name"`
 	Profile     string `gorm:"type:text" json:"profile"`
 	Uri         string `gorm:"type:text" json:"uri"`
@@ -87,26 +83,3 @@ type Artist struct {
 //     }
 //   ],
 // }
-
-func (a *Artist) BeforeCreate(tx *gorm.DB) (err error) {
-	if a.ID <= 0 {
-		return gorm.ErrInvalidValue
-	}
-	if a.Name == "" {
-		return gorm.ErrInvalidValue
-	}
-
-	return nil
-}
-
-func (a *Artist) BeforeUpdate(tx *gorm.DB) (err error) {
-	if a.Name == "" {
-		return gorm.ErrInvalidValue
-	}
-
-	return nil
-}
-
-func (a *Artist) GetDiscogsID() int64 {
-	return a.ID
-}

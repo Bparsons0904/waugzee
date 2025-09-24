@@ -38,7 +38,7 @@ type FileDownloadInfo struct {
 
 // DiscogsDataProcessing tracks the state of Discogs data dump processing
 type DiscogsDataProcessing struct {
-	BaseModel
+	BaseDiscogModel
 
 	// Processing identification
 	YearMonth string `gorm:"uniqueIndex;not null" json:"year_month"`
@@ -196,4 +196,3 @@ func (d *DiscogsDataProcessing) InitializeFileInfo(fileType string) {
 func (DiscogsDataProcessing) TableName() string {
 	return "discogs_data_processing"
 }
-

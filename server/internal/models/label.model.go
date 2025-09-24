@@ -5,7 +5,7 @@ import (
 )
 
 type Label struct {
-	BaseModel
+	BaseDiscogModel
 	Profile     *string   `gorm:"type:text"                                json:"profile,omitempty"`
 	ResourceURL string    `gorm:"type:text"                                json:"resourceUrl,omitempty"`
 	URI         string    `gorm:"type:text"                                json:"uri,omitempty"`

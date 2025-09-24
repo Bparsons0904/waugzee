@@ -23,7 +23,11 @@ type MasterRepository interface {
 	Update(ctx context.Context, tx *gorm.DB, master *Master) error
 	Delete(ctx context.Context, tx *gorm.DB, id string) error
 	UpsertBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error
-	GetBatchByDiscogsIDs(ctx context.Context, tx *gorm.DB, discogsIDs []int64) (map[int64]*Master, error)
+	GetBatchByDiscogsIDs(
+		ctx context.Context,
+		tx *gorm.DB,
+		discogsIDs []int64,
+	) (map[int64]*Master, error)
 	InsertBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error
 	UpdateBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error
 	// Association methods
@@ -69,7 +73,11 @@ func (r *masterRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) 
 	return &master, nil
 }
 
-func (r *masterRepository) GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Master, error) {
+func (r *masterRepository) GetByDiscogsID(
+	ctx context.Context,
+	tx *gorm.DB,
+	discogsID int64,
+) (*Master, error) {
 	log := r.log.Function("GetByDiscogsID")
 
 	var master Master
@@ -83,7 +91,11 @@ func (r *masterRepository) GetByDiscogsID(ctx context.Context, tx *gorm.DB, disc
 	return &master, nil
 }
 
-func (r *masterRepository) Create(ctx context.Context, tx *gorm.DB, master *Master) (*Master, error) {
+func (r *masterRepository) Create(
+	ctx context.Context,
+	tx *gorm.DB,
+	master *Master,
+) (*Master, error) {
 	log := r.log.Function("Create")
 
 	if err := tx.WithContext(ctx).Create(master).Error; err != nil {
@@ -125,8 +137,6 @@ func (r *masterRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, masters
 		return nil
 	}
 
-	log.Info("Upserting masters", "count", len(masters))
-
 	if err := tx.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"title", "updated_at"}),
@@ -134,7 +144,6 @@ func (r *masterRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, masters
 		return log.Err("failed to upsert master batch", err, "count", len(masters))
 	}
 
-	log.Info("Successfully upserted masters", "count", len(masters))
 	return nil
 }
 
@@ -162,7 +171,6 @@ func (r *masterRepository) GetBatchByDiscogsIDs(
 
 	return result, nil
 }
-
 
 func (r *masterRepository) InsertBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error {
 	log := r.log.Function("InsertBatch")
@@ -263,7 +271,12 @@ func (r *masterRepository) CreateMasterGenreAssociations(
 	return nil
 }
 
-func (r *masterRepository) AssociateArtists(ctx context.Context, tx *gorm.DB, master *Master, artists []*Artist) error {
+func (r *masterRepository) AssociateArtists(
+	ctx context.Context,
+	tx *gorm.DB,
+	master *Master,
+	artists []*Artist,
+) error {
 	log := r.log.Function("AssociateArtists")
 
 	if len(artists) == 0 {
@@ -279,7 +292,12 @@ func (r *masterRepository) AssociateArtists(ctx context.Context, tx *gorm.DB, ma
 	return nil
 }
 
-func (r *masterRepository) AssociateGenres(ctx context.Context, tx *gorm.DB, master *Master, genres []*Genre) error {
+func (r *masterRepository) AssociateGenres(
+	ctx context.Context,
+	tx *gorm.DB,
+	master *Master,
+	genres []*Genre,
+) error {
 	log := r.log.Function("AssociateGenres")
 
 	if len(genres) == 0 {

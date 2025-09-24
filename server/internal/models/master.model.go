@@ -4,20 +4,19 @@ import (
 	"time"
 
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 type Master struct {
-	BaseModel
-	Title                        string     `gorm:"type:text;not null;index:idx_masters_title"               json:"title"`
-	LastSynced                   *time.Time `gorm:"type:timestamptz"                                         json:"lastSynced,omitempty"`
-	MainReleaseID                *int64     `gorm:"type:bigint"                                              json:"mainRelease,omitempty"`
-	MainReleaseResourceURL       *string    `gorm:"type:text"                                                json:"mainReleaseResourceUrl,omitempty"`
-	MostRecentReleaseID          *int64     `gorm:"type:bigint"                                              json:"mostRecentReleaseId,omitempty"`
-	MostRecentReleaseResourceURL *string    `gorm:"type:text"                                                json:"mostRecentReleaseResourceUrl,omitempty"`
-	Year                         *int       `gorm:"type:int"                                                 json:"year,omitempty"`
-	Uri                          string     `gorm:"type:text"                                                json:"uri"`
-	ResourceURL                  string     `gorm:"type:text"                                                json:"resourceUrl"`
+	BaseDiscogModel
+	Title                        string     `gorm:"type:text"        json:"title"`
+	LastSynced                   *time.Time `gorm:"type:timestamptz" json:"lastSynced,omitempty"`
+	MainReleaseID                *int64     `gorm:"type:bigint"      json:"mainRelease,omitempty"`
+	MainReleaseResourceURL       *string    `gorm:"type:text"        json:"mainReleaseResourceUrl,omitempty"`
+	MostRecentReleaseID          *int64     `gorm:"type:bigint"      json:"mostRecentReleaseId,omitempty"`
+	MostRecentReleaseResourceURL *string    `gorm:"type:text"        json:"mostRecentReleaseResourceUrl,omitempty"`
+	Year                         *int       `gorm:"type:int"         json:"year,omitempty"`
+	Uri                          string     `gorm:"type:text"        json:"uri"`
+	ResourceURL                  string     `gorm:"type:text"        json:"resourceUrl"`
 
 	// Claude add Data - Images, Videos
 	Data datatypes.JSON `gorm:"type:jsonb" json:"data,omitempty"`
@@ -147,26 +146,3 @@ type Master struct {
 //     }
 //   ]
 // }
-
-func (m *Master) BeforeCreate(tx *gorm.DB) (err error) {
-	if m.ID <= 0 {
-		return gorm.ErrInvalidValue
-	}
-	if m.Title == "" {
-		return gorm.ErrInvalidValue
-	}
-
-	return nil
-}
-
-func (m *Master) BeforeUpdate(tx *gorm.DB) (err error) {
-	if m.Title == "" {
-		return gorm.ErrInvalidValue
-	}
-
-	return nil
-}
-
-func (m *Master) GetDiscogsID() int64 {
-	return m.ID
-}

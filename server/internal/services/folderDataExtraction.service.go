@@ -106,7 +106,7 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 		// Extract Master
 		if basicInfo.MasterID > 0 && !processedMasters[basicInfo.MasterID] {
 			master := &Master{
-				BaseModel: BaseModel{
+				BaseDiscogModel: BaseDiscogModel{
 					ID: basicInfo.MasterID,
 				},
 				Title:      basicInfo.Title, // Use release title as master title
@@ -131,7 +131,7 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 		for _, artist := range basicInfo.Artists {
 			if artist.ID > 0 && !processedArtists[artist.ID] {
 				artistRecord := &Artist{
-					BaseModel: BaseModel{
+					BaseDiscogModel: BaseDiscogModel{
 						ID: artist.ID,
 					},
 					Name:    artist.Name,
@@ -152,7 +152,7 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 		for _, label := range basicInfo.Labels {
 			if label.ID > 0 && !processedLabels[label.ID] {
 				labelRecord := &Label{
-					BaseModel: BaseModel{
+					BaseDiscogModel: BaseDiscogModel{
 						ID: label.ID,
 					},
 					Name: label.Name,

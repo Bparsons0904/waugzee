@@ -108,7 +108,11 @@ func (r *genreRepository) Delete(ctx context.Context, tx *gorm.DB, id string) er
 	return nil
 }
 
-func (r *genreRepository) FindOrCreate(ctx context.Context, tx *gorm.DB, name string) (*Genre, error) {
+func (r *genreRepository) FindOrCreate(
+	ctx context.Context,
+	tx *gorm.DB,
+	name string,
+) (*Genre, error) {
 	log := r.log.Function("FindOrCreate")
 
 	if name == "" {
@@ -153,9 +157,6 @@ func (r *genreRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, genres [
 	}
 
 	hashableRecords := make([]utils.NameHashable, len(genres))
-	for i, genre := range genres {
-		hashableRecords[i] = genre
-	}
 
 	categories := utils.CategorizeRecordsByNameHash(hashableRecords, existingHashes)
 
