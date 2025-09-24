@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
@@ -200,6 +201,59 @@ func (s *DiscogsXMLParserService) convertXMLMasterToModel(xmlMaster types.Master
 	}
 }
 
+// convertXMLReleaseToModel converts XML Release to database Release model
+func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
+	xmlRelease types.Release,
+) *models.Release {
+	resourceURL := fmt.Sprintf(DISCOG_API_URL, "releases", xmlRelease.ID)
+	uri := fmt.Sprintf(DISCOG_URL, "release", xmlRelease.ID)
+
+	var year *int
+	if xmlRelease.Released != "" {
+		// Try to parse year from released string (could be YYYY or YYYY-MM-DD)
+		if len(xmlRelease.Released) >= 4 {
+			if parsedYear, err := strconv.Atoi(xmlRelease.Released[:4]); err == nil &&
+				parsedYear > 0 {
+				year = &parsedYear
+			}
+		}
+	}
+
+	var country *string
+	if xmlRelease.Country != "" {
+		country = &xmlRelease.Country
+	}
+
+	var notes *string
+	if xmlRelease.Notes != "" {
+		notes = &xmlRelease.Notes
+	}
+
+	// Determine format based on format information
+	format := models.FormatVinyl // Default to vinyl
+	// TODO: Parse actual format from xmlRelease.Formats when needed
+
+	release := &models.Release{
+		BaseDiscogModel: models.BaseDiscogModel{
+			ID: xmlRelease.ID,
+		},
+		Title: xmlRelease.Title,
+		// MasterID:    masterID,
+		Year:        year,
+		Country:     country,
+		Format:      format,
+		Notes:       notes,
+		ResourceURL: &resourceURL,
+		URI:         &uri,
+	}
+
+	if xmlRelease.MasterID > 0 {
+		release.MasterID = &xmlRelease.MasterID
+	}
+
+	return release
+}
+
 // ParseXMLFiles processes Discogs XML data files
 func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 	log := s.log.Function("ParseXMLFiles")
@@ -214,36 +268,36 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 	}
 
 	// Process labels using the abstracted entity processor
-	// labelsFilePath := filepath.Join(downloadDir, "labels.xml.gz")
-	// labelsConfig := EntityProcessorConfig[types.Label, models.Label]{
-	// 	FilePath:       labelsFilePath,
-	// 	ElementName:    "label",
-	// 	EntityTypeName: "labels",
-	// 	ChannelSize:    5000,
-	// 	BatchSize:      5000,
-	// 	ConvertFunc:    s.convertXMLLabelToModel,
-	// 	UpsertFunc:     s.repos.Label.UpsertBatch,
-	// }
-	//
-	// if err := ProcessXMLEntities(ctx, labelsConfig, s.db, log); err != nil {
-	// 	return log.Err("failed to process labels", err)
-	// }
+	labelsFilePath := filepath.Join(downloadDir, "labels.xml.gz")
+	labelsConfig := EntityProcessorConfig[types.Label, models.Label]{
+		FilePath:       labelsFilePath,
+		ElementName:    "label",
+		EntityTypeName: "labels",
+		ChannelSize:    5000,
+		BatchSize:      5000,
+		ConvertFunc:    s.convertXMLLabelToModel,
+		UpsertFunc:     s.repos.Label.UpsertBatch,
+	}
+
+	if err := ProcessXMLEntities(ctx, labelsConfig, s.db, log); err != nil {
+		return log.Err("failed to process labels", err)
+	}
 
 	// Process artists using the abstracted entity processor
-	// artistsFilePath := filepath.Join(downloadDir, "artists.xml.gz")
-	// artistsConfig := EntityProcessorConfig[types.Artist, models.Artist]{
-	// 	FilePath:       artistsFilePath,
-	// 	ElementName:    "artist",
-	// 	EntityTypeName: "artists",
-	// 	ChannelSize:    5000,
-	// 	BatchSize:      2500,
-	// 	ConvertFunc:    s.convertXMLArtistToModel,
-	// 	UpsertFunc:     s.repos.Artist.UpsertBatch,
-	// }
-	//
-	// if err := ProcessXMLEntities(ctx, artistsConfig, s.db, log); err != nil {
-	// 	return log.Err("failed to process artists", err)
-	// }
+	artistsFilePath := filepath.Join(downloadDir, "artists.xml.gz")
+	artistsConfig := EntityProcessorConfig[types.Artist, models.Artist]{
+		FilePath:       artistsFilePath,
+		ElementName:    "artist",
+		EntityTypeName: "artists",
+		ChannelSize:    5000,
+		BatchSize:      2500,
+		ConvertFunc:    s.convertXMLArtistToModel,
+		UpsertFunc:     s.repos.Artist.UpsertBatch,
+	}
+
+	if err := ProcessXMLEntities(ctx, artistsConfig, s.db, log); err != nil {
+		return log.Err("failed to process artists", err)
+	}
 
 	// Process masters using the abstracted entity processor
 	mastersFilePath := filepath.Join(downloadDir, "masters.xml.gz")
@@ -259,6 +313,22 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 
 	if err := ProcessXMLEntities(ctx, mastersConfig, s.db, log); err != nil {
 		return log.Err("failed to process masters", err)
+	}
+
+	// Process releases using the abstracted entity processor
+	releasesFilePath := filepath.Join(downloadDir, "releases.xml.gz")
+	releasesConfig := EntityProcessorConfig[types.Release, models.Release]{
+		FilePath:       releasesFilePath,
+		ElementName:    "release",
+		EntityTypeName: "releases",
+		ChannelSize:    5000,
+		BatchSize:      2500, // Smaller batch size for releases due to more complex data
+		ConvertFunc:    s.convertXMLReleaseToModel,
+		UpsertFunc:     s.repos.Release.UpsertBatch,
+	}
+
+	if err := ProcessXMLEntities(ctx, releasesConfig, s.db, log); err != nil {
+		return log.Err("failed to process releases", err)
 	}
 
 	// Example 3: Parse releases using generics

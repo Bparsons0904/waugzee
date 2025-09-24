@@ -59,7 +59,9 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 		// Extract Release
 		if basicInfo.ID > 0 && !processedReleases[basicInfo.ID] {
 			release := &Release{
-				ID:         basicInfo.ID,
+				BaseDiscogModel: BaseDiscogModel{
+					ID: basicInfo.ID,
+				},
 				Title:      basicInfo.Title,
 				Format:     FormatVinyl, // Default to vinyl for folder releases
 				LastSynced: nil,         // Set to null for newly created records
@@ -84,9 +86,9 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 			}
 
 			// Set Master ID if available
-			if basicInfo.MasterID > 0 {
-				release.MasterID = &basicInfo.MasterID
-			}
+			// if basicInfo.MasterID > 0 {
+			// 	release.MasterID = &basicInfo.MasterID
+			// }
 
 			// Store genres and styles in Data column using the new Data struct
 			if len(basicInfo.Genres) > 0 || len(basicInfo.Styles) > 0 {

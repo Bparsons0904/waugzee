@@ -35,14 +35,14 @@ type Label struct {
 
 type Release struct {
 	XMLName     xml.Name      `xml:"release"`
-	ID          int           `xml:"id"`
+	ID          int64         `xml:"id,attr"`
 	Status      string        `xml:"status"`
 	Title       string        `xml:"title"`
 	Country     string        `xml:"country"`
 	Released    string        `xml:"released"` // Keep as string for inconsistent formats
 	Notes       string        `xml:"notes"`
 	DataQuality string        `xml:"data_quality"`
-	MasterID    int           `xml:"master_id"`
+	MasterID    int64         `xml:"master_id"`
 	Artists     ReleaseArtist `xml:"artists>artist"`
 	Labels      ReleaseLabel  `xml:"labels>label"`
 	Formats     Format        `xml:"formats>format"`

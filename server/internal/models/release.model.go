@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 type ReleaseFormat string
@@ -23,30 +22,28 @@ type Data struct {
 }
 
 type Release struct {
-	ID          int64         `gorm:"type:bigint;primaryKey;not null"                                                     json:"discogsId"             validate:"required,gt=0"`
-	CreatedAt   time.Time     `gorm:"autoCreateTime"                                                                      json:"createdAt"`
-	UpdatedAt   time.Time     `gorm:"autoUpdateTime"                                                                      json:"updatedAt"`
-	Title       string        `gorm:"type:text;not null;index:idx_releases_title"                                         json:"title"                 validate:"required"`
-	LabelID     *int64        `gorm:"type:bigint;index:idx_releases_label"                                                json:"labelId,omitempty"`
-	MasterID    *int64        `gorm:"type:bigint;index:idx_releases_master;constraint:OnUpdate:CASCADE,OnDelete:SET NULL" json:"masterId,omitempty"`
-	Year        *int          `gorm:"type:int;index:idx_releases_year"                                                    json:"year,omitempty"`
-	Country     *string       `gorm:"type:text"                                                                           json:"country,omitempty"`
-	Format      ReleaseFormat `gorm:"type:text;default:'vinyl';index:idx_releases_format"                                 json:"format"`
-	TrackCount  *int          `gorm:"type:int"                                                                            json:"trackCount,omitempty"`
-	Notes       *string       `gorm:"type:text"                                                                           json:"notes,omitempty"`
-	ResourceURL *string       `gorm:"type:text"                                                                           json:"resourceUrl,omitempty"`
-	URI         *string       `gorm:"type:text"                                                                           json:"uri,omitempty"`
-	DateAdded   *time.Time    `gorm:"type:timestamptz"                                                                    json:"dateAdded,omitempty"`
-	DateChanged *time.Time    `gorm:"type:timestamptz"                                                                    json:"dateChanged,omitempty"`
-	LastSynced  *time.Time    `gorm:"type:timestamptz"                                                                    json:"lastSynced,omitempty"`
-	Thumb       *string       `gorm:"type:text"                                                                           json:"thumb,omitempty"`
-	CoverImage  *string       `gorm:"type:text"                                                                           json:"coverImage,omitempty"`
+	BaseDiscogModel
+	Title       string        `gorm:"type:text;"       json:"title"`
+	LabelID     *int64        `gorm:"type:bigint;"     json:"labelId,omitempty"`
+	MasterID    *int64        `gorm:"type:bigint"      json:"masterId,omitempty"`
+	Year        *int          `gorm:"type:int"         json:"year,omitempty"`
+	Country     *string       `gorm:"type:text"        json:"country,omitempty"`
+	Format      ReleaseFormat `gorm:"type:text"        json:"format"`
+	TrackCount  *int          `gorm:"type:int"         json:"trackCount,omitempty"`
+	Notes       *string       `gorm:"type:text"        json:"notes,omitempty"`
+	ResourceURL *string       `gorm:"type:text"        json:"resourceUrl,omitempty"`
+	URI         *string       `gorm:"type:text"        json:"uri,omitempty"`
+	DateAdded   *time.Time    `gorm:"type:timestamptz" json:"dateAdded,omitempty"`
+	DateChanged *time.Time    `gorm:"type:timestamptz" json:"dateChanged,omitempty"`
+	LastSynced  *time.Time    `gorm:"type:timestamptz" json:"lastSynced,omitempty"`
+	Thumb       *string       `gorm:"type:text"        json:"thumb,omitempty"`
+	CoverImage  *string       `gorm:"type:text"        json:"coverImage,omitempty"`
 
 	// JSONB column containing embedded display data: tracks, styles, images, videos
 	// Claude we eventually need to properly define these with a struct
 	Data datatypes.JSON `gorm:"type:jsonb" json:"data,omitempty"`
 
-	Master  *Master  `gorm:"foreignKey:MasterID"                                                    json:"master,omitempty"`
+	Master  *Master  `gorm:"-:migration" json:"master,omitempty"`
 	Artists []Artist `gorm:"many2many:release_artists;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"artists,omitempty"`
 	Labels  []Label  `gorm:"many2many:release_labels;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"  json:"labels,omitempty"`
 	Genres  []Genre  `gorm:"many2many:release_genres;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"  json:"genres,omitempty"`
@@ -223,29 +220,3 @@ type Release struct {
 //     ],
 //     "year": 1987
 // }
-
-func (r *Release) BeforeCreate(tx *gorm.DB) (err error) {
-	if r.ID <= 0 {
-		return gorm.ErrInvalidValue
-	}
-	if r.Title == "" {
-		return gorm.ErrInvalidValue
-	}
-	if r.Format == "" {
-		r.Format = FormatVinyl
-	}
-
-	return nil
-}
-
-func (r *Release) BeforeUpdate(tx *gorm.DB) (err error) {
-	if r.Title == "" {
-		return gorm.ErrInvalidValue
-	}
-
-	return nil
-}
-
-func (r *Release) GetDiscogsID() int64 {
-	return r.ID
-}

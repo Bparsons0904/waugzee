@@ -22,9 +22,9 @@ type Master struct {
 	Data datatypes.JSON `gorm:"type:jsonb" json:"data,omitempty"`
 
 	// Relationships
-	Releases []Release `gorm:"foreignKey:MasterID"       json:"releases,omitempty"`
-	Genres   []Genre   `gorm:"many2many:master_genres;"  json:"genres,omitempty"`
-	Artists  []Artist  `gorm:"many2many:master_artists;" json:"artists,omitempty"`
+	Releases []*Release `gorm:"-:migration"              json:"releases,omitempty"`
+	Genres   []Genre    `gorm:"many2many:master_genres;"  json:"genres,omitempty"`
+	Artists  []Artist   `gorm:"many2many:master_artists;" json:"artists,omitempty"`
 }
 
 // Example response from Discogs for a master
