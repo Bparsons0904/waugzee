@@ -38,11 +38,10 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 		return nil
 	}
 
-
 	// Collect all entities to process
 	artists := make([]*Artist, 0)
 	releases := make([]*Release, 0)
-	labels := make([]*Label, 0)
+	labels := make([]Label, 0)
 	genres := make([]*Genre, 0)
 	masters := make([]*Master, 0)
 
@@ -132,7 +131,7 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 				artistRecord := &Artist{
 					ID:         artist.ID,
 					Name:       artist.Name,
-					Profile:    "", // Empty profile for basic information
+					Profile:    "",  // Empty profile for basic information
 					LastSynced: nil, // Set to null for newly created records
 				}
 
@@ -160,7 +159,7 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 					labelRecord.ResourceURL = &label.ResourceURL
 				}
 
-				labels = append(labels, labelRecord)
+				labels = append(labels, *labelRecord)
 				processedLabels[label.ID] = true
 			}
 		}
@@ -220,7 +219,6 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 	if err := f.createMasterAssociations(ctx, tx, folderReleases); err != nil {
 		return log.Err("failed to create master associations", err)
 	}
-
 
 	return nil
 }
@@ -346,7 +344,6 @@ func (f *FolderDataExtractionService) GetRecordsNeedingFullData(
 		needingFullData[i] = release.ID
 	}
 
-
 	return needingFullData, nil
 }
 
@@ -455,3 +452,4 @@ func (f *FolderDataExtractionService) createMasterAssociations(
 
 	return nil
 }
+

@@ -74,12 +74,14 @@ func (l *Label) BeforeCreate(tx *gorm.DB) (err error) {
 		return gorm.ErrInvalidValue
 	}
 
-	// Generate content hash
-	hash, err := utils.GenerateEntityHash(l)
-	if err != nil {
-		return err
+	// Only generate content hash if it's not already set (avoid duplicate work in batch operations)
+	if l.ContentHash == "" {
+		hash, err := utils.GenerateEntityHash(l)
+		if err != nil {
+			return err
+		}
+		l.ContentHash = hash
 	}
-	l.ContentHash = hash
 
 	return nil
 }

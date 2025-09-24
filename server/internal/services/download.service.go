@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 	"waugzee/config"
@@ -95,7 +96,7 @@ func (ds *DownloadService) DownloadChecksum(ctx context.Context, yearMonth strin
 
 	// Create download directory
 	downloadDir := fmt.Sprintf("%s/%s", DiscogsDataDir, yearMonth)
-	if err := ds.ensureDirectory(downloadDir); err != nil {
+	if err := ensureDirectory(downloadDir, log); err != nil {
 		return log.Err("failed to create download directory", err, "directory", downloadDir)
 	}
 
@@ -204,13 +205,7 @@ func (ds *DownloadService) DownloadXMLFile(ctx context.Context, yearMonth, fileT
 
 	// Validate file type
 	validFileTypes := []string{"artists", "labels", "masters", "releases"}
-	isValid := false
-	for _, validType := range validFileTypes {
-		if fileType == validType {
-			isValid = true
-			break
-		}
-	}
+	isValid := slices.Contains(validFileTypes, fileType)
 	if !isValid {
 		return log.Err(
 			"invalid file type",
@@ -233,7 +228,7 @@ func (ds *DownloadService) DownloadXMLFile(ctx context.Context, yearMonth, fileT
 
 	// Create download directory
 	downloadDir := fmt.Sprintf("%s/%s", DiscogsDataDir, yearMonth)
-	if err := ds.ensureDirectory(downloadDir); err != nil {
+	if err := ensureDirectory(downloadDir, log); err != nil {
 		return log.Err("failed to create download directory", err, "directory", downloadDir)
 	}
 
@@ -503,8 +498,8 @@ func (ds *DownloadService) logDownloadProgress(contentLength, downloaded int64, 
 }
 
 // ensureDirectory creates directory if it doesn't exist
-func (ds *DownloadService) ensureDirectory(dir string) error {
-	log := ds.log.Function("ensureDirectory")
+func ensureDirectory(dir string, logger logger.Logger) error {
+	log := logger.Function("ensureDirectory")
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -608,4 +603,3 @@ func isValidYearMonth(yearMonth string) bool {
 	year, month := parts[0], parts[1]
 	return len(year) == 4 && len(month) == 2
 }
-

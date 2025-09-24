@@ -40,5 +40,15 @@ func RegisterAllJobs(
 	}
 	log.Info("Registered Discogs download job", "schedule", "hourly")
 
+	// Register Discogs XML parser job - runs hourly for testing
+	discogsXMLParserJob := NewDiscogsXMLParserJob(
+		services.DiscogsXMLParser,
+		Hourly,
+	)
+	if err := schedulerService.AddJob(discogsXMLParserJob); err != nil {
+		return log.Err("failed to register Discogs XML parser job", err)
+	}
+	log.Info("Registered Discogs XML parser job", "schedule", "hourly")
+
 	return nil
 }
