@@ -41,7 +41,7 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 	// Collect all entities to process
 	artists := make([]*Artist, 0)
 	releases := make([]*Release, 0)
-	labels := make([]Label, 0)
+	labels := make([]*Label, 0)
 	genres := make([]*Genre, 0)
 	masters := make([]*Master, 0)
 
@@ -159,7 +159,7 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 					labelRecord.ResourceURL = &label.ResourceURL
 				}
 
-				labels = append(labels, *labelRecord)
+				labels = append(labels, labelRecord)
 				processedLabels[label.ID] = true
 			}
 		}
@@ -452,4 +452,3 @@ func (f *FolderDataExtractionService) createMasterAssociations(
 
 	return nil
 }
-

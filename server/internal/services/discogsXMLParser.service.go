@@ -33,6 +33,11 @@ func NewDiscogsXMLParserService(
 	}
 }
 
+const (
+	DISCOG_URL     = "https://www.discogs.com/%s/%d"
+	DISCOG_API_URL = "https://api.discogs.com/%s/%d"
+)
+
 // func (s *DiscogsXMLParserService) HandleLabels(labelChannel chan<- types.Label) string {
 //
 // }
@@ -72,7 +77,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 
 	// Example 2: Parse labels using generics
 	// Use unbuffered channel to ensure no records are lost due to channel blocking
-	labelsChan := make(chan types.Label)
+	labelsChan := make(chan types.Label, 5000)
 
 	// Start the parser in a goroutine
 	go func() {
@@ -83,7 +88,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 			targetFile,
 			"label",
 			labelsChan,
-			10000, // Remove limit to process all records
+			0, // Remove limit to process all records
 			log,
 		)
 		if err != nil {
@@ -95,60 +100,42 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 	// Process labels with smaller batch size for more frequent database saves
 	processedCount := 0
 
-	var labels []Label
+	var labels []*Label
 	for xmlLabel := range labelsChan {
 		processedCount++
-		if processedCount%1000 == 0 {
-			log.Info("Processing labels", "processed", processedCount)
-		}
 
+		resourceURL := fmt.Sprintf(
+			DISCOG_API_URL,
+			"labels",
+			xmlLabel.ID,
+		)
+		uri := fmt.Sprintf(
+			DISCOG_URL,
+			"labels",
+			xmlLabel.ID,
+		)
 		label := Label{
-			ID:      xmlLabel.ID,
-			Profile: &xmlLabel.Profile,
-			Name:    xmlLabel.Name,
-			// URI:        xmlLabel.URLs,
+			ID:          xmlLabel.ID,
+			Profile:     &xmlLabel.Profile,
+			Name:        xmlLabel.Name,
+			ResourceURL: &resourceURL,
+			URI:         &uri,
 		}
-		labels = append(labels, label)
+		labels = append(labels, &label)
 
 		// Use smaller batch size to prevent channel blocking
-		if len(labels) >= 1000 {
-			log.Info(
-				"Saving labels batch",
-				"count",
-				len(labels),
-				"totalProcessed",
-				processedCount,
-				"firstLabelID",
-				labels[0].ID,
-				"lastLabelID",
-				labels[len(labels)-1].ID,
-			)
-			if err := s.repos.Label.UpsertBatch(ctx, s.db.SQLWithContext(ctx), labels); err != nil {
+		if len(labels) >= 5000 {
+			if err := s.repos.Label.UpsertFileBatch(ctx, s.db.SQLWithContext(ctx), labels); err != nil {
 				log.Error("Failed to upsert labels", "error", err)
-			} else {
-				log.Info("Successfully saved labels batch", "count", len(labels), "firstLabelID", labels[0].ID, "lastLabelID", labels[len(labels)-1].ID)
 			}
-			labels = []Label{}
+			labels = []*Label{}
 		}
 	}
 
 	// Save any remaining labels in the final batch
 	if len(labels) > 0 {
-		log.Info(
-			"Saving final labels batch",
-			"count",
-			len(labels),
-			"totalProcessed",
-			processedCount,
-			"firstLabelID",
-			labels[0].ID,
-			"lastLabelID",
-			labels[len(labels)-1].ID,
-		)
-		if err := s.repos.Label.UpsertBatch(ctx, s.db.SQLWithContext(ctx), labels); err != nil {
+		if err := s.repos.Label.UpsertFileBatch(ctx, s.db.SQLWithContext(ctx), labels); err != nil {
 			log.Error("Failed to upsert final labels batch", "error", err)
-		} else {
-			log.Info("Successfully saved final labels batch", "count", len(labels), "firstLabelID", labels[0].ID, "lastLabelID", labels[len(labels)-1].ID)
 		}
 	}
 

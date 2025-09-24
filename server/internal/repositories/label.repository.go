@@ -2,13 +2,12 @@ package repositories
 
 import (
 	"context"
-	"fmt"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
-	"waugzee/internal/utils"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type LabelRepository interface {
@@ -17,17 +16,13 @@ type LabelRepository interface {
 	Create(ctx context.Context, tx *gorm.DB, label *Label) (*Label, error)
 	Update(ctx context.Context, tx *gorm.DB, label *Label) error
 	Delete(ctx context.Context, tx *gorm.DB, id string) error
-	UpsertBatch(ctx context.Context, tx *gorm.DB, labels []Label) error
+	UpsertFileBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error
+	UpsertBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error
 	GetBatchByDiscogsIDs(
 		ctx context.Context,
 		tx *gorm.DB,
 		discogsIDs []int64,
 	) (map[int64]*Label, error)
-	GetHashesByDiscogsIDs(
-		ctx context.Context,
-		tx *gorm.DB,
-		discogsIDs []int64,
-	) (map[int64]string, error)
 	InsertBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error
 	UpdateBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error
 }
@@ -111,78 +106,41 @@ func (r *labelRepository) Delete(ctx context.Context, tx *gorm.DB, id string) er
 	return nil
 }
 
-func (r *labelRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, labels []Label) error {
+func (r *labelRepository) UpsertFileBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
 	log := r.log.Function("UpsertBatch")
 
 	if len(labels) == 0 {
 		return nil
 	}
 
-	// Debug transaction state
-	log.Info("UpsertBatch start",
-		"labelsCount", len(labels),
-		"txPtr", fmt.Sprintf("%p", tx),
-		"txError", tx.Error,
-		"txRowsAffected", tx.RowsAffected,
-	)
-
-	discogsIDs := make([]int64, len(labels))
-	for i, label := range labels {
-		discogsIDs[i] = label.ID
+	if err := tx.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name", "profile", "updated_at", "resource_url", "uri"}),
+	}).Create(&labels).Error; err != nil {
+		return log.Err("failed to upsert label batch", err, "count", len(labels))
 	}
 
-	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, tx, discogsIDs)
-	if err != nil {
-		return log.Err("failed to get existing hashes", err, "count", len(discogsIDs))
+	return nil
+}
+
+// TODO: This should handle updates from folder sync
+func (r *labelRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
+	log := r.log.Function("UpsertBatch")
+
+	if len(labels) == 0 {
+		return nil
 	}
 
-	hashableRecords := make([]utils.DiscogsHashable, len(labels))
-	for i, label := range labels {
-		hashableRecords[i] = &label
+	log.Info("Upserting labels", "count", len(labels))
+
+	if err := tx.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name", "profile", "updated_at"}),
+	}).Create(&labels).Error; err != nil {
+		return log.Err("failed to upsert label batch", err, "count", len(labels))
 	}
 
-	categories := utils.CategorizeRecordsByHash(hashableRecords, existingHashes)
-	log.Info(
-		"Categorized labels",
-		"insert",
-		len(categories.Insert),
-		"update",
-		len(categories.Update),
-		"skip",
-		len(categories.Skip),
-	)
-
-	if len(categories.Insert) > 0 {
-		insertLabels := make([]*Label, len(categories.Insert))
-		for i, record := range categories.Insert {
-			insertLabels[i] = record.(*Label)
-		}
-		log.Info("About to insert", "count", len(insertLabels), "firstID", insertLabels[0].ID)
-		err = r.InsertBatch(ctx, tx, insertLabels)
-		if err != nil {
-			return log.Err("failed to insert label batch", err, "count", len(insertLabels))
-		}
-		log.Info("Insert completed successfully", "count", len(insertLabels))
-	}
-
-	if len(categories.Update) > 0 {
-		updateLabels := make([]*Label, len(categories.Update))
-		for i, record := range categories.Update {
-			updateLabels[i] = record.(*Label)
-		}
-		log.Info("About to update", "count", len(updateLabels), "firstID", updateLabels[0].ID)
-		err = r.UpdateBatch(ctx, tx, updateLabels)
-		if err != nil {
-			return log.Err(
-				"failed to update label batch",
-				err,
-				"count",
-				len(updateLabels),
-			)
-		}
-		log.Info("Update completed successfully", "count", len(updateLabels))
-	}
-
+	log.Info("Successfully upserted labels", "count", len(labels))
 	return nil
 }
 
@@ -212,43 +170,6 @@ func (r *labelRepository) GetBatchByDiscogsIDs(
 	return result, nil
 }
 
-func (r *labelRepository) GetHashesByDiscogsIDs(
-	ctx context.Context,
-	tx *gorm.DB,
-	discogsIDs []int64,
-) (map[int64]string, error) {
-	log := r.log.Function("GetHashesByDiscogsIDs")
-
-	if len(discogsIDs) == 0 {
-		return make(map[int64]string), nil
-	}
-
-	var labels []struct {
-		ID          int64  `json:"discogsId"`
-		ContentHash string `json:"contentHash"`
-	}
-
-	if err := tx.WithContext(ctx).
-		Model(&Label{}).
-		Select("id, content_hash").
-		Where("id IN ?", discogsIDs).
-		Find(&labels).Error; err != nil {
-		return nil, log.Err(
-			"failed to get label hashes by Discogs IDs",
-			err,
-			"count",
-			len(discogsIDs),
-		)
-	}
-
-	result := make(map[int64]string, len(labels))
-	for _, label := range labels {
-		result[label.ID] = label.ContentHash
-	}
-
-	return result, nil
-}
-
 func (r *labelRepository) InsertBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
 	log := r.log.Function("InsertBatch")
 
@@ -256,34 +177,7 @@ func (r *labelRepository) InsertBatch(ctx context.Context, tx *gorm.DB, labels [
 		return nil
 	}
 
-	// Debug logging for type information
-	log.Info("InsertBatch type debug",
-		"labelsType", fmt.Sprintf("%T", labels),
-		"labelsLen", len(labels),
-		"firstLabelType", fmt.Sprintf("%T", labels[0]),
-		"firstLabelPtr", fmt.Sprintf("%p", labels[0]),
-		"firstLabelIsNil", labels[0] == nil,
-		"txPtr", fmt.Sprintf("%p", tx),
-		"txStmt", tx.Statement != nil,
-	)
-
-	// Check if first label has required fields
-	if len(labels) > 0 {
-		log.Info("First label debug",
-			"id", labels[0].ID,
-			"name", labels[0].Name,
-			"hasProfile", labels[0].Profile != nil,
-			"contentHash", labels[0].ContentHash,
-		)
-	}
-
 	if err := tx.WithContext(ctx).Create(labels).Error; err != nil {
-		// Add more detailed error logging
-		log.Error("GORM Create failed",
-			"error", err.Error(),
-			"txError", tx.Error,
-			"txRowsAffected", tx.RowsAffected,
-		)
 		return log.Err("failed to insert label batch", err, "count", len(labels))
 	}
 
