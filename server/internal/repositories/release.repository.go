@@ -10,6 +10,12 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// ReleaseArtistAssociation represents a specific release-artist association pair
+type ReleaseArtistAssociation struct {
+	ReleaseID int64
+	ArtistID  int64
+}
+
 type ReleaseRepository interface {
 	GetByID(ctx context.Context, tx *gorm.DB, id string) (*Release, error)
 	GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Release, error)
@@ -21,6 +27,7 @@ type ReleaseRepository interface {
 	InsertBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
 	UpdateBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
 	// Association methods
+	CreateReleaseArtistAssociations(ctx context.Context, tx *gorm.DB, associations []ReleaseArtistAssociation) error
 	AssociateArtists(ctx context.Context, tx *gorm.DB, release *Release, artists []*Artist) error
 	AssociateLabels(ctx context.Context, tx *gorm.DB, release *Release, labels []*Label) error
 	AssociateGenres(ctx context.Context, tx *gorm.DB, release *Release, genres []*Genre) error
@@ -230,6 +237,49 @@ func (r *releaseRepository) AssociateGenres(ctx context.Context, tx *gorm.DB, re
 			"releaseID", release.ID,
 			"genreCount", len(genres))
 	}
+
+	return nil
+}
+
+// CreateReleaseArtistAssociations creates specific release-artist association pairs
+func (r *releaseRepository) CreateReleaseArtistAssociations(
+	ctx context.Context,
+	tx *gorm.DB,
+	associations []ReleaseArtistAssociation,
+) error {
+	log := r.log.Function("CreateReleaseArtistAssociations")
+
+	if len(associations) == 0 {
+		return nil
+	}
+
+	// Prepare association pairs for bulk insert with ordered processing to prevent deadlocks
+	releaseIDs := make([]int64, len(associations))
+	artistIDs := make([]int64, len(associations))
+
+	for i, assoc := range associations {
+		releaseIDs[i] = assoc.ReleaseID
+		artistIDs[i] = assoc.ArtistID
+	}
+
+	// Insert exact association pairs with ordering to prevent deadlocks
+	query := `
+		INSERT INTO release_artists (release_id, artist_id)
+		SELECT release_id, artist_id
+		FROM unnest($1::bigint[], $2::bigint[]) AS t(release_id, artist_id)
+		ORDER BY release_id, artist_id
+		ON CONFLICT (release_id, artist_id) DO NOTHING
+	`
+
+	result := tx.WithContext(ctx).Exec(query, releaseIDs, artistIDs)
+	if result.Error != nil {
+		return log.Err("failed to create release-artist associations", result.Error,
+			"associationCount", len(associations))
+	}
+
+	log.Info("Created release-artist associations",
+		"associationCount", len(associations),
+		"rowsAffected", result.RowsAffected)
 
 	return nil
 }

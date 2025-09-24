@@ -34,39 +34,39 @@ type Label struct {
 }
 
 type Release struct {
-	XMLName     xml.Name      `xml:"release"`
-	ID          int64         `xml:"id,attr"`
-	Status      string        `xml:"status"`
-	Title       string        `xml:"title"`
-	Country     string        `xml:"country"`
-	Released    string        `xml:"released"` // Keep as string for inconsistent formats
-	Notes       string        `xml:"notes"`
-	DataQuality string        `xml:"data_quality"`
-	MasterID    int64         `xml:"master_id"`
-	Artists     ReleaseArtist `xml:"artists>artist"`
-	Labels      ReleaseLabel  `xml:"labels>label"`
-	Formats     Format        `xml:"formats>format"`
-	Genres      string        `xml:"genres>genre"`
-	Styles      string        `xml:"styles>style"`
-	Tracklist   Track         `xml:"tracklist>track"`
-	Images      Image         `xml:"images>image"`
+	XMLName     xml.Name        `xml:"release"`
+	ID          int64           `xml:"id,attr"`
+	Status      string          `xml:"status"`
+	Title       string          `xml:"title"`
+	Country     string          `xml:"country"`
+	Released    string          `xml:"released"` // Keep as string for inconsistent formats
+	Notes       string          `xml:"notes"`
+	DataQuality string          `xml:"data_quality"`
+	MasterID    int64           `xml:"master_id"`
+	Artists     []ReleaseArtist `xml:"artists>artist"`
+	Labels      ReleaseLabel    `xml:"labels>label"`
+	Formats     Format          `xml:"formats>format"`
+	Genres      string          `xml:"genres>genre"`
+	Styles      string          `xml:"styles>style"`
+	Tracklist   Track           `xml:"tracklist>track"`
+	Images      Image           `xml:"images>image"`
 	// IdentifiersIdentifier  `xml:"identifiers>identifier"`
 	Companies Company `xml:"companies>company"`
 }
 
 type Master struct {
-	XMLName     xml.Name     `xml:"master"`
-	ID          int64        `xml:"id,attr"`
-	MainRelease int          `xml:"main_release"`
-	Title       string       `xml:"title"`
-	Year        int          `xml:"year"`
-	Notes       string       `xml:"notes"`
-	DataQuality string       `xml:"data_quality"`
-	Artists     MasterArtist `xml:"artists>artist"`
-	Genres      string       `xml:"genres>genre"`
-	Styles      string       `xml:"styles>style"`
-	Videos      Video        `xml:"videos>video"`
-	Images      Image        `xml:"images>image"`
+	XMLName     xml.Name       `xml:"master"`
+	ID          int64          `xml:"id,attr"`
+	MainRelease int            `xml:"main_release"`
+	Title       string         `xml:"title"`
+	Year        int            `xml:"year"`
+	Notes       string         `xml:"notes"`
+	DataQuality string         `xml:"data_quality"`
+	Artists     []MasterArtist `xml:"artists>artist"`
+	Genres      string         `xml:"genres>genre"`
+	Styles      string         `xml:"styles>style"`
+	Videos      Video          `xml:"videos>video"`
+	Images      Image          `xml:"images>image"`
 }
 
 // Supporting structs - Corrected
