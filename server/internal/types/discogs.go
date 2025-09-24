@@ -7,7 +7,7 @@ import (
 // Core Discogs entities - Corrected
 type Artist struct {
 	XMLName     xml.Name `xml:"artist"`
-	ID          int      `xml:"id"`
+	ID          int64    `xml:"id"`
 	Name        string   `xml:"name"`
 	RealName    string   `xml:"realname"`
 	Profile     string   `xml:"profile"`

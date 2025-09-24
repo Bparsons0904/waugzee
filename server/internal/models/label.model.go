@@ -1,21 +1,16 @@
 package models
 
 import (
-	"time"
-
 	"gorm.io/gorm"
 )
 
 type Label struct {
-	ID          int64      `gorm:"type:bigint;primaryKey;not null"          json:"discogsId"`
-	Profile     *string    `gorm:"type:text"                                json:"profile,omitempty"`
-	ResourceURL *string    `gorm:"type:text"                                json:"resourceUrl,omitempty"`
-	URI         *string    `gorm:"type:text"                                json:"uri,omitempty"`
-	CreatedAt   time.Time  `gorm:"autoCreateTime"                           json:"createdAt"`
-	UpdatedAt   time.Time  `gorm:"autoUpdateTime"                           json:"updatedAt"`
-	Name        string     `gorm:"type:text;not null;index:idx_labels_name" json:"name"`
-	LastSynced  *time.Time `gorm:"type:timestamptz"                         json:"lastSynced,omitempty"`
-	Releases    []Release  `gorm:"foreignKey:LabelID"                       json:"releases,omitempty"`
+	BaseModel
+	Profile     *string   `gorm:"type:text"                                json:"profile,omitempty"`
+	ResourceURL string    `gorm:"type:text"                                json:"resourceUrl,omitempty"`
+	URI         string    `gorm:"type:text"                                json:"uri,omitempty"`
+	Name        string    `gorm:"type:text;not null;index:idx_labels_name" json:"name"`
+	Releases    []Release `gorm:"foreignKey:LabelID"                       json:"releases,omitempty"`
 }
 
 // For reference only, from Discogs api docs

@@ -2,7 +2,6 @@ package models
 
 import (
 	"time"
-	"waugzee/internal/utils"
 
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -35,7 +34,6 @@ type Release struct {
 	Format      ReleaseFormat `gorm:"type:text;default:'vinyl';index:idx_releases_format"                                 json:"format"`
 	TrackCount  *int          `gorm:"type:int"                                                                            json:"trackCount,omitempty"`
 	Notes       *string       `gorm:"type:text"                                                                           json:"notes,omitempty"`
-	ContentHash string        `gorm:"type:varchar(64);not null;index:idx_releases_content_hash"                           json:"contentHash"`
 	ResourceURL *string       `gorm:"type:text"                                                                           json:"resourceUrl,omitempty"`
 	URI         *string       `gorm:"type:text"                                                                           json:"uri,omitempty"`
 	DateAdded   *time.Time    `gorm:"type:timestamptz"                                                                    json:"dateAdded,omitempty"`
@@ -237,13 +235,6 @@ func (r *Release) BeforeCreate(tx *gorm.DB) (err error) {
 		r.Format = FormatVinyl
 	}
 
-	// Generate content hash
-	hash, err := utils.GenerateEntityHash(r)
-	if err != nil {
-		return err
-	}
-	r.ContentHash = hash
-
 	return nil
 }
 
@@ -252,44 +243,7 @@ func (r *Release) BeforeUpdate(tx *gorm.DB) (err error) {
 		return gorm.ErrInvalidValue
 	}
 
-	// Regenerate content hash
-	hash, err := utils.GenerateEntityHash(r)
-	if err != nil {
-		return err
-	}
-	r.ContentHash = hash
-
 	return nil
-}
-
-// Hashable interface implementation
-func (r *Release) GetHashableFields() map[string]interface{} {
-	return map[string]interface{}{
-		"Title":       r.Title,
-		"LabelID":     r.LabelID,
-		"MasterID":    r.MasterID,
-		"Year":        r.Year,
-		"Country":     r.Country,
-		"Format":      r.Format,
-		"TrackCount":  r.TrackCount,
-		"Notes":       r.Notes,
-		"ResourceURL": r.ResourceURL,
-		"URI":         r.URI,
-		"DateAdded":   r.DateAdded,
-		"DateChanged": r.DateChanged,
-		"LastSynced":  r.LastSynced,
-		"Thumb":       r.Thumb,
-		"CoverImage":  r.CoverImage,
-		"Data":        r.Data,
-	}
-}
-
-func (r *Release) SetContentHash(hash string) {
-	r.ContentHash = hash
-}
-
-func (r *Release) GetContentHash() string {
-	return r.ContentHash
 }
 
 func (r *Release) GetDiscogsID() int64 {

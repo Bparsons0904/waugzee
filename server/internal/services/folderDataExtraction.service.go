@@ -106,7 +106,9 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 		// Extract Master
 		if basicInfo.MasterID > 0 && !processedMasters[basicInfo.MasterID] {
 			master := &Master{
-				ID:         basicInfo.MasterID,
+				BaseModel: BaseModel{
+					ID: basicInfo.MasterID,
+				},
 				Title:      basicInfo.Title, // Use release title as master title
 				LastSynced: nil,             // Set to null for newly created records
 			}
@@ -129,15 +131,16 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 		for _, artist := range basicInfo.Artists {
 			if artist.ID > 0 && !processedArtists[artist.ID] {
 				artistRecord := &Artist{
-					ID:         artist.ID,
-					Name:       artist.Name,
-					Profile:    "",  // Empty profile for basic information
-					LastSynced: nil, // Set to null for newly created records
+					BaseModel: BaseModel{
+						ID: artist.ID,
+					},
+					Name:    artist.Name,
+					Profile: "", // Empty profile for basic information
 				}
 
 				// Set ResourceURL if available
 				if artist.ResourceURL != "" {
-					artistRecord.ResourceURL = &artist.ResourceURL
+					artistRecord.ResourceURL = artist.ResourceURL
 				}
 
 				artists = append(artists, artistRecord)
@@ -149,14 +152,15 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 		for _, label := range basicInfo.Labels {
 			if label.ID > 0 && !processedLabels[label.ID] {
 				labelRecord := &Label{
-					ID:         label.ID,
-					Name:       label.Name,
-					LastSynced: nil, // Set to null for newly created records
+					BaseModel: BaseModel{
+						ID: label.ID,
+					},
+					Name: label.Name,
 				}
 
 				// Set ResourceURL if available
 				if label.ResourceURL != "" {
-					labelRecord.ResourceURL = &label.ResourceURL
+					labelRecord.ResourceURL = label.ResourceURL
 				}
 
 				labels = append(labels, labelRecord)

@@ -15,8 +15,8 @@ type BaseUUIDModel struct {
 }
 
 type BaseModel struct {
-	ID        int            `gorm:"type:int;primaryKey;autoIncrement" json:"id"`
-	CreatedAt time.Time      `gorm:"autoCreateTime"                    json:"createdAt"`
-	UpdatedAt time.Time      `gorm:"autoUpdateTime"                    json:"updatedAt"`
-	DeletedAt gorm.DeletedAt `                                         json:"deletedAt"`
+	ID        int64          `gorm:"type:bigint;primaryKey;autoIncrement" json:"id"`
+	CreatedAt time.Time      `gorm:"autoCreateTime"                       json:"createdAt"`
+	UpdatedAt time.Time      `gorm:"autoUpdateTime"                       json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `                                            json:"deletedAt"`
 }

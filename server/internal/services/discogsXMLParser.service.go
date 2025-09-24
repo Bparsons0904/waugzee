@@ -11,9 +11,11 @@ import (
 	"time"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
-	. "waugzee/internal/models"
+	"waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/types"
+
+	"gorm.io/gorm"
 )
 
 type DiscogsXMLParserService struct {
@@ -38,9 +40,132 @@ const (
 	DISCOG_API_URL = "https://api.discogs.com/%s/%d"
 )
 
-// func (s *DiscogsXMLParserService) HandleLabels(labelChannel chan<- types.Label) string {
-//
-// }
+// EntityProcessorConfig holds configuration for generic entity processing
+type EntityProcessorConfig[TXMLType any, TModelType any] struct {
+	FilePath       string
+	ElementName    string
+	EntityTypeName string
+	ChannelSize    int
+	BatchSize      int
+	ConvertFunc    func(TXMLType) *TModelType
+	UpsertFunc     func(ctx context.Context, db *gorm.DB, entities []*TModelType) error
+}
+
+// ProcessXMLEntities is a generic function that processes XML entities with configurable conversion and batch operations
+func ProcessXMLEntities[TXMLType any, TModelType any](
+	ctx context.Context,
+	config EntityProcessorConfig[TXMLType, TModelType],
+	db database.DB,
+	log logger.Logger,
+) error {
+	processingLog := log.Function("ProcessXMLEntities").With("entityType", config.EntityTypeName)
+
+	// Create channel for streaming XML entities
+	xmlChan := make(chan TXMLType, config.ChannelSize)
+
+	// Start XML parsing in goroutine
+	go func() {
+		defer close(xmlChan)
+		err := ParseXMLGeneric(
+			ctx,
+			config.FilePath,
+			config.ElementName,
+			xmlChan,
+			0, // No limit = 0
+			processingLog,
+		)
+		if err != nil {
+			processingLog.Error("Failed to parse XML", "error", err)
+		}
+		processingLog.Info("XML parsing goroutine completed")
+	}()
+
+	// Process entities in batches
+	processedCount := 0
+	var entities []*TModelType
+
+	for xmlEntity := range xmlChan {
+		processedCount++
+
+		// Convert XML entity to model using provided function
+		modelEntity := config.ConvertFunc(xmlEntity)
+		entities = append(entities, modelEntity)
+
+		// Process batch when it reaches the configured size
+		if len(entities) >= config.BatchSize {
+			if err := config.UpsertFunc(ctx, db.SQLWithContext(ctx), entities); err != nil {
+				processingLog.Error(
+					"Failed to upsert batch",
+					"error",
+					err,
+					"batchSize",
+					len(entities),
+				)
+			} else {
+				processingLog.Info("Processed batch", "batchSize", len(entities), "totalProcessed", processedCount)
+			}
+			entities = []*TModelType{}
+		}
+	}
+
+	// Process any remaining entities in final batch
+	if len(entities) > 0 {
+		if err := config.UpsertFunc(ctx, db.SQLWithContext(ctx), entities); err != nil {
+			processingLog.Error(
+				"Failed to upsert final batch",
+				"error",
+				err,
+				"batchSize",
+				len(entities),
+			)
+		} else {
+			processingLog.Info("Processed final batch", "batchSize", len(entities), "totalProcessed", processedCount)
+		}
+	}
+
+	processingLog.Info(
+		"Entity processing completed",
+		"entityType",
+		config.EntityTypeName,
+		"totalProcessed",
+		processedCount,
+	)
+	return nil
+}
+
+// convertXMLLabelToModel converts XML Label to database Label model
+func (s *DiscogsXMLParserService) convertXMLLabelToModel(xmlLabel types.Label) *models.Label {
+	resourceURL := fmt.Sprintf(DISCOG_API_URL, "labels", xmlLabel.ID)
+	uri := fmt.Sprintf(DISCOG_URL, "labels", xmlLabel.ID)
+
+	return &models.Label{
+		BaseModel: models.BaseModel{
+			ID: xmlLabel.ID,
+		},
+		Profile:     &xmlLabel.Profile,
+		Name:        xmlLabel.Name,
+		ResourceURL: resourceURL,
+		URI:         uri,
+	}
+}
+
+// convertXMLArtistToModel converts XML Artist to database Artist model
+func (s *DiscogsXMLParserService) convertXMLArtistToModel(xmlArtist types.Artist) *models.Artist {
+	resourceURL := fmt.Sprintf(DISCOG_API_URL, "artists", xmlArtist.ID)
+	uri := fmt.Sprintf(DISCOG_URL, "artists", xmlArtist.ID)
+	releasesURL := uri + "/releases"
+
+	return &models.Artist{
+		BaseModel: models.BaseModel{
+			ID: xmlArtist.ID,
+		},
+		Name:        xmlArtist.Name,
+		Profile:     xmlArtist.Profile,
+		ResourceURL: resourceURL,
+		ReleasesURL: releasesURL,
+		Uri:         uri,
+	}
+}
 
 // ParseXMLFiles processes Discogs XML data files
 func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
@@ -55,91 +180,37 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 		return log.Err("failed to create download directory", err, "directory", downloadDir)
 	}
 
-	// Example usage of the new generic parser
-	// In production, these would be actual file paths
-	log.Info("Example usage of generic XML parser")
+	// Process labels using the abstracted entity processor
+	// labelsFilePath := filepath.Join(downloadDir, "labels.xml.gz")
+	// labelsConfig := EntityProcessorConfig[types.Label, models.Label]{
+	// 	FilePath:       labelsFilePath,
+	// 	ElementName:    "label",
+	// 	EntityTypeName: "labels",
+	// 	ChannelSize:    5000,
+	// 	BatchSize:      5000,
+	// 	ConvertFunc:    s.convertXMLLabelToModel,
+	// 	UpsertFunc:     s.repos.Label.UpsertBatch,
+	// }
+	//
+	// if err := ProcessXMLEntities(ctx, labelsConfig, s.db, log); err != nil {
+	// 	return log.Err("failed to process labels", err)
+	// }
 
-	// Example 1: Parse artists using generics
-	/*
-		artistsChan := make(chan types.Artist, 100)
-		go func() {
-			defer close(artistsChan)
-			err := ParseXMLGeneric(ctx, "/path/to/discogs_artists.xml.gz", "artist", artistsChan, 1000, log)
-			if err != nil {
-				log.Error("Failed to parse artists", "error", err)
-			}
-		}()
-
-		for artist := range artistsChan {
-			log.Info("Parsed artist", "id", artist.ID, "name", artist.Name)
-		}
-	*/
-
-	// Example 2: Parse labels using generics
-	// Use unbuffered channel to ensure no records are lost due to channel blocking
-	labelsChan := make(chan types.Label, 5000)
-
-	// Start the parser in a goroutine
-	go func() {
-		defer close(labelsChan)
-		targetFile := filepath.Join(downloadDir, fmt.Sprintf("%s.xml.gz", "labels"))
-		err := ParseXMLGeneric(
-			ctx,
-			targetFile,
-			"label",
-			labelsChan,
-			0, // Remove limit to process all records
-			log,
-		)
-		if err != nil {
-			log.Error("Failed to parse labels", "error", err)
-		}
-		log.Info("Label parsing goroutine completed")
-	}()
-
-	// Process labels with smaller batch size for more frequent database saves
-	processedCount := 0
-
-	var labels []*Label
-	for xmlLabel := range labelsChan {
-		processedCount++
-
-		resourceURL := fmt.Sprintf(
-			DISCOG_API_URL,
-			"labels",
-			xmlLabel.ID,
-		)
-		uri := fmt.Sprintf(
-			DISCOG_URL,
-			"labels",
-			xmlLabel.ID,
-		)
-		label := Label{
-			ID:          xmlLabel.ID,
-			Profile:     &xmlLabel.Profile,
-			Name:        xmlLabel.Name,
-			ResourceURL: &resourceURL,
-			URI:         &uri,
-		}
-		labels = append(labels, &label)
-
-		// Use smaller batch size to prevent channel blocking
-		if len(labels) >= 5000 {
-			if err := s.repos.Label.UpsertFileBatch(ctx, s.db.SQLWithContext(ctx), labels); err != nil {
-				log.Error("Failed to upsert labels", "error", err)
-			}
-			labels = []*Label{}
-		}
+	// Process artists using the abstracted entity processor
+	artistsFilePath := filepath.Join(downloadDir, "artists.xml.gz")
+	artistsConfig := EntityProcessorConfig[types.Artist, models.Artist]{
+		FilePath:       artistsFilePath,
+		ElementName:    "artist",
+		EntityTypeName: "artists",
+		ChannelSize:    5000,
+		BatchSize:      2500,
+		ConvertFunc:    s.convertXMLArtistToModel,
+		UpsertFunc:     s.repos.Artist.UpsertBatch,
 	}
 
-	// Save any remaining labels in the final batch
-	if len(labels) > 0 {
-		if err := s.repos.Label.UpsertFileBatch(ctx, s.db.SQLWithContext(ctx), labels); err != nil {
-			log.Error("Failed to upsert final labels batch", "error", err)
-		}
+	if err := ProcessXMLEntities(ctx, artistsConfig, s.db, log); err != nil {
+		return log.Err("failed to process artists", err)
 	}
-
-	log.Info("Label processing completed", "totalProcessed", processedCount)
 
 	// Example 3: Parse releases using generics
 	/*

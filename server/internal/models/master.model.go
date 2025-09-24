@@ -2,24 +2,22 @@ package models
 
 import (
 	"time"
-	"waugzee/internal/utils"
 
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type Master struct {
-	ID                           int64      `gorm:"type:bigint;primaryKey;not null"                          json:"discogsId"                              validate:"required,gt=0"`
-	CreatedAt                    time.Time  `gorm:"autoCreateTime"                                           json:"createdAt"`
-	UpdatedAt                    time.Time  `gorm:"autoUpdateTime"                                           json:"updatedAt"`
-	Title                        string     `gorm:"type:text;not null;index:idx_masters_title"               json:"title"                                  validate:"required"`
+	BaseModel
+	Title                        string     `gorm:"type:text;not null;index:idx_masters_title"               json:"title"`
 	LastSynced                   *time.Time `gorm:"type:timestamptz"                                         json:"lastSynced,omitempty"`
 	MainReleaseID                *int64     `gorm:"type:bigint"                                              json:"mainRelease,omitempty"`
 	MainReleaseResourceURL       *string    `gorm:"type:text"                                                json:"mainReleaseResourceUrl,omitempty"`
 	MostRecentReleaseID          *int64     `gorm:"type:bigint"                                              json:"mostRecentReleaseId,omitempty"`
 	MostRecentReleaseResourceURL *string    `gorm:"type:text"                                                json:"mostRecentReleaseResourceUrl,omitempty"`
-	Year                         *int       `gorm:"type:int;index:idx_masters_year"                          json:"year,omitempty"`
-	ContentHash                  string     `gorm:"type:varchar(64);not null;index:idx_masters_content_hash" json:"contentHash"`
+	Year                         *int       `gorm:"type:int"                                                 json:"year,omitempty"`
+	Uri                          string     `gorm:"type:text"                                                json:"uri"`
+	ResourceURL                  string     `gorm:"type:text"                                                json:"resourceUrl"`
 
 	// Claude add Data - Images, Videos
 	Data datatypes.JSON `gorm:"type:jsonb" json:"data,omitempty"`
@@ -158,13 +156,6 @@ func (m *Master) BeforeCreate(tx *gorm.DB) (err error) {
 		return gorm.ErrInvalidValue
 	}
 
-	// Generate content hash
-	hash, err := utils.GenerateEntityHash(m)
-	if err != nil {
-		return err
-	}
-	m.ContentHash = hash
-
 	return nil
 }
 
@@ -173,36 +164,7 @@ func (m *Master) BeforeUpdate(tx *gorm.DB) (err error) {
 		return gorm.ErrInvalidValue
 	}
 
-	// Regenerate content hash
-	hash, err := utils.GenerateEntityHash(m)
-	if err != nil {
-		return err
-	}
-	m.ContentHash = hash
-
 	return nil
-}
-
-// Hashable interface implementation
-func (m *Master) GetHashableFields() map[string]any {
-	return map[string]any{
-		"Title":                        m.Title,
-		"MainReleaseID":                m.MainReleaseID,
-		"MainReleaseResourceURL":       m.MainReleaseResourceURL,
-		"MostRecentReleaseID":          m.MostRecentReleaseID,
-		"MostRecentReleaseResourceURL": m.MostRecentReleaseResourceURL,
-		"Year":                         m.Year,
-		"Data":                         m.Data,
-		"LastSynced":                   m.LastSynced,
-	}
-}
-
-func (m *Master) SetContentHash(hash string) {
-	m.ContentHash = hash
-}
-
-func (m *Master) GetContentHash() string {
-	return m.ContentHash
 }
 
 func (m *Master) GetDiscogsID() int64 {

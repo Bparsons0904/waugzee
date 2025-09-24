@@ -4,10 +4,10 @@ import (
 	"context"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
-	"waugzee/internal/utils"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type ReleaseRepository interface {
@@ -18,7 +18,6 @@ type ReleaseRepository interface {
 	Delete(ctx context.Context, tx *gorm.DB, id string) error
 	UpsertBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
 	GetBatchByDiscogsIDs(ctx context.Context, tx *gorm.DB, discogsIDs []int64) (map[int64]*Release, error)
-	GetHashesByDiscogsIDs(ctx context.Context, tx *gorm.DB, discogsIDs []int64) (map[int64]string, error)
 	InsertBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
 	UpdateBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
 	// Association methods
@@ -113,55 +112,16 @@ func (r *releaseRepository) UpsertBatch(
 		return nil
 	}
 
-	discogsIDs := make([]int64, len(releases))
-	for i, release := range releases {
-		discogsIDs[i] = release.ID
+	log.Info("Upserting releases", "count", len(releases))
+
+	if err := tx.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"title", "updated_at"}),
+	}).Create(&releases).Error; err != nil {
+		return log.Err("failed to upsert release batch", err, "count", len(releases))
 	}
 
-	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, tx, discogsIDs)
-	if err != nil {
-		return log.Err("failed to get existing hashes", err, "count", len(discogsIDs))
-	}
-
-	hashableRecords := make([]utils.DiscogsHashable, len(releases))
-	for i, release := range releases {
-		hashableRecords[i] = release
-	}
-
-	categories := utils.CategorizeRecordsByHash(hashableRecords, existingHashes)
-
-	if len(categories.Insert) > 0 {
-		insertReleases := make([]*Release, len(categories.Insert))
-		for i, record := range categories.Insert {
-			insertReleases[i] = record.(*Release)
-		}
-		err = r.InsertBatch(ctx, tx, insertReleases)
-		if err != nil {
-			return log.Err(
-				"failed to insert release batch",
-				err,
-				"count",
-				len(insertReleases),
-			)
-		}
-	}
-
-	if len(categories.Update) > 0 {
-		updateReleases := make([]*Release, len(categories.Update))
-		for i, record := range categories.Update {
-			updateReleases[i] = record.(*Release)
-		}
-		err = r.UpdateBatch(ctx, tx, updateReleases)
-		if err != nil {
-			return log.Err(
-				"failed to update release batch",
-				err,
-				"count",
-				len(updateReleases),
-			)
-		}
-	}
-
+	log.Info("Successfully upserted releases", "count", len(releases))
 	return nil
 }
 
@@ -197,42 +157,6 @@ func (r *releaseRepository) GetBatchByDiscogsIDs(
 	return result, nil
 }
 
-func (r *releaseRepository) GetHashesByDiscogsIDs(
-	ctx context.Context,
-	tx *gorm.DB,
-	discogsIDs []int64,
-) (map[int64]string, error) {
-	log := r.log.Function("GetHashesByDiscogsIDs")
-
-	if len(discogsIDs) == 0 {
-		return make(map[int64]string), nil
-	}
-
-	var releases []struct {
-		ID   int64  `json:"discogsId"`
-		ContentHash string `json:"contentHash"`
-	}
-
-	if err := tx.WithContext(ctx).
-		Model(&Release{}).
-		Select("id, content_hash").
-		Where("id IN ?", discogsIDs).
-		Find(&releases).Error; err != nil {
-		return nil, log.Err(
-			"failed to get release hashes by Discogs IDs",
-			err,
-			"count",
-			len(discogsIDs),
-		)
-	}
-
-	result := make(map[int64]string, len(releases))
-	for _, release := range releases {
-		result[release.ID] = release.ContentHash
-	}
-
-	return result, nil
-}
 
 func (r *releaseRepository) InsertBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error {
 	log := r.log.Function("InsertBatch")

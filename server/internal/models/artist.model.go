@@ -1,25 +1,16 @@
 package models
 
 import (
-	"time"
-	"waugzee/internal/utils"
-
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type Artist struct {
-	ID          int64      `gorm:"type:bigint;primaryKey;not null"                          json:"discogsId"   validate:"required,gt=0"`
-	CreatedAt   time.Time  `gorm:"autoCreateTime"                                           json:"createdAt"`
-	UpdatedAt   time.Time  `gorm:"autoUpdateTime"                                           json:"updatedAt"`
-	Name        string     `gorm:"type:text;not null;index:idx_artists_name"                json:"name"        validate:"required"`
-	Profile     string     `gorm:"type:text;not null;index:idx_artists_profile"             json:"profile"     validate:"required"`
-	ContentHash string     `gorm:"type:varchar(64);not null;index:idx_artists_content_hash" json:"contentHash"`
-	LastSynced  *time.Time `gorm:"type:timestamptz"                                         json:"lastSynced,omitempty"`
-
-	ReleaseURL  *string        `gorm:"type:text"  json:"releaseUrl,omitempty"`
-	ResourceURL *string        `gorm:"type:text"  json:"resourceUrl,omitempty"`
-	Data        datatypes.JSON `gorm:"type:jsonb" json:"data,omitempty"`
+	BaseModel
+	Name        string `gorm:"type:text" json:"name"`
+	Profile     string `gorm:"type:text" json:"profile"`
+	Uri         string `gorm:"type:text" json:"uri"`
+	ReleasesURL string `gorm:"type:text" json:"releasesUrl,omitempty"`
+	ResourceURL string `gorm:"type:text" json:"resourceUrl,omitempty"`
 
 	// Many-to-many relationship for band members
 	Members []*Artist `gorm:"many2many:artist_members;joinForeignKey:artist_id;joinReferences:member_id" json:"members,omitempty"`
@@ -105,13 +96,6 @@ func (a *Artist) BeforeCreate(tx *gorm.DB) (err error) {
 		return gorm.ErrInvalidValue
 	}
 
-	// Generate content hash
-	hash, err := utils.GenerateEntityHash(a)
-	if err != nil {
-		return err
-	}
-	a.ContentHash = hash
-
 	return nil
 }
 
@@ -120,34 +104,7 @@ func (a *Artist) BeforeUpdate(tx *gorm.DB) (err error) {
 		return gorm.ErrInvalidValue
 	}
 
-	// Regenerate content hash
-	hash, err := utils.GenerateEntityHash(a)
-	if err != nil {
-		return err
-	}
-	a.ContentHash = hash
-
 	return nil
-}
-
-// Hashable interface implementation
-func (a *Artist) GetHashableFields() map[string]interface{} {
-	return map[string]interface{}{
-		"Name":        a.Name,
-		"Profile":     a.Profile,
-		"ReleaseURL":  a.ReleaseURL,
-		"ResourceURL": a.ResourceURL,
-		"Data":        a.Data,
-		"LastSynced":  a.LastSynced,
-	}
-}
-
-func (a *Artist) SetContentHash(hash string) {
-	a.ContentHash = hash
-}
-
-func (a *Artist) GetContentHash() string {
-	return a.ContentHash
 }
 
 func (a *Artist) GetDiscogsID() int64 {

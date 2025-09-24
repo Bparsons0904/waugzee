@@ -4,10 +4,10 @@ import (
 	"context"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
-	"waugzee/internal/utils"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // MasterArtistAssociation represents a specific master-artist association pair
@@ -24,7 +24,6 @@ type MasterRepository interface {
 	Delete(ctx context.Context, tx *gorm.DB, id string) error
 	UpsertBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error
 	GetBatchByDiscogsIDs(ctx context.Context, tx *gorm.DB, discogsIDs []int64) (map[int64]*Master, error)
-	GetHashesByDiscogsIDs(ctx context.Context, tx *gorm.DB, discogsIDs []int64) (map[int64]string, error)
 	InsertBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error
 	UpdateBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error
 	// Association methods
@@ -126,49 +125,16 @@ func (r *masterRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, masters
 		return nil
 	}
 
-	discogsIDs := make([]int64, len(masters))
-	for i, master := range masters {
-		discogsIDs[i] = master.ID
+	log.Info("Upserting masters", "count", len(masters))
+
+	if err := tx.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"title", "updated_at"}),
+	}).Create(&masters).Error; err != nil {
+		return log.Err("failed to upsert master batch", err, "count", len(masters))
 	}
 
-	existingHashes, err := r.GetHashesByDiscogsIDs(ctx, tx, discogsIDs)
-	if err != nil {
-		return log.Err("failed to get existing hashes", err, "count", len(discogsIDs))
-	}
-
-	hashableRecords := make([]utils.DiscogsHashable, len(masters))
-	for i, master := range masters {
-		hashableRecords[i] = master
-	}
-
-	categories := utils.CategorizeRecordsByHash(hashableRecords, existingHashes)
-	if len(categories.Insert) > 0 {
-		insertMasters := make([]*Master, len(categories.Insert))
-		for i, record := range categories.Insert {
-			insertMasters[i] = record.(*Master)
-		}
-		err = r.InsertBatch(ctx, tx, insertMasters)
-		if err != nil {
-			return log.Err("failed to insert master batch", err, "count", len(insertMasters))
-		}
-	}
-
-	if len(categories.Update) > 0 {
-		updateMasters := make([]*Master, len(categories.Update))
-		for i, record := range categories.Update {
-			updateMasters[i] = record.(*Master)
-		}
-		err = r.UpdateBatch(ctx, tx, updateMasters)
-		if err != nil {
-			return log.Err(
-				"failed to update master batch",
-				err,
-				"count",
-				len(updateMasters),
-			)
-		}
-	}
-
+	log.Info("Successfully upserted masters", "count", len(masters))
 	return nil
 }
 
@@ -197,42 +163,6 @@ func (r *masterRepository) GetBatchByDiscogsIDs(
 	return result, nil
 }
 
-func (r *masterRepository) GetHashesByDiscogsIDs(
-	ctx context.Context,
-	tx *gorm.DB,
-	discogsIDs []int64,
-) (map[int64]string, error) {
-	log := r.log.Function("GetHashesByDiscogsIDs")
-
-	if len(discogsIDs) == 0 {
-		return make(map[int64]string), nil
-	}
-
-	var masters []struct {
-		ID   int64  `json:"discogsId"`
-		ContentHash string `json:"contentHash"`
-	}
-
-	if err := tx.WithContext(ctx).
-		Model(&Master{}).
-		Select("id, content_hash").
-		Where("id IN ?", discogsIDs).
-		Find(&masters).Error; err != nil {
-		return nil, log.Err(
-			"failed to get master hashes by Discogs IDs",
-			err,
-			"count",
-			len(discogsIDs),
-		)
-	}
-
-	result := make(map[int64]string, len(masters))
-	for _, master := range masters {
-		result[master.ID] = master.ContentHash
-	}
-
-	return result, nil
-}
 
 func (r *masterRepository) InsertBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error {
 	log := r.log.Function("InsertBatch")
