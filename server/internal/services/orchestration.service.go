@@ -35,6 +35,7 @@ type OrchestrationService struct {
 	repos                 repositories.Repository
 	transactionService    *TransactionService
 	foldersService        *FoldersService
+	releaseSyncService    *ReleaseSyncService
 	discogsRateLimiter    *DiscogsRateLimiterService
 }
 
@@ -48,6 +49,7 @@ func NewOrchestrationService(
 	log := logger.New("OrchestrationService")
 	folderDataExtractionService := NewFolderDataExtractionService(repos)
 	foldersService := NewFoldersService(eventBus, repos, db, transactionService, folderDataExtractionService, discogsRateLimiter)
+	releaseSyncService := NewReleaseSyncService(eventBus, repos, db, discogsRateLimiter)
 	return &OrchestrationService{
 		log:                   log,
 		eventBus:              eventBus,
@@ -55,6 +57,7 @@ func NewOrchestrationService(
 		repos:                 repos,
 		transactionService:    transactionService,
 		foldersService:        foldersService,
+		releaseSyncService:    releaseSyncService,
 		discogsRateLimiter:    discogsRateLimiter,
 	}
 }
@@ -144,6 +147,8 @@ func (o *OrchestrationService) HandleAPIResponse(
 		err = o.foldersService.ProcessFoldersResponse(ctx, metadata, responseData)
 	case "folder_releases":
 		err = o.foldersService.ProcessFolderReleasesResponse(ctx, metadata, responseData)
+	case "release":
+		err = o.handleReleaseResponse(ctx, metadata, responseData)
 	default:
 		return log.ErrMsg("unknown request type: " + metadata.RequestType)
 	}
@@ -189,4 +194,154 @@ func processDiscogsAPIResponse[T any](
 	}
 
 	return &result, nil
+}
+
+// handleReleaseResponse processes individual release API responses and updates sync state
+func (o *OrchestrationService) handleReleaseResponse(
+	ctx context.Context,
+	metadata RequestMetadata,
+	responseData map[string]any,
+) error {
+	log := o.log.Function("handleReleaseResponse")
+
+	// Process the release through the release sync service
+	err := o.releaseSyncService.ProcessReleaseResponse(ctx, metadata, responseData)
+	if err != nil {
+		log.Warn("Failed to process release response", "error", err)
+		// Don't fail completely - just log and continue
+	}
+
+	// Extract syncStateId from response data to update collection sync state
+	syncStateID, exists := responseData["syncStateId"]
+	if !exists {
+		log.Warn("No syncStateId in release response - cannot update collection sync state")
+		return nil
+	}
+
+	syncStateIDStr, ok := syncStateID.(string)
+	if !ok {
+		log.Warn("Invalid syncStateId type in release response")
+		return nil
+	}
+
+	// Get current collection sync state as raw data to avoid import cycles
+	var syncStateData map[string]any
+	found, err := database.NewCacheBuilder(o.cache, syncStateIDStr).
+		WithHashPattern("collection_sync").
+		WithContext(ctx).
+		Get(&syncStateData)
+	if err != nil {
+		return log.Err("failed to get collection sync state", err)
+	}
+
+	if !found {
+		// Sync state expired or doesn't exist - this is OK, sync might be complete
+		log.Info("Collection sync state not found - sync may be complete",
+			"syncStateId", syncStateIDStr)
+		return nil
+	}
+
+	// Extract pending requests from sync state data
+	pendingRequestsRaw, exists := syncStateData["PendingReleaseRequests"]
+	if exists {
+		if pendingRequestsMap, ok := pendingRequestsRaw.(map[string]any); ok {
+			// Convert to map[string]bool
+			pendingRequests := make(map[string]bool)
+			for k := range pendingRequestsMap {
+				pendingRequests[k] = true
+			}
+
+			// Remove this request from pending requests
+			delete(pendingRequests, metadata.RequestID)
+
+			// Check if all release requests are complete
+			if len(pendingRequests) == 0 {
+				// Update sync state to mark all releases ready
+				syncStateData["AllReleasesReady"] = true
+				syncStateData["PendingReleaseRequests"] = make(map[string]bool)
+
+				// Get missing releases count for logging
+				missingReleases := 0
+				if missingRaw, exists := syncStateData["MissingReleaseIDs"]; exists {
+					if missingSlice, ok := missingRaw.([]interface{}); ok {
+						missingReleases = len(missingSlice)
+					}
+				}
+
+				log.Info("All release requests completed, sync can proceed",
+					"syncStateId", syncStateIDStr,
+					"totalMissingReleases", missingReleases)
+
+				// Update sync state
+				err = database.NewCacheBuilder(o.cache, syncStateIDStr).
+					WithHashPattern("collection_sync").
+					WithStruct(syncStateData).
+					WithTTL(30 * time.Minute).
+					WithContext(ctx).
+					Set()
+				if err != nil {
+					log.Warn("Failed to update sync state", "error", err)
+					return nil
+				}
+
+		// Trigger folder processing to continue with the sync now that releases are ready
+		// We simulate a final folder release response to trigger the completion logic
+		finalResponseData := map[string]any{
+			"requestId": metadata.RequestID + "_completion",
+			"data": map[string]any{
+				"releases": []any{}, // Empty releases to trigger completion check
+				"pagination": map[string]any{
+					"page":  1,
+					"pages": 1,
+				},
+			},
+		}
+
+		// Create completion metadata
+		completionMetadata := RequestMetadata{
+			UserID:      metadata.UserID,
+			RequestID:   metadata.RequestID + "_completion",
+			RequestType: "folder_releases",
+			Timestamp:   time.Now(),
+		}
+
+		// Store completion metadata temporarily
+		err = database.NewCacheBuilder(o.cache, completionMetadata.RequestID).
+			WithHashPattern(API_HASH).
+			WithStruct(completionMetadata).
+			WithTTL(APIRequestTTL).
+			WithContext(ctx).
+			Set()
+		if err != nil {
+			log.Warn("Failed to store completion metadata", "error", err)
+			return nil
+		}
+
+		// Process the completion trigger
+		err = o.foldersService.ProcessFolderReleasesResponse(ctx, completionMetadata, finalResponseData)
+		if err != nil {
+			log.Warn("Failed to trigger sync completion", "error", err)
+		}
+			} else {
+				// Update sync state with remaining pending requests
+				syncStateData["PendingReleaseRequests"] = pendingRequests
+
+				err = database.NewCacheBuilder(o.cache, syncStateIDStr).
+					WithHashPattern("collection_sync").
+					WithStruct(syncStateData).
+					WithTTL(30 * time.Minute).
+					WithContext(ctx).
+					Set()
+				if err != nil {
+					log.Warn("Failed to update sync state", "error", err)
+				}
+
+				log.Debug("Release request completed, waiting for more",
+					"syncStateId", syncStateIDStr,
+					"remainingRequests", len(pendingRequests))
+			}
+		}
+	}
+
+	return nil
 }

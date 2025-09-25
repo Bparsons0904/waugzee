@@ -177,3 +177,7 @@ func (s *SyncState) ToMap() map[string]any {
 		"details":    s.Details,
 	}
 }
+
+// CollectionSyncState holds the state during folder collection sync
+// Note: This contains model references that create import cycles, so it's kept in services
+// This is a placeholder for documentation - actual implementation is in services package

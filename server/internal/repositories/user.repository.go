@@ -8,11 +8,13 @@ import (
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 
 type UserRepository interface {
+	GetByID(ctx context.Context, tx *gorm.DB, userID uuid.UUID) (*User, error)
 	GetByOIDCUserID(ctx context.Context, tx *gorm.DB, oidcUserID string) (*User, error)
 	Update(ctx context.Context, tx *gorm.DB, user *User) error
 	FindOrCreateOIDCUser(ctx context.Context, tx *gorm.DB, user *User) (*User, error)
@@ -30,6 +32,20 @@ func NewUserRepository(cache database.DB) UserRepository {
 		cache: cache,
 		log:   logger.New("userRepository"),
 	}
+}
+
+func (r *userRepository) GetByID(ctx context.Context, tx *gorm.DB, userID uuid.UUID) (*User, error) {
+	log := r.log.Function("GetByID")
+
+	var user User
+	if err := tx.WithContext(ctx).Preload("Configuration").First(&user, "id = ?", userID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, log.Error("user not found", "userID", userID)
+		}
+		return nil, log.Err("failed to get user by ID", err, "userID", userID)
+	}
+
+	return &user, nil
 }
 
 func (r *userRepository) Update(ctx context.Context, tx *gorm.DB, user *User) error {

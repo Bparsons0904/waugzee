@@ -520,6 +520,36 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 	if syncState.ProcessedFolders >= syncState.TotalFolders {
 		syncState.SyncComplete = true
 
+		// Perform release validation if not done yet
+		if !syncState.ReleaseValidationDone {
+			err = f.performReleaseValidation(ctx, &syncState, metadata.UserID)
+			if err != nil {
+				return log.Err("failed to perform release validation", err)
+			}
+
+			// Update sync state in cache
+			err = database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).
+				WithHashPattern(COLLECTION_SYNC_HASH).
+				WithStruct(syncState).
+				WithTTL(30 * time.Minute).
+				WithContext(ctx).
+				Set()
+			if err != nil {
+				log.Warn("Failed to update sync state after validation", "error", err)
+			}
+
+			// If we have missing releases, return early to wait for API responses
+			if len(syncState.MissingReleaseIDs) > 0 && !syncState.AllReleasesReady {
+				return nil
+			}
+		}
+
+		// Check if all releases are ready before proceeding
+		if !syncState.AllReleasesReady && len(syncState.PendingReleaseRequests) > 0 {
+			// Still waiting for release API responses
+			return nil
+		}
+
 		// Analyze what changes need to be made (business logic - outside transaction)
 		var operations *SyncCollectionOperations
 		operations, err = f.analyzeDifferentialSync(
@@ -714,14 +744,21 @@ type SyncCollectionOperations struct {
 
 // CollectionSyncState holds the state during folder collection sync
 type CollectionSyncState struct {
-	UserID           uuid.UUID
-	TotalFolders     int
-	ProcessedFolders int
-	MergedReleases   map[int]*UserRelease             // key: InstanceID
-	OriginalReleases map[int]DiscogsFolderReleaseItem // key: InstanceID - for data extraction
-	CompletedFolders map[int]bool                     // key: FolderID
-	SyncComplete     bool
+	UserID                  uuid.UUID
+	TotalFolders            int
+	ProcessedFolders        int
+	MergedReleases          map[int]*UserRelease             // key: InstanceID
+	OriginalReleases        map[int]DiscogsFolderReleaseItem // key: InstanceID - for data extraction
+	CompletedFolders        map[int]bool                     // key: FolderID
+	SyncComplete            bool
+	// Release validation tracking
+	PendingReleaseRequests  map[string]bool                  // key: requestID - tracks pending API requests
+	MissingReleaseIDs       []int64                          // release IDs that need to be fetched
+	ExistingReleaseIDs      []int64                          // release IDs that already exist
+	ReleaseValidationDone   bool                             // whether release validation is complete
+	AllReleasesReady        bool                             // whether all missing releases have been fetched
 }
+
 
 func (f *FoldersService) SyncAllUserFolders(
 	ctx context.Context,
@@ -750,13 +787,18 @@ func (f *FoldersService) SyncAllUserFolders(
 
 	// Initialize sync state
 	syncState := &CollectionSyncState{
-		UserID:           user.ID,
-		TotalFolders:     len(syncFolders),
-		ProcessedFolders: 0,
-		MergedReleases:   make(map[int]*UserRelease),
-		OriginalReleases: make(map[int]DiscogsFolderReleaseItem),
-		CompletedFolders: make(map[int]bool),
-		SyncComplete:     false,
+		UserID:                  user.ID,
+		TotalFolders:            len(syncFolders),
+		ProcessedFolders:        0,
+		MergedReleases:          make(map[int]*UserRelease),
+		OriginalReleases:        make(map[int]DiscogsFolderReleaseItem),
+		CompletedFolders:        make(map[int]bool),
+		SyncComplete:            false,
+		PendingReleaseRequests:  make(map[string]bool),
+		MissingReleaseIDs:       make([]int64, 0),
+		ExistingReleaseIDs:      make([]int64, 0),
+		ReleaseValidationDone:   false,
+		AllReleasesReady:        false,
 	}
 
 	// Store sync state in cache for tracking across API responses
@@ -883,6 +925,160 @@ func (f *FoldersService) executeSyncOperations(
 		}
 	}
 
+
+	return nil
+}
+
+// performReleaseValidation validates that releases exist and handles missing ones
+func (f *FoldersService) performReleaseValidation(
+	ctx context.Context,
+	syncState *CollectionSyncState,
+	userID uuid.UUID,
+) error {
+	log := f.log.Function("performReleaseValidation")
+
+	// Extract all release IDs from merged releases
+	releaseIDs := make([]int64, 0, len(syncState.MergedReleases))
+	for _, userRelease := range syncState.MergedReleases {
+		releaseIDs = append(releaseIDs, userRelease.ReleaseID)
+	}
+
+	if len(releaseIDs) == 0 {
+		log.Info("No releases to validate")
+		syncState.ReleaseValidationDone = true
+		syncState.AllReleasesReady = true
+		return nil
+	}
+
+	// Check which releases exist in our database
+	existingReleases, missingReleases, err := f.repos.Release.CheckReleaseExistence(
+		ctx,
+		f.db.SQLWithContext(ctx),
+		releaseIDs,
+	)
+	if err != nil {
+		return log.Err("failed to check release existence", err)
+	}
+
+	syncState.ExistingReleaseIDs = existingReleases
+	syncState.MissingReleaseIDs = missingReleases
+	syncState.ReleaseValidationDone = true
+
+	log.Info("Release validation completed",
+		"totalReleases", len(releaseIDs),
+		"existing", len(existingReleases),
+		"missing", len(missingReleases))
+
+	// Update images for existing releases
+	if len(existingReleases) > 0 {
+		err = f.updateExistingReleaseImages(ctx, syncState, existingReleases)
+		if err != nil {
+			log.Warn("Failed to update release images", "error", err)
+			// Don't fail the sync for image update errors
+		}
+	}
+
+	// If we have missing releases, initiate API requests to fetch them
+	if len(missingReleases) > 0 {
+		// Get user for API requests
+		user, err := f.repos.User.GetByID(ctx, f.db.SQLWithContext(ctx), userID)
+		if err != nil {
+			return log.Err("failed to get user for release sync", err)
+		}
+
+		// Request missing releases through release sync service
+		releaseSyncService := NewReleaseSyncService(
+			f.eventBus,
+			f.repos,
+			f.db,
+			f.discogsRateLimiter,
+		)
+
+		syncStateID := userID.String() // Use user ID as sync state ID
+		err = releaseSyncService.RequestMissingReleases(
+			ctx,
+			user,
+			missingReleases,
+			syncStateID,
+		)
+		if err != nil {
+			log.Warn("Failed to request missing releases", "error", err)
+			// Continue with existing releases only
+			syncState.AllReleasesReady = true
+		} else {
+			// Mark that we're waiting for release API responses
+			syncState.AllReleasesReady = false
+			// We'll need to track the request IDs somehow - for now assume the release sync service
+			// will manage this through the API response callbacks
+			if syncState.PendingReleaseRequests == nil {
+				syncState.PendingReleaseRequests = make(map[string]bool)
+			}
+		}
+	} else {
+		// No missing releases, we're ready to proceed
+		syncState.AllReleasesReady = true
+	}
+
+	return nil
+}
+
+// updateExistingReleaseImages updates thumb and cover image URLs for existing releases
+func (f *FoldersService) updateExistingReleaseImages(
+	ctx context.Context,
+	syncState *CollectionSyncState,
+	existingReleaseIDs []int64,
+) error {
+	log := f.log.Function("updateExistingReleaseImages")
+
+	// Build image updates from original release data
+	imageUpdates := make([]repositories.ReleaseImageUpdate, 0)
+	existingMap := make(map[int64]bool)
+	for _, id := range existingReleaseIDs {
+		existingMap[id] = true
+	}
+
+	for _, originalRelease := range syncState.OriginalReleases {
+		releaseID := originalRelease.ID
+		if releaseID == 0 && originalRelease.BasicInformation.ID != 0 {
+			releaseID = originalRelease.BasicInformation.ID
+		}
+
+		// Only update images for existing releases
+		if existingMap[releaseID] {
+			update := repositories.ReleaseImageUpdate{
+				ReleaseID: releaseID,
+			}
+
+			// Set thumb if available
+			if originalRelease.BasicInformation.Thumb != "" {
+				update.Thumb = &originalRelease.BasicInformation.Thumb
+			}
+
+			// Set cover image if available
+			if originalRelease.BasicInformation.CoverImage != "" {
+				update.CoverImage = &originalRelease.BasicInformation.CoverImage
+			}
+
+			// Only add update if we have at least one image to update
+			if update.Thumb != nil || update.CoverImage != nil {
+				imageUpdates = append(imageUpdates, update)
+			}
+		}
+	}
+
+	// Execute image updates
+	if len(imageUpdates) > 0 {
+		err := f.repos.Release.UpdateReleaseImages(
+			ctx,
+			f.db.SQLWithContext(ctx),
+			imageUpdates,
+		)
+		if err != nil {
+			return log.Err("failed to update release images", err)
+		}
+
+		log.Info("Updated release images", "count", len(imageUpdates))
+	}
 
 	return nil
 }

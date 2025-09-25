@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
@@ -27,9 +29,19 @@ type ReleaseGenreAssociation struct {
 	GenreID   int64
 }
 
+// ReleaseImageUpdate represents image updates for releases
+type ReleaseImageUpdate struct {
+	ReleaseID  int64
+	Thumb      *string
+	CoverImage *string
+}
+
 type ReleaseRepository interface {
 	GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Release, error)
 	UpsertBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
+	// New methods for sync service
+	CheckReleaseExistence(ctx context.Context, tx *gorm.DB, releaseIDs []int64) (existing []int64, missing []int64, err error)
+	UpdateReleaseImages(ctx context.Context, tx *gorm.DB, updates []ReleaseImageUpdate) error
 	// Association methods
 	CreateReleaseArtistAssociations(ctx context.Context, tx *gorm.DB, associations []ReleaseArtistAssociation) error
 	UpsertReleaseArtistAssociationsBatch(ctx context.Context, tx *gorm.DB, associations []*[]ReleaseArtistAssociation) error
@@ -387,6 +399,99 @@ func (r *releaseRepository) UpsertReleaseGenreAssociationsBatch(
 	log.Info("Created release-genre associations batch",
 		"totalAssociations", len(allAssociations),
 		"batchCount", len(associationBatches))
+
+	return nil
+}
+
+// CheckReleaseExistence checks which release IDs exist in the database
+func (r *releaseRepository) CheckReleaseExistence(
+	ctx context.Context,
+	tx *gorm.DB,
+	releaseIDs []int64,
+) (existing []int64, missing []int64, err error) {
+	log := r.log.Function("CheckReleaseExistence")
+
+	if len(releaseIDs) == 0 {
+		return []int64{}, []int64{}, nil
+	}
+
+	var existingReleases []int64
+	if err := tx.WithContext(ctx).Model(&Release{}).
+		Where("id IN ?", releaseIDs).
+		Pluck("id", &existingReleases).Error; err != nil {
+		return nil, nil, log.Err("failed to check release existence", err, "releaseCount", len(releaseIDs))
+	}
+
+	// Create a map for fast lookup of existing releases
+	existingMap := make(map[int64]bool, len(existingReleases))
+	for _, id := range existingReleases {
+		existingMap[id] = true
+	}
+
+	// Separate existing and missing
+	existing = make([]int64, 0, len(existingReleases))
+	missing = make([]int64, 0)
+
+	for _, id := range releaseIDs {
+		if existingMap[id] {
+			existing = append(existing, id)
+		} else {
+			missing = append(missing, id)
+		}
+	}
+
+	log.Info("Checked release existence",
+		"totalReleases", len(releaseIDs),
+		"existing", len(existing),
+		"missing", len(missing))
+
+	return existing, missing, nil
+}
+
+// UpdateReleaseImages updates thumb and cover image URLs for releases
+func (r *releaseRepository) UpdateReleaseImages(
+	ctx context.Context,
+	tx *gorm.DB,
+	updates []ReleaseImageUpdate,
+) error {
+	log := r.log.Function("UpdateReleaseImages")
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	// Build the SQL for batch update
+	query := `
+		UPDATE releases
+		SET thumb = COALESCE(data_table.thumb, thumb),
+		    cover_image = COALESCE(data_table.cover_image, cover_image),
+		    updated_at = NOW()
+		FROM (VALUES `
+
+	args := make([]interface{}, 0, len(updates)*3)
+	values := make([]string, 0, len(updates))
+
+	for i, update := range updates {
+		placeholder := fmt.Sprintf("($%d, $%d, $%d)", i*3+1, i*3+2, i*3+3)
+		values = append(values, placeholder)
+
+		args = append(args, update.ReleaseID)
+		args = append(args, update.Thumb)
+		args = append(args, update.CoverImage)
+	}
+
+	query += strings.Join(values, ", ")
+	query += `) AS data_table(release_id, thumb, cover_image)
+		WHERE releases.id = data_table.release_id`
+
+	result := tx.WithContext(ctx).Exec(query, args...)
+	if result.Error != nil {
+		return log.Err("failed to update release images", result.Error, "updateCount", len(updates))
+	}
+
+	log.Info("Updated release images",
+		"updateCount", len(updates),
+		"rowsAffected", result.RowsAffected)
 
 	return nil
 }

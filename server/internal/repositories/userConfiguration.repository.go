@@ -12,6 +12,7 @@ import (
 type UserConfigurationRepository interface {
 	GetByUserID(ctx context.Context, tx *gorm.DB, userID uuid.UUID) (*UserConfiguration, error)
 	Update(ctx context.Context, tx *gorm.DB, config *UserConfiguration, userRepo UserRepository) error
+	CreateOrUpdate(ctx context.Context, tx *gorm.DB, config *UserConfiguration, userRepo UserRepository) error
 }
 
 type userConfigurationRepository struct {
@@ -43,6 +44,21 @@ func (r *userConfigurationRepository) Update(ctx context.Context, tx *gorm.DB, c
 
 	if err := tx.WithContext(ctx).Save(config).Error; err != nil {
 		return log.Err("failed to update user configuration", err)
+	}
+
+	// Clear user cache after successful update
+	if err := userRepo.ClearUserCacheByUserID(ctx, tx, config.UserID.String()); err != nil {
+		log.Warn("failed to clear user cache after configuration update", "userID", config.UserID, "error", err)
+	}
+
+	return nil
+}
+
+func (r *userConfigurationRepository) CreateOrUpdate(ctx context.Context, tx *gorm.DB, config *UserConfiguration, userRepo UserRepository) error {
+	log := r.log.Function("CreateOrUpdate")
+
+	if err := tx.WithContext(ctx).Save(config).Error; err != nil {
+		return log.Err("failed to create or update user configuration", err)
 	}
 
 	// Clear user cache after successful update

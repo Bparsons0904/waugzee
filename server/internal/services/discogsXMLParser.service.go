@@ -72,8 +72,8 @@ func ProcessXMLEntities[XMLType any, TModelType any](
 			config.FilePath,
 			config.ElementName,
 			xmlChan,
-			// 0, // No limit = 0
-			50_000, // No limit = 0
+			0, // No limit = 0
+			// 50_000, // No limit = 0
 			processingLog,
 		)
 		if err != nil {
