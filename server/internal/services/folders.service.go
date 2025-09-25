@@ -221,7 +221,7 @@ func (f *FoldersService) updateUserConfigWithUncategorizedFolderIfNotSet(
 	// Set to folder 1 (Uncategorized) as default instead of folder 0 (All)
 	uncategorizedFolderID := 1
 	userConfig.SelectedFolderID = &uncategorizedFolderID
-	if err = f.repos.UserConfiguration.Update(ctx, tx, userConfig); err != nil {
+	if err = f.repos.UserConfiguration.Update(ctx, tx, userConfig, f.repos.User); err != nil {
 		return log.Err("failed to update user configuration with selected folder", err)
 	}
 

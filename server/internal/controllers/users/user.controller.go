@@ -67,7 +67,7 @@ func (uc *UserController) UpdateDiscogsToken(
 		DiscogsUsername: &identity.Username,
 	}
 
-	if err := uc.userConfigRepo.CreateOrUpdate(ctx, uc.db.SQL, config); err != nil {
+	if err := uc.userConfigRepo.CreateOrUpdate(ctx, uc.db.SQL, config, uc.userRepo); err != nil {
 		return nil, log.Err("failed to update user configuration with discogs credentials", err)
 	}
 

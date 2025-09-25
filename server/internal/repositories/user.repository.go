@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"time"
+	"waugzee/internal/constants"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
@@ -10,16 +11,13 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	USER_CACHE_EXPIRY = 7 * 24 * time.Hour // 7 days
-	USER_CACHE_PREFIX = "user_oidc:"       // Single cache by OIDC ID
-)
 
 type UserRepository interface {
 	GetByOIDCUserID(ctx context.Context, tx *gorm.DB, oidcUserID string) (*User, error)
 	Update(ctx context.Context, tx *gorm.DB, user *User) error
 	FindOrCreateOIDCUser(ctx context.Context, tx *gorm.DB, user *User) (*User, error)
 	ClearUserCacheByOIDC(ctx context.Context, oidcUserID string) error
+	ClearUserCacheByUserID(ctx context.Context, tx *gorm.DB, userID string) error
 }
 
 type userRepository struct {
@@ -38,9 +36,6 @@ func (r *userRepository) Update(ctx context.Context, tx *gorm.DB, user *User) er
 	log := r.log.Function("Update")
 
 	if err := tx.WithContext(ctx).Save(user).Error; err != nil {
-		if err = r.ClearUserCacheByOIDC(ctx, user.OIDCUserID); err != nil {
-			log.Warn("failed to clear user cache after update", "userID", user.ID, "error", err)
-		}
 		return log.Err("failed to update user", err, "user", user)
 	}
 
@@ -52,7 +47,7 @@ func (r *userRepository) Update(ctx context.Context, tx *gorm.DB, user *User) er
 }
 
 func (r *userRepository) getCacheByOIDC(ctx context.Context, oidcUserID string, user *User) error {
-	cacheKey := USER_CACHE_PREFIX + oidcUserID
+	cacheKey := constants.UserCachePrefix + oidcUserID
 	found, err := database.NewCacheBuilder(r.cache.Cache.User, cacheKey).WithContext(ctx).Get(user)
 	if err != nil {
 		return r.log.Function("getCacheByOIDC").
@@ -68,10 +63,10 @@ func (r *userRepository) getCacheByOIDC(ctx context.Context, oidcUserID string, 
 }
 
 func (r *userRepository) addUserToCache(ctx context.Context, user *User) error {
-	cacheKey := USER_CACHE_PREFIX + user.OIDCUserID
+	cacheKey := constants.UserCachePrefix + user.OIDCUserID
 	if err := database.NewCacheBuilder(r.cache.Cache.User, cacheKey).
 		WithStruct(user).
-		WithTTL(USER_CACHE_EXPIRY).
+		WithTTL(constants.UserCacheExpiry).
 		WithContext(ctx).
 		Set(); err != nil {
 		return r.log.Function("addUserToCache").
@@ -170,7 +165,7 @@ func (r *userRepository) FindOrCreateOIDCUser(
 func (r *userRepository) ClearUserCacheByOIDC(ctx context.Context, oidcUserID string) error {
 	log := r.log.Function("ClearUserCacheByOIDC")
 
-	userCacheKey := USER_CACHE_PREFIX + oidcUserID
+	userCacheKey := constants.UserCachePrefix + oidcUserID
 	if err := database.NewCacheBuilder(r.cache.Cache.User, userCacheKey).WithContext(ctx).Delete(); err != nil {
 		log.Warn("failed to remove user from cache", "oidcUserID", oidcUserID, "error", err)
 		return err
@@ -178,4 +173,19 @@ func (r *userRepository) ClearUserCacheByOIDC(ctx context.Context, oidcUserID st
 
 	log.Info("cleared user cache", "oidcUserID", oidcUserID)
 	return nil
+}
+
+func (r *userRepository) ClearUserCacheByUserID(ctx context.Context, tx *gorm.DB, userID string) error {
+	log := r.log.Function("ClearUserCacheByUserID")
+
+	var user User
+	if err := tx.WithContext(ctx).First(&user, "id = ?", userID).Error; err != nil {
+		return log.Err("failed to get user for cache clearing", err, "userID", userID)
+	}
+
+	if user.OIDCUserID == "" {
+		return log.Error("user has no OIDC ID, cannot clear cache", "userID", userID)
+	}
+
+	return r.ClearUserCacheByOIDC(ctx, user.OIDCUserID)
 }

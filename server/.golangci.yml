@@ -1,9 +1,9 @@
 version: 2
 
 linters:
+  enable:
+    - gocritic
   settings:
-    # revive:
-    #   enable-all-rules: true
     staticcheck:
       dot-import-whitelist:
         - waugzee/internal/models
