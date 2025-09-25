@@ -2,6 +2,8 @@ version: 2
 
 linters:
   settings:
+    # revive:
+    #   enable-all-rules: true
     staticcheck:
       dot-import-whitelist:
         - waugzee/internal/models

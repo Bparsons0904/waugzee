@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"strings"
+	"unicode/utf8"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
 	"waugzee/internal/repositories"
@@ -10,7 +11,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// GenreStyleManager handles in-memory genre/style processing for XML parsing
 type GenreStyleManager struct {
 	log       logger.Logger
 	genreRepo repositories.GenreRepository
@@ -18,7 +18,6 @@ type GenreStyleManager struct {
 	lowNames  map[string]struct{} // Tracks collected "name|type" pairs to avoid duplicates
 }
 
-// NewGenreStyleManager creates a new genre/style manager
 func NewGenreStyleManager(genreRepo repositories.GenreRepository) *GenreStyleManager {
 	return &GenreStyleManager{
 		log:       logger.New("genreStyleManager"),
@@ -28,15 +27,12 @@ func NewGenreStyleManager(genreRepo repositories.GenreRepository) *GenreStyleMan
 	}
 }
 
-// Reset clears the in-memory state for processing a new entity type
 func (gsm *GenreStyleManager) Reset() {
 	gsm.nameToID = make(map[string]int64)
 	gsm.lowNames = make(map[string]struct{})
 }
 
-// CollectNames collects unique genre and style names from the provided lists
 func (gsm *GenreStyleManager) CollectNames(genres []string, styles []string) {
-	// Collect genres
 	for _, genre := range genres {
 		if genre = strings.TrimSpace(genre); genre != "" {
 			key := strings.ToLower(genre) + "|genre"
@@ -44,7 +40,6 @@ func (gsm *GenreStyleManager) CollectNames(genres []string, styles []string) {
 		}
 	}
 
-	// Collect styles as separate type
 	for _, style := range styles {
 		if style = strings.TrimSpace(style); style != "" {
 			key := strings.ToLower(style) + "|style"
@@ -53,7 +48,6 @@ func (gsm *GenreStyleManager) CollectNames(genres []string, styles []string) {
 	}
 }
 
-// BatchUpsertMissingGenres ensures all collected genre/style names exist in the database
 func (gsm *GenreStyleManager) BatchUpsertMissingGenres(ctx context.Context, tx *gorm.DB) error {
 	log := gsm.log.Function("BatchUpsertMissingGenres")
 
@@ -61,7 +55,6 @@ func (gsm *GenreStyleManager) BatchUpsertMissingGenres(ctx context.Context, tx *
 		return nil
 	}
 
-	// Parse collected keys into name/type pairs
 	type GenreEntry struct {
 		Name string
 		Type string
@@ -80,64 +73,60 @@ func (gsm *GenreStyleManager) BatchUpsertMissingGenres(ctx context.Context, tx *
 		}
 	}
 
-	log.Info("Processing collected genre/style entries", "count", len(entries))
 
-	// Get existing genres by name and type
 	existingGenres := make([]*models.Genre, 0)
 	if err := tx.WithContext(ctx).Find(&existingGenres).Error; err != nil {
 		return log.Err("failed to fetch existing genres", err)
 	}
 
-	// Build map of existing genres using name|type key
 	existingMap := make(map[string]*models.Genre)
 	for _, genre := range existingGenres {
 		key := genre.NameLower + "|" + genre.Type
 		existingMap[key] = genre
 	}
 
-	// Find missing genres that need to be created
+
 	var newGenres []*models.Genre
 	for _, entry := range entries {
 		if _, exists := existingMap[entry.Key]; !exists {
-			// Create proper case name (capitalize first letter of each word)
 			properName := gsm.toProperCase(entry.Name)
-			newGenres = append(newGenres, &models.Genre{
-				Name: properName,
-				Type: entry.Type,
-			})
+
+			cleanName := gsm.cleanUTF8String(properName)
+			cleanNameLower := strings.ToLower(cleanName)
+
+			cleanKey := cleanNameLower + "|" + entry.Type
+			if _, exists := existingMap[cleanKey]; !exists {
+				newGenres = append(newGenres, &models.Genre{
+					Name: cleanName,
+					Type: entry.Type,
+				})
+			}
 		}
 	}
 
-	// Batch insert new genres
 	if len(newGenres) > 0 {
-		log.Info("Creating new genres/styles", "count", len(newGenres))
 		if err := gsm.genreRepo.InsertBatch(ctx, tx, newGenres); err != nil {
 			return log.Err("failed to insert new genres/styles", err, "count", len(newGenres))
 		}
 
-		// Add newly created genres to existing map
 		for _, genre := range newGenres {
 			key := genre.NameLower + "|" + genre.Type
 			existingMap[key] = genre
 		}
 	}
 
-	// Build name|type-to-ID lookup map for fast association processing
 	gsm.nameToID = make(map[string]int64, len(existingMap))
 	for key, genre := range existingMap {
 		gsm.nameToID[key] = genre.ID
 	}
 
-	log.Info("Prepared genre lookup map", "totalGenres", len(gsm.nameToID))
 	return nil
 }
 
-// GetGenreIDsByNames returns genre IDs for the given genre and style names
 func (gsm *GenreStyleManager) GetGenreIDsByNames(genres []string, styles []string) []int64 {
 	var genreIDs []int64
 	keysSeen := make(map[string]struct{})
 
-	// Process genres
 	for _, genre := range genres {
 		if genre = strings.TrimSpace(genre); genre != "" {
 			key := strings.ToLower(genre) + "|genre"
@@ -150,7 +139,6 @@ func (gsm *GenreStyleManager) GetGenreIDsByNames(genres []string, styles []strin
 		}
 	}
 
-	// Process styles as separate type
 	for _, style := range styles {
 		if style = strings.TrimSpace(style); style != "" {
 			key := strings.ToLower(style) + "|style"
@@ -166,7 +154,6 @@ func (gsm *GenreStyleManager) GetGenreIDsByNames(genres []string, styles []strin
 	return genreIDs
 }
 
-// GetGenresByNames returns genre models for the given genre and style names
 func (gsm *GenreStyleManager) GetGenresByNames(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -187,7 +174,6 @@ func (gsm *GenreStyleManager) GetGenresByNames(
 	return genreModels, nil
 }
 
-// toProperCase converts a lowercase string to proper case (capitalizes first letter of each word)
 func (gsm *GenreStyleManager) toProperCase(s string) string {
 	words := strings.Fields(s)
 	for i, word := range words {
@@ -198,7 +184,13 @@ func (gsm *GenreStyleManager) toProperCase(s string) string {
 	return strings.Join(words, " ")
 }
 
-// GetStats returns statistics about the current manager state
+func (gsm *GenreStyleManager) cleanUTF8String(s string) string {
+	if !utf8.ValidString(s) || strings.Contains(s, "\x00") {
+		return strings.ToValidUTF8(strings.ReplaceAll(s, "\x00", ""), "")
+	}
+	return s
+}
+
 func (gsm *GenreStyleManager) GetStats() map[string]any {
 	return map[string]any{
 		"collectedNames": len(gsm.lowNames),

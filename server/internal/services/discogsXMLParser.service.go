@@ -517,6 +517,21 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 		return log.Err("failed to process master-artist associations", err)
 	}
 
+	// Process release-artist associations using the same pattern
+	releaseArtistConfig := EntityProcessorConfig[types.Release, []repositories.ReleaseArtistAssociation]{
+		FilePath:       releasesFilePath,
+		ElementName:    "release",
+		EntityTypeName: "release-artist-associations",
+		ChannelSize:    5000,
+		BatchSize:      5000,
+		ConvertFunc:    s.convertReleaseToArtistAssociations,
+		UpsertFunc:     s.repos.Release.UpsertReleaseArtistAssociationsBatch,
+	}
+
+	if err := ProcessXMLEntities(ctx, releaseArtistConfig, s.db, log); err != nil {
+		return log.Err("failed to process release-artist associations", err)
+	}
+
 	log.Info("XML parsing completed successfully", "yearMonth", yearMonth)
 	return nil
 }
