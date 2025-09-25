@@ -4,7 +4,6 @@ import (
 	"context"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
-	"waugzee/internal/utils"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -20,7 +19,7 @@ type GenreRepository interface {
 	FindOrCreate(ctx context.Context, tx *gorm.DB, name string) (*Genre, error)
 	UpsertBatch(ctx context.Context, tx *gorm.DB, genres []*Genre) error
 	GetBatchByNames(ctx context.Context, tx *gorm.DB, names []string) (map[string]*Genre, error)
-	GetHashesByNames(ctx context.Context, tx *gorm.DB, names []string) (map[string]string, error)
+
 	InsertBatch(ctx context.Context, tx *gorm.DB, genres []*Genre) error
 	UpdateBatch(ctx context.Context, tx *gorm.DB, genres []*Genre) error
 }
@@ -151,34 +150,35 @@ func (r *genreRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, genres [
 		names[i] = genre.Name
 	}
 
-	existingHashes, err := r.GetHashesByNames(ctx, tx, names)
+	existingGenres, err := r.GetBatchByNames(ctx, tx, names)
 	if err != nil {
-		return log.Err("failed to get existing hashes", err, "count", len(names))
+		return log.Err("failed to get existing genres", err, "count", len(names))
 	}
 
-	hashableRecords := make([]utils.NameHashable, len(genres))
+	var toInsert []*Genre
+	var toUpdate []*Genre
 
-	categories := utils.CategorizeRecordsByNameHash(hashableRecords, existingHashes)
-
-	if len(categories.Insert) > 0 {
-		insertGenres := make([]*Genre, len(categories.Insert))
-		for i, record := range categories.Insert {
-			insertGenres[i] = record.(*Genre)
-		}
-		err = r.InsertBatch(ctx, tx, insertGenres)
-		if err != nil {
-			return log.Err("failed to insert genre batch", err, "count", len(insertGenres))
+	for _, genre := range genres {
+		if existing, exists := existingGenres[genre.Name]; exists {
+			// Update existing genre
+			genre.ID = existing.ID
+			genre.CreatedAt = existing.CreatedAt
+			toUpdate = append(toUpdate, genre)
+		} else {
+			// Insert new genre
+			toInsert = append(toInsert, genre)
 		}
 	}
 
-	if len(categories.Update) > 0 {
-		updateGenres := make([]*Genre, len(categories.Update))
-		for i, record := range categories.Update {
-			updateGenres[i] = record.(*Genre)
+	if len(toInsert) > 0 {
+		if err := r.InsertBatch(ctx, tx, toInsert); err != nil {
+			return log.Err("failed to insert genre batch", err, "count", len(toInsert))
 		}
-		err = r.UpdateBatch(ctx, tx, updateGenres)
-		if err != nil {
-			return log.Err("failed to update genre batch", err, "count", len(updateGenres))
+	}
+
+	if len(toUpdate) > 0 {
+		if err := r.UpdateBatch(ctx, tx, toUpdate); err != nil {
+			return log.Err("failed to update genre batch", err, "count", len(toUpdate))
 		}
 	}
 
@@ -210,37 +210,7 @@ func (r *genreRepository) GetBatchByNames(
 	return result, nil
 }
 
-func (r *genreRepository) GetHashesByNames(
-	ctx context.Context,
-	tx *gorm.DB,
-	names []string,
-) (map[string]string, error) {
-	log := r.log.Function("GetHashesByNames")
 
-	if len(names) == 0 {
-		return make(map[string]string), nil
-	}
-
-	var genres []struct {
-		Name        string `json:"name"`
-		ContentHash string `json:"contentHash"`
-	}
-
-	if err := tx.WithContext(ctx).
-		Model(&Genre{}).
-		Select("name, content_hash").
-		Where("name IN ?", names).
-		Find(&genres).Error; err != nil {
-		return nil, log.Err("failed to get genre hashes by names", err, "count", len(names))
-	}
-
-	result := make(map[string]string, len(genres))
-	for _, genre := range genres {
-		result[genre.Name] = genre.ContentHash
-	}
-
-	return result, nil
-}
 
 func (r *genreRepository) InsertBatch(ctx context.Context, tx *gorm.DB, genres []*Genre) error {
 	log := r.log.Function("InsertBatch")

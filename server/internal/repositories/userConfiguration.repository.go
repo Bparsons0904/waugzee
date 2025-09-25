@@ -11,7 +11,6 @@ import (
 
 type UserConfigurationRepository interface {
 	GetByUserID(ctx context.Context, tx *gorm.DB, userID uuid.UUID) (*UserConfiguration, error)
-	CreateOrUpdate(ctx context.Context, tx *gorm.DB, config *UserConfiguration, userRepo UserRepository) error
 	Update(ctx context.Context, tx *gorm.DB, config *UserConfiguration, userRepo UserRepository) error
 }
 
@@ -37,39 +36,7 @@ func (r *userConfigurationRepository) GetByUserID(ctx context.Context, tx *gorm.
 	return &config, nil
 }
 
-func (r *userConfigurationRepository) CreateOrUpdate(ctx context.Context, tx *gorm.DB, config *UserConfiguration, userRepo UserRepository) error {
-	log := r.log.Function("CreateOrUpdate")
 
-	// Try to find existing configuration
-	var existing UserConfiguration
-	err := tx.WithContext(ctx).Where("user_id = ?", config.UserID).First(&existing).Error
-
-	if err != nil {
-		// Configuration doesn't exist, create new one
-		if err := tx.WithContext(ctx).Create(config).Error; err != nil {
-			return log.Err("failed to create user configuration", err)
-		}
-		// Clear user cache after successful creation
-		if err := userRepo.ClearUserCacheByUserID(ctx, tx, config.UserID.String()); err != nil {
-			log.Warn("failed to clear user cache after configuration creation", "userID", config.UserID, "error", err)
-		}
-		return nil
-	}
-
-	// Configuration exists, update it
-	config.ID = existing.ID
-	config.CreatedAt = existing.CreatedAt
-	if err := tx.WithContext(ctx).Save(config).Error; err != nil {
-		return log.Err("failed to update user configuration", err)
-	}
-
-	// Clear user cache after successful update
-	if err := userRepo.ClearUserCacheByUserID(ctx, tx, config.UserID.String()); err != nil {
-		log.Warn("failed to clear user cache after configuration update", "userID", config.UserID, "error", err)
-	}
-
-	return nil
-}
 
 func (r *userConfigurationRepository) Update(ctx context.Context, tx *gorm.DB, config *UserConfiguration, userRepo UserRepository) error {
 	log := r.log.Function("Update")
