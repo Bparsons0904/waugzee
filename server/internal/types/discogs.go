@@ -107,7 +107,7 @@ type Video struct {
 
 // New specialized structs for nested elements with additional attributes
 type ReleaseArtist struct {
-	ID   int    `xml:"id,attr"`
+	ID   int64  `xml:"id"`
 	Name string `xml:"name"`
 	Anv  string `xml:"anv"`
 	Join string `xml:"join"`
@@ -123,7 +123,7 @@ type ReleaseLabel struct {
 }
 
 type MasterArtist struct {
-	ID   int    `xml:"id,attr"`
+	ID   int64  `xml:"id"`
 	Name string `xml:"name"`
 	Anv  string `xml:"anv"`
 	Join string `xml:"join"`

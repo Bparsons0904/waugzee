@@ -6,15 +6,11 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
-	"sync"
 	"time"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
-	"waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/types"
 
@@ -44,27 +40,27 @@ const (
 )
 
 // EntityProcessorConfig holds configuration for generic entity processing
-type EntityProcessorConfig[TXMLType any, TModelType any] struct {
+type EntityProcessorConfig[XMLType any, TModelType any] struct {
 	FilePath       string
 	ElementName    string
 	EntityTypeName string
 	ChannelSize    int
 	BatchSize      int
-	ConvertFunc    func(TXMLType) *TModelType
+	ConvertFunc    func(XMLType) *TModelType
 	UpsertFunc     func(ctx context.Context, db *gorm.DB, entities []*TModelType) error
 }
 
 // ProcessXMLEntities is a generic function that processes XML entities with configurable conversion and batch operations
-func ProcessXMLEntities[TXMLType any, TModelType any](
+func ProcessXMLEntities[XMLType any, TModelType any](
 	ctx context.Context,
-	config EntityProcessorConfig[TXMLType, TModelType],
+	config EntityProcessorConfig[XMLType, TModelType],
 	db database.DB,
 	log logger.Logger,
 ) error {
 	processingLog := log.Function("ProcessXMLEntities").With("entityType", config.EntityTypeName)
 
 	// Create channel for streaming XML entities
-	xmlChan := make(chan TXMLType, config.ChannelSize)
+	xmlChan := make(chan XMLType, config.ChannelSize)
 
 	// Start XML parsing in goroutine
 	go func() {
@@ -138,122 +134,158 @@ func ProcessXMLEntities[TXMLType any, TModelType any](
 }
 
 // convertXMLLabelToModel converts XML Label to database Label model
-func (s *DiscogsXMLParserService) convertXMLLabelToModel(xmlLabel types.Label) *models.Label {
-	resourceURL := fmt.Sprintf(DISCOG_API_URL, "labels", xmlLabel.ID)
-	uri := fmt.Sprintf(DISCOG_URL, "labels", xmlLabel.ID)
-
-	return &models.Label{
-		BaseDiscogModel: models.BaseDiscogModel{
-			ID: xmlLabel.ID,
-		},
-		Profile:     &xmlLabel.Profile,
-		Name:        xmlLabel.Name,
-		ResourceURL: resourceURL,
-		URI:         uri,
-	}
-}
+// func (s *DiscogsXMLParserService) convertXMLLabelToModel(xmlLabel types.Label) *models.Label {
+// 	resourceURL := fmt.Sprintf(DISCOG_API_URL, "labels", xmlLabel.ID)
+// 	uri := fmt.Sprintf(DISCOG_URL, "labels", xmlLabel.ID)
+//
+// 	return &models.Label{
+// 		BaseDiscogModel: models.BaseDiscogModel{
+// 			ID: xmlLabel.ID,
+// 		},
+// 		Profile:     &xmlLabel.Profile,
+// 		Name:        xmlLabel.Name,
+// 		ResourceURL: resourceURL,
+// 		URI:         uri,
+// 	}
+// }
 
 // convertXMLArtistToModel converts XML Artist to database Artist model
-func (s *DiscogsXMLParserService) convertXMLArtistToModel(xmlArtist types.Artist) *models.Artist {
-	resourceURL := fmt.Sprintf(DISCOG_API_URL, "artists", xmlArtist.ID)
-	uri := fmt.Sprintf(DISCOG_URL, "artists", xmlArtist.ID)
-	releasesURL := uri + "/releases"
-
-	return &models.Artist{
-		BaseDiscogModel: models.BaseDiscogModel{
-			ID: xmlArtist.ID,
-		},
-		Name:        xmlArtist.Name,
-		Profile:     xmlArtist.Profile,
-		ResourceURL: resourceURL,
-		ReleasesURL: releasesURL,
-		Uri:         uri,
-	}
-}
+// func (s *DiscogsXMLParserService) convertXMLArtistToModel(xmlArtist types.Artist) *models.Artist {
+// 	resourceURL := fmt.Sprintf(DISCOG_API_URL, "artists", xmlArtist.ID)
+// 	uri := fmt.Sprintf(DISCOG_URL, "artists", xmlArtist.ID)
+// 	releasesURL := uri + "/releases"
+//
+// 	return &models.Artist{
+// 		BaseDiscogModel: models.BaseDiscogModel{
+// 			ID: xmlArtist.ID,
+// 		},
+// 		Name:        xmlArtist.Name,
+// 		Profile:     xmlArtist.Profile,
+// 		ResourceURL: resourceURL,
+// 		ReleasesURL: releasesURL,
+// 		Uri:         uri,
+// 	}
+// }
 
 // convertXMLMasterToModel converts XML Master to database Master model
-func (s *DiscogsXMLParserService) convertXMLMasterToModel(xmlMaster types.Master) *models.Master {
-	resourceURL := fmt.Sprintf(DISCOG_API_URL, "masters", xmlMaster.ID)
-	uri := fmt.Sprintf(DISCOG_URL, "master", xmlMaster.ID)
-
-	var mainReleaseID *int64
-	var mainReleaseResourceURL *string
-	if xmlMaster.MainRelease > 0 {
-		id := int64(xmlMaster.MainRelease)
-		mainReleaseID = &id
-		url := fmt.Sprintf(DISCOG_API_URL, "releases", xmlMaster.MainRelease)
-		mainReleaseResourceURL = &url
-	}
-
-	var year *int
-	if xmlMaster.Year > 0 {
-		year = &xmlMaster.Year
-	}
-
-	return &models.Master{
-		BaseDiscogModel: models.BaseDiscogModel{
-			ID: xmlMaster.ID,
-		},
-		Title:                  xmlMaster.Title,
-		Year:                   year,
-		MainReleaseID:          mainReleaseID,
-		MainReleaseResourceURL: mainReleaseResourceURL,
-		Uri:                    uri,
-		ResourceURL:            resourceURL,
-	}
-}
+// func (s *DiscogsXMLParserService) convertXMLMasterToModel(xmlMaster types.Master) *models.Master {
+// 	resourceURL := fmt.Sprintf(DISCOG_API_URL, "masters", xmlMaster.ID)
+// 	uri := fmt.Sprintf(DISCOG_URL, "master", xmlMaster.ID)
+//
+// 	var mainReleaseID *int64
+// 	var mainReleaseResourceURL *string
+// 	if xmlMaster.MainRelease > 0 {
+// 		id := int64(xmlMaster.MainRelease)
+// 		mainReleaseID = &id
+// 		url := fmt.Sprintf(DISCOG_API_URL, "releases", xmlMaster.MainRelease)
+// 		mainReleaseResourceURL = &url
+// 	}
+//
+// 	var year *int
+// 	if xmlMaster.Year > 0 {
+// 		year = &xmlMaster.Year
+// 	}
+//
+// 	return &models.Master{
+// 		BaseDiscogModel: models.BaseDiscogModel{
+// 			ID: xmlMaster.ID,
+// 		},
+// 		Title:                  xmlMaster.Title,
+// 		Year:                   year,
+// 		MainReleaseID:          mainReleaseID,
+// 		MainReleaseResourceURL: mainReleaseResourceURL,
+// 		Uri:                    uri,
+// 		ResourceURL:            resourceURL,
+// 	}
+// }
 
 // convertXMLReleaseToModel converts XML Release to database Release model
-func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
-	xmlRelease types.Release,
-) *models.Release {
-	resourceURL := fmt.Sprintf(DISCOG_API_URL, "releases", xmlRelease.ID)
-	uri := fmt.Sprintf(DISCOG_URL, "release", xmlRelease.ID)
+// func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
+// 	xmlRelease types.Release,
+// ) *models.Release {
+// 	resourceURL := fmt.Sprintf(DISCOG_API_URL, "releases", xmlRelease.ID)
+// 	uri := fmt.Sprintf(DISCOG_URL, "release", xmlRelease.ID)
+//
+// 	var year *int
+// 	if xmlRelease.Released != "" {
+// 		// Try to parse year from released string (could be YYYY or YYYY-MM-DD)
+// 		if len(xmlRelease.Released) >= 4 {
+// 			if parsedYear, err := strconv.Atoi(xmlRelease.Released[:4]); err == nil &&
+// 				parsedYear > 0 {
+// 				year = &parsedYear
+// 			}
+// 		}
+// 	}
+//
+// 	var country *string
+// 	if xmlRelease.Country != "" {
+// 		country = &xmlRelease.Country
+// 	}
+//
+// 	var notes *string
+// 	if xmlRelease.Notes != "" {
+// 		notes = &xmlRelease.Notes
+// 	}
+//
+// 	// Determine format based on format information
+// 	format := models.FormatVinyl // Default to vinyl
+// 	// TODO: Parse actual format from xmlRelease.Formats when needed
+//
+// 	release := &models.Release{
+// 		BaseDiscogModel: models.BaseDiscogModel{
+// 			ID: xmlRelease.ID,
+// 		},
+// 		Title: xmlRelease.Title,
+// 		// MasterID:    masterID,
+// 		Year:        year,
+// 		Country:     country,
+// 		Format:      format,
+// 		Notes:       notes,
+// 		ResourceURL: &resourceURL,
+// 		URI:         &uri,
+// 	}
+//
+// 	if xmlRelease.MasterID > 0 {
+// 		release.MasterID = &xmlRelease.MasterID
+// 	}
+//
+// 	return release
+// }
 
-	var year *int
-	if xmlRelease.Released != "" {
-		// Try to parse year from released string (could be YYYY or YYYY-MM-DD)
-		if len(xmlRelease.Released) >= 4 {
-			if parsedYear, err := strconv.Atoi(xmlRelease.Released[:4]); err == nil &&
-				parsedYear > 0 {
-				year = &parsedYear
-			}
+// convertReleaseToArtistAssociations extracts artist associations from a release
+func (s *DiscogsXMLParserService) convertReleaseToArtistAssociations(
+	xmlRelease types.Release,
+) *[]repositories.ReleaseArtistAssociation {
+	var associations []repositories.ReleaseArtistAssociation
+
+	for _, artist := range xmlRelease.Artists {
+		if artist.ID > 0 {
+			associations = append(associations, repositories.ReleaseArtistAssociation{
+				ReleaseID: xmlRelease.ID,
+				ArtistID:  artist.ID,
+			})
 		}
 	}
 
-	var country *string
-	if xmlRelease.Country != "" {
-		country = &xmlRelease.Country
+	return &associations
+}
+
+// convertMasterToArtistAssociations extracts artist associations from a master
+func (s *DiscogsXMLParserService) convertMasterToArtistAssociations(
+	xmlMaster types.Master,
+) *[]repositories.MasterArtistAssociation {
+	var associations []repositories.MasterArtistAssociation
+
+	for _, artist := range xmlMaster.Artists {
+		if artist.ID > 0 {
+			associations = append(associations, repositories.MasterArtistAssociation{
+				MasterID: xmlMaster.ID,
+				ArtistID: artist.ID,
+			})
+		}
 	}
 
-	var notes *string
-	if xmlRelease.Notes != "" {
-		notes = &xmlRelease.Notes
-	}
-
-	// Determine format based on format information
-	format := models.FormatVinyl // Default to vinyl
-	// TODO: Parse actual format from xmlRelease.Formats when needed
-
-	release := &models.Release{
-		BaseDiscogModel: models.BaseDiscogModel{
-			ID: xmlRelease.ID,
-		},
-		Title: xmlRelease.Title,
-		// MasterID:    masterID,
-		Year:        year,
-		Country:     country,
-		Format:      format,
-		Notes:       notes,
-		ResourceURL: &resourceURL,
-		URI:         &uri,
-	}
-
-	if xmlRelease.MasterID > 0 {
-		release.MasterID = &xmlRelease.MasterID
-	}
-
-	return release
+	return &associations
 }
 
 // ParseXMLFiles processes Discogs XML data files
@@ -335,8 +367,37 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 
 	// Second pass: Process associations now that all entities are stored
 	log.Info("Starting second pass: processing artist relationships")
-	if err := s.ProcessArtistAssociations(ctx); err != nil {
-		return log.Err("failed to process artist associations", err)
+
+	// Process release-artist associations using the same pattern
+	releasesFilePath := filepath.Join(downloadDir, "releases.xml.gz")
+	releaseArtistConfig := EntityProcessorConfig[types.Release, []repositories.ReleaseArtistAssociation]{
+		FilePath:       releasesFilePath,
+		ElementName:    "release",
+		EntityTypeName: "release-artist-associations",
+		ChannelSize:    5000,
+		BatchSize:      5000,
+		ConvertFunc:    s.convertReleaseToArtistAssociations,
+		UpsertFunc:     s.repos.Release.UpsertReleaseArtistAssociationsBatch,
+	}
+
+	if err := ProcessXMLEntities(ctx, releaseArtistConfig, s.db, log); err != nil {
+		return log.Err("failed to process release-artist associations", err)
+	}
+
+	// Process master-artist associations using the same pattern
+	mastersFilePath := filepath.Join(downloadDir, "masters.xml.gz")
+	masterArtistConfig := EntityProcessorConfig[types.Master, []repositories.MasterArtistAssociation]{
+		FilePath:       mastersFilePath,
+		ElementName:    "master",
+		EntityTypeName: "master-artist-associations",
+		ChannelSize:    5000,
+		BatchSize:      5000,
+		ConvertFunc:    s.convertMasterToArtistAssociations,
+		UpsertFunc:     s.repos.Master.UpsertMasterArtistAssociationsBatch,
+	}
+
+	if err := ProcessXMLEntities(ctx, masterArtistConfig, s.db, log); err != nil {
+		return log.Err("failed to process master-artist associations", err)
 	}
 
 	log.Info("XML parsing completed successfully", "yearMonth", yearMonth)
@@ -357,6 +418,7 @@ func ParseXMLGeneric[T any](
 	maxEntities int,
 	log logger.Logger,
 ) error {
+	log = log.Function("ParseXMLGeneric")
 	// Open the file
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -445,254 +507,4 @@ func ParseXMLGeneric[T any](
 
 	log.Info("Generic XML parsing completed", "entitiesParsed", entityCount, "errors", errorCount)
 	return nil
-}
-
-// ProcessArtistAssociations processes artist relationships in a second pass
-func (s *DiscogsXMLParserService) ProcessArtistAssociations(ctx context.Context) error {
-	log := s.log.Function("ProcessArtistAssociations")
-
-	now := time.Now().UTC()
-	yearMonth := now.Format("2006-01")
-	downloadDir := fmt.Sprintf("%s/%s", DiscogsDataDir, yearMonth)
-
-	// Process release-artist associations
-	if err := s.processReleaseArtistAssociations(ctx, downloadDir, log); err != nil {
-		return log.Err("failed to process release-artist associations", err)
-	}
-
-	// Process master-artist associations
-	if err := s.processMasterArtistAssociations(ctx, downloadDir, log); err != nil {
-		return log.Err("failed to process master-artist associations", err)
-	}
-
-	return nil
-}
-
-// processReleaseArtistAssociations extracts and processes release-artist relationships
-func (s *DiscogsXMLParserService) processReleaseArtistAssociations(
-	ctx context.Context,
-	downloadDir string,
-	log logger.Logger,
-) error {
-	log = log.Function("processReleaseArtistAssociations")
-
-	releasesFilePath := filepath.Join(downloadDir, "releases.xml.gz")
-	if _, err := os.Stat(releasesFilePath); os.IsNotExist(err) {
-		return log.Err("releases file not found", err, "filePath", releasesFilePath)
-	}
-
-	// Channel to collect associations
-	associationsChan := make(chan repositories.ReleaseArtistAssociation, 10000)
-	var wg sync.WaitGroup
-
-	// Start association collector
-	wg.Go(func() {
-		s.collectReleaseArtistAssociations(ctx, associationsChan, log)
-	})
-
-	// Parse releases and extract associations
-	releasesChan := make(chan types.Release, 1000)
-	wg.Go(func() {
-		defer close(releasesChan)
-		if err := ParseXMLGeneric(ctx, releasesFilePath, "release", releasesChan, 0, log); err != nil {
-			log.Err("failed to parse releases for associations", err)
-		}
-	})
-
-	// Process releases and extract associations
-	go func() {
-		defer close(associationsChan)
-		for release := range releasesChan {
-			// Extract artist relationships from release
-			for _, artist := range release.Artists {
-				sl og.Info(
-					"Processing release-artist association",
-					"releaseID",
-					release.ID,
-					"artistID",
-					artist.ID,
-				)
-				if artist.ID > 0 {
-					associationsChan <- repositories.ReleaseArtistAssociation{
-						ReleaseID: release.ID,
-						ArtistID:  int64(artist.ID),
-					}
-				}
-			}
-		}
-	}()
-
-	// Wait for all processing to complete
-	wg.Wait()
-
-	return nil
-}
-
-// processMasterArtistAssociations extracts and processes master-artist relationships
-func (s *DiscogsXMLParserService) processMasterArtistAssociations(
-	ctx context.Context,
-	downloadDir string,
-	log logger.Logger,
-) error {
-	log = log.Function("processMasterArtistAssociations")
-
-	mastersFilePath := filepath.Join(downloadDir, "masters.xml.gz")
-	if _, err := os.Stat(mastersFilePath); os.IsNotExist(err) {
-		return log.Err("masters file not found", err, "filePath", mastersFilePath)
-	}
-
-	// Channel to collect associations
-	associationsChan := make(chan repositories.MasterArtistAssociation, 10000)
-	var wg sync.WaitGroup
-
-	// Start association collector
-	wg.Go(func() {
-		s.collectMasterArtistAssociations(ctx, associationsChan, log)
-	})
-
-	// Parse masters and extract associations
-	mastersChan := make(chan types.Master, 1000)
-	wg.Go(func() {
-		defer close(mastersChan)
-		if err := ParseXMLGeneric(ctx, mastersFilePath, "master", mastersChan, 0, log); err != nil {
-			log.Err("failed to parse masters for associations", err)
-		}
-	})
-
-	// Process masters and extract associations
-	go func() {
-		defer close(associationsChan)
-		for master := range mastersChan {
-			// Extract artist relationships from master
-			for _, artist := range master.Artists {
-				if artist.ID > 0 {
-					associationsChan <- repositories.MasterArtistAssociation{
-						MasterID: master.ID,
-						ArtistID: int64(artist.ID),
-					}
-				}
-			}
-		}
-	}()
-
-	// Wait for all processing to complete
-	wg.Wait()
-
-	return nil
-}
-
-// collectReleaseArtistAssociations batches and stores release-artist associations
-func (s *DiscogsXMLParserService) collectReleaseArtistAssociations(
-	ctx context.Context,
-	associationsChan <-chan repositories.ReleaseArtistAssociation,
-	log logger.Logger,
-) {
-	log = log.Function("collectReleaseArtistAssociations")
-
-	const batchSize = 5000
-	associations := make([]repositories.ReleaseArtistAssociation, 0, batchSize)
-	totalProcessed := 0
-
-	for association := range associationsChan {
-		associations = append(associations, association)
-
-		if len(associations) >= batchSize {
-			if err := s.storeReleaseArtistAssociations(ctx, associations, log); err != nil {
-				log.Err(
-					"failed to store release-artist associations batch",
-					err,
-					"batchSize",
-					len(associations),
-				)
-			} else {
-				totalProcessed += len(associations)
-			}
-			associations = associations[:0] // Reset slice
-		}
-	}
-
-	// Process remaining associations
-	if len(associations) > 0 {
-		if err := s.storeReleaseArtistAssociations(ctx, associations, log); err != nil {
-			log.Err(
-				"failed to store final release-artist associations batch",
-				err,
-				"batchSize",
-				len(associations),
-			)
-		} else {
-			totalProcessed += len(associations)
-		}
-	}
-
-	log.Info("Completed release-artist association processing", "totalAssociations", totalProcessed)
-}
-
-// collectMasterArtistAssociations batches and stores master-artist associations
-func (s *DiscogsXMLParserService) collectMasterArtistAssociations(
-	ctx context.Context,
-	associationsChan <-chan repositories.MasterArtistAssociation,
-	log logger.Logger,
-) {
-	log = log.Function("collectMasterArtistAssociations")
-
-	const batchSize = 5000
-	associations := make([]repositories.MasterArtistAssociation, 0, batchSize)
-	totalProcessed := 0
-
-	for association := range associationsChan {
-		associations = append(associations, association)
-
-		if len(associations) >= batchSize {
-			if err := s.storeMasterArtistAssociations(ctx, associations, log); err != nil {
-				log.Err(
-					"failed to store master-artist associations batch",
-					err,
-					"batchSize",
-					len(associations),
-				)
-			} else {
-				totalProcessed += len(associations)
-			}
-			associations = associations[:0] // Reset slice
-		}
-	}
-
-	// Process remaining associations
-	if len(associations) > 0 {
-		if err := s.storeMasterArtistAssociations(ctx, associations, log); err != nil {
-			log.Err(
-				"failed to store final master-artist associations batch",
-				err,
-				"batchSize",
-				len(associations),
-			)
-		} else {
-			totalProcessed += len(associations)
-		}
-	}
-
-	log.Info("Completed master-artist association processing", "totalAssociations", totalProcessed)
-}
-
-// storeReleaseArtistAssociations stores a batch of release-artist associations
-func (s *DiscogsXMLParserService) storeReleaseArtistAssociations(
-	ctx context.Context,
-	associations []repositories.ReleaseArtistAssociation,
-	log logger.Logger,
-) error {
-	return s.db.SQLWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		return s.repos.Release.CreateReleaseArtistAssociations(ctx, tx, associations)
-	})
-}
-
-// storeMasterArtistAssociations stores a batch of master-artist associations
-func (s *DiscogsXMLParserService) storeMasterArtistAssociations(
-	ctx context.Context,
-	associations []repositories.MasterArtistAssociation,
-	log logger.Logger,
-) error {
-	return s.db.SQLWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		return s.repos.Master.CreateMasterArtistAssociations(ctx, tx, associations)
-	})
 }

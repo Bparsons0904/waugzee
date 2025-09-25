@@ -5,7 +5,6 @@ import (
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -17,30 +16,18 @@ type MasterArtistAssociation struct {
 }
 
 type MasterRepository interface {
-	GetByID(ctx context.Context, tx *gorm.DB, id string) (*Master, error)
 	GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Master, error)
-	Create(ctx context.Context, tx *gorm.DB, master *Master) (*Master, error)
-	Update(ctx context.Context, tx *gorm.DB, master *Master) error
-	Delete(ctx context.Context, tx *gorm.DB, id string) error
 	UpsertBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error
-	GetBatchByDiscogsIDs(
-		ctx context.Context,
-		tx *gorm.DB,
-		discogsIDs []int64,
-	) (map[int64]*Master, error)
-	InsertBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error
-	UpdateBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error
 	// Association methods
 	CreateMasterArtistAssociations(
 		ctx context.Context,
 		tx *gorm.DB,
 		associations []MasterArtistAssociation,
 	) error
-	CreateMasterGenreAssociations(
+	UpsertMasterArtistAssociationsBatch(
 		ctx context.Context,
 		tx *gorm.DB,
-		masterIDs []int64,
-		genreNames []string,
+		associations []*[]MasterArtistAssociation,
 	) error
 	// Individual association methods
 	AssociateArtists(ctx context.Context, tx *gorm.DB, master *Master, artists []*Artist) error
@@ -57,21 +44,6 @@ func NewMasterRepository() MasterRepository {
 	}
 }
 
-func (r *masterRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (*Master, error) {
-	log := r.log.Function("GetByID")
-
-	masterID, err := uuid.Parse(id)
-	if err != nil {
-		return nil, log.Err("failed to parse master ID", err, "id", id)
-	}
-
-	var master Master
-	if err := tx.WithContext(ctx).First(&master, "id = ?", masterID).Error; err != nil {
-		return nil, log.Err("failed to get master by ID", err, "id", id)
-	}
-
-	return &master, nil
-}
 
 func (r *masterRepository) GetByDiscogsID(
 	ctx context.Context,
@@ -91,44 +63,7 @@ func (r *masterRepository) GetByDiscogsID(
 	return &master, nil
 }
 
-func (r *masterRepository) Create(
-	ctx context.Context,
-	tx *gorm.DB,
-	master *Master,
-) (*Master, error) {
-	log := r.log.Function("Create")
 
-	if err := tx.WithContext(ctx).Create(master).Error; err != nil {
-		return nil, log.Err("failed to create master", err, "master", master)
-	}
-
-	return master, nil
-}
-
-func (r *masterRepository) Update(ctx context.Context, tx *gorm.DB, master *Master) error {
-	log := r.log.Function("Update")
-
-	if err := tx.WithContext(ctx).Save(master).Error; err != nil {
-		return log.Err("failed to update master", err, "master", master)
-	}
-
-	return nil
-}
-
-func (r *masterRepository) Delete(ctx context.Context, tx *gorm.DB, id string) error {
-	log := r.log.Function("Delete")
-
-	masterID, err := uuid.Parse(id)
-	if err != nil {
-		return log.Err("failed to parse master ID", err, "id", id)
-	}
-
-	if err := tx.WithContext(ctx).Delete(&Master{}, "id = ?", masterID).Error; err != nil {
-		return log.Err("failed to delete master", err, "id", id)
-	}
-
-	return nil
-}
 
 func (r *masterRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error {
 	log := r.log.Function("UpsertBatch")
@@ -147,58 +82,7 @@ func (r *masterRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, masters
 	return nil
 }
 
-func (r *masterRepository) GetBatchByDiscogsIDs(
-	ctx context.Context,
-	tx *gorm.DB,
-	discogsIDs []int64,
-) (map[int64]*Master, error) {
-	log := r.log.Function("GetBatchByDiscogsIDs")
 
-	if len(discogsIDs) == 0 {
-		return make(map[int64]*Master), nil
-	}
-
-	var masters []*Master
-	if err := tx.WithContext(ctx).Where("id IN ?", discogsIDs).Find(&masters).Error; err != nil {
-		return nil, log.Err("failed to get masters by Discogs IDs", err, "count", len(discogsIDs))
-	}
-
-	// Convert to map for O(1) lookup
-	result := make(map[int64]*Master, len(masters))
-	for _, master := range masters {
-		result[master.ID] = master
-	}
-
-	return result, nil
-}
-
-func (r *masterRepository) InsertBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error {
-	log := r.log.Function("InsertBatch")
-
-	if len(masters) == 0 {
-		return nil
-	}
-
-	if err := tx.WithContext(ctx).Create(&masters).Error; err != nil {
-		return log.Err("failed to insert master batch", err, "count", len(masters))
-	}
-
-	return nil
-}
-
-func (r *masterRepository) UpdateBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error {
-	log := r.log.Function("UpdateBatch")
-
-	if len(masters) == 0 {
-		return nil
-	}
-
-	if err := tx.WithContext(ctx).Save(&masters).Error; err != nil {
-		return log.Err("failed to update master batch", err, "count", len(masters))
-	}
-
-	return nil
-}
 
 // CreateMasterArtistAssociations creates specific master-artist association pairs
 func (r *masterRepository) CreateMasterArtistAssociations(
@@ -222,11 +106,14 @@ func (r *masterRepository) CreateMasterArtistAssociations(
 	}
 
 	// Insert exact association pairs with ordering to prevent deadlocks
+	// Only insert associations where both master_id and artist_id exist in their respective tables
 	query := `
 		INSERT INTO master_artists (master_id, artist_id)
-		SELECT master_id, artist_id
+		SELECT t.master_id, t.artist_id
 		FROM unnest($1::bigint[], $2::bigint[]) AS t(master_id, artist_id)
-		ORDER BY master_id, artist_id
+		INNER JOIN masters m ON m.id = t.master_id
+		INNER JOIN artists a ON a.id = t.artist_id
+		ORDER BY t.master_id, t.artist_id
 		ON CONFLICT (master_id, artist_id) DO NOTHING
 	`
 
@@ -239,37 +126,43 @@ func (r *masterRepository) CreateMasterArtistAssociations(
 	return nil
 }
 
-// CreateMasterGenreAssociations creates many-to-many associations between masters and genres
-func (r *masterRepository) CreateMasterGenreAssociations(
+// UpsertMasterArtistAssociationsBatch processes batches of association arrays for the EntityProcessor pattern
+func (r *masterRepository) UpsertMasterArtistAssociationsBatch(
 	ctx context.Context,
 	tx *gorm.DB,
-	masterIDs []int64,
-	genreNames []string,
+	associationBatches []*[]MasterArtistAssociation,
 ) error {
-	log := r.log.Function("CreateMasterGenreAssociations")
+	log := r.log.Function("UpsertMasterArtistAssociationsBatch")
 
-	if len(masterIDs) == 0 || len(genreNames) == 0 {
+	if len(associationBatches) == 0 {
 		return nil
 	}
 
-	// Build cross-product associations using genre names with ON CONFLICT DO NOTHING
-	query := `
-		INSERT INTO master_genres (master_id, genre_id)
-		SELECT m.id, g.id
-		FROM unnest($1::bigint[]) AS m(id)
-		CROSS JOIN genres g
-		WHERE g.name = ANY($2::text[])
-		ON CONFLICT (master_id, genre_id) DO NOTHING
-	`
-
-	result := tx.WithContext(ctx).Exec(query, masterIDs, genreNames)
-	if result.Error != nil {
-		return log.Err("failed to create master-genre associations", result.Error,
-			"masterCount", len(masterIDs), "genreCount", len(genreNames))
+	// Flatten all association batches into a single slice
+	var allAssociations []MasterArtistAssociation
+	for _, batch := range associationBatches {
+		if batch != nil && len(*batch) > 0 {
+			allAssociations = append(allAssociations, *batch...)
+		}
 	}
+
+	if len(allAssociations) == 0 {
+		return nil
+	}
+
+	// Use the existing CreateMasterArtistAssociations method which has foreign key validation
+	if err := r.CreateMasterArtistAssociations(ctx, tx, allAssociations); err != nil {
+		return log.Err("failed to create master-artist associations batch", err,
+			"totalAssociations", len(allAssociations))
+	}
+
+	log.Info("Created master-artist associations batch",
+		"totalAssociations", len(allAssociations),
+		"batchCount", len(associationBatches))
 
 	return nil
 }
+
 
 func (r *masterRepository) AssociateArtists(
 	ctx context.Context,

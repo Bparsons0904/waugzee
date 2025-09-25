@@ -5,7 +5,6 @@ import (
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -17,17 +16,11 @@ type ReleaseArtistAssociation struct {
 }
 
 type ReleaseRepository interface {
-	GetByID(ctx context.Context, tx *gorm.DB, id string) (*Release, error)
 	GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Release, error)
-	Create(ctx context.Context, tx *gorm.DB, release *Release) (*Release, error)
-	Update(ctx context.Context, tx *gorm.DB, release *Release) error
-	Delete(ctx context.Context, tx *gorm.DB, id string) error
 	UpsertBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
-	GetBatchByDiscogsIDs(ctx context.Context, tx *gorm.DB, discogsIDs []int64) (map[int64]*Release, error)
-	InsertBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
-	UpdateBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
 	// Association methods
 	CreateReleaseArtistAssociations(ctx context.Context, tx *gorm.DB, associations []ReleaseArtistAssociation) error
+	UpsertReleaseArtistAssociationsBatch(ctx context.Context, tx *gorm.DB, associations []*[]ReleaseArtistAssociation) error
 	AssociateArtists(ctx context.Context, tx *gorm.DB, release *Release, artists []*Artist) error
 	AssociateLabels(ctx context.Context, tx *gorm.DB, release *Release, labels []*Label) error
 	AssociateGenres(ctx context.Context, tx *gorm.DB, release *Release, genres []*Genre) error
@@ -43,21 +36,6 @@ func NewReleaseRepository() ReleaseRepository {
 	}
 }
 
-func (r *releaseRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (*Release, error) {
-	log := r.log.Function("GetByID")
-
-	releaseID, err := uuid.Parse(id)
-	if err != nil {
-		return nil, log.Err("failed to parse release ID", err, "id", id)
-	}
-
-	var release Release
-	if err := tx.WithContext(ctx).Preload("Labels").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "id = ?", releaseID).Error; err != nil {
-		return nil, log.Err("failed to get release by ID", err, "id", id)
-	}
-
-	return &release, nil
-}
 
 func (r *releaseRepository) GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Release, error) {
 	log := r.log.Function("GetByDiscogsID")
@@ -73,40 +51,7 @@ func (r *releaseRepository) GetByDiscogsID(ctx context.Context, tx *gorm.DB, dis
 	return &release, nil
 }
 
-func (r *releaseRepository) Create(ctx context.Context, tx *gorm.DB, release *Release) (*Release, error) {
-	log := r.log.Function("Create")
 
-	if err := tx.WithContext(ctx).Create(release).Error; err != nil {
-		return nil, log.Err("failed to create release", err, "release", release)
-	}
-
-	return release, nil
-}
-
-func (r *releaseRepository) Update(ctx context.Context, tx *gorm.DB, release *Release) error {
-	log := r.log.Function("Update")
-
-	if err := tx.WithContext(ctx).Save(release).Error; err != nil {
-		return log.Err("failed to update release", err, "release", release)
-	}
-
-	return nil
-}
-
-func (r *releaseRepository) Delete(ctx context.Context, tx *gorm.DB, id string) error {
-	log := r.log.Function("Delete")
-
-	releaseID, err := uuid.Parse(id)
-	if err != nil {
-		return log.Err("failed to parse release ID", err, "id", id)
-	}
-
-	if err := tx.WithContext(ctx).Delete(&Release{}, "id = ?", releaseID).Error; err != nil {
-		return log.Err("failed to delete release", err, "id", id)
-	}
-
-	return nil
-}
 
 func (r *releaseRepository) UpsertBatch(
 	ctx context.Context,
@@ -132,66 +77,6 @@ func (r *releaseRepository) UpsertBatch(
 	return nil
 }
 
-func (r *releaseRepository) GetBatchByDiscogsIDs(
-	ctx context.Context,
-	tx *gorm.DB,
-	discogsIDs []int64,
-) (map[int64]*Release, error) {
-	log := r.log.Function("GetBatchByDiscogsIDs")
-
-	if len(discogsIDs) == 0 {
-		return make(map[int64]*Release), nil
-	}
-
-	var releases []*Release
-	if err := tx.WithContext(ctx).Where("id IN ?", discogsIDs).Find(&releases).Error; err != nil {
-		return nil, log.Err("failed to get releases by Discogs IDs", err, "count", len(discogsIDs))
-	}
-
-	// Convert to map for O(1) lookup
-	result := make(map[int64]*Release, len(releases))
-	for _, release := range releases {
-		result[release.ID] = release
-	}
-
-	log.Info(
-		"Retrieved releases by Discogs IDs",
-		"requested",
-		len(discogsIDs),
-		"found",
-		len(result),
-	)
-	return result, nil
-}
-
-
-func (r *releaseRepository) InsertBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error {
-	log := r.log.Function("InsertBatch")
-
-	if len(releases) == 0 {
-		return nil
-	}
-
-	if err := tx.WithContext(ctx).Create(&releases).Error; err != nil {
-		return log.Err("failed to insert release batch", err, "count", len(releases))
-	}
-
-	return nil
-}
-
-func (r *releaseRepository) UpdateBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error {
-	log := r.log.Function("UpdateBatch")
-
-	if len(releases) == 0 {
-		return nil
-	}
-
-	if err := tx.WithContext(ctx).Save(&releases).Error; err != nil {
-		return log.Err("failed to update release batch", err, "count", len(releases))
-	}
-
-	return nil
-}
 
 func (r *releaseRepository) AssociateArtists(ctx context.Context, tx *gorm.DB, release *Release, artists []*Artist) error {
 	log := r.log.Function("AssociateArtists")
@@ -263,11 +148,14 @@ func (r *releaseRepository) CreateReleaseArtistAssociations(
 	}
 
 	// Insert exact association pairs with ordering to prevent deadlocks
+	// Only insert associations where both release_id and artist_id exist in their respective tables
 	query := `
 		INSERT INTO release_artists (release_id, artist_id)
-		SELECT release_id, artist_id
+		SELECT t.release_id, t.artist_id
 		FROM unnest($1::bigint[], $2::bigint[]) AS t(release_id, artist_id)
-		ORDER BY release_id, artist_id
+		INNER JOIN releases r ON r.id = t.release_id
+		INNER JOIN artists a ON a.id = t.artist_id
+		ORDER BY t.release_id, t.artist_id
 		ON CONFLICT (release_id, artist_id) DO NOTHING
 	`
 
@@ -280,6 +168,43 @@ func (r *releaseRepository) CreateReleaseArtistAssociations(
 	log.Info("Created release-artist associations",
 		"associationCount", len(associations),
 		"rowsAffected", result.RowsAffected)
+
+	return nil
+}
+
+// UpsertReleaseArtistAssociationsBatch processes batches of association arrays for the EntityProcessor pattern
+func (r *releaseRepository) UpsertReleaseArtistAssociationsBatch(
+	ctx context.Context,
+	tx *gorm.DB,
+	associationBatches []*[]ReleaseArtistAssociation,
+) error {
+	log := r.log.Function("UpsertReleaseArtistAssociationsBatch")
+
+	if len(associationBatches) == 0 {
+		return nil
+	}
+
+	// Flatten all association batches into a single slice
+	var allAssociations []ReleaseArtistAssociation
+	for _, batch := range associationBatches {
+		if batch != nil && len(*batch) > 0 {
+			allAssociations = append(allAssociations, *batch...)
+		}
+	}
+
+	if len(allAssociations) == 0 {
+		return nil
+	}
+
+	// Use the existing CreateReleaseArtistAssociations method which has foreign key validation
+	if err := r.CreateReleaseArtistAssociations(ctx, tx, allAssociations); err != nil {
+		return log.Err("failed to create release-artist associations batch", err,
+			"totalAssociations", len(allAssociations))
+	}
+
+	log.Info("Created release-artist associations batch",
+		"totalAssociations", len(allAssociations),
+		"batchCount", len(associationBatches))
 
 	return nil
 }
