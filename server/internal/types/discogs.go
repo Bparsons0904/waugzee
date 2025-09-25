@@ -44,10 +44,10 @@ type Release struct {
 	DataQuality string          `xml:"data_quality"`
 	MasterID    int64           `xml:"master_id"`
 	Artists     []ReleaseArtist `xml:"artists>artist"`
-	Labels      ReleaseLabel    `xml:"labels>label"`
+	Labels      []ReleaseLabel  `xml:"labels>label"`
 	Formats     Format          `xml:"formats>format"`
-	Genres      string          `xml:"genres>genre"`
-	Styles      string          `xml:"styles>style"`
+	Genres      []string        `xml:"genres>genre"`
+	Styles      []string        `xml:"styles>style"`
 	Tracklist   Track           `xml:"tracklist>track"`
 	Images      Image           `xml:"images>image"`
 	// IdentifiersIdentifier  `xml:"identifiers>identifier"`
@@ -63,8 +63,8 @@ type Master struct {
 	Notes       string         `xml:"notes"`
 	DataQuality string         `xml:"data_quality"`
 	Artists     []MasterArtist `xml:"artists>artist"`
-	Genres      string         `xml:"genres>genre"`
-	Styles      string         `xml:"styles>style"`
+	Genres      []string       `xml:"genres>genre"`
+	Styles      []string       `xml:"styles>style"`
 	Videos      Video          `xml:"videos>video"`
 	Images      Image          `xml:"images>image"`
 }
@@ -117,9 +117,9 @@ type ReleaseArtist struct {
 type ReleaseLabel struct {
 	Name        string `xml:"name,attr"`
 	Catno       string `xml:"catno,attr"`
-	ID          int    `xml:"id,attr"`
+	ID          int64  `xml:"id,attr"`
 	Sublabel    bool   `xml:"sublabel,attr"`
-	ParentLabel int    `xml:"parent_label_id,attr"`
+	ParentLabel int64  `xml:"parent_label_id,attr"`
 }
 
 type MasterArtist struct {

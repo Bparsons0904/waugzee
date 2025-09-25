@@ -1,9 +1,5 @@
 package models
 
-import (
-	"gorm.io/gorm"
-)
-
 type Label struct {
 	BaseDiscogModel
 	Profile     *string   `gorm:"type:text"                                json:"profile,omitempty"`
@@ -51,20 +47,3 @@ type Label struct {
 //   "id": 1,
 //   "data_quality": "Needs Vote"
 // }
-
-func (l *Label) BeforeCreate(tx *gorm.DB) (err error) {
-	// if l.ID <= 0 {
-	// 	return gorm.ErrInvalidValue
-	// }
-	// if l.Name == "" {
-	// 	return gorm.ErrInvalidValue
-	// }
-	return nil
-}
-
-func (l *Label) BeforeUpdate(tx *gorm.DB) (err error) {
-	// if l.Name == "" {
-	// 	return gorm.ErrInvalidValue
-	// }
-	return nil
-}

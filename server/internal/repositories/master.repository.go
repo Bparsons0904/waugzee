@@ -15,6 +15,12 @@ type MasterArtistAssociation struct {
 	ArtistID int64
 }
 
+// MasterGenreAssociation represents a specific master-genre association pair
+type MasterGenreAssociation struct {
+	MasterID int64
+	GenreID  int64
+}
+
 type MasterRepository interface {
 	GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Master, error)
 	UpsertBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error
@@ -28,6 +34,16 @@ type MasterRepository interface {
 		ctx context.Context,
 		tx *gorm.DB,
 		associations []*[]MasterArtistAssociation,
+	) error
+	CreateMasterGenreAssociations(
+		ctx context.Context,
+		tx *gorm.DB,
+		associations []MasterGenreAssociation,
+	) error
+	UpsertMasterGenreAssociationsBatch(
+		ctx context.Context,
+		tx *gorm.DB,
+		associations []*[]MasterGenreAssociation,
 	) error
 	// Individual association methods
 	AssociateArtists(ctx context.Context, tx *gorm.DB, master *Master, artists []*Artist) error
@@ -202,6 +218,89 @@ func (r *masterRepository) AssociateGenres(
 			"masterID", master.ID,
 			"genreCount", len(genres))
 	}
+
+	return nil
+}
+
+// CreateMasterGenreAssociations creates specific master-genre association pairs
+func (r *masterRepository) CreateMasterGenreAssociations(
+	ctx context.Context,
+	tx *gorm.DB,
+	associations []MasterGenreAssociation,
+) error {
+	log := r.log.Function("CreateMasterGenreAssociations")
+
+	if len(associations) == 0 {
+		return nil
+	}
+
+	// Prepare association pairs for bulk insert with ordered processing to prevent deadlocks
+	masterIDs := make([]int64, len(associations))
+	genreIDs := make([]int64, len(associations))
+
+	for i, assoc := range associations {
+		masterIDs[i] = assoc.MasterID
+		genreIDs[i] = assoc.GenreID
+	}
+
+	// Insert exact association pairs with ordering to prevent deadlocks
+	// Only insert associations where both master_id and genre_id exist in their respective tables
+	query := `
+		INSERT INTO master_genres (master_id, genre_id)
+		SELECT t.master_id, t.genre_id
+		FROM unnest($1::bigint[], $2::bigint[]) AS t(master_id, genre_id)
+		INNER JOIN masters m ON m.id = t.master_id
+		INNER JOIN genres g ON g.id = t.genre_id
+		ORDER BY t.master_id, t.genre_id
+		ON CONFLICT (master_id, genre_id) DO NOTHING
+	`
+
+	result := tx.WithContext(ctx).Exec(query, masterIDs, genreIDs)
+	if result.Error != nil {
+		return log.Err("failed to create master-genre associations", result.Error,
+			"associationCount", len(associations))
+	}
+
+	log.Info("Created master-genre associations",
+		"associationCount", len(associations),
+		"rowsAffected", result.RowsAffected)
+
+	return nil
+}
+
+// UpsertMasterGenreAssociationsBatch processes batches of association arrays for the EntityProcessor pattern
+func (r *masterRepository) UpsertMasterGenreAssociationsBatch(
+	ctx context.Context,
+	tx *gorm.DB,
+	associationBatches []*[]MasterGenreAssociation,
+) error {
+	log := r.log.Function("UpsertMasterGenreAssociationsBatch")
+
+	if len(associationBatches) == 0 {
+		return nil
+	}
+
+	// Flatten all association batches into a single slice
+	var allAssociations []MasterGenreAssociation
+	for _, batch := range associationBatches {
+		if batch != nil && len(*batch) > 0 {
+			allAssociations = append(allAssociations, *batch...)
+		}
+	}
+
+	if len(allAssociations) == 0 {
+		return nil
+	}
+
+	// Use the existing CreateMasterGenreAssociations method which has foreign key validation
+	if err := r.CreateMasterGenreAssociations(ctx, tx, allAssociations); err != nil {
+		return log.Err("failed to create master-genre associations batch", err,
+			"totalAssociations", len(allAssociations))
+	}
+
+	log.Info("Created master-genre associations batch",
+		"totalAssociations", len(allAssociations),
+		"batchCount", len(associationBatches))
 
 	return nil
 }
