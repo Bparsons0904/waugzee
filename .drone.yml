@@ -27,7 +27,7 @@ steps:
       - npm run build
 
   - name: build-backend
-    image: golang:1.24.3-alpine
+    image: golang:1.25.1-alpine
     commands:
       - apk add --no-cache gcc musl-dev
       - cd server
@@ -35,7 +35,7 @@ steps:
       - CGO_ENABLED=1 GOOS=linux go build -ldflags="-w -s" -o main cmd/api/main.go
 
   - name: build-migration
-    image: golang:1.24.3-alpine
+    image: golang:1.25.1-alpine
     commands:
       - apk add --no-cache gcc musl-dev
       - cd server
@@ -110,6 +110,18 @@ steps:
         from_secret: SECURITY_PEPPER
       SECURITY_JWT_SECRET:
         from_secret: SECURITY_JWT_SECRET
+      SCHEDULER_ENABLED:
+        from_secret: SCHEDULER_ENABLED
+      ZITADEL_CLIENT_ID:
+        from_secret: ZITADEL_CLIENT_ID
+      ZITADEL_INSTANCE_URL:
+        from_secret: ZITADEL_INSTANCE_URL
+      ZITADEL_PRIVATE_KEY:
+        from_secret: ZITADEL_PRIVATE_KEY
+      ZITADEL_KEY_ID:
+        from_secret: ZITADEL_KEY_ID
+      ZITADEL_CLIENT_ID_M2M:
+        from_secret: ZITADEL_CLIENT_ID_M2M
       CLIENT_PORT:
         from_secret: CLIENT_PORT
       VITE_GENERAL_VERSION:
@@ -161,6 +173,18 @@ steps:
         from_secret: SECURITY_PEPPER
       SECURITY_JWT_SECRET:
         from_secret: SECURITY_JWT_SECRET
+      SCHEDULER_ENABLED:
+        from_secret: SCHEDULER_ENABLED
+      ZITADEL_CLIENT_ID:
+        from_secret: ZITADEL_CLIENT_ID
+      ZITADEL_INSTANCE_URL:
+        from_secret: ZITADEL_INSTANCE_URL
+      ZITADEL_PRIVATE_KEY:
+        from_secret: ZITADEL_PRIVATE_KEY
+      ZITADEL_KEY_ID:
+        from_secret: ZITADEL_KEY_ID
+      ZITADEL_CLIENT_ID_M2M:
+        from_secret: ZITADEL_CLIENT_ID_M2M
       CLIENT_PORT:
         from_secret: CLIENT_PORT
       VITE_GENERAL_VERSION:
