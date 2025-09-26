@@ -86,9 +86,9 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 			}
 
 			// Set Master ID if available
-			// if basicInfo.MasterID > 0 {
-			// 	release.MasterID = &basicInfo.MasterID
-			// }
+			if basicInfo.MasterID > 0 {
+				release.MasterID = &basicInfo.MasterID
+			}
 
 			// Store genres and styles in Data column using the new Data struct
 			if len(basicInfo.Genres) > 0 || len(basicInfo.Styles) > 0 {

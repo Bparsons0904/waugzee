@@ -68,12 +68,43 @@ type FileChecksums struct {
 	ReleasesDump string `json:"releases_dump,omitempty"`
 }
 
+// ProcessingStep represents an individual processing step
+type ProcessingStep string
+
+const (
+	StepLabelsProcessing              ProcessingStep = "labels_processing"
+	StepArtistsProcessing             ProcessingStep = "artists_processing"
+	StepMastersProcessing             ProcessingStep = "masters_processing"
+	StepReleasesProcessing            ProcessingStep = "releases_processing"
+	StepMasterGenresCollection        ProcessingStep = "master_genres_collection"
+	StepMasterGenresUpsert            ProcessingStep = "master_genres_upsert"
+	StepMasterGenreAssociations       ProcessingStep = "master_genre_associations"
+	StepReleaseGenresCollection       ProcessingStep = "release_genres_collection"
+	StepReleaseGenresUpsert           ProcessingStep = "release_genres_upsert"
+	StepReleaseGenreAssociations      ProcessingStep = "release_genre_associations"
+	StepReleaseLabelAssociations      ProcessingStep = "release_label_associations"
+	StepMasterArtistAssociations      ProcessingStep = "master_artist_associations"
+	StepReleaseArtistAssociations     ProcessingStep = "release_artist_associations"
+)
+
+// StepStatus represents the completion status of a processing step
+type StepStatus struct {
+	Completed     bool       `json:"completed"`
+	CompletedAt   *time.Time `json:"completed_at,omitempty"`
+	ErrorMessage  *string    `json:"error_message,omitempty"`
+	RecordsCount  *int64     `json:"records_count,omitempty"`
+	Duration      *string    `json:"duration,omitempty"`
+}
+
 // ProcessingStats tracks detailed information about file processing
 type ProcessingStats struct {
 	ArtistsFile  *FileDownloadInfo `json:"artists_file,omitempty"`
 	LabelsFile   *FileDownloadInfo `json:"labels_file,omitempty"`
 	MastersFile  *FileDownloadInfo `json:"masters_file,omitempty"`
 	ReleasesFile *FileDownloadInfo `json:"releases_file,omitempty"`
+
+	// Individual processing steps tracking
+	ProcessingSteps map[ProcessingStep]*StepStatus `json:"processing_steps,omitempty"`
 }
 
 // UpdateStatus updates the processing status with validation
@@ -190,6 +221,99 @@ func (d *DiscogsDataProcessing) InitializeFileInfo(fileType string) {
 			Validated:  false,
 		})
 	}
+}
+
+// InitializeProcessingSteps initializes the processing steps map if nil
+func (d *DiscogsDataProcessing) InitializeProcessingSteps() {
+	d.InitializeProcessingStats()
+	if d.ProcessingStats.ProcessingSteps == nil {
+		d.ProcessingStats.ProcessingSteps = make(map[ProcessingStep]*StepStatus)
+	}
+}
+
+// IsStepCompleted returns true if the specified step has been completed
+func (d *DiscogsDataProcessing) IsStepCompleted(step ProcessingStep) bool {
+	if d.ProcessingStats == nil || d.ProcessingStats.ProcessingSteps == nil {
+		return false
+	}
+
+	stepStatus, exists := d.ProcessingStats.ProcessingSteps[step]
+	return exists && stepStatus.Completed
+}
+
+// MarkStepCompleted marks a processing step as completed with optional metadata
+func (d *DiscogsDataProcessing) MarkStepCompleted(step ProcessingStep, recordsCount *int64, duration *string) {
+	d.InitializeProcessingSteps()
+
+	now := time.Now().UTC()
+	d.ProcessingStats.ProcessingSteps[step] = &StepStatus{
+		Completed:    true,
+		CompletedAt:  &now,
+		RecordsCount: recordsCount,
+		Duration:     duration,
+	}
+}
+
+// MarkStepFailed marks a processing step as failed with error message
+func (d *DiscogsDataProcessing) MarkStepFailed(step ProcessingStep, errorMessage string) {
+	d.InitializeProcessingSteps()
+
+	d.ProcessingStats.ProcessingSteps[step] = &StepStatus{
+		Completed:    false,
+		ErrorMessage: &errorMessage,
+	}
+}
+
+// GetCompletedSteps returns a list of completed processing steps
+func (d *DiscogsDataProcessing) GetCompletedSteps() []ProcessingStep {
+	if d.ProcessingStats == nil || d.ProcessingStats.ProcessingSteps == nil {
+		return []ProcessingStep{}
+	}
+
+	var completed []ProcessingStep
+	for step, status := range d.ProcessingStats.ProcessingSteps {
+		if status.Completed {
+			completed = append(completed, step)
+		}
+	}
+
+	return completed
+}
+
+// GetStepStatus returns the status of a specific processing step
+func (d *DiscogsDataProcessing) GetStepStatus(step ProcessingStep) *StepStatus {
+	if d.ProcessingStats == nil || d.ProcessingStats.ProcessingSteps == nil {
+		return nil
+	}
+
+	return d.ProcessingStats.ProcessingSteps[step]
+}
+
+// AllStepsCompleted returns true if all processing steps have been completed
+func (d *DiscogsDataProcessing) AllStepsCompleted() bool {
+	allSteps := []ProcessingStep{
+		StepLabelsProcessing,
+		StepArtistsProcessing,
+		StepMastersProcessing,
+		StepReleasesProcessing,
+		StepMasterGenresCollection,
+		StepMasterGenresUpsert,
+		StepMasterGenreAssociations,
+		StepReleaseGenresCollection,
+		StepReleaseGenresUpsert,
+		StepReleaseGenreAssociations,
+		StepReleaseLabelAssociations,
+		StepMasterArtistAssociations,
+		StepReleaseArtistAssociations,
+	}
+
+	for _, step := range allSteps {
+		if !d.IsStepCompleted(step) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // TableName specifies the table name for GORM

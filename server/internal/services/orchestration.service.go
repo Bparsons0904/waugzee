@@ -29,14 +29,14 @@ type RequestMetadata struct {
 }
 
 type OrchestrationService struct {
-	log                   logger.Logger
-	eventBus              *events.EventBus
-	cache                 valkey.Client
-	repos                 repositories.Repository
-	transactionService    *TransactionService
-	foldersService        *FoldersService
-	releaseSyncService    *ReleaseSyncService
-	discogsRateLimiter    *DiscogsRateLimiterService
+	log                logger.Logger
+	eventBus           *events.EventBus
+	cache              valkey.Client
+	repos              repositories.Repository
+	transactionService *TransactionService
+	foldersService     *FoldersService
+	releaseSyncService *ReleaseSyncService
+	discogsRateLimiter *DiscogsRateLimiterService
 }
 
 func NewOrchestrationService(
@@ -48,17 +48,24 @@ func NewOrchestrationService(
 ) *OrchestrationService {
 	log := logger.New("OrchestrationService")
 	folderDataExtractionService := NewFolderDataExtractionService(repos)
-	foldersService := NewFoldersService(eventBus, repos, db, transactionService, folderDataExtractionService, discogsRateLimiter)
+	foldersService := NewFoldersService(
+		eventBus,
+		repos,
+		db,
+		transactionService,
+		folderDataExtractionService,
+		discogsRateLimiter,
+	)
 	releaseSyncService := NewReleaseSyncService(eventBus, repos, db, discogsRateLimiter)
 	return &OrchestrationService{
-		log:                   log,
-		eventBus:              eventBus,
-		cache:                 transactionService.db.Cache.ClientAPI,
-		repos:                 repos,
-		transactionService:    transactionService,
-		foldersService:        foldersService,
-		releaseSyncService:    releaseSyncService,
-		discogsRateLimiter:    discogsRateLimiter,
+		log:                log,
+		eventBus:           eventBus,
+		cache:              transactionService.db.Cache.ClientAPI,
+		repos:              repos,
+		transactionService: transactionService,
+		foldersService:     foldersService,
+		releaseSyncService: releaseSyncService,
+		discogsRateLimiter: discogsRateLimiter,
 	}
 }
 
@@ -85,13 +92,11 @@ func (o *OrchestrationService) SyncUserFoldersAndCollection(
 		return log.ErrMsg("user does not have a Discogs token configured")
 	}
 
-
 	// Step 1: Request folder discovery (async - will trigger folder processing)
 	_, err := o.foldersService.RequestUserFolders(ctx, user)
 	if err != nil {
 		return log.Err("failed to initiate folder discovery", err)
 	}
-
 
 	// Step 2: Start collection sync for all user folders
 	// This will process folders 1+ and coordinate with folder responses
@@ -99,7 +104,6 @@ func (o *OrchestrationService) SyncUserFoldersAndCollection(
 	if err != nil {
 		return log.Err("failed to initiate collection sync", err)
 	}
-
 
 	return nil
 }
@@ -115,7 +119,6 @@ func (o *OrchestrationService) HandleAPIResponse(
 		return log.ErrMsg("missing or invalid requestId in response")
 	}
 
-
 	var metadata RequestMetadata
 	found, err := database.NewCacheBuilder(o.cache, requestID).
 		WithHashPattern(API_HASH).
@@ -130,7 +133,9 @@ func (o *OrchestrationService) HandleAPIResponse(
 	}
 
 	if metadata.RequestID != requestID {
-		return log.ErrMsg("request ID mismatch: expected " + metadata.RequestID + ", received " + requestID)
+		return log.ErrMsg(
+			"request ID mismatch: expected " + metadata.RequestID + ", received " + requestID,
+		)
 	}
 
 	err = database.NewCacheBuilder(o.cache, requestID).
@@ -140,7 +145,6 @@ func (o *OrchestrationService) HandleAPIResponse(
 	if err != nil {
 		log.Er("failed to cleanup cache entry", err, "requestID", requestID)
 	}
-
 
 	switch metadata.RequestType {
 	case "folders":
@@ -263,7 +267,7 @@ func (o *OrchestrationService) handleReleaseResponse(
 				// Get missing releases count for logging
 				missingReleases := 0
 				if missingRaw, exists := syncStateData["MissingReleaseIDs"]; exists {
-					if missingSlice, ok := missingRaw.([]interface{}); ok {
+					if missingSlice, ok := missingRaw.([]any); ok {
 						missingReleases = len(missingSlice)
 					}
 				}
@@ -284,44 +288,48 @@ func (o *OrchestrationService) handleReleaseResponse(
 					return nil
 				}
 
-		// Trigger folder processing to continue with the sync now that releases are ready
-		// We simulate a final folder release response to trigger the completion logic
-		finalResponseData := map[string]any{
-			"requestId": metadata.RequestID + "_completion",
-			"data": map[string]any{
-				"releases": []any{}, // Empty releases to trigger completion check
-				"pagination": map[string]any{
-					"page":  1,
-					"pages": 1,
-				},
-			},
-		}
+				// Trigger folder processing to continue with the sync now that releases are ready
+				// We simulate a final folder release response to trigger the completion logic
+				finalResponseData := map[string]any{
+					"requestId": metadata.RequestID + "_completion",
+					"data": map[string]any{
+						"releases": []any{}, // Empty releases to trigger completion check
+						"pagination": map[string]any{
+							"page":  1,
+							"pages": 1,
+						},
+					},
+				}
 
-		// Create completion metadata
-		completionMetadata := RequestMetadata{
-			UserID:      metadata.UserID,
-			RequestID:   metadata.RequestID + "_completion",
-			RequestType: "folder_releases",
-			Timestamp:   time.Now(),
-		}
+				// Create completion metadata
+				completionMetadata := RequestMetadata{
+					UserID:      metadata.UserID,
+					RequestID:   metadata.RequestID + "_completion",
+					RequestType: "folder_releases",
+					Timestamp:   time.Now(),
+				}
 
-		// Store completion metadata temporarily
-		err = database.NewCacheBuilder(o.cache, completionMetadata.RequestID).
-			WithHashPattern(API_HASH).
-			WithStruct(completionMetadata).
-			WithTTL(APIRequestTTL).
-			WithContext(ctx).
-			Set()
-		if err != nil {
-			log.Warn("Failed to store completion metadata", "error", err)
-			return nil
-		}
+				// Store completion metadata temporarily
+				err = database.NewCacheBuilder(o.cache, completionMetadata.RequestID).
+					WithHashPattern(API_HASH).
+					WithStruct(completionMetadata).
+					WithTTL(APIRequestTTL).
+					WithContext(ctx).
+					Set()
+				if err != nil {
+					log.Warn("Failed to store completion metadata", "error", err)
+					return nil
+				}
 
-		// Process the completion trigger
-		err = o.foldersService.ProcessFolderReleasesResponse(ctx, completionMetadata, finalResponseData)
-		if err != nil {
-			log.Warn("Failed to trigger sync completion", "error", err)
-		}
+				// Process the completion trigger
+				err = o.foldersService.ProcessFolderReleasesResponse(
+					ctx,
+					completionMetadata,
+					finalResponseData,
+				)
+				if err != nil {
+					log.Warn("Failed to trigger sync completion", "error", err)
+				}
 			} else {
 				// Update sync state with remaining pending requests
 				syncStateData["PendingReleaseRequests"] = pendingRequests

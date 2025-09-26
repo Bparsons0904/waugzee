@@ -160,11 +160,9 @@ func (f *FoldersService) ProcessFoldersResponse(
 		folders = append(folders, folder)
 	}
 
-
 	keepDiscogIDs, _ := f.extractFolderSyncData(folders)
 
 	err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
-
 		if err = f.repos.Folder.UpsertFolders(txCtx, tx, metadata.UserID, folders); err != nil {
 			return log.Err("failed to upsert folders", err)
 		}
@@ -181,7 +179,6 @@ func (f *FoldersService) ProcessFoldersResponse(
 			"userID", metadata.UserID,
 			"requestID", metadata.RequestID)
 	}
-
 
 	return nil
 }
@@ -224,7 +221,6 @@ func (f *FoldersService) updateUserConfigWithUncategorizedFolderIfNotSet(
 	if err = f.repos.UserConfiguration.Update(ctx, tx, userConfig, f.repos.User); err != nil {
 		return log.Err("failed to update user configuration with selected folder", err)
 	}
-
 
 	return nil
 }
@@ -327,7 +323,6 @@ func (f *FoldersService) RequestFolderReleases(
 			Delete()
 		return "", log.Err("failed to publish API request event", err)
 	}
-
 
 	return requestID, nil
 }
@@ -440,7 +435,6 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 	// Check if this folder has more pages to process
 	currentPage := discogsFolderReleasesResponse.Data.Pagination.Page
 	totalPages := discogsFolderReleasesResponse.Data.Pagination.Pages
-
 
 	if currentPage < totalPages {
 		// Check if there's a next URL in pagination
@@ -676,7 +670,6 @@ func (f *FoldersService) processIndividualFolder(
 ) error {
 	log := f.log.Function("processIndividualFolder")
 
-
 	// TODO: Implement individual folder processing
 	// For now, just log that we received the data
 	missingReleaseIDs := make([]int64, 0)
@@ -699,7 +692,6 @@ func (f *FoldersService) processIndividualFolder(
 				"releaseCount", len(missingReleaseIDs))
 		}
 	}
-
 
 	return nil
 }
@@ -731,7 +723,6 @@ func (f *FoldersService) queueMissingReleases(
 		return log.Err("failed to queue releases for processing", err)
 	}
 
-
 	return nil
 }
 
@@ -744,21 +735,20 @@ type SyncCollectionOperations struct {
 
 // CollectionSyncState holds the state during folder collection sync
 type CollectionSyncState struct {
-	UserID                  uuid.UUID
-	TotalFolders            int
-	ProcessedFolders        int
-	MergedReleases          map[int]*UserRelease             // key: InstanceID
-	OriginalReleases        map[int]DiscogsFolderReleaseItem // key: InstanceID - for data extraction
-	CompletedFolders        map[int]bool                     // key: FolderID
-	SyncComplete            bool
+	UserID           uuid.UUID
+	TotalFolders     int
+	ProcessedFolders int
+	MergedReleases   map[int]*UserRelease             // key: InstanceID
+	OriginalReleases map[int]DiscogsFolderReleaseItem // key: InstanceID - for data extraction
+	CompletedFolders map[int]bool                     // key: FolderID
+	SyncComplete     bool
 	// Release validation tracking
-	PendingReleaseRequests  map[string]bool                  // key: requestID - tracks pending API requests
-	MissingReleaseIDs       []int64                          // release IDs that need to be fetched
-	ExistingReleaseIDs      []int64                          // release IDs that already exist
-	ReleaseValidationDone   bool                             // whether release validation is complete
-	AllReleasesReady        bool                             // whether all missing releases have been fetched
+	PendingReleaseRequests map[string]bool // key: requestID - tracks pending API requests
+	MissingReleaseIDs      []int64         // release IDs that need to be fetched
+	ExistingReleaseIDs     []int64         // release IDs that already exist
+	ReleaseValidationDone  bool            // whether release validation is complete
+	AllReleasesReady       bool            // whether all missing releases have been fetched
 }
-
 
 func (f *FoldersService) SyncAllUserFolders(
 	ctx context.Context,
@@ -784,25 +774,24 @@ func (f *FoldersService) SyncAllUserFolders(
 		return log.ErrMsg("no folders to sync (only found folder 0 or no folders)")
 	}
 
-
 	// Initialize sync state
 	syncState := &CollectionSyncState{
-		UserID:                  user.ID,
-		TotalFolders:            len(syncFolders),
-		ProcessedFolders:        0,
-		MergedReleases:          make(map[int]*UserRelease),
-		OriginalReleases:        make(map[int]DiscogsFolderReleaseItem),
-		CompletedFolders:        make(map[int]bool),
-		SyncComplete:            false,
-		PendingReleaseRequests:  make(map[string]bool),
-		MissingReleaseIDs:       make([]int64, 0),
-		ExistingReleaseIDs:      make([]int64, 0),
-		ReleaseValidationDone:   false,
-		AllReleasesReady:        false,
+		UserID:                 user.ID,
+		TotalFolders:           len(syncFolders),
+		ProcessedFolders:       0,
+		MergedReleases:         make(map[int]*UserRelease),
+		OriginalReleases:       make(map[int]DiscogsFolderReleaseItem),
+		CompletedFolders:       make(map[int]bool),
+		SyncComplete:           false,
+		PendingReleaseRequests: make(map[string]bool),
+		MissingReleaseIDs:      make([]int64, 0),
+		ExistingReleaseIDs:     make([]int64, 0),
+		ReleaseValidationDone:  false,
+		AllReleasesReady:       false,
 	}
 
 	// Store sync state in cache for tracking across API responses
-	err = database.NewCacheBuilder(f.db.Cache.ClientAPI, user.ID.String()).
+	err = database.NewCacheBuilder(f.db.Cache.ClientAPI, user.ID).
 		WithHashPattern(COLLECTION_SYNC_HASH).
 		WithStruct(syncState).
 		WithTTL(30 * time.Minute). // 30 min timeout for sync
@@ -825,7 +814,6 @@ func (f *FoldersService) SyncAllUserFolders(
 				"error", err)
 		}
 	}
-
 
 	return nil
 }
@@ -882,7 +870,6 @@ func (f *FoldersService) analyzeDifferentialSync(
 		operations.Delete = append(operations.Delete, instanceID)
 	}
 
-
 	return operations, nil
 }
 
@@ -924,7 +911,6 @@ func (f *FoldersService) executeSyncOperations(
 			return log.Err("failed to delete user releases", err)
 		}
 	}
-
 
 	return nil
 }

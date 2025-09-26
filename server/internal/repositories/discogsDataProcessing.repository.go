@@ -13,6 +13,7 @@ type DiscogsDataProcessingRepository interface {
 	GetByYearMonth(ctx context.Context, yearMonth string) (*DiscogsDataProcessing, error)
 	Update(ctx context.Context, processing *DiscogsDataProcessing) error
 	GetAll(ctx context.Context) ([]*DiscogsDataProcessing, error)
+	GetLatestProcessing(ctx context.Context) (*DiscogsDataProcessing, error)
 }
 
 type discogsDataProcessingRepository struct {
@@ -69,4 +70,23 @@ func (r *discogsDataProcessingRepository) GetAll(ctx context.Context) ([]*Discog
 	}
 
 	return processings, nil
+}
+
+func (r *discogsDataProcessingRepository) GetLatestProcessing(ctx context.Context) (*DiscogsDataProcessing, error) {
+	log := r.log.Function("GetLatestProcessing")
+
+	var processing DiscogsDataProcessing
+	err := r.db.WithContext(ctx).
+		Where("status IN (?)", []ProcessingStatus{ProcessingStatusReadyForProcessing, ProcessingStatusProcessing}).
+		Order("created_at DESC").
+		First(&processing).Error
+
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, log.Err("failed to get latest processing record", err)
+	}
+
+	return &processing, nil
 }

@@ -352,6 +352,26 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 	yearMonth := now.Format("2006-01")
 	log.Info("Starting XML parsing process", "yearMonth", yearMonth)
 
+	// Get or create processing record
+	processing, err := s.getOrCreateProcessingRecord(ctx, yearMonth)
+	if err != nil {
+		return log.Err("failed to get or create processing record", err)
+	}
+
+	// Validate processing status
+	if processing.Status != models.ProcessingStatusReadyForProcessing && processing.Status != models.ProcessingStatusProcessing {
+		return log.Err("processing not ready", nil, "status", processing.Status, "yearMonth", yearMonth)
+	}
+
+	// Update status to processing if not already
+	if processing.Status != models.ProcessingStatusProcessing {
+		processing.Status = models.ProcessingStatusProcessing
+		processing.StartedAt = &now
+		if err := s.repos.DiscogsDataProcessing.Update(ctx, processing); err != nil {
+			return log.Err("failed to update processing status", err)
+		}
+	}
+
 	downloadDir := fmt.Sprintf("%s/%s", DiscogsDataDir, yearMonth)
 	if err := ensureDirectory(downloadDir, log); err != nil {
 		return log.Err("failed to create download directory", err, "directory", downloadDir)
@@ -359,66 +379,74 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 
 	// Process labels using the abstracted entity processor
 	labelsFilePath := filepath.Join(downloadDir, "labels.xml.gz")
-	labelsConfig := EntityProcessorConfig[types.Label, models.Label]{
-		FilePath:       labelsFilePath,
-		ElementName:    "label",
-		EntityTypeName: "labels",
-		ChannelSize:    5000,
-		BatchSize:      5000,
-		ConvertFunc:    s.convertXMLLabelToModel,
-		UpsertFunc:     s.repos.Label.UpsertBatch,
-	}
-
-	if err := ProcessXMLEntities(ctx, labelsConfig, s.db, log); err != nil {
-		return log.Err("failed to process labels", err)
+	err = s.executeProcessingStep(ctx, processing, models.StepLabelsProcessing, "Labels Processing", func() error {
+		labelsConfig := EntityProcessorConfig[types.Label, models.Label]{
+			FilePath:       labelsFilePath,
+			ElementName:    "label",
+			EntityTypeName: "labels",
+			ChannelSize:    5000,
+			BatchSize:      5000,
+			ConvertFunc:    s.convertXMLLabelToModel,
+			UpsertFunc:     s.repos.Label.UpsertBatch,
+		}
+		return ProcessXMLEntities(ctx, labelsConfig, s.db, log)
+	})
+	if err != nil {
+		return err
 	}
 
 	// Process artists using the abstracted entity processor
 	artistsFilePath := filepath.Join(downloadDir, "artists.xml.gz")
-	artistsConfig := EntityProcessorConfig[types.Artist, models.Artist]{
-		FilePath:       artistsFilePath,
-		ElementName:    "artist",
-		EntityTypeName: "artists",
-		ChannelSize:    5000,
-		BatchSize:      2500,
-		ConvertFunc:    s.convertXMLArtistToModel,
-		UpsertFunc:     s.repos.Artist.UpsertBatch,
-	}
-
-	if err := ProcessXMLEntities(ctx, artistsConfig, s.db, log); err != nil {
-		return log.Err("failed to process artists", err)
+	err = s.executeProcessingStep(ctx, processing, models.StepArtistsProcessing, "Artists Processing", func() error {
+		artistsConfig := EntityProcessorConfig[types.Artist, models.Artist]{
+			FilePath:       artistsFilePath,
+			ElementName:    "artist",
+			EntityTypeName: "artists",
+			ChannelSize:    5000,
+			BatchSize:      2500,
+			ConvertFunc:    s.convertXMLArtistToModel,
+			UpsertFunc:     s.repos.Artist.UpsertBatch,
+		}
+		return ProcessXMLEntities(ctx, artistsConfig, s.db, log)
+	})
+	if err != nil {
+		return err
 	}
 
 	// Process masters using the abstracted entity processor
 	mastersFilePath := filepath.Join(downloadDir, "masters.xml.gz")
-	mastersConfig := EntityProcessorConfig[types.Master, models.Master]{
-		FilePath:       mastersFilePath,
-		ElementName:    "master",
-		EntityTypeName: "masters",
-		ChannelSize:    5000,
-		BatchSize:      5000,
-		ConvertFunc:    s.convertXMLMasterToModel,
-		UpsertFunc:     s.repos.Master.UpsertBatch,
-	}
-
-	if err := ProcessXMLEntities(ctx, mastersConfig, s.db, log); err != nil {
-		return log.Err("failed to process masters", err)
+	err = s.executeProcessingStep(ctx, processing, models.StepMastersProcessing, "Masters Processing", func() error {
+		mastersConfig := EntityProcessorConfig[types.Master, models.Master]{
+			FilePath:       mastersFilePath,
+			ElementName:    "master",
+			EntityTypeName: "masters",
+			ChannelSize:    5000,
+			BatchSize:      5000,
+			ConvertFunc:    s.convertXMLMasterToModel,
+			UpsertFunc:     s.repos.Master.UpsertBatch,
+		}
+		return ProcessXMLEntities(ctx, mastersConfig, s.db, log)
+	})
+	if err != nil {
+		return err
 	}
 
 	// Process releases using the abstracted entity processor
 	releasesFilePath := filepath.Join(downloadDir, "releases.xml.gz")
-	releasesConfig := EntityProcessorConfig[types.Release, models.Release]{
-		FilePath:       releasesFilePath,
-		ElementName:    "release",
-		EntityTypeName: "releases",
-		ChannelSize:    5000,
-		BatchSize:      2500, // Smaller batch size for releases due to more complex data
-		ConvertFunc:    s.convertXMLReleaseToModel,
-		UpsertFunc:     s.repos.Release.UpsertBatch,
-	}
-
-	if err := ProcessXMLEntities(ctx, releasesConfig, s.db, log); err != nil {
-		return log.Err("failed to process releases", err)
+	err = s.executeProcessingStep(ctx, processing, models.StepReleasesProcessing, "Releases Processing", func() error {
+		releasesConfig := EntityProcessorConfig[types.Release, models.Release]{
+			FilePath:       releasesFilePath,
+			ElementName:    "release",
+			EntityTypeName: "releases",
+			ChannelSize:    5000,
+			BatchSize:      2500, // Smaller batch size for releases due to more complex data
+			ConvertFunc:    s.convertXMLReleaseToModel,
+			UpsertFunc:     s.repos.Release.UpsertBatch,
+		}
+		return ProcessXMLEntities(ctx, releasesConfig, s.db, log)
+	})
+	if err != nil {
+		return err
 	}
 
 	// Process genre/style data using entity-by-entity approach
@@ -428,111 +456,201 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 	genreManager := NewGenreStyleManager(s.repos.Genre)
 
 	// === MASTERS GENRE PROCESSING ===
-	log.Info("Phase 1: Collecting genres/styles from masters")
-	if err := s.collectGenresFromXML(ctx, mastersFilePath, "master", genreManager, log); err != nil {
-		return log.Err("failed to collect genres from masters", err)
+	err = s.executeProcessingStep(ctx, processing, models.StepMasterGenresCollection, "Master Genres Collection", func() error {
+		return s.collectGenresFromXML(ctx, mastersFilePath, "master", genreManager, log)
+	})
+	if err != nil {
+		return err
 	}
 
-	log.Info("Phase 2: Batch upserting master genres to database")
-	if err := genreManager.BatchUpsertMissingGenres(ctx, s.db.SQLWithContext(ctx)); err != nil {
-		return log.Err("failed to batch upsert master genres", err)
+	err = s.executeProcessingStep(ctx, processing, models.StepMasterGenresUpsert, "Master Genres Upsert", func() error {
+		return genreManager.BatchUpsertMissingGenres(ctx, s.db.SQLWithContext(ctx))
+	})
+	if err != nil {
+		return err
 	}
 
-	log.Info("Phase 3: Processing master-genre associations")
-	masterGenreConfig := EntityProcessorConfig[types.Master, []repositories.MasterGenreAssociation]{
-		FilePath:       mastersFilePath,
-		ElementName:    "master",
-		EntityTypeName: "master-genre-associations",
-		ChannelSize:    5000,
-		BatchSize:      5000,
-		ConvertFunc: func(xmlMaster types.Master) *[]repositories.MasterGenreAssociation {
-			return s.convertMasterToGenreAssociations(xmlMaster, genreManager)
-		},
-		UpsertFunc: s.repos.Master.UpsertMasterGenreAssociationsBatch,
-	}
-
-	if err := ProcessXMLEntities(ctx, masterGenreConfig, s.db, log); err != nil {
-		return log.Err("failed to process master-genre associations", err)
+	err = s.executeProcessingStep(ctx, processing, models.StepMasterGenreAssociations, "Master Genre Associations", func() error {
+		masterGenreConfig := EntityProcessorConfig[types.Master, []repositories.MasterGenreAssociation]{
+			FilePath:       mastersFilePath,
+			ElementName:    "master",
+			EntityTypeName: "master-genre-associations",
+			ChannelSize:    5000,
+			BatchSize:      5000,
+			ConvertFunc: func(xmlMaster types.Master) *[]repositories.MasterGenreAssociation {
+				return s.convertMasterToGenreAssociations(xmlMaster, genreManager)
+			},
+			UpsertFunc: s.repos.Master.UpsertMasterGenreAssociationsBatch,
+		}
+		return ProcessXMLEntities(ctx, masterGenreConfig, s.db, log)
+	})
+	if err != nil {
+		return err
 	}
 
 	// === RELEASES GENRE PROCESSING ===
-	log.Info("Phase 4: Reset manager and collect genres/styles from releases")
-	genreManager.Reset()
-	if err := s.collectGenresFromXML(ctx, releasesFilePath, "release", genreManager, log); err != nil {
-		return log.Err("failed to collect genres from releases", err)
+	err = s.executeProcessingStep(ctx, processing, models.StepReleaseGenresCollection, "Release Genres Collection", func() error {
+		genreManager.Reset()
+		return s.collectGenresFromXML(ctx, releasesFilePath, "release", genreManager, log)
+	})
+	if err != nil {
+		return err
 	}
 
-	log.Info("Phase 5: Batch upserting release genres to database")
-	if err := genreManager.BatchUpsertMissingGenres(ctx, s.db.SQLWithContext(ctx)); err != nil {
-		return log.Err("failed to batch upsert release genres", err)
+	err = s.executeProcessingStep(ctx, processing, models.StepReleaseGenresUpsert, "Release Genres Upsert", func() error {
+		return genreManager.BatchUpsertMissingGenres(ctx, s.db.SQLWithContext(ctx))
+	})
+	if err != nil {
+		return err
 	}
 
-	log.Info("Phase 6: Processing release-genre associations")
-	releaseGenreConfig := EntityProcessorConfig[types.Release, []repositories.ReleaseGenreAssociation]{
-		FilePath:       releasesFilePath,
-		ElementName:    "release",
-		EntityTypeName: "release-genre-associations",
-		ChannelSize:    5000,
-		BatchSize:      5000,
-		ConvertFunc: func(xmlRelease types.Release) *[]repositories.ReleaseGenreAssociation {
-			return s.convertReleaseToGenreAssociations(xmlRelease, genreManager)
-		},
-		UpsertFunc: s.repos.Release.UpsertReleaseGenreAssociationsBatch,
-	}
-
-	if err := ProcessXMLEntities(ctx, releaseGenreConfig, s.db, log); err != nil {
-		return log.Err("failed to process release-genre associations", err)
+	err = s.executeProcessingStep(ctx, processing, models.StepReleaseGenreAssociations, "Release Genre Associations", func() error {
+		releaseGenreConfig := EntityProcessorConfig[types.Release, []repositories.ReleaseGenreAssociation]{
+			FilePath:       releasesFilePath,
+			ElementName:    "release",
+			EntityTypeName: "release-genre-associations",
+			ChannelSize:    5000,
+			BatchSize:      5000,
+			ConvertFunc: func(xmlRelease types.Release) *[]repositories.ReleaseGenreAssociation {
+				return s.convertReleaseToGenreAssociations(xmlRelease, genreManager)
+			},
+			UpsertFunc: s.repos.Release.UpsertReleaseGenreAssociationsBatch,
+		}
+		return ProcessXMLEntities(ctx, releaseGenreConfig, s.db, log)
+	})
+	if err != nil {
+		return err
 	}
 
 	// === OTHER ASSOCIATIONS ===
 	log.Info("Processing other associations")
 
-	// Process release-label associations using the same pattern
-	releaseLabelConfig := EntityProcessorConfig[types.Release, []repositories.ReleaseLabelAssociation]{
-		FilePath:       releasesFilePath,
-		ElementName:    "release",
-		EntityTypeName: "release-label-associations",
-		ChannelSize:    5000,
-		BatchSize:      5000,
-		ConvertFunc:    s.convertReleaseToLabelAssociations,
-		UpsertFunc:     s.repos.Release.UpsertReleaseLabelAssociationsBatch,
+	err = s.executeProcessingStep(ctx, processing, models.StepReleaseLabelAssociations, "Release Label Associations", func() error {
+		releaseLabelConfig := EntityProcessorConfig[types.Release, []repositories.ReleaseLabelAssociation]{
+			FilePath:       releasesFilePath,
+			ElementName:    "release",
+			EntityTypeName: "release-label-associations",
+			ChannelSize:    5000,
+			BatchSize:      5000,
+			ConvertFunc:    s.convertReleaseToLabelAssociations,
+			UpsertFunc:     s.repos.Release.UpsertReleaseLabelAssociationsBatch,
+		}
+		return ProcessXMLEntities(ctx, releaseLabelConfig, s.db, log)
+	})
+	if err != nil {
+		return err
 	}
 
-	if err := ProcessXMLEntities(ctx, releaseLabelConfig, s.db, log); err != nil {
-		return log.Err("failed to process release-label associations", err)
+	err = s.executeProcessingStep(ctx, processing, models.StepMasterArtistAssociations, "Master Artist Associations", func() error {
+		masterArtistConfig := EntityProcessorConfig[types.Master, []repositories.MasterArtistAssociation]{
+			FilePath:       mastersFilePath,
+			ElementName:    "master",
+			EntityTypeName: "master-artist-associations",
+			ChannelSize:    5000,
+			BatchSize:      5000,
+			ConvertFunc:    s.convertMasterToArtistAssociations,
+			UpsertFunc:     s.repos.Master.UpsertMasterArtistAssociationsBatch,
+		}
+		return ProcessXMLEntities(ctx, masterArtistConfig, s.db, log)
+	})
+	if err != nil {
+		return err
 	}
 
-	// Process master-artist associations using the same pattern
-	masterArtistConfig := EntityProcessorConfig[types.Master, []repositories.MasterArtistAssociation]{
-		FilePath:       mastersFilePath,
-		ElementName:    "master",
-		EntityTypeName: "master-artist-associations",
-		ChannelSize:    5000,
-		BatchSize:      5000,
-		ConvertFunc:    s.convertMasterToArtistAssociations,
-		UpsertFunc:     s.repos.Master.UpsertMasterArtistAssociationsBatch,
+	err = s.executeProcessingStep(ctx, processing, models.StepReleaseArtistAssociations, "Release Artist Associations", func() error {
+		releaseArtistConfig := EntityProcessorConfig[types.Release, []repositories.ReleaseArtistAssociation]{
+			FilePath:       releasesFilePath,
+			ElementName:    "release",
+			EntityTypeName: "release-artist-associations",
+			ChannelSize:    5000,
+			BatchSize:      5000,
+			ConvertFunc:    s.convertReleaseToArtistAssociations,
+			UpsertFunc:     s.repos.Release.UpsertReleaseArtistAssociationsBatch,
+		}
+		return ProcessXMLEntities(ctx, releaseArtistConfig, s.db, log)
+	})
+	if err != nil {
+		return err
 	}
 
-	if err := ProcessXMLEntities(ctx, masterArtistConfig, s.db, log); err != nil {
-		return log.Err("failed to process master-artist associations", err)
+	// Mark processing as completed
+	processing.Status = models.ProcessingStatusCompleted
+	completedAt := time.Now().UTC()
+	processing.ProcessingCompletedAt = &completedAt
+
+	if err := s.repos.DiscogsDataProcessing.Update(ctx, processing); err != nil {
+		return log.Err("failed to update final processing status", err)
 	}
 
-	// Process release-artist associations using the same pattern
-	releaseArtistConfig := EntityProcessorConfig[types.Release, []repositories.ReleaseArtistAssociation]{
-		FilePath:       releasesFilePath,
-		ElementName:    "release",
-		EntityTypeName: "release-artist-associations",
-		ChannelSize:    5000,
-		BatchSize:      5000,
-		ConvertFunc:    s.convertReleaseToArtistAssociations,
-		UpsertFunc:     s.repos.Release.UpsertReleaseArtistAssociationsBatch,
+	log.Info("XML parsing completed successfully", "yearMonth", yearMonth, "allStepsCompleted", processing.AllStepsCompleted())
+	return nil
+}
+
+// getOrCreateProcessingRecord gets the processing record for the given year month or creates it if not found
+func (s *DiscogsXMLParserService) getOrCreateProcessingRecord(ctx context.Context, yearMonth string) (*models.DiscogsDataProcessing, error) {
+	log := s.log.Function("getOrCreateProcessingRecord")
+
+	// Try to get existing record
+	processing, err := s.repos.DiscogsDataProcessing.GetByYearMonth(ctx, yearMonth)
+	if err == nil {
+		return processing, nil
 	}
 
-	if err := ProcessXMLEntities(ctx, releaseArtistConfig, s.db, log); err != nil {
-		return log.Err("failed to process release-artist associations", err)
+	// If not found, try to get the latest processing record
+	processing, err = s.repos.DiscogsDataProcessing.GetLatestProcessing(ctx)
+	if err != nil {
+		return nil, log.Err("failed to get latest processing record", err)
 	}
 
-	log.Info("XML parsing completed successfully", "yearMonth", yearMonth)
+	if processing == nil {
+		return nil, log.Err("no processing record found with ready_for_processing or processing status", nil)
+	}
+
+	return processing, nil
+}
+
+// executeProcessingStep executes a processing step if not already completed
+func (s *DiscogsXMLParserService) executeProcessingStep(
+	ctx context.Context,
+	processing *models.DiscogsDataProcessing,
+	step models.ProcessingStep,
+	stepName string,
+	stepFunc func() error,
+) error {
+	log := s.log.Function("executeProcessingStep").With("step", step, "stepName", stepName)
+
+	// Check if step is already completed
+	if processing.IsStepCompleted(step) {
+		log.Info("Step already completed, skipping", "step", step)
+		return nil
+	}
+
+	log.Info("Starting processing step", "step", step)
+	startTime := time.Now()
+
+	// Execute the step
+	err := stepFunc()
+
+	// Calculate duration
+	duration := time.Since(startTime)
+	durationStr := duration.String()
+
+	// Update step status based on result
+	if err != nil {
+		processing.MarkStepFailed(step, err.Error())
+		if updateErr := s.repos.DiscogsDataProcessing.Update(ctx, processing); updateErr != nil {
+			log.Error("Failed to update step status after failure", "error", updateErr)
+		}
+		return log.Err("processing step failed", err, "step", step, "duration", durationStr)
+	}
+
+	// Mark step as completed
+	processing.MarkStepCompleted(step, nil, &durationStr)
+	if err := s.repos.DiscogsDataProcessing.Update(ctx, processing); err != nil {
+		return log.Err("failed to update step completion status", err, "step", step)
+	}
+
+	log.Info("Processing step completed", "step", step, "duration", durationStr)
 	return nil
 }
 

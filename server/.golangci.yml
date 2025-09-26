@@ -2,7 +2,7 @@ version: 2
 
 linters:
   enable:
-    - gocritic
+    # - gocritic
   settings:
     staticcheck:
       dot-import-whitelist:

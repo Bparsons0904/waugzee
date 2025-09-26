@@ -13,7 +13,7 @@ import (
 
 const (
 	DISCOGS_RATE_LIMIT_HASH = "discogs_rate_limit:%s" // %s = userID
-	DISCOGS_RATE_LIMIT      = 5                       // 5 requests per 60 seconds
+	DISCOGS_RATE_LIMIT      = 30                      // 5 requests per 60 seconds
 	DISCOGS_RATE_WINDOW     = 60 * time.Second        // 60 second window
 
 	// Throttling configuration
