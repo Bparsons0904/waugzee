@@ -25,6 +25,7 @@ type FoldersService struct {
 	db                          database.DB
 	transactionService          *TransactionService
 	folderDataExtractionService *FolderDataExtractionService
+	folderValidationService     *FolderValidationService
 	discogsRateLimiter          *DiscogsRateLimiterService
 }
 
@@ -37,6 +38,7 @@ func NewFoldersService(
 	discogsRateLimiter *DiscogsRateLimiterService,
 ) *FoldersService {
 	log := logger.New("FoldersService")
+	folderValidationService := NewFolderValidationService(repos, db)
 	return &FoldersService{
 		log:                         log,
 		eventBus:                    eventBus,
@@ -44,6 +46,7 @@ func NewFoldersService(
 		db:                          db,
 		transactionService:          transactionService,
 		folderDataExtractionService: folderDataExtractionService,
+		folderValidationService:     folderValidationService,
 		discogsRateLimiter:          discogsRateLimiter,
 	}
 }
@@ -54,17 +57,8 @@ func (f *FoldersService) RequestUserFolders(
 ) (string, error) {
 	log := f.log.Function("RequestUserFolders")
 
-	if user == nil {
-		return "", log.ErrMsg("user cannot be nil")
-	}
-
-	if user.Configuration == nil || user.Configuration.DiscogsToken == nil ||
-		*user.Configuration.DiscogsToken == "" {
-		return "", log.ErrMsg("user does not have a Discogs token")
-	}
-
-	if user.Configuration.DiscogsUsername == nil || *user.Configuration.DiscogsUsername == "" {
-		return "", log.ErrMsg("user does not have a Discogs username")
+	if err := f.folderValidationService.ValidateUserForFolderOperation(user); err != nil {
+		return "", err
 	}
 
 	// Check rate limit before making API request
@@ -186,28 +180,6 @@ func (f *FoldersService) ProcessFoldersResponse(
 	return nil
 }
 
-func (f *FoldersService) extractFolderID(
-	responseData map[string]any,
-	response *DiscogsFolderReleasesResponse,
-) (int, error) {
-	// Try to get folderID from request data first
-	folderIDRaw, exists := responseData["folderID"]
-	if !exists {
-		// Fallback: extract folder_id from first release in the response
-		if response != nil && len(response.Data.Releases) > 0 {
-			folderIDRaw = response.Data.Releases[0].FolderID
-		} else {
-			return 0, fmt.Errorf("missing folderID in response data and no releases to extract from")
-		}
-	}
-
-	folderID, ok := folderIDRaw.(int)
-	if !ok {
-		return 0, fmt.Errorf("folderID is not an integer")
-	}
-
-	return folderID, nil
-}
 
 // processReleasesToSyncState converts Discogs release data to UserRelease models
 // and accumulates them in the sync state for later processing.
@@ -218,6 +190,17 @@ func (f *FoldersService) processReleasesToSyncState(
 	folderID int,
 ) []int64 {
 	log := f.log.Function("processReleasesToSyncState")
+
+	if syncState == nil {
+		log.Warn("syncState is nil, cannot process releases")
+		return []int64{}
+	}
+
+	if len(releases) == 0 {
+		log.Debug("No releases to process")
+		return []int64{}
+	}
+
 	missingReleaseIDs := make([]int64, 0)
 
 	for _, discogsRelease := range releases {
@@ -231,7 +214,6 @@ func (f *FoldersService) processReleasesToSyncState(
 			continue
 		}
 
-		// Convert notes to JSON
 		notesJSON, _ := json.Marshal(discogsRelease.Notes)
 
 		// Parse DateAdded from Discogs API response
@@ -259,6 +241,14 @@ func (f *FoldersService) processReleasesToSyncState(
 			Notes:      datatypes.JSON(notesJSON),
 			DateAdded:  dateAdded,
 			Active:     true,
+		}
+
+		// Check collection size limits to prevent memory issues
+		if len(syncState.MergedReleases) >= MaxReleasesPerSync {
+			log.Warn("Reached maximum releases per sync, skipping additional releases",
+				"maxReleases", MaxReleasesPerSync,
+				"instanceID", discogsRelease.InstanceID)
+			break
 		}
 
 		// Add to merged releases (overwrite if exists - latest folder wins)
@@ -303,9 +293,9 @@ func (f *FoldersService) updateUserConfigWithUncategorizedFolderIfNotSet(
 		return nil
 	}
 
-	// Set to folder 1 (Uncategorized) as default instead of folder 0 (All)
-	uncategorizedFolderID := 1
-	userConfig.SelectedFolderID = &uncategorizedFolderID
+	// Set to Uncategorized folder as default instead of All folder
+	defaultFolderID := UncategorizedFolderID
+	userConfig.SelectedFolderID = &defaultFolderID
 	if err = f.repos.UserConfiguration.Update(ctx, tx, userConfig, f.repos.User); err != nil {
 		return log.Err("failed to update user configuration with selected folder", err)
 	}
@@ -321,30 +311,15 @@ func (f *FoldersService) RequestFolderReleases(
 ) (string, error) {
 	log := f.log.Function("RequestFolderReleases")
 
-	if user == nil {
-		return "", log.ErrMsg("user cannot be nil")
+	if err := f.folderValidationService.ValidateUserForFolderOperation(user); err != nil {
+		return "", err
 	}
 
-	if user.Configuration == nil || user.Configuration.DiscogsToken == nil ||
-		*user.Configuration.DiscogsToken == "" {
-		return "", log.ErrMsg("user does not have a Discogs token")
+	validatedPage, err := f.folderValidationService.ValidatePaginationParams(folderID, page)
+	if err != nil {
+		return "", log.Err("invalid pagination parameters", err)
 	}
-
-	if user.Configuration.DiscogsUsername == nil || *user.Configuration.DiscogsUsername == "" {
-		return "", log.ErrMsg("user does not have a Discogs username")
-	}
-
-	if folderID < 0 {
-		return "", log.ErrMsg("folderID must be non-negative")
-	}
-
-	if page < 1 {
-		page = 1
-	}
-
-	if page > 10000 { // Reasonable upper limit to prevent abuse
-		return "", log.ErrMsg("page number too large (max: 10000)")
-	}
+	page = validatedPage
 
 	// Check rate limit before making API request
 	if err := f.discogsRateLimiter.CheckUserRateLimit(ctx, user.ID); err != nil {
@@ -423,7 +398,7 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		return nil // Don't return error as this is an expected API failure
 	}
 
-	folderID, err := f.extractFolderID(responseData, discogsFolderReleasesResponse)
+	folderID, err := f.folderValidationService.ExtractFolderID(responseData, discogsFolderReleasesResponse)
 	if err != nil {
 		return log.Err("failed to extract folder ID", err)
 	}
@@ -545,7 +520,7 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 			err = database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).
 				WithHashPattern(COLLECTION_SYNC_HASH).
 				WithStruct(syncState).
-				WithTTL(30 * time.Minute).
+				WithTTL(SyncStateTTL).
 				WithContext(ctx).
 				Set()
 			if err != nil {
@@ -710,6 +685,8 @@ type SyncCollectionOperations struct {
 // CollectionSyncState holds the state during folder collection sync
 type CollectionSyncState struct {
 	UserID           uuid.UUID
+	SyncOperationID  string    // Unique ID for this sync operation (idempotency)
+	StartedAt        time.Time // When sync operation started
 	TotalFolders     int
 	ProcessedFolders int
 	MergedReleases   map[int]*UserRelease             // key: InstanceID
@@ -730,16 +707,32 @@ func (f *FoldersService) SyncAllUserFolders(
 ) error {
 	log := f.log.Function("SyncAllUserFolders")
 
+	// Check if sync is already in progress (idempotency check)
+	var existingSyncState CollectionSyncState
+	found, err := database.NewCacheBuilder(f.db.Cache.ClientAPI, user.ID.String()).
+		WithHashPattern(COLLECTION_SYNC_HASH).
+		WithContext(ctx).
+		Get(&existingSyncState)
+	if err != nil {
+		log.Warn("Failed to check for existing sync state", "error", err)
+	} else if found && !existingSyncState.SyncComplete {
+		log.Info("Sync already in progress for user",
+			"userID", user.ID,
+			"syncOperationID", existingSyncState.SyncOperationID,
+			"startedAt", existingSyncState.StartedAt)
+		return nil // Don't start duplicate sync
+	}
+
 	// First, get user's folders to determine which ones to sync (skip folder 0)
 	folders, err := f.repos.Folder.GetUserFolders(ctx, f.db.SQLWithContext(ctx), user.ID)
 	if err != nil {
 		return log.Err("failed to get user folders", err)
 	}
 
-	// Filter to folders 1+ (skip folder 0 "All")
+	// Filter to folders excluding the "All" folder (read-only)
 	syncFolders := make([]*Folder, 0)
 	for _, folder := range folders {
-		if folder.DiscogID != nil && *folder.DiscogID > 0 {
+		if folder.DiscogID != nil && *folder.DiscogID > AllFolderID {
 			syncFolders = append(syncFolders, folder)
 		}
 	}
@@ -748,9 +741,14 @@ func (f *FoldersService) SyncAllUserFolders(
 		return log.ErrMsg("no folders to sync (only found folder 0 or no folders)")
 	}
 
+	// Generate unique sync operation ID for idempotency
+	syncOperationID := uuid.New().String()
+
 	// Initialize sync state
 	syncState := &CollectionSyncState{
 		UserID:                 user.ID,
+		SyncOperationID:        syncOperationID,
+		StartedAt:              time.Now(),
 		TotalFolders:           len(syncFolders),
 		ProcessedFolders:       0,
 		MergedReleases:         make(map[int]*UserRelease),
@@ -768,7 +766,7 @@ func (f *FoldersService) SyncAllUserFolders(
 	err = database.NewCacheBuilder(f.db.Cache.ClientAPI, user.ID).
 		WithHashPattern(COLLECTION_SYNC_HASH).
 		WithStruct(syncState).
-		WithTTL(30 * time.Minute). // 30 min timeout for sync
+		WithTTL(MaxCollectionSyncTTL).
 		WithContext(ctx).
 		Set()
 	if err != nil {
@@ -857,7 +855,6 @@ func (f *FoldersService) executeSyncOperations(
 
 	// Execute creates
 	if len(operations.Create) > 0 {
-		// Convert slice to slice of pointers
 		createPointers := make([]*UserRelease, len(operations.Create))
 		for i := range operations.Create {
 			createPointers[i] = &operations.Create[i]
@@ -869,7 +866,6 @@ func (f *FoldersService) executeSyncOperations(
 
 	// Execute updates
 	if len(operations.Update) > 0 {
-		// Convert slice to slice of pointers
 		updatePointers := make([]*UserRelease, len(operations.Update))
 		for i := range operations.Update {
 			updatePointers[i] = &operations.Update[i]
@@ -910,28 +906,19 @@ func (f *FoldersService) performReleaseValidation(
 		return nil
 	}
 
-	// Check which releases exist in our database
-	existingReleases, missingReleases, err := f.repos.Release.CheckReleaseExistence(
-		ctx,
-		f.db.SQLWithContext(ctx),
-		releaseIDs,
-	)
+	// Use validation service to check release existence
+	existingReleases, missingReleases, err := f.folderValidationService.ValidateReleases(ctx, releaseIDs)
 	if err != nil {
-		return log.Err("failed to check release existence", err)
+		return log.Err("failed to validate releases", err)
 	}
 
 	syncState.ExistingReleaseIDs = existingReleases
 	syncState.MissingReleaseIDs = missingReleases
 	syncState.ReleaseValidationDone = true
 
-	log.Info("Release validation completed",
-		"totalReleases", len(releaseIDs),
-		"existing", len(existingReleases),
-		"missing", len(missingReleases))
-
 	// Update images for existing releases
 	if len(existingReleases) > 0 {
-		err = f.updateExistingReleaseImages(ctx, syncState, existingReleases)
+		err = f.folderValidationService.UpdateReleaseImages(ctx, syncState.OriginalReleases, existingReleases)
 		if err != nil {
 			log.Warn("Failed to update release images", "error", err)
 			// Don't fail the sync for image update errors
@@ -982,66 +969,6 @@ func (f *FoldersService) performReleaseValidation(
 	return nil
 }
 
-// updateExistingReleaseImages updates thumb and cover image URLs for existing releases
-func (f *FoldersService) updateExistingReleaseImages(
-	ctx context.Context,
-	syncState *CollectionSyncState,
-	existingReleaseIDs []int64,
-) error {
-	log := f.log.Function("updateExistingReleaseImages")
-
-	// Build image updates from original release data
-	imageUpdates := make([]repositories.ReleaseImageUpdate, 0)
-	existingMap := make(map[int64]bool)
-	for _, id := range existingReleaseIDs {
-		existingMap[id] = true
-	}
-
-	for _, originalRelease := range syncState.OriginalReleases {
-		releaseID := originalRelease.ID
-		if releaseID == 0 && originalRelease.BasicInformation.ID != 0 {
-			releaseID = originalRelease.BasicInformation.ID
-		}
-
-		// Only update images for existing releases
-		if existingMap[releaseID] {
-			update := repositories.ReleaseImageUpdate{
-				ReleaseID: releaseID,
-			}
-
-			// Set thumb if available
-			if originalRelease.BasicInformation.Thumb != "" {
-				update.Thumb = &originalRelease.BasicInformation.Thumb
-			}
-
-			// Set cover image if available
-			if originalRelease.BasicInformation.CoverImage != "" {
-				update.CoverImage = &originalRelease.BasicInformation.CoverImage
-			}
-
-			// Only add update if we have at least one image to update
-			if update.Thumb != nil || update.CoverImage != nil {
-				imageUpdates = append(imageUpdates, update)
-			}
-		}
-	}
-
-	// Execute image updates
-	if len(imageUpdates) > 0 {
-		err := f.repos.Release.UpdateReleaseImages(
-			ctx,
-			f.db.SQLWithContext(ctx),
-			imageUpdates,
-		)
-		if err != nil {
-			return log.Err("failed to update release images", err)
-		}
-
-		log.Debug("Updated release images", "count", len(imageUpdates))
-	}
-
-	return nil
-}
 
 // TriggerSyncCompletion directly triggers completion of a collection sync
 func (f *FoldersService) TriggerSyncCompletion(ctx context.Context, userID uuid.UUID) error {

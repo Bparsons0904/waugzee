@@ -113,6 +113,10 @@ func (o *OrchestrationService) HandleAPIResponse(
 ) error {
 	log := o.log.Function("HandleAPIResponse")
 
+	if responseData == nil {
+		return log.ErrMsg("responseData cannot be nil")
+	}
+
 	requestID, ok := responseData["requestId"].(string)
 	if !ok || requestID == "" {
 		return log.ErrMsg("missing or invalid requestId in response")
@@ -180,7 +184,6 @@ func processDiscogsAPIResponse[T any](
 			"error", errorMsg)
 	}
 
-	// Extract data from response
 	data, exists := responseData["data"]
 	if !exists {
 		return nil, log.ErrMsg("missing data field in " + responseType + " response")
@@ -250,7 +253,6 @@ func (o *OrchestrationService) handleReleaseResponse(
 	pendingRequestsRaw, exists := syncStateData["PendingReleaseRequests"]
 	if exists {
 		if pendingRequestsMap, ok := pendingRequestsRaw.(map[string]any); ok {
-			// Convert to map[string]bool
 			pendingRequests := make(map[string]bool)
 			for k := range pendingRequestsMap {
 				pendingRequests[k] = true
@@ -281,7 +283,7 @@ func (o *OrchestrationService) handleReleaseResponse(
 				err = database.NewCacheBuilder(o.cache, syncStateIDStr).
 					WithHashPattern("collection_sync").
 					WithStruct(syncStateData).
-					WithTTL(30 * time.Minute).
+					WithTTL(SyncStateTTL).
 					WithContext(ctx).
 					Set()
 				if err != nil {
@@ -301,7 +303,7 @@ func (o *OrchestrationService) handleReleaseResponse(
 				err = database.NewCacheBuilder(o.cache, syncStateIDStr).
 					WithHashPattern("collection_sync").
 					WithStruct(syncStateData).
-					WithTTL(30 * time.Minute).
+					WithTTL(SyncStateTTL).
 					WithContext(ctx).
 					Set()
 				if err != nil {

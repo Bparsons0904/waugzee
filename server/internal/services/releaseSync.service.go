@@ -63,8 +63,22 @@ func (rs *ReleaseSyncService) RequestMissingReleases(
 	// Track request IDs to update sync state
 	requestIDs := make([]string, 0, len(missingReleaseIDs))
 
-	// Request each missing release
+	// Limit concurrent API requests to prevent overwhelming the system
+	processedCount := 0
+	maxRequests := MaxPendingAPIRequests
+	if len(missingReleaseIDs) < maxRequests {
+		maxRequests = len(missingReleaseIDs)
+	}
+
+	// Request each missing release up to the limit
 	for _, releaseID := range missingReleaseIDs {
+		if processedCount >= maxRequests {
+			log.Warn("Reached maximum concurrent API requests, queuing remaining releases",
+				"maxRequests", MaxPendingAPIRequests,
+				"totalRequested", len(missingReleaseIDs),
+				"processed", processedCount)
+			break
+		}
 		// Check rate limit before making API request
 		if err := rs.discogsRateLimiter.CheckUserRateLimit(ctx, user.ID); err != nil {
 			log.Warn("Rate limit check failed, skipping release",
@@ -129,6 +143,7 @@ func (rs *ReleaseSyncService) RequestMissingReleases(
 		}
 
 		requestIDs = append(requestIDs, requestID)
+		processedCount++
 		log.Debug("Requested missing release",
 			"releaseID", releaseID,
 			"requestID", requestID)
@@ -282,7 +297,7 @@ func (rs *ReleaseSyncService) updateSyncStateWithPendingRequests(
 	err = database.NewCacheBuilder(rs.db.Cache.ClientAPI, syncStateID).
 		WithHashPattern(COLLECTION_SYNC_HASH).
 		WithStruct(syncStateData).
-		WithTTL(30*time.Minute).
+		WithTTL(SyncStateTTL).
 		WithContext(ctx).
 		Set()
 	if err != nil {
