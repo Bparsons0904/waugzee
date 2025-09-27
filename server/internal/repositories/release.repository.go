@@ -2,8 +2,7 @@ package repositories
 
 import (
 	"context"
-	"fmt"
-	"strings"
+	"time"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
@@ -515,38 +514,43 @@ func (r *releaseRepository) UpdateReleaseImages(
 		return nil
 	}
 
-	// Build the SQL for batch update
-	query := `
-		UPDATE releases
-		SET thumb = COALESCE(data_table.thumb, releases.thumb),
-		    cover_image = COALESCE(data_table.cover_image, releases.cover_image),
-		    updated_at = NOW()
-		FROM (VALUES `
+	var totalRowsAffected int64
+	now := time.Now()
 
-	args := make([]any, 0, len(updates)*3)
-	values := make([]string, 0, len(updates))
+	// Process updates individually using GORM's Updates method
+	for _, update := range updates {
+		// Build update map with only non-nil values
+		updateData := map[string]interface{}{
+			"updated_at": now,
+		}
 
-	for i, update := range updates {
-		placeholder := fmt.Sprintf("($%d::bigint, $%d::text, $%d::text)", i*3+1, i*3+2, i*3+3)
-		values = append(values, placeholder)
+		if update.Thumb != nil {
+			updateData["thumb"] = *update.Thumb
+		}
 
-		args = append(args, update.ReleaseID)
-		args = append(args, update.Thumb)
-		args = append(args, update.CoverImage)
-	}
+		if update.CoverImage != nil {
+			updateData["cover_image"] = *update.CoverImage
+		}
 
-	query += strings.Join(values, ", ")
-	query += `) AS data_table(release_id, thumb, cover_image)
-		WHERE releases.id = data_table.release_id`
+		// Only proceed if we have fields to update besides updated_at
+		if len(updateData) > 1 {
+			result := tx.WithContext(ctx).
+				Model(&Release{}).
+				Where("id = ?", update.ReleaseID).
+				Updates(updateData)
 
-	result := tx.WithContext(ctx).Exec(query, args...)
-	if result.Error != nil {
-		return log.Err("failed to update release images", result.Error, "updateCount", len(updates))
+			if result.Error != nil {
+				return log.Err("failed to update release images", result.Error,
+					"releaseID", update.ReleaseID, "updateCount", len(updates))
+			}
+
+			totalRowsAffected += result.RowsAffected
+		}
 	}
 
 	log.Info("Updated release images",
 		"updateCount", len(updates),
-		"rowsAffected", result.RowsAffected)
+		"rowsAffected", totalRowsAffected)
 
 	return nil
 }

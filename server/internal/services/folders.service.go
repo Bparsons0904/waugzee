@@ -17,10 +17,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	COLLECTION_SYNC_HASH = "collection_sync"
-	RELEASE_QUEUE_HASH   = "release_queue"
-)
 
 type FoldersService struct {
 	log                         logger.Logger
@@ -190,6 +186,91 @@ func (f *FoldersService) ProcessFoldersResponse(
 	return nil
 }
 
+func (f *FoldersService) extractFolderID(
+	responseData map[string]any,
+	response *DiscogsFolderReleasesResponse,
+) (int, error) {
+	// Try to get folderID from request data first
+	folderIDRaw, exists := responseData["folderID"]
+	if !exists {
+		// Fallback: extract folder_id from first release in the response
+		if response != nil && len(response.Data.Releases) > 0 {
+			folderIDRaw = response.Data.Releases[0].FolderID
+		} else {
+			return 0, fmt.Errorf("missing folderID in response data and no releases to extract from")
+		}
+	}
+
+	folderID, ok := folderIDRaw.(int)
+	if !ok {
+		return 0, fmt.Errorf("folderID is not an integer")
+	}
+
+	return folderID, nil
+}
+
+// processReleasesToSyncState converts Discogs release data to UserRelease models
+// and accumulates them in the sync state for later processing.
+func (f *FoldersService) processReleasesToSyncState(
+	syncState *CollectionSyncState,
+	releases []DiscogsFolderReleaseItem,
+	userID uuid.UUID,
+	folderID int,
+) []int64 {
+	log := f.log.Function("processReleasesToSyncState")
+	missingReleaseIDs := make([]int64, 0)
+
+	for _, discogsRelease := range releases {
+		releaseID := discogsRelease.ID
+		if releaseID == 0 && discogsRelease.BasicInformation.ID != 0 {
+			releaseID = discogsRelease.BasicInformation.ID
+		}
+
+		if releaseID == 0 {
+			log.Warn("Skipping release with no valid ID", "instanceID", discogsRelease.InstanceID)
+			continue
+		}
+
+		// Convert notes to JSON
+		notesJSON, _ := json.Marshal(discogsRelease.Notes)
+
+		// Parse DateAdded from Discogs API response
+		var dateAdded time.Time
+		if discogsRelease.DateAdded != "" {
+			if parsedDate, err := time.Parse(time.RFC3339, discogsRelease.DateAdded); err == nil {
+				dateAdded = parsedDate
+			} else {
+				log.Warn("Failed to parse DateAdded from Discogs API, using current time",
+					"dateAdded", discogsRelease.DateAdded,
+					"instanceID", discogsRelease.InstanceID,
+					"error", err)
+				dateAdded = time.Now()
+			}
+		} else {
+			dateAdded = time.Now()
+		}
+
+		userRelease := &UserRelease{
+			UserID:     userID,
+			ReleaseID:  releaseID,
+			InstanceID: discogsRelease.InstanceID,
+			FolderID:   folderID,
+			Rating:     discogsRelease.Rating,
+			Notes:      datatypes.JSON(notesJSON),
+			DateAdded:  dateAdded,
+			Active:     true,
+		}
+
+		// Add to merged releases (overwrite if exists - latest folder wins)
+		syncState.MergedReleases[discogsRelease.InstanceID] = userRelease
+		// Store original data for data extraction
+		syncState.OriginalReleases[discogsRelease.InstanceID] = discogsRelease
+		missingReleaseIDs = append(missingReleaseIDs, releaseID)
+	}
+
+	return missingReleaseIDs
+}
+
 func (f *FoldersService) extractFolderSyncData(
 	folders []*Folder,
 ) (keepDiscogIDs []int, allFolderDiscogID *int) {
@@ -342,21 +423,9 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		return nil // Don't return error as this is an expected API failure
 	}
 
-	// Try to get folderID from request data first
-	folderIDRaw, exists := responseData["folderID"]
-	if !exists {
-		// Fallback: extract folder_id from first release in the response
-		if discogsFolderReleasesResponse != nil &&
-			len(discogsFolderReleasesResponse.Data.Releases) > 0 {
-			folderIDRaw = discogsFolderReleasesResponse.Data.Releases[0].FolderID
-		} else {
-			return log.ErrMsg("missing folderID in response data and no releases to extract from")
-		}
-	}
-
-	folderID, ok := folderIDRaw.(int)
-	if !ok {
-		return log.ErrMsg("folderID is not an integer")
+	folderID, err := f.extractFolderID(responseData, discogsFolderReleasesResponse)
+	if err != nil {
+		return log.Err("failed to extract folder ID", err)
 	}
 
 	missingReleaseIDs := make([]int64, 0)
@@ -380,59 +449,13 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		)
 	}
 
-	// Accumulate releases to sync state instead of immediate DB writes
-	for _, discogsRelease := range discogsFolderReleasesResponse.Data.Releases {
-
-		releaseID := discogsRelease.ID
-		if releaseID == 0 && discogsRelease.BasicInformation.ID != 0 {
-			releaseID = discogsRelease.BasicInformation.ID
-		}
-
-		if releaseID == 0 {
-			log.Warn("Skipping release with no valid ID", "instanceID", discogsRelease.InstanceID)
-			continue
-		}
-
-		// Convert notes to JSON
-		notesJSON, _ := json.Marshal(discogsRelease.Notes)
-
-		// Parse DateAdded from Discogs API response
-		var dateAdded time.Time
-		if discogsRelease.DateAdded != "" {
-			// Try to parse the date_added field from Discogs API
-			var parsedDate time.Time
-			if parsedDate, err = time.Parse(time.RFC3339, discogsRelease.DateAdded); err == nil {
-				dateAdded = parsedDate
-			} else {
-				// Fallback to current time if parsing fails
-				log.Warn("Failed to parse DateAdded from Discogs API, using current time",
-					"dateAdded", discogsRelease.DateAdded,
-					"instanceID", discogsRelease.InstanceID,
-					"error", err)
-				dateAdded = time.Now()
-			}
-		} else {
-			// If no date_added in response, use current time
-			dateAdded = time.Now()
-		}
-
-		userRelease := &UserRelease{
-			UserID:     metadata.UserID,
-			ReleaseID:  releaseID, // Use the Discogs release ID directly
-			InstanceID: discogsRelease.InstanceID,
-			FolderID:   folderID,
-			Rating:     discogsRelease.Rating,
-			Notes:      datatypes.JSON(notesJSON),
-			DateAdded:  dateAdded,
-			Active:     true,
-		}
-
-		// Add to merged releases (overwrite if exists - latest folder wins)
-		syncState.MergedReleases[discogsRelease.InstanceID] = userRelease
-		// Store original data for data extraction
-		syncState.OriginalReleases[discogsRelease.InstanceID] = discogsRelease
-		missingReleaseIDs = append(missingReleaseIDs, releaseID)
-	}
+	// Process releases and accumulate to sync state
+	missingReleaseIDs = f.processReleasesToSyncState(
+		&syncState,
+		discogsFolderReleasesResponse.Data.Releases,
+		metadata.UserID,
+		folderID,
+	)
 
 	// Check if this folder has more pages to process
 	currentPage := discogsFolderReleasesResponse.Data.Pagination.Page
@@ -582,54 +605,9 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 			WithContext(ctx).
 			Delete()
 
-		// TODO: TESTING - Early escape before full data sync to test basic data extraction
-		// Remove this early return after testing to enable full data sync
-		// log.Info("Collection sync completed successfully (TESTING MODE - full data sync disabled)",
-		// 	"userID", metadata.UserID,
-		// 	"totalReleases", len(syncState.MergedReleases))
-		// return nil
-		//
-		// // After sync completion, identify records needing full data
-		// releaseIDs := make([]int64, 0, len(syncState.MergedReleases))
-		// for _, userRelease := range syncState.MergedReleases {
-		// 	releaseIDs = append(releaseIDs, userRelease.ReleaseID)
-		// }
-		//
-		// // Get records needing full data sync
-		// needingFullData, err := f.folderDataExtractionService.GetRecordsNeedingFullData(
-		// 	ctx,
-		// 	f.db.SQLWithContext(ctx),
-		// 	releaseIDs,
-		// )
-		// if err != nil {
-		// 	log.Warn("Failed to identify records needing full data", "error", err)
-		// } else if len(needingFullData) > 0 {
-		// 	// Send WebSocket message to client with list of IDs to fetch
-		// 	message := events.Message{
-		// 		ID:      uuid.New().String(),
-		// 		Service: events.SYSTEM,
-		// 		Event:   "sync_trigger_full_data",
-		// 		UserID:  metadata.UserID.String(),
-		// 		Payload: map[string]any{
-		// 			"releaseIDs": needingFullData,
-		// 			"message":    "Additional release data needs to be fetched",
-		// 		},
-		// 		Timestamp: time.Now(),
-		// 	}
-		//
-		// 	if err = f.eventBus.Publish(events.WEBSOCKET, "user", message); err != nil {
-		// 		log.Warn("Failed to publish sync trigger message", "error", err)
-		// 	} else {
-		// 		log.Info("Triggered client-side full data sync",
-		// 			"userID", metadata.UserID,
-		// 			"releaseCount", len(needingFullData))
-		// 	}
-		// }
-		//
-		// log.Info("Collection sync completed successfully",
-		// 	"userID", metadata.UserID,
-		// 	"totalReleases", len(syncState.MergedReleases),
-		// 	"needingFullData", len(needingFullData))
+		log.Info("Collection sync completed successfully",
+			"userID", metadata.UserID,
+			"totalReleases", len(syncState.MergedReleases))
 	} else {
 		// Update sync state in cache
 		err = database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).
@@ -657,7 +635,8 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 	return nil
 }
 
-// processIndividualFolder handles processing a single folder when not part of collection sync
+// processIndividualFolder handles processing a single folder when not part of collection sync.
+// This is used for standalone folder processing outside of the full sync workflow.
 func (f *FoldersService) processIndividualFolder(
 	ctx context.Context,
 	metadata RequestMetadata,
@@ -666,8 +645,7 @@ func (f *FoldersService) processIndividualFolder(
 ) error {
 	log := f.log.Function("processIndividualFolder")
 
-	// TODO: Implement individual folder processing
-	// For now, just log that we received the data
+	// Process individual folder when not part of collection sync
 	missingReleaseIDs := make([]int64, 0)
 	for _, discogsRelease := range discogsFolderReleasesResponse.Data.Releases {
 		releaseID := discogsRelease.ID
@@ -926,7 +904,7 @@ func (f *FoldersService) performReleaseValidation(
 	}
 
 	if len(releaseIDs) == 0 {
-		log.Info("No releases to validate")
+		log.Debug("No releases to validate")
 		syncState.ReleaseValidationDone = true
 		syncState.AllReleasesReady = true
 		return nil
@@ -1059,7 +1037,7 @@ func (f *FoldersService) updateExistingReleaseImages(
 			return log.Err("failed to update release images", err)
 		}
 
-		log.Info("Updated release images", "count", len(imageUpdates))
+		log.Debug("Updated release images", "count", len(imageUpdates))
 	}
 
 	return nil

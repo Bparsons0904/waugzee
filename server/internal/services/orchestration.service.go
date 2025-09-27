@@ -14,11 +14,6 @@ import (
 	"github.com/valkey-io/valkey-go"
 )
 
-const (
-	API_HASH          = "api_request"
-	APIRequestTTL     = 10 * time.Minute
-	DiscogsAPIBaseURL = "https://api.discogs.com"
-)
 
 type RequestMetadata struct {
 	UserID       uuid.UUID `json:"userId"`
@@ -76,7 +71,8 @@ func (o *OrchestrationService) GetUserFolders(
 	return o.foldersService.RequestUserFolders(ctx, user)
 }
 
-// SyncUserFoldersAndCollection performs comprehensive sync: discovers folders then syncs collection
+// SyncUserFoldersAndCollection performs comprehensive sync: discovers folders then syncs collection.
+// This is the main entry point for collection synchronization.
 func (o *OrchestrationService) SyncUserFoldersAndCollection(
 	ctx context.Context,
 	user *User,
@@ -108,6 +104,9 @@ func (o *OrchestrationService) SyncUserFoldersAndCollection(
 	return nil
 }
 
+// HandleAPIResponse processes API responses from the client-as-proxy pattern.
+// It retrieves request metadata from cache, routes responses to appropriate services,
+// and handles request cleanup.
 func (o *OrchestrationService) HandleAPIResponse(
 	ctx context.Context,
 	responseData map[string]any,
@@ -143,7 +142,7 @@ func (o *OrchestrationService) HandleAPIResponse(
 		WithContext(ctx).
 		Delete()
 	if err != nil {
-		log.Er("failed to cleanup cache entry", err, "requestID", requestID)
+		log.Err("failed to cleanup cache entry", err, "requestID", requestID)
 	}
 
 	switch metadata.RequestType {
@@ -164,7 +163,8 @@ func (o *OrchestrationService) HandleAPIResponse(
 	return nil
 }
 
-// processDiscogsAPIResponse is a generic function to handle common Discogs API response patterns
+// processDiscogsAPIResponse is a generic function to handle common Discogs API response patterns.
+// It validates the response, extracts data, and unmarshals to the target type.
 func processDiscogsAPIResponse[T any](
 	log logger.Logger,
 	responseData map[string]any,
@@ -200,7 +200,8 @@ func processDiscogsAPIResponse[T any](
 	return &result, nil
 }
 
-// handleReleaseResponse processes individual release API responses and updates sync state
+// handleReleaseResponse processes individual release API responses and updates sync state.
+// It delegates to ReleaseSyncService for actual release processing and manages collection sync state.
 func (o *OrchestrationService) handleReleaseResponse(
 	ctx context.Context,
 	metadata RequestMetadata,

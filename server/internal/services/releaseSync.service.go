@@ -36,7 +36,8 @@ func NewReleaseSyncService(
 	}
 }
 
-// RequestMissingReleases initiates API requests for missing releases
+// RequestMissingReleases initiates API requests for missing releases.
+// It creates individual API requests for each missing release and tracks them in sync state.
 func (rs *ReleaseSyncService) RequestMissingReleases(
 	ctx context.Context,
 	user *User,
@@ -205,11 +206,11 @@ func (rs *ReleaseSyncService) ProcessReleaseResponse(
 	// Save release to database
 	err = rs.repos.Release.UpsertBatch(ctx, rs.db.SQLWithContext(ctx), []*Release{release})
 	if err != nil {
-		return log.Err("Failed to save release from API response", err,
+		return log.Err("failed to save release from API response", err,
 			"releaseID", releaseData.ID)
 	}
 
-	log.Info("Successfully processed release from API response",
+	log.Debug("Successfully processed release from API response",
 		"releaseID", releaseData.ID,
 		"title", releaseData.Title)
 
@@ -242,7 +243,6 @@ func (rs *ReleaseSyncService) updateSyncStateWithPendingRequests(
 ) error {
 	log := rs.log.Function("updateSyncStateWithPendingRequests")
 
-	const COLLECTION_SYNC_HASH = "collection_sync"
 
 	// Get current sync state as raw data to avoid import cycles
 	var syncStateData map[string]any
