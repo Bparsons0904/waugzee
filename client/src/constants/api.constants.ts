@@ -21,6 +21,7 @@ export const AUTH_ENDPOINTS = {
 export const USER_ENDPOINTS = {
   LIST: API_PATHS.USERS,
   ME: `${API_PATHS.USERS}/me`,
+  ME_DISCOGS: `${API_PATHS.USERS}/me/discogs`,
   PROFILE: (id: string) => `${API_PATHS.USERS}/${id}`,
 } as const;
 
@@ -29,12 +30,13 @@ export const HEALTH_ENDPOINTS = {
   CHECK: API_PATHS.HEALTH,
 } as const;
 
+
 // Frontend route constants (for consistency with backend auth routes)
 export const FRONTEND_ROUTES = {
   HOME: '/',
   LOGIN: '/auth/login',
   CALLBACK: '/auth/callback',
-  SILENT_CALLBACK: '/auth/silent-callback',
+  SILENT_CALLBACK: '/auth/silentCallback',
   DASHBOARD: '/dashboard',
   PROFILE: '/profile',
 } as const;

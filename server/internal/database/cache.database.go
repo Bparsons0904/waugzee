@@ -3,19 +3,19 @@ package database
 import (
 	"context"
 	"fmt"
+	"time"
 	"waugzee/config"
 	"waugzee/internal/logger"
-	"time"
 
 	"github.com/valkey-io/valkey-go"
 )
 
 const (
 	GENERAL_CACHE_INDEX = iota
-	SESSION_CACHE_INDEX
+	SESSION_CACHE_INDEX // This can be repurposed to something else
 	USER_CACHE_INDEX
 	EVENTS_CACHE_INDEX
-	LOAD_TEST_CACHE_INDEX
+	CLIENT_API_CACHE_INDEX
 )
 
 func (s *DB) initializeCacheDB(config config.Config) error {
@@ -71,14 +71,14 @@ func (s *DB) initializeCacheDB(config config.Config) error {
 		return log.Err("failed to create events valkey client", err)
 	}
 
-	cacheDB.LoadTest, err = valkey.NewClient(
+	cacheDB.ClientAPI, err = valkey.NewClient(
 		valkey.ClientOption{
 			InitAddress: []string{fmt.Sprintf("%s:%d", address, port)},
-			SelectDB:    LOAD_TEST_CACHE_INDEX,
+			SelectDB:    CLIENT_API_CACHE_INDEX,
 		},
 	)
 	if err != nil {
-		return log.Err("failed to create load test valkey client", err)
+		return log.Err("failed to create client api valkey client", err)
 	}
 
 	s.Cache = cacheDB
@@ -111,9 +111,9 @@ func clearCacheDB(index int, cacheDB Cache) {
 	case EVENTS_CACHE_INDEX:
 		client = cacheDB.Events
 		dbName = "Events"
-	case LOAD_TEST_CACHE_INDEX:
-		client = cacheDB.LoadTest
-		dbName = "LoadTest"
+	case CLIENT_API_CACHE_INDEX:
+		client = cacheDB.ClientAPI
+		dbName = "ClientAPI"
 	default:
 		log.Warn("Invalid cache database index", "index", index)
 		return

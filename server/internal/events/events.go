@@ -3,34 +3,57 @@ package events
 import (
 	"context"
 	"encoding/json"
-	"waugzee/config"
-	"waugzee/internal/logger"
 	"sync"
 	"time"
+	"waugzee/config"
+	"waugzee/internal/logger"
 
-	"github.com/google/uuid"
 	"github.com/valkey-io/valkey-go"
 )
 
-type Event struct {
-	ID        string         `json:"id"`
-	Type      string         `json:"type"`
-	Channel   string         `json:"channel"`
-	UserID    string         `json:"userId,omitempty"`
-	Data      map[string]any `json:"data"`
-	Timestamp time.Time      `json:"timestamp"`
+type Channel string
+
+const (
+	WEBSOCKET  Channel = "websocket"
+	CONTROLLER Channel = "controller"
+)
+
+func (c Channel) String() string {
+	return string(c)
 }
 
-type EventHandler func(event Event) error
+type ChannelEvent struct {
+	Event   string
+	Message Message
+}
+
+type EventHandler func(event ChannelEvent) error
 
 type EventBus struct {
 	client   valkey.Client
 	logger   logger.Logger
 	config   config.Config
-	handlers map[string][]EventHandler
+	handlers map[Channel][]EventHandler
 	mutex    sync.RWMutex
 	ctx      context.Context
 	cancel   context.CancelFunc
+}
+
+type Service string
+
+const (
+	SYSTEM Service = "system"
+	USER   Service = "user"
+	API    Service = "api"
+)
+
+type Message struct {
+	ID        string         `json:"id"`
+	Service   Service        `json:"service,omitempty"`
+	Event     string         `json:"event"`
+	UserID    string         `json:"userId,omitempty"`
+	Payload   map[string]any `json:"payload,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
 }
 
 func New(client valkey.Client, config config.Config) *EventBus {
@@ -40,36 +63,45 @@ func New(client valkey.Client, config config.Config) *EventBus {
 		client:   client,
 		logger:   logger.New("EventBus"),
 		config:   config,
-		handlers: make(map[string][]EventHandler),
+		handlers: make(map[Channel][]EventHandler),
 		ctx:      ctx,
 		cancel:   cancel,
 	}
 }
 
-func (eb *EventBus) Publish(channel string, event Event) error {
+// Publish supports both old ChannelEvent struct and new individual parameters
+func (eb *EventBus) Publish(channel Channel, eventTypeOrChannelEvent any, message ...Message) error {
 	log := eb.logger.Function("Publish")
 
-	if event.ID == "" {
-		event.ID = uuid.New().String()
+	var channelEvent ChannelEvent
+
+	// Handle different parameter combinations
+	switch v := eventTypeOrChannelEvent.(type) {
+	case ChannelEvent:
+		// Legacy usage: Publish(channel, channelEvent)
+		channelEvent = v
+	case string:
+		// New usage: Publish(channel, "eventType", message)
+		if len(message) != 1 {
+			return log.Err("message parameter required when using string event type", nil)
+		}
+		channelEvent = ChannelEvent{
+			Event:   v,
+			Message: message[0],
+		}
+	default:
+		return log.Err("invalid event type parameter", nil)
 	}
 
-	if event.Timestamp.IsZero() {
-		event.Timestamp = time.Now()
-	}
-
-	if event.Channel == "" {
-		event.Channel = channel
-	}
-
-	eventData, err := json.Marshal(event)
+	eventData, err := json.Marshal(channelEvent)
 	if err != nil {
-		return log.Err("failed to marshal event", err, "eventID", event.ID)
+		return log.Err("failed to marshal event", err, "channel", channel, "event", channelEvent)
 	}
 
 	ctx, cancel := context.WithTimeout(eb.ctx, 5*time.Second)
 	defer cancel()
 
-	err = eb.client.Do(ctx, eb.client.B().Publish().Channel(channel).Message(string(eventData)).Build()).
+	err = eb.client.Do(ctx, eb.client.B().Publish().Channel(channel.String()).Message(string(eventData)).Build()).
 		Error()
 	if err != nil {
 		return log.Err(
@@ -77,20 +109,18 @@ func (eb *EventBus) Publish(channel string, event Event) error {
 			err,
 			"channel",
 			channel,
-			"eventID",
-			event.ID,
+			"event",
+			channelEvent,
 		)
 	}
 
-	log.Info("Event published", "channel", channel, "eventID", event.ID, "eventType", event.Type)
 
-	// Also notify local handlers
-	eb.notifyLocalHandlers(channel, event)
+	eb.notifyLocalHandlers(channel, channelEvent)
 
 	return nil
 }
 
-func (eb *EventBus) Subscribe(channel string, handler EventHandler) error {
+func (eb *EventBus) Subscribe(channel Channel, handler EventHandler) error {
 	log := eb.logger.Function("Subscribe")
 
 	eb.mutex.Lock()
@@ -105,7 +135,7 @@ func (eb *EventBus) Subscribe(channel string, handler EventHandler) error {
 	return nil
 }
 
-func (eb *EventBus) notifyLocalHandlers(channel string, event Event) {
+func (eb *EventBus) notifyLocalHandlers(channel Channel, event ChannelEvent) {
 	log := eb.logger.Function("notifyLocalHandlers")
 
 	eb.mutex.RLock()
@@ -124,17 +154,13 @@ func (eb *EventBus) notifyLocalHandlers(channel string, event Event) {
 					err,
 					"channel",
 					channel,
-					"eventID",
-					event.ID,
-					"handlerIndex",
-					handlerIndex,
 				)
 			}
 		}(handler, i)
 	}
 }
 
-func (eb *EventBus) listenToChannel(channel string) {
+func (eb *EventBus) listenToChannel(channel Channel) {
 	log := eb.logger.Function("listenToChannel")
 
 	ctx, cancel := context.WithCancel(eb.ctx)
@@ -144,24 +170,15 @@ func (eb *EventBus) listenToChannel(channel string) {
 
 	err := eb.client.Receive(
 		ctx,
-		eb.client.B().Subscribe().Channel(channel).Build(),
+		eb.client.B().Subscribe().Channel(channel.String()).Build(),
 		func(msg valkey.PubSubMessage) {
-			var event Event
+			var event ChannelEvent
 			if err := json.Unmarshal([]byte(msg.Message), &event); err != nil {
 				log.Er("failed to unmarshal event", err, "channel", channel, "message", msg.Message)
 				return
 			}
 
-			log.Info(
-				"Received event from valkey",
-				"channel",
-				channel,
-				"eventID",
-				event.ID,
-				"eventType",
-				event.Type,
-			)
-			eb.notifyLocalHandlers(channel, event)
+					eb.notifyLocalHandlers(channel, event)
 		},
 	)
 	if err != nil {
@@ -177,33 +194,3 @@ func (eb *EventBus) Close() error {
 	log.Info("EventBus closed")
 	return nil
 }
-
-// Convenience methods for common event types
-func (eb *EventBus) PublishUserLogin(userID string, userData map[string]any) error {
-	return eb.Publish("user.login", Event{
-		Type:   "user_login",
-		UserID: userID,
-		Data:   userData,
-	})
-}
-
-func (eb *EventBus) PublishUserLogout(userID string) error {
-	return eb.Publish("user.logout", Event{
-		Type:   "user_logout",
-		UserID: userID,
-		Data:   map[string]any{},
-	})
-}
-
-
-func (eb *EventBus) PublishCacheInvalidation(resourceType string, resourceID string, userIDs []string) error {
-	return eb.Publish("cache.invalidation", Event{
-		Type: "cache_invalidation",
-		Data: map[string]any{
-			"resourceType": resourceType,
-			"resourceId":   resourceID,
-			"userIds":      userIDs,
-		},
-	})
-}
-

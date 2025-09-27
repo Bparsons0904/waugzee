@@ -13,14 +13,14 @@ import (
 type UserHandler struct {
 	Handler
 	zitadelService *services.ZitadelService
-	userController *userController.UserController
+	userController userController.UserControllerInterface
 }
 
 func NewUserHandler(app app.App, router fiber.Router) *UserHandler {
 	log := logger.New("handlers").File("user_handler")
 	return &UserHandler{
-		zitadelService: app.ZitadelService,
-		userController: app.UserController,
+		zitadelService: app.Services.Zitadel,
+		userController: app.Controllers.User,
 		Handler: Handler{
 			log:        log,
 			router:     router,
@@ -32,9 +32,8 @@ func NewUserHandler(app app.App, router fiber.Router) *UserHandler {
 func (h *UserHandler) Register() {
 	users := h.router.Group("/users")
 
-	protected := users.Group("/", h.middleware.RequireAuth(h.zitadelService))
-	protected.Get("/me", h.getCurrentUser)
-	protected.Put("/me/discogs", h.updateDiscogsToken)
+	users.Get("/me", h.getCurrentUser)
+	users.Put("/me/discogs", h.updateDiscogsToken)
 }
 
 func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
@@ -75,6 +74,5 @@ func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(fiber.Map{"user": user})
 	return c.JSON(fiber.Map{"user": user})
 }

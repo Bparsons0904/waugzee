@@ -22,20 +22,22 @@ interface RecentActivity {
 
 const HomePageDashboard: Component = () => {
   const { user } = useAuth();
-  
+
   const [stats, setStats] = createSignal<DashboardStats>({
     totalRecords: 0,
     totalPlays: 0,
     listeningHours: 0,
     favoriteGenre: "Loading...",
   });
-  const [recentActivity, setRecentActivity] = createSignal<RecentActivity[]>([]);
+  const [recentActivity, setRecentActivity] = createSignal<RecentActivity[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = createSignal(true);
 
   onMount(async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       setStats({
         totalRecords: 247,
         totalPlays: 1430,
@@ -49,22 +51,22 @@ const HomePageDashboard: Component = () => {
           type: "play",
           title: "Kind of Blue",
           subtitle: "Miles Davis • 2h ago",
-          timestamp: "2h ago"
+          timestamp: "2h ago",
         },
         {
-          id: "2", 
+          id: "2",
           type: "addition",
           title: "The Dark Side of the Moon",
           subtitle: "Pink Floyd • Added to collection",
-          timestamp: "1d ago"
+          timestamp: "1d ago",
         },
         {
           id: "3",
           type: "maintenance",
           title: "Stylus Cleaning",
           subtitle: "Audio-Technica AT95E • Cleaned",
-          timestamp: "3d ago"
-        }
+          timestamp: "3d ago",
+        },
       ]);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
@@ -106,10 +108,14 @@ const HomePageDashboard: Component = () => {
 
   const getActivityIcon = (type: RecentActivity["type"]) => {
     switch (type) {
-      case "play": return "▶️";
-      case "addition": return "💽";
-      case "maintenance": return "🛠️";
-      default: return "📅";
+      case "play":
+        return "▶️";
+      case "addition":
+        return "💽";
+      case "maintenance":
+        return "🛠️";
+      default:
+        return "📅";
     }
   };
 
@@ -118,7 +124,7 @@ const HomePageDashboard: Component = () => {
       <div class={styles.container}>
         <section class={styles.hero}>
           <h1 class={styles.heroTitle}>
-            Welcome back, {user?.firstName || "User"}!
+            Welcome back, {user()?.firstName || "User"}!
           </h1>
           <p class={styles.heroSubtitle}>
             Ready to dive into your vinyl collection?
@@ -136,7 +142,7 @@ const HomePageDashboard: Component = () => {
                 <p class={styles.statLabel}>Records</p>
               </div>
             </div>
-            
+
             <div class={styles.statCard}>
               <div class={styles.statIcon}>▶️</div>
               <div class={styles.statContent}>
@@ -146,7 +152,7 @@ const HomePageDashboard: Component = () => {
                 <p class={styles.statLabel}>Plays</p>
               </div>
             </div>
-            
+
             <div class={styles.statCard}>
               <div class={styles.statIcon}>⏱️</div>
               <div class={styles.statContent}>
@@ -156,7 +162,7 @@ const HomePageDashboard: Component = () => {
                 <p class={styles.statLabel}>Hours</p>
               </div>
             </div>
-            
+
             <div class={styles.statCard}>
               <div class={styles.statIcon}>🎯</div>
               <div class={styles.statContent}>
@@ -194,12 +200,12 @@ const HomePageDashboard: Component = () => {
               View All
             </A>
           </div>
-          
+
           <div class={styles.activityList}>
             {isLoading() ? (
               <div class={styles.activitySkeleton}>
-                {[1, 2, 3].map((i) => (
-                  <div key={i} class={styles.skeletonItem}>
+                {[1, 2, 3].map(() => (
+                  <div class={styles.skeletonItem}>
                     <div class={styles.skeletonIcon}></div>
                     <div class={styles.skeletonContent}>
                       <div class={styles.skeletonTitle}></div>
@@ -210,7 +216,7 @@ const HomePageDashboard: Component = () => {
               </div>
             ) : (
               recentActivity().map((activity) => (
-                <div key={activity.id} class={styles.activityItem}>
+                <div class={styles.activityItem}>
                   <div class={styles.activityIcon}>
                     {getActivityIcon(activity.type)}
                   </div>
@@ -229,7 +235,8 @@ const HomePageDashboard: Component = () => {
           <div class={styles.ctaCard}>
             <h2 class={styles.ctaTitle}>Explore Your Collection</h2>
             <p class={styles.ctaDescription}>
-              Discover new insights about your listening habits and collection patterns.
+              Discover new insights about your listening habits and collection
+              patterns.
             </p>
             <A href={FRONTEND_ROUTES.DASHBOARD} class={styles.ctaLink}>
               <Button variant="gradient" size="lg">
@@ -244,3 +251,4 @@ const HomePageDashboard: Component = () => {
 };
 
 export default HomePageDashboard;
+

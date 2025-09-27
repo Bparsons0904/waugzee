@@ -2,8 +2,8 @@ version: "3.8"
 
 services:
   server:
-    image: vim-actions-server-dev-claude
-    container_name: vim-actions-server-claude
+    image: waugzee-server-dev-claude
+    container_name: waugzee-server-claude
     ports:
       - "${SERVER_PORT:-8280}:8280"
     volumes:
@@ -28,8 +28,8 @@ services:
       - valkey
 
   client:
-    image: vim-actions-client-dev-claude
-    container_name: vim-actions-client-claude
+    image: waugzee-client-dev-claude
+    container_name: waugzee-client-claude
     ports:
       - "${CLIENT_PORT:-3010}:3010"
     volumes:
@@ -51,8 +51,8 @@ services:
       - server
 
   valkey:
-    image: vim-actions-valkey-dev-claude
-    container_name: vim-actions-valkey-claude
+    image: waugzee-valkey-dev-claude
+    container_name: waugzee-valkey-claude
     ports:
       - "${DB_CACHE_PORT:-6379}:6379"
     volumes:

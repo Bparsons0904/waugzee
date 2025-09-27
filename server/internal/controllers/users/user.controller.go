@@ -3,6 +3,7 @@ package userController
 import (
 	"context"
 	"waugzee/config"
+	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
@@ -11,19 +12,28 @@ import (
 
 type UserController struct {
 	userRepo       repositories.UserRepository
+	userConfigRepo repositories.UserConfigurationRepository
 	discogsService *services.DiscogsService
+	db             database.DB
 	Config         config.Config
 	log            logger.Logger
 }
 
+type UserControllerInterface interface {
+	UpdateDiscogsToken(ctx context.Context, user *User, req UpdateDiscogsTokenRequest) (*User, error)
+}
+
 func New(
-	userRepo repositories.UserRepository,
-	discogsService *services.DiscogsService,
+	repos repositories.Repository,
+	services services.Service,
 	config config.Config,
-) *UserController {
+	db database.DB,
+) UserControllerInterface {
 	return &UserController{
-		userRepo:       userRepo,
-		discogsService: discogsService,
+		userRepo:       repos.User,
+		userConfigRepo: repos.UserConfiguration,
+		discogsService: services.Discogs,
+		db:             db,
 		Config:         config,
 		log:            logger.New("userController"),
 	}
@@ -44,16 +54,33 @@ func (uc *UserController) UpdateDiscogsToken(
 		return nil, log.ErrMsg("token is required")
 	}
 
-	// Validate token with Discogs API
-	if err := uc.discogsService.ValidateToken(req.Token); err != nil {
+	identity, err := uc.discogsService.GetUserIdentity(req.Token)
+	if err != nil {
 		log.Warn("Invalid Discogs token provided", "userID", user.ID, "error", err)
 		return nil, log.Err("invalid discogs token", err)
 	}
 
-	user.DiscogsToken = &req.Token
-	if err := uc.userRepo.Update(ctx, user); err != nil {
-		return nil, log.Err("failed to update user with discogs token", err)
+	// Create or update user configuration
+	config := &UserConfiguration{
+		UserID:          user.ID,
+		DiscogsToken:    &req.Token,
+		DiscogsUsername: &identity.Username,
 	}
+
+	if err := uc.userConfigRepo.CreateOrUpdate(ctx, uc.db.SQL, config, uc.userRepo); err != nil {
+		return nil, log.Err("failed to update user configuration with discogs credentials", err)
+	}
+
+	// Update user's configuration relationship
+	user.Configuration = config
+
+	log.Info(
+		"Discogs credentials updated successfully",
+		"userID",
+		user.ID,
+		"username",
+		identity.Username,
+	)
 
 	return user, nil
 }

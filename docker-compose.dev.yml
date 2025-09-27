@@ -14,6 +14,7 @@ services:
       - server_cache:/go/pkg/mod
       - server_gocache:/.cache/go-build
       - server_db:/app/tmp
+      - discogs_data:/app/discogs-data
     environment:
       - GO_ENV=development
       - CGO_ENABLED=1
@@ -80,6 +81,7 @@ volumes:
   server_cache:
   server_gocache:
   server_db:
+  discogs_data:
   client_node_modules:
   client_dist:
   valkey_data:

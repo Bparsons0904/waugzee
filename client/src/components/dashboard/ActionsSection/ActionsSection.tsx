@@ -7,6 +7,7 @@ export interface ActionItem {
   description: string;
   buttonText: string;
   onClick: () => void;
+  disabled?: boolean;
 }
 
 interface ActionsSectionProps {
@@ -27,7 +28,11 @@ export const ActionsSection: Component<ActionsSectionProps> = (props) => {
                 <p>{action.description}</p>
               </div>
               <div class={styles.cardFooter}>
-                <button class={styles.button} onClick={action.onClick}>
+                <button
+                  class={styles.button}
+                  onClick={action.onClick}
+                  disabled={action.disabled}
+                >
                   {action.buttonText}
                 </button>
               </div>

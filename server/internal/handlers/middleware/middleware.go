@@ -20,13 +20,13 @@ func New(
 	db database.DB,
 	eventBus *events.EventBus,
 	config config.Config,
-	userRepo repositories.UserRepository,
+	repos repositories.Repository,
 ) Middleware {
 	log := logger.New("middleware")
 
 	return Middleware{
 		DB:       db,
-		userRepo: userRepo,
+		userRepo: repos.User,
 		Config:   config,
 		log:      log,
 		eventBus: eventBus,

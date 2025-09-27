@@ -13,7 +13,8 @@ import {
 import { env } from "@services/env.service";
 import { useAuth } from "./AuthContext";
 
-export const MessageType = {
+// Event constants matching server-side implementation
+export const Events = {
   PING: "ping",
   PONG: "pong",
   MESSAGE: "message",
@@ -25,18 +26,22 @@ export const MessageType = {
   AUTH_RESPONSE: "auth_response",
   AUTH_SUCCESS: "auth_success",
   AUTH_FAILURE: "auth_failure",
-  INVALIDATE_CACHE: "invalidateCache",
+  API_REQUEST: "api_request",
+  API_RESPONSE: "api_response",
+  API_PROGRESS: "api_progress",
+  API_COMPLETE: "api_complete",
+  API_ERROR: "api_error",
 } as const;
 
-export type ChannelType = "system" | "user";
+// Service types matching server-side implementation
+export type ServiceType = "system" | "user" | "api";
 
 export interface WebSocketMessage {
   id: string;
-  type: string;
-  channel: ChannelType;
-  action: string;
+  service?: ServiceType | string;
+  event: string;
   userId?: string;
-  data?: Record<string, unknown>;
+  payload?: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -56,11 +61,8 @@ interface WebSocketContextValue {
   isAuthenticated: () => boolean;
   lastError: () => string | null;
   lastMessage: () => string;
-  sendMessage: (message: string) => void;
+  sendMessage: (message: object) => void;
   reconnect: () => void;
-  onCacheInvalidation: (
-    callback: (resourceType: string, resourceId: string) => void,
-  ) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue>(
@@ -82,15 +84,11 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
   > | null>(null);
   const [wsAuthenticated, setWsAuthenticated] = createSignal<boolean>(false);
 
-  // Cache invalidation callbacks
-  const [cacheInvalidationCallbacks, setCacheInvalidationCallbacks] =
-    createSignal<Array<(resourceType: string, resourceId: string) => void>>([]);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const log = (..._args: unknown[]) => {
     // Debug logging disabled for production
     // if (debug) {
-    //   console.log(`[WebSocket] ${_args[0]}`, ..._args.slice(1));
+    console.log(`[WebSocket] ${_args[0]}`, ..._args.slice(1));
     // }
   };
 
@@ -113,10 +111,9 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
 
     const authResponse: WebSocketMessage = {
       id: crypto.randomUUID(),
-      type: MessageType.AUTH_RESPONSE,
-      channel: "system",
-      action: "authenticate",
-      data: { token },
+      service: "system",
+      event: Events.AUTH_RESPONSE,
+      payload: { token },
       timestamp: new Date().toISOString(),
     };
 
@@ -133,45 +130,40 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
       log("Received message:", message);
       setLastMessage(event.data);
 
-      switch (message.type) {
-        case MessageType.AUTH_REQUEST:
+      // Validate basic message structure
+      if (!message.event) {
+        log("Invalid message: missing event field");
+        return;
+      }
+
+      switch (message.event) {
+        case Events.AUTH_REQUEST:
           handleAuthRequest();
           break;
 
-        case MessageType.AUTH_SUCCESS:
+        case Events.AUTH_SUCCESS:
           log("Authentication successful");
           setWsAuthenticated(true);
           setLastError(null);
           break;
 
-        case MessageType.AUTH_FAILURE:
-          log("Authentication failed:", message.data?.reason);
+        case Events.AUTH_FAILURE:
+          log("Authentication failed:", message.payload?.reason);
           setWsAuthenticated(false);
           setLastError(
-            typeof message.data?.reason === "string"
-              ? message.data.reason
+            typeof message.payload?.reason === "string"
+              ? message.payload.reason
               : "Authentication failed",
           );
           break;
 
+        case Events.API_REQUEST:
+        case Events.API_RESPONSE:
+        case Events.API_PROGRESS:
+        case Events.API_COMPLETE:
+        case Events.API_ERROR:
         default:
-          // Handle cache invalidation and other message types
-          if (message.action === "invalidateCache" && message.data) {
-            const resourceType = message.data.resourceType as string;
-            const resourceId = message.data.resourceId as string;
-
-            if (resourceType && resourceId) {
-              log("Cache invalidation received:", resourceType, resourceId);
-              // Notify all cache invalidation callbacks
-              cacheInvalidationCallbacks().forEach((callback) => {
-                try {
-                  callback(resourceType, resourceId);
-                } catch (error) {
-                  log("Cache invalidation callback error:", error);
-                }
-              });
-            }
-          }
+          // All other messages are handled by services listening to lastMessage()
           break;
       }
     } catch (error) {
@@ -270,7 +262,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
 
   const isWebSocketAuthenticated = () => wsAuthenticated();
 
-  const sendMessage = (message: string) => {
+  const sendMessage = (message: object) => {
     if (!message) {
       log("Cannot send message: Message is empty");
       setLastError("Cannot send message: Message is empty");
@@ -298,7 +290,8 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     }
 
     try {
-      ws.send(message);
+      const messageString = JSON.stringify(message);
+      ws.send(messageString);
       log("Message sent:", message);
     } catch (error) {
       log("Failed to send message:", error);
@@ -345,18 +338,6 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     });
   });
 
-  const onCacheInvalidation = (
-    callback: (resourceType: string, resourceId: string) => void,
-  ) => {
-    setCacheInvalidationCallbacks((prev) => [...prev, callback]);
-
-    // Return cleanup function
-    return () => {
-      setCacheInvalidationCallbacks((prev) =>
-        prev.filter((cb) => cb !== callback),
-      );
-    };
-  };
 
   const contextValue: WebSocketContextValue = {
     connectionState,
@@ -366,7 +347,6 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     lastMessage,
     sendMessage,
     reconnect,
-    onCacheInvalidation,
   };
 
   return (

@@ -21,7 +21,9 @@ func Router(router fiber.Router, app *app.App) (err error) {
 	api := router.Group("/api")
 	HealthHandler(api, app.Config)
 	NewAuthHandler(*app, api).Register()
+	api.Use(app.Middleware.RequireAuth(app.Services.Zitadel))
 	NewUserHandler(*app, api).Register()
+	NewSyncHandler(*app, api).Register()
 
 	return nil
 }

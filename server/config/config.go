@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"waugzee/internal/logger"
 
 	"github.com/spf13/viper"
@@ -29,12 +28,13 @@ type Config struct {
 	ZitadelPrivateKey    string `mapstructure:"ZITADEL_PRIVATE_KEY"`
 	ZitadelKeyID         string `mapstructure:"ZITADEL_KEY_ID"`
 	ZitadelClientIDM2M   string `mapstructure:"ZITADEL_CLIENT_ID_M2M"`
+	SchedulerEnabled     bool   `mapstructure:"SCHEDULER_ENABLED"`
 }
 
 var ConfigInstance Config
 
-func InitConfig() (Config, error) {
-	log := logger.New("config").Function("InitConfig")
+func New() (Config, error) {
+	log := logger.New("config").Function("New")
 	log.Info("Initializing config")
 
 	// Enable automatic environment variable reading first
@@ -46,6 +46,7 @@ func InitConfig() (Config, error) {
 		"DB_CACHE_ADDRESS", "DB_CACHE_PORT", "DB_CACHE_RESET",
 		"CORS_ALLOW_ORIGINS", "SECURITY_SALT", "SECURITY_PEPPER", "SECURITY_JWT_SECRET",
 		"ZITADEL_CLIENT_ID", "ZITADEL_CLIENT_SECRET", "ZITADEL_INSTANCE_URL", "ZITADEL_PRIVATE_KEY", "ZITADEL_KEY_ID", "ZITADEL_CLIENT_ID_M2M",
+		"SCHEDULER_ENABLED",
 	}
 
 	for _, env := range envVars {
@@ -100,9 +101,8 @@ func GetConfig() Config {
 
 func validateConfig(config Config, log logger.Logger) error {
 	if config.ServerPort <= 0 {
-		return log.Err(
+		return log.Error(
 			"Fatal error: invalid server port",
-			fmt.Errorf("invalid port: %d", config.ServerPort),
 			"port", config.ServerPort,
 		)
 	}

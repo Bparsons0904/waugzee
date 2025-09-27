@@ -4,34 +4,35 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"waugzee/config"
-	logg "waugzee/internal/logger"
 	"time"
+	"waugzee/config"
+	"waugzee/internal/logger"
 
 	"github.com/valkey-io/valkey-go"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormLogger "gorm.io/gorm/logger"
 )
 
 type CacheClient valkey.Client
 
 type Cache struct {
-	General  CacheClient
-	Session  CacheClient
-	User     CacheClient
-	Events   CacheClient
-	LoadTest CacheClient
+	General   CacheClient
+	Session   CacheClient
+	User      CacheClient
+	Events    CacheClient
+	ClientAPI CacheClient
 }
 
 type DB struct {
-	SQL   *gorm.DB
-	Cache Cache
-	log   logg.Logger
+	SQL     *gorm.DB
+	Primary *gorm.DB
+	Cache   Cache
+	log     logger.Logger
 }
 
 func New(config config.Config) (DB, error) {
-	log := logg.New("database").Function("New")
+	log := logger.New("database").Function("New")
 
 	log.Info("Initializing database")
 	db := &DB{log: log}
@@ -49,7 +50,7 @@ func New(config config.Config) (DB, error) {
 	return *db, nil
 }
 
-func TXDefer(tx *gorm.DB, log logg.Logger) {
+func TXDefer(tx *gorm.DB, log logger.Logger) {
 	if tx.Error != nil {
 		log.Er("failed to commit transaction", tx.Error)
 		tx.Rollback()
@@ -57,21 +58,22 @@ func TXDefer(tx *gorm.DB, log logg.Logger) {
 		err := tx.Commit().Error
 		if err != nil {
 			log.Er("failed to commit transaction", err)
-		} else {
-			log.Info("committed transaction")
 		}
+		// Removed success logging to reduce log noise during bulk operations
 	}
 }
 
 func (s *DB) initializeDB(config config.Config) error {
-	gormLogger := logger.New(
-		slog.NewLogLogger(slog.Default().Handler(), slog.LevelInfo),
-		logger.Config{
-			SlowThreshold:             2 * time.Second,
-			LogLevel:                  logger.Info,
+	// Use Silent log level for bulk operations to prevent SQL query logging
+	// This will completely disable GORM SQL logging to improve performance during data processing
+	gormLogger := gormLogger.New(
+		slog.NewLogLogger(slog.Default().Handler(), slog.LevelError), // Only show errors
+		gormLogger.Config{
+			SlowThreshold:             10 * time.Second,  // Only log extremely slow queries (10s+)
+			LogLevel:                  gormLogger.Silent, // Silent mode - no SQL query logging
 			IgnoreRecordNotFoundError: true,
 			ParameterizedQueries:      false,
-			Colorful:                  false,
+			Colorful:                  true,
 		},
 	)
 
@@ -80,7 +82,6 @@ func (s *DB) initializeDB(config config.Config) error {
 		PrepareStmt:                              true,
 		DisableForeignKeyConstraintWhenMigrating: false,
 		SkipDefaultTransaction:                   true,
-		// CreateBatchSize:                          100,
 	}
 
 	return s.initializePostgresDB(gormConfig, config)
@@ -132,10 +133,11 @@ func (s *DB) initializePostgresDB(gormConfig *gorm.Config, config config.Config)
 
 	log.Info("Successfully connected to PostgreSQL with GORM")
 	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetMaxOpenConns(50)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	s.SQL = db
+	s.Primary = db // Alias for repository compatibility
 
 	return nil
 }
@@ -162,15 +164,15 @@ func (s *DB) Close() (err error) {
 		s.Cache.Events.Close()
 	}
 
-	if s.Cache.LoadTest != nil {
-		s.Cache.LoadTest.Close()
+	if s.Cache.ClientAPI != nil {
+		s.Cache.ClientAPI.Close()
 	}
 
-	return
+	return err
 }
 
 func (s *DB) SQLWithContext(ctx context.Context) *gorm.DB {
-	return s.SQL.WithContext(ctx)
+	return s.SQL.WithContext(ctx).Set("db_instance", *s)
 }
 
 func (s *DB) FlushAllCaches() error {
@@ -188,7 +190,7 @@ func (s *DB) FlushAllCaches() error {
 		{s.Cache.Session, "Session"},
 		{s.Cache.User, "User"},
 		{s.Cache.Events, "Events"},
-		{s.Cache.LoadTest, "LoadTest"},
+		{s.Cache.ClientAPI, "ClientAPI"},
 	}
 
 	for _, cache := range cacheClients {

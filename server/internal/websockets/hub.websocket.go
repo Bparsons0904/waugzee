@@ -62,6 +62,9 @@ func (m *Manager) unregisterClient(client *Client) {
 
 	delete(m.hub.clients, client.ID)
 
+	// Client was authenticated and disconnected - this is where business logic
+	// can be triggered via EventBus if needed
+
 	log.Info(
 		"Client unregistered and removed from local storage",
 		"clientID",
@@ -134,23 +137,6 @@ func (h *Hub) broadcastMessage(message Message, m *Manager) {
 		sentCount,
 		"totalClients",
 		totalClients,
-	)
-}
-
-func (m *Manager) promoteClientToAuthenticated(client *Client) {
-	log := m.log.Function("promoteClientToAuthenticated")
-
-	if client.Status != STATUS_AUTHENTICATED {
-		log.Warn("Attempted to promote non-authenticated client", "clientID", client.ID)
-		return
-	}
-
-	log.Info(
-		"Client promoted to authenticated",
-		"clientID",
-		client.ID,
-		"userID",
-		client.UserID,
 	)
 }
 

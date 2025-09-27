@@ -2,13 +2,13 @@ package authController
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
+	"waugzee/internal/types"
 )
 
 type AuthController struct {
@@ -64,13 +64,13 @@ type LogoutResponse struct {
 
 
 func New(
-	zitadelService *services.ZitadelService,
-	userRepo repositories.UserRepository,
+	services services.Service,
+	repos repositories.Repository,
 	db database.DB,
 ) AuthControllerInterface {
 	return &AuthController{
-		zitadelService: zitadelService,
-		userRepo:       userRepo,
+		zitadelService: services.Zitadel,
+		userRepo:       repos.User,
 		db:             db,
 		log:            logger.New("authController"),
 	}
@@ -89,7 +89,7 @@ func (ac *AuthController) GetAuthConfig() (*AuthConfigResponse, error) {
 // getOrCreateOIDCUser finds or creates a user from OIDC token claims
 func (ac *AuthController) getOrCreateOIDCUser(
 	ctx context.Context,
-	tokenInfo *services.TokenInfo,
+	tokenInfo *types.TokenInfo,
 ) (*User, error) {
 	log := ac.log.Function("getOrCreateOIDCUser")
 
@@ -143,7 +143,7 @@ func (ac *AuthController) getOrCreateOIDCUser(
 		user.OIDCProjectID = &tokenInfo.ProjectID
 	}
 
-	user, err := ac.userRepo.FindOrCreateOIDCUser(ctx, user)
+	user, err := ac.userRepo.FindOrCreateOIDCUser(ctx, ac.db.SQL, user)
 	if err != nil {
 		log.Info(
 			"failed to find or create OIDC user",
@@ -152,7 +152,7 @@ func (ac *AuthController) getOrCreateOIDCUser(
 			"oidcUserID",
 			tokenInfo.UserID,
 		)
-		return nil, fmt.Errorf("failed to create user session")
+		return nil, log.ErrMsg("failed to create user session")
 	}
 
 	return user, nil
@@ -168,12 +168,12 @@ func (ac *AuthController) HandleOIDCCallback(
 	tokenInfo, err := ac.zitadelService.ValidateIDToken(ctx, req.IDToken)
 	if err != nil {
 		log.Info("ID token validation failed", "error", err.Error())
-		return nil, fmt.Errorf("authentication failed")
+		return nil, log.ErrMsg("authentication failed")
 	}
 
 	if !tokenInfo.Valid {
 		log.Info("ID token is invalid")
-		return nil, fmt.Errorf("authentication failed")
+		return nil, log.ErrMsg("authentication failed")
 	}
 
 	// Find or create user from OIDC claims
@@ -186,7 +186,7 @@ func (ac *AuthController) HandleOIDCCallback(
 			"oidcUserID",
 			tokenInfo.UserID,
 		)
-		return nil, fmt.Errorf("authentication failed")
+		return nil, log.ErrMsg("authentication failed")
 	}
 
 	log.Info("OIDC token callback successful", "userID", user.ID, "email", user.Email)
@@ -206,10 +206,20 @@ func (ac *AuthController) LogoutUser(
 ) (*LogoutResponse, error) {
 	log := ac.log.Function("LogoutUser")
 
-	var userID string
+	var oidcUserID string
 	if user != nil {
-		userID = user.OIDCUserID
-		log.Info("processing logout request", "userID", userID, "dbUserID", user.ID)
+		log.Info("processing logout request", "dbUserID", user.ID)
+	}
+
+	// Get OIDC User ID from the access token since cached user may not have it
+	if req.AccessToken != "" {
+		tokenInfo, _, err := ac.zitadelService.ValidateTokenWithFallback(ctx, req.AccessToken)
+		if err != nil {
+			log.Warn("failed to validate access token during logout", "error", err.Error())
+		} else {
+			oidcUserID = tokenInfo.UserID
+			log.Info("extracted OIDC user ID from token", "oidcUserID", oidcUserID)
+		}
 	}
 
 	var revokedTokens []string
@@ -234,19 +244,21 @@ func (ac *AuthController) LogoutUser(
 		}
 	}
 
-	// Clear user cache data if we have user info
-	if user != nil {
-		if err := ac.clearUserCacheByOIDC(ctx, user.OIDCUserID); err != nil {
+	// Clear user cache data using OIDC User ID from token
+	if oidcUserID != "" {
+		if err := ac.userRepo.ClearUserCacheByOIDC(ctx, oidcUserID); err != nil {
 			log.Warn(
 				"failed to clear user cache",
 				"error",
 				err.Error(),
 				"oidcUserID",
-				user.OIDCUserID,
+				oidcUserID,
 			)
 		} else {
-			log.Info("user cache cleared successfully", "oidcUserID", user.OIDCUserID)
+			log.Info("user cache cleared successfully", "oidcUserID", oidcUserID)
 		}
+	} else {
+		log.Warn("no OIDC user ID available for cache clearing")
 	}
 
 	// Generate logout URL
@@ -264,8 +276,8 @@ func (ac *AuthController) LogoutUser(
 		log.Info("logout URL generated successfully")
 	}
 
-	if userID != "" {
-		log.Info("user logout completed", "userID", userID, "revokedTokens", len(revokedTokens))
+	if oidcUserID != "" {
+		log.Info("user logout completed", "oidcUserID", oidcUserID, "revokedTokens", len(revokedTokens))
 	}
 
 	response := &LogoutResponse{
@@ -281,37 +293,4 @@ func (ac *AuthController) LogoutUser(
 	}
 
 	return response, nil
-}
-
-// clearUserCacheByOIDC clears user cache by OIDC user ID
-func (ac *AuthController) clearUserCacheByOIDC(ctx context.Context, oidcUserID string) error {
-	log := ac.log.Function("clearUserCacheByOIDC")
-
-	// Get user from database to find UUID for cache cleanup
-	user, err := ac.userRepo.GetByOIDCUserID(ctx, oidcUserID)
-	if err != nil {
-		log.Warn(
-			"failed to get user for cache cleanup",
-			"error",
-			err.Error(),
-			"oidcUserID",
-			oidcUserID,
-		)
-		return err
-	}
-
-	// Clear user cache by UUID
-	if err := database.NewCacheBuilder(ac.db.Cache.User, user.ID.String()).Delete(); err != nil {
-		log.Warn("failed to remove user from cache", "userID", user.ID, "error", err)
-		return err
-	}
-
-	// Clear OIDC mapping cache
-	oidcCacheKey := "oidc:" + oidcUserID
-	if err := database.NewCacheBuilder(ac.db.Cache.User, oidcCacheKey).Delete(); err != nil {
-		log.Warn("failed to remove OIDC mapping from cache", "oidcUserID", oidcUserID, "error", err)
-		return err
-	}
-
-	return nil
 }

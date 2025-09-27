@@ -10,44 +10,40 @@ import (
 	"waugzee/internal/logger"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
+	"waugzee/internal/types"
 
 	"github.com/gofiber/websocket/v2"
 	"github.com/google/uuid"
 )
 
+// Type alias for events.Message to avoid conflicts
+type Message = events.Message
+
 const (
-	MESSAGE_TYPE_PING          = "ping"
-	MESSAGE_TYPE_PONG          = "pong"
-	MESSAGE_TYPE_MESSAGE       = "message"
-	MESSAGE_TYPE_BROADCAST     = "broadcast"
-	MESSAGE_TYPE_ERROR         = "error"
-	MESSAGE_TYPE_USER_JOIN     = "user_join"
-	MESSAGE_TYPE_USER_LEAVE    = "user_leave"
-	MESSAGE_TYPE_AUTH_REQUEST  = "auth_request"
-	MESSAGE_TYPE_AUTH_RESPONSE = "auth_response"
-	MESSAGE_TYPE_AUTH_SUCCESS  = "auth_success"
-	MESSAGE_TYPE_AUTH_FAILURE  = "auth_failure"
-	PING_INTERVAL              = 30 * time.Second
-	PONG_TIMEOUT               = 60 * time.Second
-	WRITE_TIMEOUT              = 10 * time.Second
-	AUTH_HANDSHAKE_TIMEOUT     = 10 * time.Second
-	MAX_MESSAGE_SIZE           = 1024 * 1024 // 1 MB
-	SEND_CHANNEL_SIZE          = 64
+	MESSAGE_TYPE_PING = "ping"
+	MESSAGE_TYPE_PONG = "pong"
+	API_REQUEST       = "api_request"
+	API_RESPONSE      = "api_response"
+	API_PROGRESS      = "api_progress"
+	API_COMPLETE      = "api_complete"
+	API_ERROR         = "api_error"
+	USER_JOIN         = "user_join"
+	BROADCAST         = "broadcast"
+	SEND              = "send"
+	MESSAGE           = "message"
 )
 
-// Channels
 const (
-	BROADCAST_CHANNEL = "broadcast"
+	PING_INTERVAL     = 30 * time.Second
+	PONG_TIMEOUT      = 60 * time.Second
+	WRITE_TIMEOUT     = 10 * time.Second
+	MAX_MESSAGE_SIZE  = 1024 * 1024 // 1 MB
+	SEND_CHANNEL_SIZE = 64
 )
 
-type Message struct {
-	ID        string         `json:"id"`
-	Type      string         `json:"type"`
-	Channel   string         `json:"channel,omitempty"`
-	Action    string         `json:"action,omitempty"`
-	UserID    string         `json:"userId,omitempty"`
-	Data      map[string]any `json:"data,omitempty"`
-	Timestamp time.Time      `json:"timestamp"`
+// ZitadelService interface to avoid circular imports
+type ZitadelService interface {
+	ValidateTokenWithFallback(ctx context.Context, token string) (*types.TokenInfo, string, error)
 }
 
 type Client struct {
@@ -60,21 +56,22 @@ type Client struct {
 }
 
 type Manager struct {
-	hub            *Hub
-	db             database.DB
-	config         config.Config
-	log            logger.Logger
-	eventBus       *events.EventBus
-	zitadelService *services.ZitadelService
-	userRepo       repositories.UserRepository
+	hub                  *Hub
+	db                   database.DB
+	config               config.Config
+	log                  logger.Logger
+	eventBus             *events.EventBus
+	zitadelService       ZitadelService
+	userRepo             repositories.UserRepository
+	orchestrationService *services.OrchestrationService
 }
 
 func New(
 	db database.DB,
 	eventBus *events.EventBus,
 	config config.Config,
-	zitadelService *services.ZitadelService,
-	userRepo repositories.UserRepository,
+	services services.Service,
+	repos repositories.Repository,
 ) (*Manager, error) {
 	log := logger.New("websockets")
 
@@ -85,19 +82,19 @@ func New(
 			unregister: make(chan *Client),
 			clients:    make(map[string]*Client),
 		},
-		db:             db,
-		config:         config,
-		log:            log,
-		eventBus:       eventBus,
-		zitadelService: zitadelService,
-		userRepo:       userRepo,
+		db:                   db,
+		config:               config,
+		log:                  log,
+		eventBus:             eventBus,
+		zitadelService:       services.Zitadel,
+		userRepo:             repos.User,
+		orchestrationService: services.Orchestration,
 	}
 
 	log.Function("New").Info("Starting websocket hub")
 	go manager.hub.run(manager)
 
-	go manager.subscribeToBroadcastEvents()
-	go manager.subscribeToCacheInvalidationEvents()
+	go manager.subscribeToEventBus()
 
 	return manager, nil
 }
@@ -115,23 +112,12 @@ func (m *Manager) HandleWebSocket(c *websocket.Conn) {
 		send:       make(chan Message, SEND_CHANNEL_SIZE),
 	}
 
-	authRequest := Message{
-		ID:        uuid.New().String(),
-		Type:      MESSAGE_TYPE_AUTH_REQUEST,
-		Channel:   "system",
-		Action:    "authenticate",
-		Timestamp: time.Now(),
-	}
-
-	if err := c.WriteJSON(authRequest); err != nil {
-		log.Er("failed to send auth request", err)
+	if err := client.sendAuthRequest(); err != nil {
 		if err := c.Close(); err != nil {
 			log.Er("failed to close connection", err)
 		}
 		return
 	}
-
-	log.Info("Auth request sent to client", "clientID", clientID)
 	m.hub.register <- client
 	defer func() {
 		log.Info("Client disconnected in the defer", "clientID", clientID)
@@ -141,36 +127,8 @@ func (m *Manager) HandleWebSocket(c *websocket.Conn) {
 		}
 	}()
 
-	// Start auth timeout goroutine
-	go func() {
-		time.Sleep(AUTH_HANDSHAKE_TIMEOUT)
-		if client.Status == STATUS_UNAUTHENTICATED {
-			log.Warn("Client failed to authenticate within timeout, disconnecting", 
-				"clientID", clientID, 
-				"timeout", AUTH_HANDSHAKE_TIMEOUT)
-			
-			authTimeout := Message{
-				ID:        uuid.New().String(),
-				Type:      MESSAGE_TYPE_AUTH_FAILURE,
-				Channel:   "system",
-				Action:    "authentication_timeout",
-				Data:      map[string]any{"reason": "Authentication timeout"},
-				Timestamp: time.Now(),
-			}
-			
-			select {
-			case client.send <- authTimeout:
-				// Message sent, now close after a brief delay
-				time.Sleep(100 * time.Millisecond)
-			default:
-				// Channel is full or closed, proceed to close immediately
-			}
-			
-			if err := c.Close(); err != nil {
-				log.Er("failed to close connection after auth timeout", err, "clientID", clientID)
-			}
-		}
-	}()
+	// Start auth timeout
+	client.startAuthTimeout()
 
 	go client.readPump()
 	client.writePump()
@@ -182,32 +140,8 @@ func (m *Manager) BroadcastMessage(message Message) {
 
 	select {
 	case m.hub.broadcast <- message:
-		log.Info("Message sent to broadcast channel", "messageID", message.ID)
-	default:
+		default:
 		log.Warn("Broadcast channel is full, dropping message", "messageID", message.ID)
-	}
-}
-
-func (m *Manager) BroadcastUserLogin(userID string, userData map[string]any) {
-	log := m.log.Function("BroadcastUserLogin")
-
-	message := Message{
-		ID:        uuid.New().String(),
-		Type:      MESSAGE_TYPE_USER_JOIN,
-		Channel:   "system",
-		Action:    "user_login",
-		UserID:    userID,
-		Data:      userData,
-		Timestamp: time.Now(),
-	}
-
-	log.Info("Broadcasting user login", "userID", userID, "messageID", message.ID)
-
-	select {
-	case m.hub.broadcast <- message:
-		log.Info("User login message sent to broadcast channel", "userID", userID)
-	default:
-		log.Warn("Broadcast channel is full, dropping user login message", "userID", userID)
 	}
 }
 
@@ -232,8 +166,7 @@ func (c *Client) readPump() {
 	for {
 		var message Message
 		err := c.Connection.ReadJSON(&message)
-		log.Info("Read message", "clientID", c.ID, "message", message)
-		if err != nil {
+			if err != nil {
 			log.Er("failed to read message", err)
 			if websocket.IsUnexpectedCloseError(
 				err,
@@ -255,125 +188,29 @@ func (c *Client) readPump() {
 func (c *Client) routeMessage(message Message) {
 	log := c.Manager.log.Function("routeMessage")
 
-	if message.Type == MESSAGE_TYPE_AUTH_RESPONSE {
+	if message.Event == AUTH_RESPONSE {
 		c.handleAuthResponse(message)
 		return
 	}
 
 	if c.Status == STATUS_UNAUTHENTICATED {
-		log.Warn(
-			"Blocking message from unauthenticated client",
-			"clientID",
-			c.ID,
-			"messageType",
-			message.Type,
-		)
-		authFailure := Message{
-			ID:        uuid.New().String(),
-			Type:      MESSAGE_TYPE_AUTH_FAILURE,
-			Channel:   "system",
-			Action:    "authentication_required",
-			Data:      map[string]any{"reason": "Authentication required"},
-			Timestamp: time.Now(),
-		}
-		c.send <- authFailure
+		c.handleUnauthenticatedMessage(message)
 		return
 	}
 
-	switch message.Type {
+	switch message.Event {
+	case API_RESPONSE:
+			c.handleAPIResponse(message)
 	default:
-		log.Warn("Unknown message type", "type", message.Type)
+		log.Warn("Unknown message event", "event", message.Event)
 	}
 
-	switch message.Channel {
+	switch message.Service {
 	case "system":
 		slog.Info("System message", "messageID", message.ID, "clientID", c.ID, "message", message)
 	case "user":
 		slog.Info("User message", "messageID", message.ID, "clientID", c.ID, "message", message)
 	}
-}
-
-func (c *Client) handleAuthResponse(message Message) {
-	log := c.Manager.log.Function("handleAuthResponse")
-
-	if c.Status != STATUS_UNAUTHENTICATED {
-		log.Warn("Auth response from already authenticated client", "clientID", c.ID)
-		return
-	}
-
-	token, ok := message.Data["token"].(string)
-	if !ok || token == "" {
-		log.Warn("Invalid token in auth response", "clientID", c.ID)
-		c.sendAuthFailure("Invalid token format")
-		return
-	}
-
-	// Validate token using the consolidated method
-	tokenInfo, validationMethod, err := c.Manager.zitadelService.ValidateTokenWithFallback(
-		context.Background(),
-		token,
-	)
-	if err != nil {
-		log.Info("WebSocket token validation failed", "clientID", c.ID, "error", err.Error())
-		c.sendAuthFailure("Authentication failed")
-		return
-	}
-
-	// Get user from database using OIDC User ID
-	user, err := c.Manager.userRepo.GetByOIDCUserID(context.Background(), tokenInfo.UserID)
-	if err != nil {
-		log.Info("WebSocket user not found in database", 
-			"clientID", c.ID, 
-			"oidcUserID", tokenInfo.UserID, 
-			"error", err.Error())
-		c.sendAuthFailure("User not found")
-		return
-	}
-
-	// Set client as authenticated with the validated user
-	c.Status = STATUS_AUTHENTICATED
-	c.UserID = user.ID
-
-	log.Info("WebSocket client authenticated successfully", 
-		"clientID", c.ID, 
-		"userID", user.ID, 
-		"email", tokenInfo.Email,
-		"method", validationMethod)
-
-	c.Manager.promoteClientToAuthenticated(c)
-
-	authSuccess := Message{
-		ID:        uuid.New().String(),
-		Type:      MESSAGE_TYPE_AUTH_SUCCESS,
-		Channel:   "system",
-		Action:    "authenticated",
-		Data:      map[string]any{"userId": c.UserID.String()},
-		Timestamp: time.Now(),
-	}
-
-	c.send <- authSuccess
-}
-
-func (c *Client) sendAuthFailure(reason string) {
-	log := c.Manager.log.Function("sendAuthFailure")
-
-	authFailure := Message{
-		ID:        uuid.New().String(),
-		Type:      MESSAGE_TYPE_AUTH_FAILURE,
-		Channel:   "system",
-		Action:    "authentication_failed",
-		Data:      map[string]any{"reason": reason},
-		Timestamp: time.Now(),
-	}
-
-	c.send <- authFailure
-
-	log.Info("Auth failure sent, closing connection", "clientID", c.ID, "reason", reason)
-
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		_ = c.Connection.Close()
-	}()
 }
 
 func (c *Client) writePump() {
@@ -403,8 +240,7 @@ func (c *Client) writePump() {
 			}
 
 		case <-ticker.C:
-			log.Debug("Sending ping", "clientID", c.ID)
-			if err := c.Connection.SetWriteDeadline(time.Now().Add(WRITE_TIMEOUT)); err != nil {
+					if err := c.Connection.SetWriteDeadline(time.Now().Add(WRITE_TIMEOUT)); err != nil {
 				log.Er("failed to set write deadline for ping", err, "clientID", c.ID)
 			}
 			if err := c.Connection.WriteMessage(websocket.PingMessage, nil); err != nil {
@@ -414,33 +250,23 @@ func (c *Client) writePump() {
 	}
 }
 
-func (m *Manager) subscribeToBroadcastEvents() {
-	log := m.log.Function("subscribeToBroadcastEvents")
-	log.Info("Starting broadcast events subscription")
+func (m *Manager) subscribeToEventBus() {
+	log := m.log.Function("subscribeToEventBus")
+	log.Info("Starting WebSocket events subscription")
 
-	err := m.eventBus.Subscribe(BROADCAST_CHANNEL, func(event events.Event) error {
-		log.Info(
-			"Received broadcast event",
-			"eventID",
-			event.ID,
-			"eventType",
-			event.Type,
-			"data",
-			event.Data,
-		)
-
-		m.sendToAuthenticatedClients(Message{
-			ID:        uuid.New().String(),
-			Type:      MESSAGE_TYPE_BROADCAST,
-			Channel:   "system",
-			Action:    "broadcast",
-			Data:      event.Data,
-			Timestamp: time.Now(),
-		})
+	if err := m.eventBus.Subscribe(events.WEBSOCKET, func(event events.ChannelEvent) error {
+	
+		switch event.Event {
+		case "broadcast":
+			m.sendToAuthenticatedClients(event.Message)
+		case "user":
+			m.sendToSpecificUser(event.Message)
+		default:
+			log.Warn("Unknown WebSocket event type", "event", event.Event)
+		}
 		return nil
-	})
-	if err != nil {
-		log.Er("Failed to subscribe to broadcast events", err)
+	}); err != nil {
+		log.Er("Failed to subscribe to WebSocket events", err)
 	}
 }
 
@@ -459,110 +285,69 @@ func (m *Manager) sendToAuthenticatedClients(message Message) {
 		}
 	}
 
-	log.Info("Message sent to authenticated clients", "messageID", message.ID, "clientCount", sent)
 }
 
-func (m *Manager) subscribeToCacheInvalidationEvents() {
-	log := m.log.Function("subscribeToCacheInvalidationEvents")
-	log.Info("Starting cache invalidation events subscription")
+func (m *Manager) sendToSpecificUser(message Message) {
+	log := m.log.Function("sendToSpecificUser")
 
-	err := m.eventBus.Subscribe("cache.invalidation", func(event events.Event) error {
-		log.Info(
-			"Received cache invalidation event",
-			"eventID", event.ID,
-			"eventType", event.Type,
-			"data", event.Data,
-		)
-
-		resourceType, ok := event.Data["resourceType"].(string)
-		if !ok {
-			log.Warn("Invalid resourceType in cache invalidation event", "eventID", event.ID)
-			return nil
-		}
-
-		resourceID, ok := event.Data["resourceId"].(string)
-		if !ok {
-			log.Warn("Invalid resourceId in cache invalidation event", "eventID", event.ID)
-			return nil
-		}
-
-		userIDsInterface, ok := event.Data["userIds"].([]interface{})
-		if !ok {
-			log.Warn("Invalid userIds in cache invalidation event", "eventID", event.ID)
-			return nil
-		}
-
-		var userIDs []string
-		for _, userIDInterface := range userIDsInterface {
-			if userID, ok := userIDInterface.(string); ok {
-				userIDs = append(userIDs, userID)
-			}
-		}
-
-		m.BroadcastCacheInvalidation(resourceType, resourceID, userIDs)
-		return nil
-	})
-	if err != nil {
-		log.Er("Failed to subscribe to cache invalidation events", err)
-	}
-}
-
-func (m *Manager) BroadcastCacheInvalidation(
-	resourceType string,
-	resourceID string,
-	userIDs []string,
-) {
-	log := m.log.Function("BroadcastCacheInvalidation")
-
-	if len(userIDs) == 0 {
-		log.Debug(
-			"No users to send cache invalidation to",
-			"resourceType",
-			resourceType,
-			"resourceID",
-			resourceID,
-		)
+	if message.UserID == "" {
+		log.Warn("Cannot send to specific user: UserID is empty", "messageID", message.ID)
 		return
 	}
 
-	message := Message{
-		ID:      uuid.New().String(),
-		Type:    MESSAGE_TYPE_MESSAGE,
-		Channel: "user",
-		Action:  "invalidateCache",
-		Data: map[string]any{
-			"resourceType": resourceType,
-			"resourceId":   resourceID,
-		},
-		Timestamp: time.Now(),
+	// Parse UserID from string
+	userID, err := uuid.Parse(message.UserID)
+	if err != nil {
+		log.Er("Invalid UserID format", err, "messageID", message.ID, "userID", message.UserID)
+		return
 	}
 
-	sentCount := 0
-	for _, userID := range userIDs {
-		userUUID, err := uuid.Parse(userID)
-		if err != nil {
-			log.Warn(
-				"Invalid user ID format",
-				"userID",
-				userID,
-				"resourceType",
-				resourceType,
-				"resourceID",
-				resourceID,
-			)
-			continue
+	// Find the client for this specific user
+	var targetClient *Client
+	for _, client := range m.hub.clients {
+		if client.Status == STATUS_AUTHENTICATED && client.UserID == userID {
+			targetClient = client
+			break
 		}
-
-		m.SendMessageToUser(userUUID, message)
-		sentCount++
 	}
 
-	log.Info(
-		"Cache invalidation broadcast complete",
-		"resourceType", resourceType,
-		"resourceID", resourceID,
-		"messageID", message.ID,
-		"userCount", len(userIDs),
-		"sentCount", sentCount,
-	)
+	if targetClient == nil {
+		log.Warn("User not found or not connected", "messageID", message.ID, "userID", message.UserID)
+		return
+	}
+
+	// Send message to the specific user's client
+	select {
+	case targetClient.send <- message:
+		default:
+		log.Warn("User's send channel full, dropping message", "messageID", message.ID, "userID", message.UserID, "clientID", targetClient.ID)
+	}
 }
+
+// handleAPIResponse processes API responses from the client and routes them to the orchestration service
+func (c *Client) handleAPIResponse(message Message) {
+	log := c.Manager.log.Function("handleAPIResponse")
+
+	if c.Status != STATUS_AUTHENTICATED {
+		log.Warn("Received API response from unauthenticated client", "clientID", c.ID)
+		return
+	}
+
+	// Validate that the message contains valid payload
+	if message.Payload == nil {
+		log.Warn("API response missing payload", "messageID", message.ID, "clientID", c.ID)
+		return
+	}
+
+
+	// Pass the response to the orchestration service for processing
+	if err := c.Manager.orchestrationService.HandleAPIResponse(context.Background(), message.Payload); err != nil {
+		log.Er("Failed to process API response", err,
+			"messageID", message.ID,
+			"clientID", c.ID,
+			"userID", c.UserID)
+		return
+	}
+
+}
+

@@ -1,6 +1,9 @@
-import { Component, createSignal, onMount } from "solid-js";
+import { Component, createSignal, onMount, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { useAuth } from "@context/AuthContext";
+import { DiscogsTokenModal } from "@components/common/ui/DiscogsTokenModal/DiscogsTokenModal";
+import { DiscogsFolderSync } from "@components/common/ui/DiscogsFolderSync/DiscogsFolderSync";
+import { useToast } from "@context/ToastContext";
 import styles from "./Dashboard.module.scss";
 import { Button } from "@components/common/ui/Button/Button";
 
@@ -14,7 +17,8 @@ interface DashboardStats {
 const Dashboard: Component = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+  const toast = useToast();
+
   const [stats, setStats] = createSignal<DashboardStats>({
     totalRecords: 0,
     totalPlays: 0,
@@ -22,11 +26,83 @@ const Dashboard: Component = () => {
     favoriteGenre: "Loading...",
   });
   const [isLoading, setIsLoading] = createSignal(true);
+  const [showTokenModal, setShowTokenModal] = createSignal(false);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleAction = (..._args: unknown[]) => {
-    // Handle actions here
-    // TODO: Implement specific action handling
+  onMount(async () => {
+    try {
+      // TODO: Replace with actual API call
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      setStats({
+        totalRecords: 247,
+        totalPlays: 1430,
+        listeningHours: 89,
+        favoriteGenre: "Jazz",
+      });
+    } catch (error) {
+      console.error("Failed to load dashboard stats:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  });
+
+  const actionCards = [
+    {
+      title: "Log Play",
+      description: "Record when you play a record from your collection.",
+      icon: "🎵",
+      action: () => navigate("/log"),
+    },
+    {
+      title: "View Collection",
+      description: "Browse and search through your vinyl collection.",
+      icon: "💽",
+      action: () => navigate("/collection"),
+    },
+    {
+      title: "Play History",
+      description: "View your listening history and statistics.",
+      icon: "📊",
+      action: () => navigate("/history"),
+    },
+    {
+      title: "Equipment",
+      description: "Manage your turntables, cartridges, and styluses.",
+      icon: "🎧",
+      action: () => navigate("/equipment"),
+    },
+    {
+      title: "Sync Folders",
+      description: "Sync your Discogs folders to organize your collection.",
+      icon: "🔄",
+      action: () => handleFolderSync(),
+    },
+    {
+      title: "Analytics",
+      description:
+        "Explore insights about your collection and listening habits.",
+      icon: "📈",
+      action: () => navigate("/analytics"),
+    },
+  ];
+
+  const handleFolderSync = () => {
+    const currentUser = user();
+    if (!currentUser?.configuration?.discogsToken) {
+      toast.showInfo("Please add your Discogs token to sync your folders");
+      setShowTokenModal(true);
+      return;
+    }
+
+    toast.showInfo("Click the 'Sync Now' button below to start folder sync");
+  };
+
+  const handleSyncComplete = (foldersCount: number) => {
+    console.log(`Folder sync completed with ${foldersCount} folders`);
+  };
+
+  const handleSyncError = (error: string) => {
+    console.error("Folder sync failed:", error);
   };
 
   return (
@@ -34,7 +110,7 @@ const Dashboard: Component = () => {
       <div class={styles.container}>
         <header class={styles.header}>
           <h1 class={styles.headerTitle}>
-            Welcome back, {user?.firstName || "User"}!
+            Welcome back, {user()?.firstName || "User"}!
           </h1>
           <p class={styles.headerSubtitle}>
             Manage your vinyl collection and track your listening sessions.
@@ -43,23 +119,34 @@ const Dashboard: Component = () => {
 
         <section class={styles.section}>
           <h2 class={styles.sectionTitle}>Quick Actions</h2>
-          
+
           <div class={styles.cardGrid}>
             {actionCards.map((card) => (
-              <div 
+              <div
                 class={styles.actionCard}
-                onClick={card.action}
+                onClick={
+                  card.title === "Sync Folders" ? undefined : card.action
+                }
               >
                 <div class={styles.cardIcon}>{card.icon}</div>
                 <h3 class={styles.cardTitle}>{card.title}</h3>
                 <p class={styles.cardDescription}>{card.description}</p>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={card.action}
+
+                <Show
+                  when={card.title === "Sync Folders"}
+                  fallback={
+                    <Button variant="primary" size="sm" onClick={card.action}>
+                      Get Started
+                    </Button>
+                  }
                 >
-                  Get Started
-                </Button>
+                  <DiscogsFolderSync
+                    variant="primary"
+                    size="sm"
+                    onSyncComplete={handleSyncComplete}
+                    onSyncError={handleSyncError}
+                  />
+                </Show>
               </div>
             ))}
           </div>
@@ -67,7 +154,7 @@ const Dashboard: Component = () => {
 
         <section class={styles.section}>
           <h2 class={styles.sectionTitle}>Collection Overview</h2>
-          
+
           <div class={styles.overviewGrid}>
             <div class={styles.statCard}>
               <div class={styles.statIcon}>💽</div>
@@ -78,7 +165,7 @@ const Dashboard: Component = () => {
                 <p class={styles.statLabel}>Total Records</p>
               </div>
             </div>
-            
+
             <div class={styles.statCard}>
               <div class={styles.statIcon}>▶️</div>
               <div class={styles.statContent}>
@@ -88,7 +175,7 @@ const Dashboard: Component = () => {
                 <p class={styles.statLabel}>Total Plays</p>
               </div>
             </div>
-            
+
             <div class={styles.statCard}>
               <div class={styles.statIcon}>⏱️</div>
               <div class={styles.statContent}>
@@ -98,7 +185,7 @@ const Dashboard: Component = () => {
                 <p class={styles.statLabel}>Listening Time</p>
               </div>
             </div>
-            
+
             <div class={styles.statCard}>
               <div class={styles.statIcon}>🎯</div>
               <div class={styles.statContent}>
@@ -111,6 +198,10 @@ const Dashboard: Component = () => {
           </div>
         </section>
       </div>
+
+      <Show when={showTokenModal()}>
+        <DiscogsTokenModal onClose={() => setShowTokenModal(false)} />
+      </Show>
     </div>
   );
 };
