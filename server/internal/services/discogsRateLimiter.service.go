@@ -12,15 +12,21 @@ import (
 )
 
 const (
+	// Discogs API rate limiting
 	DISCOGS_RATE_LIMIT_HASH = "discogs_rate_limit:%s" // %s = userID
 	DISCOGS_RATE_LIMIT      = 50
 	DISCOGS_RATE_WINDOW     = 60 * time.Second // 60 second window
 
-	// Throttling configuration
+	// Throttling configuration for proactive rate limiting
 	THROTTLE_THRESHOLD_MEDIUM = 0.5             // 50% capacity - start light throttling
 	THROTTLE_THRESHOLD_HIGH   = 0.75            // 75% capacity - increase throttling
 	THROTTLE_DELAY_MEDIUM     = 1 * time.Second // 50-75% capacity delay
 	THROTTLE_DELAY_HIGH       = 2 * time.Second // 75-100% capacity delay
+
+	// Rate limiting safety thresholds
+	MIN_CONTEXT_DEADLINE     = 5 * time.Second   // Minimum time required for rate limit processing
+	RETRY_CALCULATION_BUFFER = 100 * time.Millisecond // Buffer added to retry calculations
+	MAX_RETRY_WAIT          = 30 * time.Second   // Maximum time to wait for rate limit slot
 )
 
 type DiscogsRateLimiterService struct {
@@ -36,8 +42,8 @@ func NewDiscogsRateLimiterService(cache valkey.Client) *DiscogsRateLimiterServic
 	}
 }
 
-// CheckUserRateLimit checks if the user can make a Discogs API request
-// If rate limited, it will sleep and retry until a slot becomes available
+// CheckUserRateLimit checks rate limit with proactive throttling based on capacity usage
+// Applies sliding scale delays: 0-50% (no delay), 50-75% (1s), 75-100% (2s)
 func (d *DiscogsRateLimiterService) CheckUserRateLimit(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -46,66 +52,7 @@ func (d *DiscogsRateLimiterService) CheckUserRateLimit(
 
 	// Check if context has a reasonable deadline
 	if deadline, ok := ctx.Deadline(); ok {
-		if time.Until(deadline) < 5*time.Second {
-			err := errors.New("insufficient time remaining for rate limit processing")
-			return log.Err(
-				"insufficient time remaining for rate limit processing",
-				err,
-				"userID",
-				userID,
-				"timeRemaining",
-				time.Until(deadline),
-			)
-		}
-	}
-
-	for {
-		// Check current rate limit status
-		canProceed, _, err := d.checkAndAddRequest(ctx, userID)
-		if err != nil {
-			return log.Err("failed to check rate limit", err, "userID", userID)
-		}
-
-		if canProceed {
-			log.Info("Rate limit check passed", "userID", userID)
-			return nil
-		}
-
-		// Rate limited - calculate when next slot becomes available
-		retryAfter, err := d.calculateNextSlotAvailable(ctx, userID)
-		if err != nil {
-			return log.Err("failed to calculate retry delay", err, "userID", userID)
-		}
-
-		log.Info("Rate limited, waiting for next slot",
-			"userID", userID,
-			"retryAfter", retryAfter)
-
-		select {
-		case <-ctx.Done():
-			return log.Err(
-				"context cancelled while waiting for rate limit",
-				ctx.Err(),
-				"userID",
-				userID,
-			)
-		case <-time.After(retryAfter):
-			// Continue to next iteration
-		}
-	}
-}
-
-// CheckUserRateLimitWithThrottling checks rate limit with proactive throttling based on capacity usage
-// Applies sliding scale delays: 0-50% (no delay), 50-75% (1s), 75-100% (2s)
-func (d *DiscogsRateLimiterService) CheckUserRateLimitWithThrottling(
-	ctx context.Context,
-	userID uuid.UUID,
-) error {
-	log := d.log.Function("CheckUserRateLimitWithThrottling")
-
-	// Check if context has a reasonable deadline
-	if deadline, ok := ctx.Deadline(); ok {
-		if time.Until(deadline) < 5*time.Second {
+		if time.Until(deadline) < MIN_CONTEXT_DEADLINE {
 			err := errors.New("insufficient time remaining for rate limit processing")
 			return log.Err(
 				"insufficient time remaining for rate limit processing",
@@ -280,10 +227,10 @@ func (d *DiscogsRateLimiterService) calculateNextSlotAvailable(
 	}
 
 	// Return time until oldest entry expires, plus small buffer
-	retryAfter := expiresAt.Sub(now) + (100 * time.Millisecond)
+	retryAfter := expiresAt.Sub(now) + RETRY_CALCULATION_BUFFER
 
 	// Cap the retry time to prevent excessive waiting
-	maxWait := 30 * time.Second
+	maxWait := MAX_RETRY_WAIT
 	if retryAfter > maxWait {
 		retryAfter = maxWait
 	}

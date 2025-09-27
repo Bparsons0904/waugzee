@@ -25,22 +25,22 @@ func TestCalculateThrottleDelay(t *testing.T) {
 		},
 		{
 			name:         "No throttling at 40% capacity",
-			currentCount: 2,
+			currentCount: 20,
 			expectedDelay: 0,
 		},
 		{
 			name:         "Light throttling at 60% capacity",
-			currentCount: 3,
+			currentCount: 30,
 			expectedDelay: THROTTLE_DELAY_MEDIUM,
 		},
 		{
 			name:         "Moderate throttling at 80% capacity",
-			currentCount: 4,
+			currentCount: 40,
 			expectedDelay: THROTTLE_DELAY_HIGH,
 		},
 		{
 			name:         "Moderate throttling at 100% capacity",
-			currentCount: 5,
+			currentCount: 50,
 			expectedDelay: THROTTLE_DELAY_HIGH,
 		},
 	}
@@ -57,8 +57,8 @@ func TestCalculateThrottleDelay(t *testing.T) {
 
 func TestConstants(t *testing.T) {
 	// Test that our constants have expected values
-	if DISCOGS_RATE_LIMIT != 5 {
-		t.Errorf("DISCOGS_RATE_LIMIT = %d, want 5", DISCOGS_RATE_LIMIT)
+	if DISCOGS_RATE_LIMIT != 50 {
+		t.Errorf("DISCOGS_RATE_LIMIT = %d, want 50", DISCOGS_RATE_LIMIT)
 	}
 
 	if DISCOGS_RATE_WINDOW != 60*time.Second {
@@ -102,30 +102,35 @@ func TestServiceConstruction(t *testing.T) {
 func TestThrottleDelayBoundaryConditions(t *testing.T) {
 	service := &DiscogsRateLimiterService{}
 
-	// Test exact boundary conditions
+	// Test exact boundary conditions with 50 request limit
 	tests := []struct {
 		name         string
 		currentCount int64
 		expectedDelay time.Duration
 	}{
 		{
-			name:         "Exactly 50% capacity (2.5 rounds to 2)",
-			currentCount: 2, // 2/5 = 40% (under 50%)
-			expectedDelay: 0,
-		},
-		{
-			name:         "Just over 50% capacity",
-			currentCount: 3, // 3/5 = 60% (50-75% range)
+			name:         "Exactly 50% capacity",
+			currentCount: 25, // 25/50 = 50% (boundary)
 			expectedDelay: THROTTLE_DELAY_MEDIUM,
 		},
 		{
-			name:         "Exactly 75% capacity",
-			currentCount: 4, // 4/5 = 80% (75-100% range)
+			name:         "Just under 50% capacity",
+			currentCount: 24, // 24/50 = 48% (under 50%)
+			expectedDelay: 0,
+		},
+		{
+			name:         "Just over 75% capacity",
+			currentCount: 38, // 38/50 = 76% (75-100% range)
 			expectedDelay: THROTTLE_DELAY_HIGH,
 		},
 		{
+			name:         "Exactly 75% capacity",
+			currentCount: 37, // 37/50 = 74% (50-75% range)
+			expectedDelay: THROTTLE_DELAY_MEDIUM,
+		},
+		{
 			name:         "Over 100% capacity",
-			currentCount: 6, // 6/5 = 120% (75-100% range)
+			currentCount: 60, // 60/50 = 120% (75-100% range)
 			expectedDelay: THROTTLE_DELAY_HIGH,
 		},
 	}
@@ -165,18 +170,6 @@ func TestContextTimeoutValidation(t *testing.T) {
 				t.Error("Error message is empty")
 			}
 			// We can't check exact string due to logger formatting, but we can check it's not empty
-		}
-	})
-
-	t.Run("Short context timeout should return error for throttling method", func(t *testing.T) {
-		// Create context with insufficient time
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-
-		// This should return an error before trying to access Redis
-		err := service.CheckUserRateLimitWithThrottling(ctx, userID)
-		if err == nil {
-			t.Error("Expected error due to insufficient time remaining, got nil")
 		}
 	})
 

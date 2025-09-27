@@ -14,7 +14,6 @@ import (
 	"github.com/valkey-io/valkey-go"
 )
 
-
 type RequestMetadata struct {
 	UserID       uuid.UUID `json:"userId"`
 	RequestID    string    `json:"requestId"`

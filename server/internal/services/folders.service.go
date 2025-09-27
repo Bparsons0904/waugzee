@@ -17,7 +17,6 @@ import (
 	"gorm.io/gorm"
 )
 
-
 type FoldersService struct {
 	log                         logger.Logger
 	eventBus                    *events.EventBus
@@ -179,7 +178,6 @@ func (f *FoldersService) ProcessFoldersResponse(
 
 	return nil
 }
-
 
 // processReleasesToSyncState converts Discogs release data to UserRelease models
 // and accumulates them in the sync state for later processing.
@@ -398,7 +396,10 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		return nil // Don't return error as this is an expected API failure
 	}
 
-	folderID, err := f.folderValidationService.ExtractFolderID(responseData, discogsFolderReleasesResponse)
+	folderID, err := f.folderValidationService.ExtractFolderID(
+		responseData,
+		discogsFolderReleasesResponse,
+	)
 	if err != nil {
 		return log.Err("failed to extract folder ID", err)
 	}
@@ -566,7 +567,11 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 
 		if len(folderReleases) > 0 {
 			err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
-				return f.folderDataExtractionService.ExtractBasicInformation(txCtx, tx, folderReleases)
+				return f.folderDataExtractionService.ExtractBasicInformation(
+					txCtx,
+					tx,
+					folderReleases,
+				)
 			})
 			if err != nil {
 				log.Warn("Failed to extract basic information", "error", err)
@@ -907,7 +912,10 @@ func (f *FoldersService) performReleaseValidation(
 	}
 
 	// Use validation service to check release existence
-	existingReleases, missingReleases, err := f.folderValidationService.ValidateReleases(ctx, releaseIDs)
+	existingReleases, missingReleases, err := f.folderValidationService.ValidateReleases(
+		ctx,
+		releaseIDs,
+	)
 	if err != nil {
 		return log.Err("failed to validate releases", err)
 	}
@@ -918,7 +926,11 @@ func (f *FoldersService) performReleaseValidation(
 
 	// Update images for existing releases
 	if len(existingReleases) > 0 {
-		err = f.folderValidationService.UpdateReleaseImages(ctx, syncState.OriginalReleases, existingReleases)
+		err = f.folderValidationService.UpdateReleaseImages(
+			ctx,
+			syncState.OriginalReleases,
+			existingReleases,
+		)
 		if err != nil {
 			log.Warn("Failed to update release images", "error", err)
 			// Don't fail the sync for image update errors
@@ -968,7 +980,6 @@ func (f *FoldersService) performReleaseValidation(
 
 	return nil
 }
-
 
 // TriggerSyncCompletion directly triggers completion of a collection sync
 func (f *FoldersService) TriggerSyncCompletion(ctx context.Context, userID uuid.UUID) error {
