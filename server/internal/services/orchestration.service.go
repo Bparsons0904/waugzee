@@ -276,7 +276,7 @@ func (o *OrchestrationService) handleReleaseResponse(
 					"syncStateId", syncStateIDStr,
 					"totalMissingReleases", missingReleases)
 
-				// Update sync state
+				// Update sync state and trigger completion directly
 				err = database.NewCacheBuilder(o.cache, syncStateIDStr).
 					WithHashPattern("collection_sync").
 					WithStruct(syncStateData).
@@ -288,45 +288,8 @@ func (o *OrchestrationService) handleReleaseResponse(
 					return nil
 				}
 
-				// Trigger folder processing to continue with the sync now that releases are ready
-				// We simulate a final folder release response to trigger the completion logic
-				finalResponseData := map[string]any{
-					"requestId": metadata.RequestID + "_completion",
-					"data": map[string]any{
-						"releases": []any{}, // Empty releases to trigger completion check
-						"pagination": map[string]any{
-							"page":  1,
-							"pages": 1,
-						},
-					},
-				}
-
-				// Create completion metadata
-				completionMetadata := RequestMetadata{
-					UserID:      metadata.UserID,
-					RequestID:   metadata.RequestID + "_completion",
-					RequestType: "folder_releases",
-					Timestamp:   time.Now(),
-				}
-
-				// Store completion metadata temporarily
-				err = database.NewCacheBuilder(o.cache, completionMetadata.RequestID).
-					WithHashPattern(API_HASH).
-					WithStruct(completionMetadata).
-					WithTTL(APIRequestTTL).
-					WithContext(ctx).
-					Set()
-				if err != nil {
-					log.Warn("Failed to store completion metadata", "error", err)
-					return nil
-				}
-
-				// Process the completion trigger
-				err = o.foldersService.ProcessFolderReleasesResponse(
-					ctx,
-					completionMetadata,
-					finalResponseData,
-				)
+				// Trigger sync completion directly via folders service
+				err = o.foldersService.TriggerSyncCompletion(ctx, metadata.UserID)
 				if err != nil {
 					log.Warn("Failed to trigger sync completion", "error", err)
 				}

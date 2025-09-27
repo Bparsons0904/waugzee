@@ -40,15 +40,43 @@ type ReleaseRepository interface {
 	GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Release, error)
 	UpsertBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
 	// New methods for sync service
-	CheckReleaseExistence(ctx context.Context, tx *gorm.DB, releaseIDs []int64) (existing []int64, missing []int64, err error)
+	CheckReleaseExistence(
+		ctx context.Context,
+		tx *gorm.DB,
+		releaseIDs []int64,
+	) (existing []int64, missing []int64, err error)
 	UpdateReleaseImages(ctx context.Context, tx *gorm.DB, updates []ReleaseImageUpdate) error
 	// Association methods
-	CreateReleaseArtistAssociations(ctx context.Context, tx *gorm.DB, associations []ReleaseArtistAssociation) error
-	UpsertReleaseArtistAssociationsBatch(ctx context.Context, tx *gorm.DB, associations []*[]ReleaseArtistAssociation) error
-	CreateReleaseLabelAssociations(ctx context.Context, tx *gorm.DB, associations []ReleaseLabelAssociation) error
-	UpsertReleaseLabelAssociationsBatch(ctx context.Context, tx *gorm.DB, associations []*[]ReleaseLabelAssociation) error
-	CreateReleaseGenreAssociations(ctx context.Context, tx *gorm.DB, associations []ReleaseGenreAssociation) error
-	UpsertReleaseGenreAssociationsBatch(ctx context.Context, tx *gorm.DB, associations []*[]ReleaseGenreAssociation) error
+	CreateReleaseArtistAssociations(
+		ctx context.Context,
+		tx *gorm.DB,
+		associations []ReleaseArtistAssociation,
+	) error
+	UpsertReleaseArtistAssociationsBatch(
+		ctx context.Context,
+		tx *gorm.DB,
+		associations []*[]ReleaseArtistAssociation,
+	) error
+	CreateReleaseLabelAssociations(
+		ctx context.Context,
+		tx *gorm.DB,
+		associations []ReleaseLabelAssociation,
+	) error
+	UpsertReleaseLabelAssociationsBatch(
+		ctx context.Context,
+		tx *gorm.DB,
+		associations []*[]ReleaseLabelAssociation,
+	) error
+	CreateReleaseGenreAssociations(
+		ctx context.Context,
+		tx *gorm.DB,
+		associations []ReleaseGenreAssociation,
+	) error
+	UpsertReleaseGenreAssociationsBatch(
+		ctx context.Context,
+		tx *gorm.DB,
+		associations []*[]ReleaseGenreAssociation,
+	) error
 	AssociateArtists(ctx context.Context, tx *gorm.DB, release *Release, artists []*Artist) error
 	AssociateLabels(ctx context.Context, tx *gorm.DB, release *Release, labels []*Label) error
 	AssociateGenres(ctx context.Context, tx *gorm.DB, release *Release, genres []*Genre) error
@@ -64,22 +92,30 @@ func NewReleaseRepository() ReleaseRepository {
 	}
 }
 
-
-func (r *releaseRepository) GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Release, error) {
-	log := r.log.Function("GetByDiscogsID")
-
+func (r *releaseRepository) GetByDiscogsID(
+	ctx context.Context,
+	tx *gorm.DB,
+	discogsID int64,
+) (*Release, error) {
 	var release Release
-	if err := tx.WithContext(ctx).Preload("Labels").Preload("Master").Preload("Artists").Preload("Genres").First(&release, "id = ?", discogsID).Error; err != nil {
+	if err := tx.WithContext(ctx).
+		Preload("Labels").
+		Preload("Master").
+		Preload("Artists").
+		Preload("Genres").
+		First(&release,
+			&BaseDiscogModel{
+				ID: discogsID,
+			}).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
-		return nil, log.Err("failed to get release by Discogs ID", err, "discogsID", discogsID)
+		return nil, r.log.Function("GetByDiscogsID").
+			Err("failed to get release by Discogs ID", err, "discogsID", discogsID)
 	}
 
 	return &release, nil
 }
-
-
 
 func (r *releaseRepository) UpsertBatch(
 	ctx context.Context,
@@ -105,8 +141,12 @@ func (r *releaseRepository) UpsertBatch(
 	return nil
 }
 
-
-func (r *releaseRepository) AssociateArtists(ctx context.Context, tx *gorm.DB, release *Release, artists []*Artist) error {
+func (r *releaseRepository) AssociateArtists(
+	ctx context.Context,
+	tx *gorm.DB,
+	release *Release,
+	artists []*Artist,
+) error {
 	log := r.log.Function("AssociateArtists")
 
 	if len(artists) == 0 {
@@ -122,7 +162,12 @@ func (r *releaseRepository) AssociateArtists(ctx context.Context, tx *gorm.DB, r
 	return nil
 }
 
-func (r *releaseRepository) AssociateLabels(ctx context.Context, tx *gorm.DB, release *Release, labels []*Label) error {
+func (r *releaseRepository) AssociateLabels(
+	ctx context.Context,
+	tx *gorm.DB,
+	release *Release,
+	labels []*Label,
+) error {
 	log := r.log.Function("AssociateLabels")
 
 	if len(labels) == 0 {
@@ -138,7 +183,12 @@ func (r *releaseRepository) AssociateLabels(ctx context.Context, tx *gorm.DB, re
 	return nil
 }
 
-func (r *releaseRepository) AssociateGenres(ctx context.Context, tx *gorm.DB, release *Release, genres []*Genre) error {
+func (r *releaseRepository) AssociateGenres(
+	ctx context.Context,
+	tx *gorm.DB,
+	release *Release,
+	genres []*Genre,
+) error {
 	log := r.log.Function("AssociateGenres")
 
 	if len(genres) == 0 {
@@ -419,7 +469,12 @@ func (r *releaseRepository) CheckReleaseExistence(
 	if err := tx.WithContext(ctx).Model(&Release{}).
 		Where("id IN ?", releaseIDs).
 		Pluck("id", &existingReleases).Error; err != nil {
-		return nil, nil, log.Err("failed to check release existence", err, "releaseCount", len(releaseIDs))
+		return nil, nil, log.Err(
+			"failed to check release existence",
+			err,
+			"releaseCount",
+			len(releaseIDs),
+		)
 	}
 
 	// Create a map for fast lookup of existing releases
@@ -463,16 +518,16 @@ func (r *releaseRepository) UpdateReleaseImages(
 	// Build the SQL for batch update
 	query := `
 		UPDATE releases
-		SET thumb = COALESCE(data_table.thumb, thumb),
-		    cover_image = COALESCE(data_table.cover_image, cover_image),
+		SET thumb = COALESCE(data_table.thumb, releases.thumb),
+		    cover_image = COALESCE(data_table.cover_image, releases.cover_image),
 		    updated_at = NOW()
 		FROM (VALUES `
 
-	args := make([]interface{}, 0, len(updates)*3)
+	args := make([]any, 0, len(updates)*3)
 	values := make([]string, 0, len(updates))
 
 	for i, update := range updates {
-		placeholder := fmt.Sprintf("($%d, $%d, $%d)", i*3+1, i*3+2, i*3+3)
+		placeholder := fmt.Sprintf("($%d::bigint, $%d::text, $%d::text)", i*3+1, i*3+2, i*3+3)
 		values = append(values, placeholder)
 
 		args = append(args, update.ReleaseID)

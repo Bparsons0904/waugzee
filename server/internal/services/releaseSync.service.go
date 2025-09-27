@@ -64,6 +64,13 @@ func (rs *ReleaseSyncService) RequestMissingReleases(
 
 	// Request each missing release
 	for _, releaseID := range missingReleaseIDs {
+		// Check rate limit before making API request
+		if err := rs.discogsRateLimiter.CheckUserRateLimit(ctx, user.ID); err != nil {
+			log.Warn("Rate limit check failed, skipping release",
+				"releaseID", releaseID, "error", err)
+			continue
+		}
+
 		requestID := uuid.New().String()
 
 		metadata := RequestMetadata{
@@ -82,18 +89,6 @@ func (rs *ReleaseSyncService) RequestMissingReleases(
 			WithContext(ctx).
 			Set(); err != nil {
 			log.Warn("Failed to store request metadata", "error", err, "requestID", requestID)
-			continue
-		}
-
-		// Check rate limit before making API request
-		if err := rs.discogsRateLimiter.CheckUserRateLimit(ctx, user.ID); err != nil {
-			// Clean up cache entry since we can't proceed
-			_ = database.NewCacheBuilder(rs.db.Cache.ClientAPI, requestID).
-				WithHashPattern(API_HASH).
-				WithContext(ctx).
-				Delete()
-			log.Warn("Rate limit check failed, skipping release",
-				"releaseID", releaseID, "error", err)
 			continue
 		}
 

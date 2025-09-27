@@ -71,6 +71,11 @@ func (f *FoldersService) RequestUserFolders(
 		return "", log.ErrMsg("user does not have a Discogs username")
 	}
 
+	// Check rate limit before making API request
+	if err := f.discogsRateLimiter.CheckUserRateLimit(ctx, user.ID); err != nil {
+		return "", log.Err("rate limit check failed", err)
+	}
+
 	requestID := uuid.New().String()
 
 	metadata := RequestMetadata{
@@ -88,16 +93,6 @@ func (f *FoldersService) RequestUserFolders(
 		WithContext(ctx).
 		Set(); err != nil {
 		return "", log.Err("failed to store request metadata in cache", err)
-	}
-
-	// Check rate limit before making API request
-	if err := f.discogsRateLimiter.CheckUserRateLimit(ctx, user.ID); err != nil {
-		// Clean up cache entry since we can't proceed
-		_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
-			WithHashPattern(API_HASH).
-			WithContext(ctx).
-			Delete()
-		return "", log.Err("rate limit check failed", err)
 	}
 
 	fullURL := fmt.Sprintf(
@@ -162,20 +157,32 @@ func (f *FoldersService) ProcessFoldersResponse(
 
 	keepDiscogIDs, _ := f.extractFolderSyncData(folders)
 
+	// Execute folder upsert
 	err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
-		if err = f.repos.Folder.UpsertFolders(txCtx, tx, metadata.UserID, folders); err != nil {
-			return log.Err("failed to upsert folders", err)
-		}
+		return f.repos.Folder.UpsertFolders(txCtx, tx, metadata.UserID, folders)
+	})
+	if err != nil {
+		return log.Err("failed to upsert folders", err,
+			"userID", metadata.UserID,
+			"requestID", metadata.RequestID)
+	}
 
-		if err = f.repos.Folder.DeleteOrphanFolders(txCtx, tx, metadata.UserID, keepDiscogIDs); err != nil {
-			return log.Err("failed to delete orphan folders", err)
-		}
+	// Execute orphan cleanup in separate transaction
+	err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
+		return f.repos.Folder.DeleteOrphanFolders(txCtx, tx, metadata.UserID, keepDiscogIDs)
+	})
+	if err != nil {
+		return log.Err("failed to delete orphan folders", err,
+			"userID", metadata.UserID,
+			"requestID", metadata.RequestID)
+	}
 
-		// Set default selected folder to Uncategorized (folder 1) if not set
+	// Update user config in separate transaction
+	err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
 		return f.updateUserConfigWithUncategorizedFolderIfNotSet(txCtx, tx, metadata.UserID)
 	})
 	if err != nil {
-		return log.Err("failed to save folders to database", err,
+		return log.Err("failed to update user config with default folder", err,
 			"userID", metadata.UserID,
 			"requestID", metadata.RequestID)
 	}
@@ -258,6 +265,11 @@ func (f *FoldersService) RequestFolderReleases(
 		return "", log.ErrMsg("page number too large (max: 10000)")
 	}
 
+	// Check rate limit before making API request
+	if err := f.discogsRateLimiter.CheckUserRateLimit(ctx, user.ID); err != nil {
+		return "", log.Err("rate limit check failed", err)
+	}
+
 	requestID := uuid.New().String()
 
 	metadata := RequestMetadata{
@@ -275,16 +287,6 @@ func (f *FoldersService) RequestFolderReleases(
 		WithContext(ctx).
 		Set(); err != nil {
 		return "", log.Err("failed to store request metadata in cache", err)
-	}
-
-	// Check rate limit before making API request
-	if err := f.discogsRateLimiter.CheckUserRateLimit(ctx, user.ID); err != nil {
-		// Clean up cache entry since we can't proceed
-		_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
-			WithHashPattern(API_HASH).
-			WithContext(ctx).
-			Delete()
-		return "", log.Err("rate limit check failed", err)
 	}
 
 	fullURL := fmt.Sprintf(
@@ -441,6 +443,12 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		if nextURL, exists := discogsFolderReleasesResponse.Data.Pagination.URLs["next"]; exists &&
 			nextURL != "" {
 
+			// Check rate limit before making pagination API request
+			if err = f.discogsRateLimiter.CheckUserRateLimit(ctx, metadata.UserID); err != nil {
+				log.Warn("Rate limit check failed for pagination request", "error", err)
+				return nil
+			}
+
 			// Create API request using the next URL from pagination
 			requestID := uuid.New().String()
 
@@ -459,17 +467,6 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 				WithContext(ctx).
 				Set(); err != nil {
 				log.Warn("Failed to store pagination request metadata", "error", err)
-				return nil
-			}
-
-			// Check rate limit before making pagination API request
-			if err = f.discogsRateLimiter.CheckUserRateLimit(ctx, metadata.UserID); err != nil {
-				// Clean up cache entry since we can't proceed
-				_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
-					WithHashPattern(API_HASH).
-					WithContext(ctx).
-					Delete()
-				log.Warn("Rate limit check failed for pagination request", "error", err)
 				return nil
 			}
 
@@ -555,29 +552,28 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 			return log.Err("failed to analyze differential sync", err)
 		}
 
-		// Execute only the database operations in transaction
+		// Execute sync operations in focused transaction
 		err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
-			if err = f.executeSyncOperations(txCtx, tx, metadata.UserID, operations); err != nil {
-				return err
-			}
-
-			// Extract basic information from folder releases for immediate data population
-			folderReleases := make([]DiscogsFolderReleaseItem, 0, len(syncState.OriginalReleases))
-			for _, originalRelease := range syncState.OriginalReleases {
-				folderReleases = append(folderReleases, originalRelease)
-			}
-
-			if len(folderReleases) > 0 {
-				if err = f.folderDataExtractionService.ExtractBasicInformation(txCtx, tx, folderReleases); err != nil {
-					log.Warn("Failed to extract basic information", "error", err)
-					// Don't fail the sync for data extraction errors
-				}
-			}
-
-			return nil
+			return f.executeSyncOperations(txCtx, tx, metadata.UserID, operations)
 		})
 		if err != nil {
 			return log.Err("failed to execute differential sync", err)
+		}
+
+		// Extract basic information in separate transaction to avoid long locks
+		folderReleases := make([]DiscogsFolderReleaseItem, 0, len(syncState.OriginalReleases))
+		for _, originalRelease := range syncState.OriginalReleases {
+			folderReleases = append(folderReleases, originalRelease)
+		}
+
+		if len(folderReleases) > 0 {
+			err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
+				return f.folderDataExtractionService.ExtractBasicInformation(txCtx, tx, folderReleases)
+			})
+			if err != nil {
+				log.Warn("Failed to extract basic information", "error", err)
+				// Don't fail the sync for data extraction errors
+			}
 		}
 
 		// Clean up sync state
@@ -1065,6 +1061,81 @@ func (f *FoldersService) updateExistingReleaseImages(
 
 		log.Info("Updated release images", "count", len(imageUpdates))
 	}
+
+	return nil
+}
+
+// TriggerSyncCompletion directly triggers completion of a collection sync
+func (f *FoldersService) TriggerSyncCompletion(ctx context.Context, userID uuid.UUID) error {
+	log := f.log.Function("TriggerSyncCompletion")
+
+	// Get current sync state from cache
+	var syncState CollectionSyncState
+	found, err := database.NewCacheBuilder(f.db.Cache.ClientAPI, userID.String()).
+		WithHashPattern(COLLECTION_SYNC_HASH).
+		WithContext(ctx).
+		Get(&syncState)
+	if err != nil {
+		return log.Err("failed to get sync state from cache", err)
+	}
+	if !found {
+		log.Warn("No active sync state found, completion already processed", "userID", userID)
+		return nil
+	}
+
+	// Check if sync is ready for completion
+	if !syncState.SyncComplete || !syncState.AllReleasesReady {
+		log.Warn("Sync not ready for completion",
+			"userID", userID,
+			"syncComplete", syncState.SyncComplete,
+			"allReleasesReady", syncState.AllReleasesReady)
+		return nil
+	}
+
+	// Analyze what changes need to be made (business logic - outside transaction)
+	var operations *SyncCollectionOperations
+	operations, err = f.analyzeDifferentialSync(
+		ctx,
+		userID,
+		syncState.MergedReleases,
+	)
+	if err != nil {
+		return log.Err("failed to analyze differential sync", err)
+	}
+
+	// Execute sync operations in focused transaction
+	err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
+		return f.executeSyncOperations(txCtx, tx, userID, operations)
+	})
+	if err != nil {
+		return log.Err("failed to execute differential sync", err)
+	}
+
+	// Extract basic information in separate transaction to avoid long locks
+	folderReleases := make([]DiscogsFolderReleaseItem, 0, len(syncState.OriginalReleases))
+	for _, originalRelease := range syncState.OriginalReleases {
+		folderReleases = append(folderReleases, originalRelease)
+	}
+
+	if len(folderReleases) > 0 {
+		err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
+			return f.folderDataExtractionService.ExtractBasicInformation(txCtx, tx, folderReleases)
+		})
+		if err != nil {
+			log.Warn("Failed to extract basic information", "error", err)
+			// Don't fail the sync for data extraction errors
+		}
+	}
+
+	// Clean up sync state
+	_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, userID.String()).
+		WithHashPattern(COLLECTION_SYNC_HASH).
+		WithContext(ctx).
+		Delete()
+
+	log.Info("Collection sync completed successfully",
+		"userID", userID,
+		"totalReleases", len(syncState.MergedReleases))
 
 	return nil
 }
