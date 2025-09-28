@@ -1,6 +1,11 @@
-import { UserManager, UserManagerSettings, User as OidcUser, WebStorageStateStore } from 'oidc-client-ts';
-import { AuthConfig } from 'src/types/User';
-import { FRONTEND_ROUTES } from '@constants/api.constants';
+import {
+  UserManager,
+  UserManagerSettings,
+  User as OidcUser,
+  WebStorageStateStore,
+} from "oidc-client-ts";
+import { AuthConfig } from "src/types/User";
+import { ROUTES } from "@constants/api.constants";
 
 /**
  * Event callback types for OIDC service events
@@ -28,24 +33,26 @@ export class OIDCService {
   /**
    * Discover OIDC configuration from the provider
    */
-  private async discoverOIDCConfiguration(instanceUrl: string): Promise<Record<string, unknown>> {
-    console.debug('Attempting OIDC discovery for:', instanceUrl);
-    
+  private async discoverOIDCConfiguration(
+    instanceUrl: string,
+  ): Promise<Record<string, unknown>> {
+    console.debug("Attempting OIDC discovery for:", instanceUrl);
+
     // Try multiple discovery URL patterns for Zitadel
     const discoveryUrls = [
       `${instanceUrl}/.well-known/openid-configuration`, // Zitadel standard (hyphen)
       `${instanceUrl}/.well-known/openid_configuration`, // Generic OIDC standard (underscore)
       `${instanceUrl}/oidc/v1/.well-known/openid-configuration`, // Zitadel with path prefix
     ];
-    
+
     for (const discoveryUrl of discoveryUrls) {
       try {
         console.debug(`Trying discovery URL: ${discoveryUrl}`);
         const response = await fetch(discoveryUrl);
-        
+
         if (response.ok) {
           const metadata = await response.json();
-          console.debug('OIDC discovery successful:', {
+          console.debug("OIDC discovery successful:", {
             discoveryUrl,
             issuer: metadata.issuer,
             endpoints: {
@@ -53,20 +60,24 @@ export class OIDCService {
               token: metadata.token_endpoint,
               userinfo: metadata.userinfo_endpoint,
               end_session: metadata.end_session_endpoint,
-            }
+            },
           });
-          
+
           return metadata;
         } else {
-          console.debug(`Discovery URL failed: ${discoveryUrl} - ${response.status} ${response.statusText}`);
+          console.debug(
+            `Discovery URL failed: ${discoveryUrl} - ${response.status} ${response.statusText}`,
+          );
         }
       } catch (error) {
         console.debug(`Discovery URL error: ${discoveryUrl} -`, error);
       }
     }
-    
-    console.warn('All OIDC discovery URLs failed, falling back to Zitadel endpoints');
-    
+
+    console.warn(
+      "All OIDC discovery URLs failed, falling back to Zitadel endpoints",
+    );
+
     // Fallback to hardcoded Zitadel endpoints
     return {
       issuer: instanceUrl,
@@ -83,40 +94,44 @@ export class OIDCService {
    */
   async initialize(config: AuthConfig): Promise<void> {
     if (!config.configured || !config.clientId || !config.instanceUrl) {
-      throw new Error('OIDC configuration is incomplete');
+      throw new Error("OIDC configuration is incomplete");
     }
 
     // Validate URLs to prevent "Invalid URL" constructor errors
     try {
       new URL(config.instanceUrl);
-      new URL(`${window.location.origin}${FRONTEND_ROUTES.CALLBACK}`);
-      new URL(`${window.location.origin}${FRONTEND_ROUTES.SILENT_CALLBACK}`);
-      new URL(`${window.location.origin}${FRONTEND_ROUTES.LOGIN}`);
+      new URL(`${window.location.origin}${ROUTES.CALLBACK}`);
+      new URL(`${window.location.origin}${ROUTES.SILENT_CALLBACK}`);
+      new URL(`${window.location.origin}${ROUTES.LOGIN}`);
     } catch (error) {
-      throw new Error(`Invalid URL in OIDC configuration: ${error instanceof Error ? error.message : 'Unknown URL error'}`);
+      throw new Error(
+        `Invalid URL in OIDC configuration: ${error instanceof Error ? error.message : "Unknown URL error"}`,
+      );
     }
 
     this.config = config;
 
     // Discover OIDC endpoints dynamically
-    const discoveredMetadata = await this.discoverOIDCConfiguration(config.instanceUrl);
+    const discoveredMetadata = await this.discoverOIDCConfiguration(
+      config.instanceUrl,
+    );
 
     const settings: UserManagerSettings = {
       // Core OIDC settings
       authority: config.instanceUrl,
       client_id: config.clientId,
-      redirect_uri: `${window.location.origin}${FRONTEND_ROUTES.CALLBACK}`,
-      post_logout_redirect_uri: `${window.location.origin}${FRONTEND_ROUTES.LOGIN}`,
-      response_type: 'code',
-      scope: 'openid profile email offline_access',
+      redirect_uri: `${window.location.origin}${ROUTES.CALLBACK}`,
+      post_logout_redirect_uri: `${window.location.origin}${ROUTES.LOGIN}`,
+      response_type: "code",
+      scope: "openid profile email offline_access",
 
       // Security settings
       automaticSilentRenew: true, // Automatic token refresh
       includeIdTokenInSilentRenew: true,
-      silent_redirect_uri: `${window.location.origin}${FRONTEND_ROUTES.SILENT_CALLBACK}`,
+      silent_redirect_uri: `${window.location.origin}${ROUTES.SILENT_CALLBACK}`,
 
       // PKCE (Proof Key for Code Exchange) for enhanced security
-      response_mode: 'query',
+      response_mode: "query",
       loadUserInfo: false, // We'll get user info from our backend
 
       // Secure token storage - use sessionStorage for better security
@@ -132,7 +147,7 @@ export class OIDCService {
     };
 
     try {
-      console.debug('Creating UserManager with settings:', {
+      console.debug("Creating UserManager with settings:", {
         authority: settings.authority,
         client_id: settings.client_id,
         redirect_uri: settings.redirect_uri,
@@ -143,11 +158,13 @@ export class OIDCService {
 
       // Set up event handlers
       this.setupEventHandlers();
-      
-      console.debug('OIDC UserManager created successfully');
+
+      console.debug("OIDC UserManager created successfully");
     } catch (error) {
       this.userManager = null;
-      throw new Error(`Failed to create OIDC UserManager: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to create OIDC UserManager: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   }
 
@@ -159,12 +176,12 @@ export class OIDCService {
 
     // Token renewed successfully
     this.userManager.events.addAccessTokenExpiring(() => {
-      console.debug('Access token expiring, attempting renewal...');
+      console.debug("Access token expiring, attempting renewal...");
     });
 
     // Token expired - trigger logout if automatic renewal fails
     this.userManager.events.addAccessTokenExpired(() => {
-      console.warn('Access token expired - triggering logout');
+      console.warn("Access token expired - triggering logout");
       if (this.eventCallbacks.onTokenExpired) {
         this.eventCallbacks.onTokenExpired();
       }
@@ -172,15 +189,17 @@ export class OIDCService {
 
     // Silent renewal failed - trigger logout
     this.userManager.events.addSilentRenewError((error) => {
-      console.error('Silent token renewal failed - triggering logout:', error);
+      console.error("Silent token renewal failed - triggering logout:", error);
       if (this.eventCallbacks.onSilentRenewError) {
-        this.eventCallbacks.onSilentRenewError(new Error(error.message || 'Silent renewal failed'));
+        this.eventCallbacks.onSilentRenewError(
+          new Error(error.message || "Silent renewal failed"),
+        );
       }
     });
 
     // User loaded successfully
     this.userManager.events.addUserLoaded((user) => {
-      console.debug('User loaded from OIDC:', {
+      console.debug("User loaded from OIDC:", {
         sub: user.profile.sub,
         exp: user.expires_at,
         scopes: user.scopes,
@@ -189,12 +208,12 @@ export class OIDCService {
 
     // User session terminated
     this.userManager.events.addUserUnloaded(() => {
-      console.debug('User session terminated');
+      console.debug("User session terminated");
     });
 
     // User signed out
     this.userManager.events.addUserSignedOut(() => {
-      console.debug('User signed out - triggering logout callback');
+      console.debug("User signed out - triggering logout callback");
       if (this.eventCallbacks.onUserSignedOut) {
         this.eventCallbacks.onUserSignedOut();
       }
@@ -206,7 +225,7 @@ export class OIDCService {
    */
   async getUser(): Promise<OidcUser | null> {
     if (!this.userManager) {
-      console.warn('OIDC service not initialized - getUser() called too early');
+      console.warn("OIDC service not initialized - getUser() called too early");
       return null;
     }
 
@@ -214,7 +233,7 @@ export class OIDCService {
       const user = await this.userManager.getUser();
       return user;
     } catch (error) {
-      console.error('Failed to get user from OIDC:', error);
+      console.error("Failed to get user from OIDC:", error);
       return null;
     }
   }
@@ -232,7 +251,9 @@ export class OIDCService {
    */
   async isAuthenticated(): Promise<boolean> {
     if (!this.userManager) {
-      console.warn('OIDC service not initialized - isAuthenticated() called too early');
+      console.warn(
+        "OIDC service not initialized - isAuthenticated() called too early",
+      );
       return false;
     }
 
@@ -245,7 +266,7 @@ export class OIDCService {
    */
   async signInRedirect(): Promise<void> {
     if (!this.userManager) {
-      throw new Error('OIDC service not initialized');
+      throw new Error("OIDC service not initialized");
     }
 
     try {
@@ -254,8 +275,8 @@ export class OIDCService {
         state: { timestamp: Date.now() },
       });
     } catch (error) {
-      console.error('Failed to start sign-in redirect:', error);
-      throw new Error('Failed to initiate authentication');
+      console.error("Failed to start sign-in redirect:", error);
+      throw new Error("Failed to initiate authentication");
     }
   }
 
@@ -264,22 +285,22 @@ export class OIDCService {
    */
   async signInRedirectCallback(): Promise<OidcUser> {
     if (!this.userManager) {
-      throw new Error('OIDC service not initialized');
+      throw new Error("OIDC service not initialized");
     }
 
     try {
       const user = await this.userManager.signinRedirectCallback();
-      
+
       if (!user) {
-        throw new Error('No user returned from callback');
+        throw new Error("No user returned from callback");
       }
 
       // Validate that we have required tokens
       if (!user.access_token) {
-        throw new Error('No access token received');
+        throw new Error("No access token received");
       }
 
-      console.debug('Authentication callback successful', {
+      console.debug("Authentication callback successful", {
         sub: user.profile.sub,
         exp: user.expires_at,
         scopes: user.scopes,
@@ -287,8 +308,8 @@ export class OIDCService {
 
       return user;
     } catch (error) {
-      console.error('OIDC callback failed:', error);
-      throw new Error('Authentication callback failed');
+      console.error("OIDC callback failed:", error);
+      throw new Error("Authentication callback failed");
     }
   }
 
@@ -297,7 +318,7 @@ export class OIDCService {
    */
   async signOut(): Promise<void> {
     if (!this.userManager) {
-      throw new Error('OIDC service not initialized');
+      throw new Error("OIDC service not initialized");
     }
 
     try {
@@ -306,7 +327,7 @@ export class OIDCService {
         state: { timestamp: Date.now() },
       });
     } catch (error) {
-      console.error('Failed to sign out:', error);
+      console.error("Failed to sign out:", error);
       // Fallback: clear local session even if remote logout fails
       await this.userManager.removeUser();
       throw error;
@@ -318,13 +339,13 @@ export class OIDCService {
    */
   async clearUserSession(): Promise<void> {
     if (!this.userManager) {
-      throw new Error('OIDC service not initialized');
+      throw new Error("OIDC service not initialized");
     }
 
     try {
       await this.userManager.removeUser();
     } catch (error) {
-      console.error('Failed to clear user session:', error);
+      console.error("Failed to clear user session:", error);
       throw error;
     }
   }
@@ -334,13 +355,13 @@ export class OIDCService {
    */
   async signInSilentCallback(): Promise<void> {
     if (!this.userManager) {
-      throw new Error('OIDC service not initialized');
+      throw new Error("OIDC service not initialized");
     }
 
     try {
       await this.userManager.signinSilentCallback();
     } catch (error) {
-      console.error('Silent renewal callback failed:', error);
+      console.error("Silent renewal callback failed:", error);
       throw error;
     }
   }
@@ -350,14 +371,14 @@ export class OIDCService {
    */
   async renewToken(): Promise<OidcUser | null> {
     if (!this.userManager) {
-      throw new Error('OIDC service not initialized');
+      throw new Error("OIDC service not initialized");
     }
 
     try {
       const user = await this.userManager.signinSilent();
       return user;
     } catch (error) {
-      console.error('Manual token renewal failed:', error);
+      console.error("Manual token renewal failed:", error);
       return null;
     }
   }
@@ -398,13 +419,16 @@ export class OIDCService {
     const expiresAt = user.expires_at || 0;
     const bufferSeconds = 5 * 60; // 5 minutes
 
-    return (expiresAt - now) <= bufferSeconds;
+    return expiresAt - now <= bufferSeconds;
   }
 
   /**
    * Get token expiry information
    */
-  async getTokenExpiry(): Promise<{ expiresAt: number; expiresInSeconds: number } | null> {
+  async getTokenExpiry(): Promise<{
+    expiresAt: number;
+    expiresInSeconds: number;
+  } | null> {
     const user = await this.getUser();
     if (!user || !user.expires_at) return null;
 
@@ -420,3 +444,4 @@ export class OIDCService {
 
 // Export singleton instance
 export const oidcService = new OIDCService();
+

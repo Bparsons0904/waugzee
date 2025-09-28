@@ -2,42 +2,29 @@
 @import "../../styles/colors";
 
 .folderSelector {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-md;
-  background: $bg-surface;
-  border: $border-width-thin solid $border-default;
-  border-radius: $border-radius-lg;
-  padding: $spacing-lg;
   position: relative;
 }
 
-.selectorHeader {
+.compactWrapper {
   display: flex;
-  flex-direction: column;
-  gap: $spacing-xs;
-  margin-bottom: $spacing-sm;
-
-  @media (min-width: $breakpoint-sm) {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
-}
-
-.selectorTitle {
-  font-size: $font-size-lg;
-  font-weight: $font-weight-semibold;
-  margin: 0;
-  color: $text-default;
-}
-
-.currentSelection {
+  align-items: center;
+  gap: $spacing-md;
   font-size: $font-size-sm;
+}
+
+.dropdownLabel {
   color: $text-muted;
+  font-weight: $font-weight-medium;
+  white-space: nowrap;
+}
+
+.currentViewing {
   display: flex;
   align-items: center;
   gap: $spacing-xs;
+  color: $text-muted;
+  font-size: $font-size-sm;
+  white-space: nowrap;
 
   strong {
     color: $text-default;
@@ -45,109 +32,31 @@
   }
 }
 
-.folderCount {
-  color: $text-subtle;
+.placeholder {
+  color: $text-light;
+  font-style: italic;
+}
+
+.itemCount {
+  color: $text-light;
   font-weight: $font-weight-normal;
 }
 
-// Grid layout for detailed view
-.folderGrid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: $spacing-md;
 
-  @media (min-width: $breakpoint-sm) {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  }
-}
-
-.folderCard {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: $spacing-md;
-  background: $bg-surface;
-  border: $border-width-thin solid $border-default;
-  border-radius: $border-radius-md;
-  transition: all $transition-fast $transition-timing-default;
-  min-height: 80px;
-
-  &:hover {
-    border-color: $border-strong;
-    background: $bg-elevated;
-  }
-}
-
-.folderCardSelected {
-  border-color: $color-primary-500;
-  background: rgba($color-primary-50, 0.5);
-
-  &:hover {
-    border-color: $color-primary-600;
-    background: rgba($color-primary-100, 0.5);
-  }
-}
-
-.folderInfo {
-  flex: 1;
-  min-width: 0;
-}
-
-.folderName {
-  font-size: $font-size-md;
-  font-weight: $font-weight-medium;
-  margin: 0 0 $spacing-xs 0;
-  color: $text-default;
-  word-break: break-word;
-}
-
-.folderMeta {
-  font-size: $font-size-sm;
-  color: $text-muted;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-}
-
-.publicBadge {
-  background: $color-success-100;
-  color: $color-success-700;
-  font-size: $font-size-xs;
-  font-weight: $font-weight-medium;
-  padding: $spacing-xs $spacing-sm;
-  border-radius: $border-radius-sm;
-  text-transform: uppercase;
-  letter-spacing: $letter-spacing-wide;
-}
-
-.selectedBadge {
-  display: flex;
-  align-items: center;
-  gap: $spacing-xs;
-  color: $color-primary-600;
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
-
-  svg {
-    flex-shrink: 0;
-  }
-}
-
-// Compact selector view
 .compactSelector {
   position: relative;
   display: flex;
   align-items: center;
+  min-width: 200px;
 }
 
 .folderSelect {
   width: 100%;
-  padding: $spacing-sm $spacing-xl $spacing-sm $spacing-md;
+  padding: $spacing-xs $spacing-lg $spacing-xs $spacing-sm;
   background-color: $bg-surface;
   border: $border-width-thin solid $border-default;
-  border-radius: $border-radius-md;
-  font-size: $font-size-md;
+  border-radius: $border-radius-sm;
+  font-size: $font-size-sm;
   color: $text-default;
   cursor: pointer;
   appearance: none;
@@ -161,13 +70,14 @@
   &:focus {
     outline: none;
     border-color: $color-primary-500;
-    box-shadow: 0 0 0 3px rgba($color-primary-500, 0.2);
+    box-shadow: 0 0 0 2px rgba($color-primary-500, 0.15);
   }
 
   &:disabled {
     background-color: $bg-disabled;
     color: $text-disabled;
     cursor: not-allowed;
+    opacity: 0.6;
   }
 
   // Hide default arrow in IE
@@ -178,7 +88,7 @@
 
 .selectIcon {
   position: absolute;
-  right: $spacing-md;
+  right: $spacing-sm;
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
@@ -186,7 +96,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color $transition-normal;
+  transition: color $transition-fast;
 
   .folderSelect:focus + & {
     color: $text-default;
@@ -197,56 +107,28 @@
   }
 }
 
-// No folders state
-.noFolders {
-  text-align: center;
-  padding: $spacing-2xl;
-  color: $text-muted;
-}
-
-.noFoldersText {
-  font-size: $font-size-lg;
-  font-weight: $font-weight-medium;
-  margin: 0 0 $spacing-sm 0;
-  color: $text-default;
-}
-
-.noFoldersSubtext {
-  font-size: $font-size-sm;
-  margin: 0;
-  color: $text-muted;
-}
-
-// Loading state
-.loadingOverlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba($bg-surface, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-md;
-  border-radius: $border-radius-lg;
-  backdrop-filter: blur(2px);
-}
-
-.spinner {
-  width: 20px;
-  height: 20px;
+.loadingSpinner {
+  width: 14px;
+  height: 14px;
   border: 2px solid $border-default;
   border-top-color: $color-primary-500;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
-.loadingText {
-  font-size: $font-size-sm;
+.noFolders {
+  display: flex;
+  align-items: center;
+  padding: $spacing-sm;
   color: $text-muted;
-  font-weight: $font-weight-medium;
+  font-size: $font-size-sm;
 }
+
+.noFoldersText {
+  margin: 0;
+  font-style: italic;
+}
+
 
 @keyframes spin {
   to {
@@ -254,34 +136,135 @@
   }
 }
 
+// ====================
+// Navbar Mode Styles
+// ====================
+
+.navbarMode {
+  position: relative;
+}
+
+.navbarSelector {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 160px;
+}
+
+.navbarSelect {
+  width: 100%;
+  padding: $spacing-xs $spacing-lg $spacing-xs $spacing-sm;
+  background-color: rgba($bg-surface, 0.8);
+  backdrop-filter: blur(8px);
+  border: $border-width-thin solid rgba($border-default, 0.6);
+  border-radius: $border-radius-md;
+  font-size: $font-size-sm;
+  color: $text-default;
+  cursor: pointer;
+  appearance: none;
+  transition: all $transition-fast $transition-timing-default;
+  font-weight: $font-weight-medium;
+
+  &:hover {
+    background-color: rgba($bg-surface, 0.95);
+    border-color: rgba($border-strong, 0.8);
+    box-shadow: $shadow-sm;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $color-primary-500;
+    box-shadow: 0 0 0 2px rgba($color-primary-500, 0.15);
+    background-color: $bg-surface;
+  }
+
+  &:disabled {
+    background-color: rgba($bg-disabled, 0.6);
+    color: $text-disabled;
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  // Hide default arrow in IE
+  &::-ms-expand {
+    display: none;
+  }
+
+  // Modern option styling
+  option {
+    background-color: $bg-surface;
+    color: $text-default;
+    padding: $spacing-xs;
+  }
+}
+
+.navbarSelectIcon {
+  position: absolute;
+  right: $spacing-sm;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: $text-muted;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-fast;
+
+  .navbarSelect:focus + & {
+    color: $color-primary-500;
+  }
+
+  .navbarSelect:disabled + & {
+    color: $text-disabled;
+  }
+
+  svg {
+    transition: transform $transition-fast;
+  }
+
+  .navbarSelect:focus + & svg {
+    transform: rotate(180deg);
+  }
+}
+
+.navbarLoadingSpinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba($border-default, 0.3);
+  border-top-color: $color-primary-500;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
 // Responsive adjustments
 @media (max-width: $breakpoint-sm) {
-  .folderSelector {
-    padding: $spacing-md;
-  }
-
-  .folderCard {
+  .compactWrapper {
     flex-direction: column;
     align-items: stretch;
-    gap: $spacing-md;
-    text-align: center;
-    min-height: auto;
+    gap: $spacing-sm;
   }
 
-  .folderInfo {
-    order: 1;
-  }
-
-  .selectedBadge {
+  .currentViewing {
     justify-content: center;
-    order: 2;
-  }
-
-  .selectorHeader {
     text-align: center;
   }
 
-  .currentSelection {
-    justify-content: center;
+  .compactSelector {
+    min-width: auto;
+    width: 100%;
+  }
+
+  .dropdownLabel {
+    text-align: center;
+  }
+
+  // Navbar responsive adjustments
+  .navbarSelector {
+    min-width: 120px;
+  }
+
+  .navbarSelect {
+    font-size: $font-size-xs;
+    padding: $spacing-xs $spacing-md $spacing-xs $spacing-xs;
   }
 }

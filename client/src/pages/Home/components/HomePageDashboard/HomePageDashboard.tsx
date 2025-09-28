@@ -2,7 +2,7 @@ import { Component, createSignal, onMount } from "solid-js";
 import { A } from "@solidjs/router";
 import { useAuth } from "@context/AuthContext";
 import { Button } from "@components/common/ui/Button/Button";
-import { FRONTEND_ROUTES } from "@constants/api.constants";
+import { ROUTES } from "@constants/api.constants";
 import styles from "./HomePageDashboard.module.scss";
 
 interface DashboardStats {
@@ -238,7 +238,7 @@ const HomePageDashboard: Component = () => {
               Discover new insights about your listening habits and collection
               patterns.
             </p>
-            <A href={FRONTEND_ROUTES.DASHBOARD} class={styles.ctaLink}>
+            <A href={ROUTES.DASHBOARD} class={styles.ctaLink}>
               <Button variant="gradient" size="lg">
                 Go to Full Dashboard
               </Button>
@@ -251,4 +251,3 @@ const HomePageDashboard: Component = () => {
 };
 
 export default HomePageDashboard;
-

@@ -5,9 +5,9 @@
 
 // Base API paths
 export const API_PATHS = {
-  AUTH: '/auth',
-  USERS: '/users',
-  HEALTH: '/health',
+  AUTH: "/auth",
+  USERS: "/users",
+  HEALTH: "/health",
 } as const;
 
 // Authentication endpoints
@@ -31,15 +31,17 @@ export const HEALTH_ENDPOINTS = {
   CHECK: API_PATHS.HEALTH,
 } as const;
 
-
 // Frontend route constants (for consistency with backend auth routes)
-export const FRONTEND_ROUTES = {
-  HOME: '/',
-  LOGIN: '/auth/login',
-  CALLBACK: '/auth/callback',
-  SILENT_CALLBACK: '/auth/silentCallback',
-  DASHBOARD: '/dashboard',
-  PROFILE: '/profile',
+export const ROUTES = {
+  HOME: "/",
+  LOGIN: "/auth/login",
+  CALLBACK: "/auth/callback",
+  SILENT_CALLBACK: "/auth/silentCallback",
+  PROFILE: "/profile",
+  LOG_PLAY: "/log",
+  COLLECTION: "/collection",
+  PLAY_HISTORY: "/playHistory",
+  EQUIPMENT: "/equipment",
 } as const;
 
 // Error retry configuration
@@ -55,3 +57,4 @@ export const TOKEN_CONFIG = {
   EXPIRY_BUFFER_MINUTES: 5, // Refresh token 5 minutes before expiry
   MAX_RETRY_ATTEMPTS: 2,
 } as const;
+

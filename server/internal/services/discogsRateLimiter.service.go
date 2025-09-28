@@ -24,9 +24,9 @@ const (
 	THROTTLE_DELAY_HIGH       = 2 * time.Second // 75-100% capacity delay
 
 	// Rate limiting safety thresholds
-	MIN_CONTEXT_DEADLINE     = 5 * time.Second   // Minimum time required for rate limit processing
+	MIN_CONTEXT_DEADLINE     = 5 * time.Second        // Minimum time required for rate limit processing
 	RETRY_CALCULATION_BUFFER = 100 * time.Millisecond // Buffer added to retry calculations
-	MAX_RETRY_WAIT          = 30 * time.Second   // Maximum time to wait for rate limit slot
+	MAX_RETRY_WAIT           = 30 * time.Second       // Maximum time to wait for rate limit slot
 )
 
 type DiscogsRateLimiterService struct {
@@ -276,3 +276,4 @@ func (d *DiscogsRateLimiterService) GetUserRateLimitStatus(
 
 	return int(count), DISCOGS_RATE_LIMIT, nil
 }
+

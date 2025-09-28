@@ -14,6 +14,7 @@ import {
 import { syncService } from "@services/sync.service";
 import { useToast } from "@context/ToastContext";
 import styles from "./Home.module.scss";
+import { ROUTES } from "@constants/api.constants";
 
 interface DashboardStats {
   totalRecords: number;
@@ -38,24 +39,8 @@ const Home: Component = () => {
   const [syncStatus, setSyncStatus] = createSignal<string>("");
   const [isSyncing, setIsSyncing] = createSignal(false);
 
-  // const hasDiscogsToken = user()?.discogsToken;
-  //
-  // console.log("hasDiscogsToken:", hasDiscogsToken);
-
-  const handleLogPlay = () => {
-    navigate("/log");
-  };
-
-  const handleViewCollection = () => {
-    navigate("/collection");
-  };
-
-  const handleViewPlayHistory = () => {
-    navigate("/playHistory");
-  };
-
-  const handleViewStyluses = () => {
-    navigate("/equipment");
+  const handleNavigation = (route: string) => {
+    navigate(route);
   };
 
   const handleSyncCollection = async () => {
@@ -122,25 +107,25 @@ const Home: Component = () => {
       title: "Log Play",
       description: "Record when you play a record from your collection.",
       buttonText: "Log Now",
-      onClick: handleLogPlay,
+      onClick: () => handleNavigation(ROUTES.LOG_PLAY),
     },
     {
       title: "View Play History",
       description: "View your play history and listening statistics.",
       buttonText: "View Stats",
-      onClick: handleViewPlayHistory,
+      onClick: () => handleNavigation(ROUTES.PLAY_HISTORY),
     },
     {
       title: "View Collection",
       description: "Browse and search through your vinyl collection.",
       buttonText: "View Collection",
-      onClick: handleViewCollection,
+      onClick: () => handleNavigation(ROUTES.COLLECTION),
     },
     {
       title: "View Styluses",
       description: "View, edit and add styluses to track wear.",
       buttonText: "View Styluses",
-      onClick: handleViewStyluses,
+      onClick: () => handleNavigation(ROUTES.EQUIPMENT),
     },
     {
       title: "Sync Collection",
@@ -195,7 +180,9 @@ const Home: Component = () => {
           class={styles.primaryButton}
           onClick={() => setShowTokenModal(true)}
         >
-          {user()?.configuration?.discogsToken ? "Update Discogs Token" : "Connect Discogs"}
+          {user()?.configuration?.discogsToken
+            ? "Update Discogs Token"
+            : "Connect Discogs"}
         </button>
       </div>
 

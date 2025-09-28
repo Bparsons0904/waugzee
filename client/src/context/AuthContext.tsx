@@ -8,13 +8,18 @@ import {
   onCleanup,
 } from "solid-js";
 import { createStore } from "solid-js/store";
-import { User, AuthConfig, Folder, UserWithFoldersResponse } from "src/types/User";
+import {
+  User,
+  AuthConfig,
+  Folder,
+  UserWithFoldersResponse,
+} from "src/types/User";
 import { api, setTokenGetter } from "@services/api";
 import { oidcService } from "@services/oidc.service";
 import {
   AUTH_ENDPOINTS,
   USER_ENDPOINTS,
-  FRONTEND_ROUTES,
+  ROUTES,
 } from "@constants/api.constants";
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -93,7 +98,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       error: null,
     });
 
-    navigate(FRONTEND_ROUTES.LOGIN);
+    navigate(ROUTES.LOGIN);
   };
 
   createEffect(async () => {
@@ -204,9 +209,12 @@ export function AuthProvider(props: { children: JSX.Element }) {
         }
 
         // Get user info from backend
-        const response = await api.get<UserWithFoldersResponse>(USER_ENDPOINTS.ME, {
-          signal: controller.signal,
-        });
+        const response = await api.get<UserWithFoldersResponse>(
+          USER_ENDPOINTS.ME,
+          {
+            signal: controller.signal,
+          },
+        );
 
         if (!cancelled && response?.user) {
           console.info("Authentication successful", {
@@ -323,7 +331,9 @@ export function AuthProvider(props: { children: JSX.Element }) {
       }
 
       // Finally, get the user info from our backend (which should now exist)
-      const response = await api.get<UserWithFoldersResponse>(USER_ENDPOINTS.ME);
+      const response = await api.get<UserWithFoldersResponse>(
+        USER_ENDPOINTS.ME,
+      );
 
       if (response?.user) {
         setAuthState({
@@ -334,7 +344,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           error: null,
         });
 
-        navigate(FRONTEND_ROUTES.HOME);
+        navigate(ROUTES.HOME);
       } else {
         throw new Error("Failed to get user info from backend after callback");
       }
@@ -375,7 +385,9 @@ export function AuthProvider(props: { children: JSX.Element }) {
     }
 
     try {
-      const response = await api.get<UserWithFoldersResponse>(USER_ENDPOINTS.ME);
+      const response = await api.get<UserWithFoldersResponse>(
+        USER_ENDPOINTS.ME,
+      );
 
       if (response?.user) {
         setAuthState("user", response.user);

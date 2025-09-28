@@ -2,7 +2,8 @@ import { Component, Match, Switch } from "solid-js";
 import { A } from "@solidjs/router";
 import styles from "./NavBar.module.scss";
 import { useAuth } from "@context/AuthContext";
-import { FRONTEND_ROUTES } from "@constants/api.constants";
+import { ROUTES } from "@constants/api.constants";
+import { FolderSelector } from "@components/folders";
 
 export const NavBar: Component = () => {
   const { isAuthenticated, logout } = useAuth();
@@ -12,7 +13,7 @@ export const NavBar: Component = () => {
       <nav class={styles.navbar}>
         <div class={styles.navbarContainer}>
           <div class={styles.navbarLogo}>
-            <A href={FRONTEND_ROUTES.HOME} class={styles.navbarTitle}>
+            <A href={ROUTES.HOME} class={styles.navbarTitle}>
               Waugzee
             </A>
           </div>
@@ -32,25 +33,7 @@ export const NavBar: Component = () => {
                 <Match when={isAuthenticated()}>
                   <li class={styles.navbarItem}>
                     <A
-                      href="/workstation"
-                      class={styles.navbarLink}
-                      activeClass={styles.active}
-                    >
-                      Workstation
-                    </A>
-                  </li>
-                  <li class={styles.navbarItem}>
-                    <A
-                      href="/loadtest"
-                      class={styles.navbarLink}
-                      activeClass={styles.active}
-                    >
-                      Load Test
-                    </A>
-                  </li>
-                  <li class={styles.navbarItem}>
-                    <A
-                      href={FRONTEND_ROUTES.PROFILE}
+                      href={ROUTES.PROFILE}
                       class={styles.navbarLink}
                       activeClass={styles.active}
                     >
@@ -68,11 +51,23 @@ export const NavBar: Component = () => {
                   {/* </li> */}
                 </Match>
               </Switch>
+            </ul>
+
+            {/* Folder Selector for authenticated users */}
+            <Switch>
+              <Match when={isAuthenticated()}>
+                <div class={styles.navbarFolderSelector}>
+                  <FolderSelector navbar showCounts />
+                </div>
+              </Match>
+            </Switch>
+
+            <ul class={styles.navbarActions}>
               <li class={styles.navbarItem}>
                 <Switch>
                   <Match when={!isAuthenticated()}>
                     <A
-                      href={FRONTEND_ROUTES.LOGIN}
+                      href={ROUTES.LOGIN}
                       class={styles.navbarLink}
                       activeClass={styles.active}
                     >
@@ -80,7 +75,11 @@ export const NavBar: Component = () => {
                     </A>
                   </Match>
                   <Match when={isAuthenticated()}>
-                    <A href={FRONTEND_ROUTES.HOME} class={styles.navbarLink} onClick={logout}>
+                    <A
+                      href={ROUTES.HOME}
+                      class={styles.navbarLink}
+                      onClick={logout}
+                    >
                       Logout
                     </A>
                   </Match>
