@@ -134,9 +134,8 @@ func (r *folderRepository) GetUserFolders(
 ) ([]*Folder, error) {
 	log := r.log.Function("GetUserFolders")
 
-	// Try to get from cache first
 	var cachedFolders []*Folder
-	found, err := database.NewCacheBuilder(r.cache.Cache.User, userID.String()).
+	found, err := database.NewCacheBuilder(r.cache.Cache.User, userID).
 		WithContext(ctx).
 		WithHash(constants.UserFoldersCachePrefix).
 		Get(&cachedFolders)
@@ -153,8 +152,7 @@ func (r *folderRepository) GetUserFolders(
 		return nil, log.Err("failed to get user folders", err, "userID", userID)
 	}
 
-	// Cache the folders
-	if err := database.NewCacheBuilder(r.cache.Cache.User, userID.String()).
+	if err := database.NewCacheBuilder(r.cache.Cache.User, userID).
 		WithContext(ctx).
 		WithHash(constants.UserFoldersCachePrefix).
 		WithStruct(folders).
