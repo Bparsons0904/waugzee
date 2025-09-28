@@ -3,7 +3,10 @@ import { USER_ENDPOINTS } from '../constants/api.constants';
 import type {
   User,
   UpdateDiscogsTokenRequest,
-  UpdateDiscogsTokenResponse
+  UpdateDiscogsTokenResponse,
+  UpdateSelectedFolderRequest,
+  UpdateSelectedFolderResponse,
+  UserWithFoldersResponse
 } from '../types/User';
 
 /**
@@ -11,10 +14,10 @@ import type {
  */
 export class UserService {
   /**
-   * Get current user profile
+   * Get current user profile with folders
    */
-  static async getCurrentUser(): Promise<{ user: User }> {
-    return api.get<{ user: User }>(USER_ENDPOINTS.ME);
+  static async getCurrentUser(): Promise<UserWithFoldersResponse> {
+    return api.get<UserWithFoldersResponse>(USER_ENDPOINTS.ME);
   }
 
   /**
@@ -25,8 +28,18 @@ export class UserService {
   ): Promise<UpdateDiscogsTokenResponse> {
     return api.put<UpdateDiscogsTokenResponse>(USER_ENDPOINTS.ME_DISCOGS, request);
   }
+
+  /**
+   * Update user's selected folder
+   */
+  static async updateSelectedFolder(
+    request: UpdateSelectedFolderRequest
+  ): Promise<UpdateSelectedFolderResponse> {
+    return api.put<UpdateSelectedFolderResponse>(USER_ENDPOINTS.ME_FOLDER, request);
+  }
 }
 
 // Export individual functions for convenience
 export const getCurrentUser = UserService.getCurrentUser;
 export const updateDiscogsToken = UserService.updateDiscogsToken;
+export const updateSelectedFolder = UserService.updateSelectedFolder;

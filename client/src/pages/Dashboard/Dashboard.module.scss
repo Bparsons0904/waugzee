@@ -177,3 +177,18 @@
   margin: 0;
   line-height: $line-height-normal;
 }
+
+.settingsPlaceholder {
+  background: $bg-surface;
+  border-radius: $border-radius-lg;
+  padding: $spacing-xl;
+  text-align: center;
+  border: $border-width-thin solid $border-default;
+}
+
+.placeholderText {
+  color: $text-muted;
+  margin-bottom: $spacing-lg;
+  font-size: $font-size-md;
+  line-height: $line-height-normal;
+}

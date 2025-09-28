@@ -22,6 +22,7 @@ export const USER_ENDPOINTS = {
   LIST: API_PATHS.USERS,
   ME: `${API_PATHS.USERS}/me`,
   ME_DISCOGS: `${API_PATHS.USERS}/me/discogs`,
+  ME_FOLDER: `${API_PATHS.USERS}/me/folder`,
   PROFILE: (id: string) => `${API_PATHS.USERS}/${id}`,
 } as const;
 

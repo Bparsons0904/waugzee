@@ -3,7 +3,14 @@ export interface UserConfiguration {
   userId: string;
   discogsToken?: string;
   discogsUsername?: string;
-  selectedFolderId?: string;
+  selectedFolderId?: number;
+}
+
+export interface Folder {
+  id: number;
+  name: string;
+  count: number;
+  public: boolean;
 }
 
 export interface User {
@@ -18,6 +25,11 @@ export interface User {
   lastLoginAt?: string;
   profileVerified: boolean;
   configuration?: UserConfiguration;
+}
+
+export interface UserWithFoldersResponse {
+  user: User;
+  folders: Folder[];
 }
 
 // OIDC Authentication Types
@@ -58,5 +70,13 @@ export interface UpdateDiscogsTokenRequest {
 }
 
 export interface UpdateDiscogsTokenResponse {
+  user: User;
+}
+
+export interface UpdateSelectedFolderRequest {
+  folderId: number;
+}
+
+export interface UpdateSelectedFolderResponse {
   user: User;
 }

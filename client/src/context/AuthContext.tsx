@@ -8,7 +8,7 @@ import {
   onCleanup,
 } from "solid-js";
 import { createStore } from "solid-js/store";
-import { User, AuthConfig } from "src/types/User";
+import { User, AuthConfig, Folder, UserWithFoldersResponse } from "src/types/User";
 import { api, setTokenGetter } from "@services/api";
 import { oidcService } from "@services/oidc.service";
 import {
@@ -38,6 +38,7 @@ interface CallbackResponse {
 type AuthState = {
   status: AuthStatus;
   user: User | null;
+  folders: Folder[];
   token: string | null;
   config: AuthConfig | null;
   configLoading: boolean;
@@ -49,6 +50,7 @@ type AuthContextValue = {
   authState: AuthState;
   isAuthenticated: () => boolean;
   user: () => User | null;
+  folders: () => Folder[];
   authToken: () => string | null;
   authConfig: () => AuthConfig | null;
   loginWithOIDC: () => Promise<void>;
@@ -66,6 +68,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
   const [authState, setAuthState] = createStore<AuthState>({
     status: "loading",
     user: null,
+    folders: [],
     token: null,
     config: null,
     configLoading: true,
@@ -85,6 +88,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
     setAuthState({
       status: "unauthenticated",
       user: null,
+      folders: [],
       token: null,
       error: null,
     });
@@ -200,7 +204,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
         }
 
         // Get user info from backend
-        const response = await api.get<{ user: User }>(USER_ENDPOINTS.ME, {
+        const response = await api.get<UserWithFoldersResponse>(USER_ENDPOINTS.ME, {
           signal: controller.signal,
         });
 
@@ -213,6 +217,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           setAuthState({
             status: "authenticated",
             user: response.user,
+            folders: response.folders || [],
             token: oidcUser.access_token,
             error: null,
           });
@@ -222,6 +227,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           setAuthState({
             status: "unauthenticated",
             user: null,
+            folders: [],
             token: null,
             error: { type: "auth_failed", message: "Failed to get user info" },
           });
@@ -232,6 +238,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
           setAuthState({
             status: "unauthenticated",
             user: null,
+            folders: [],
             token: null,
             error: {
               type: "network",
@@ -316,12 +323,13 @@ export function AuthProvider(props: { children: JSX.Element }) {
       }
 
       // Finally, get the user info from our backend (which should now exist)
-      const response = await api.get<{ user: User }>(USER_ENDPOINTS.ME);
+      const response = await api.get<UserWithFoldersResponse>(USER_ENDPOINTS.ME);
 
       if (response?.user) {
         setAuthState({
           status: "authenticated",
           user: response.user,
+          folders: response.folders || [],
           token: oidcUser.access_token,
           error: null,
         });
@@ -336,6 +344,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       setAuthState({
         status: "unauthenticated",
         user: null,
+        folders: [],
         token: null,
         error: {
           type: "auth_failed",
@@ -366,10 +375,11 @@ export function AuthProvider(props: { children: JSX.Element }) {
     }
 
     try {
-      const response = await api.get<{ user: User }>(USER_ENDPOINTS.ME);
+      const response = await api.get<UserWithFoldersResponse>(USER_ENDPOINTS.ME);
 
       if (response?.user) {
         setAuthState("user", response.user);
+        setAuthState("folders", response.folders || []);
         console.debug("User refreshed successfully");
       } else {
         console.warn("Failed to refresh user - no user data returned");
@@ -438,6 +448,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
         authState,
         isAuthenticated,
         user: () => authState.user,
+        folders: () => authState.folders,
         authToken: () => authState.token,
         authConfig: () => authState.config,
         loginWithOIDC,

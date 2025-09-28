@@ -31,6 +31,10 @@ const Profile: Component = () => {
             <strong>Discogs Token:</strong>{" "}
             {user()?.configuration?.discogsToken ? "Connected" : "Not connected"}
           </p>
+          <p>
+            <strong>Selected Folder:</strong>{" "}
+            {user()?.configuration?.selectedFolderId ? `Folder ID ${user()?.configuration?.selectedFolderId}` : "Not selected"}
+          </p>
         </div>
       </div>
       <div>

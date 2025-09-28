@@ -3,6 +3,7 @@ import { useNavigate } from "@solidjs/router";
 import { useAuth } from "@context/AuthContext";
 import { DiscogsTokenModal } from "@components/common/ui/DiscogsTokenModal/DiscogsTokenModal";
 import { DiscogsFolderSync } from "@components/common/ui/DiscogsFolderSync/DiscogsFolderSync";
+import { FolderSelector } from "@components/folders";
 import { useToast } from "@context/ToastContext";
 import styles from "./Dashboard.module.scss";
 import { Button } from "@components/common/ui/Button/Button";
@@ -150,6 +151,21 @@ const Dashboard: Component = () => {
               </div>
             ))}
           </div>
+        </section>
+
+        <section class={styles.section}>
+          <h2 class={styles.sectionTitle}>Collection Settings</h2>
+
+          <Show when={user()?.configuration?.discogsToken} fallback={
+            <div class={styles.settingsPlaceholder}>
+              <p class={styles.placeholderText}>Connect your Discogs account to manage collection folders</p>
+              <Button variant="primary" onClick={() => setShowTokenModal(true)}>
+                Add Discogs Token
+              </Button>
+            </div>
+          }>
+            <FolderSelector variant="detailed" showCounts={true} />
+          </Show>
         </section>
 
         <section class={styles.section}>
