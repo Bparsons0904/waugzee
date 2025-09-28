@@ -31,7 +31,7 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
     return folders().find((folder) => folder.id === folderId) || null;
   };
 
-  const handleFolderChange = async (folderId: number) => {
+  const handleFolderChange = async (folderId: string) => {
     if (isUpdating()) return;
 
     const currentUserId = user()?.id;
@@ -101,8 +101,8 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
                   value={selectedFolderId() || selectedFolder()?.id || ""}
                   disabled={isUpdating()}
                   onChange={(e) => {
-                    const value = parseInt(e.target.value);
-                    if (!isNaN(value)) {
+                    const value = e.target.value;
+                    if (value) {
                       handleFolderChange(value);
                     }
                   }}
@@ -156,8 +156,8 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
               value={selectedFolderId() || selectedFolder()?.id || ""}
               disabled={isUpdating()}
               onChange={(e) => {
-                const value = parseInt(e.target.value);
-                if (!isNaN(value)) {
+                const value = e.target.value;
+                if (value) {
                   handleFolderChange(value);
                 }
               }}

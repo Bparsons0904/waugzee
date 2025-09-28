@@ -1,6 +1,6 @@
 import { createContext, useContext, JSX, createEffect } from "solid-js";
 import { createSignal } from "solid-js";
-import { User, Folder, UserWithFoldersResponse } from "src/types/User";
+import { User, Folder, UserRelease, UserWithFoldersAndReleasesResponse } from "src/types/User";
 import { useAuth } from "./AuthContext";
 import { useApiQuery } from "@services/apiHooks";
 import { useQueryClient } from "@tanstack/solid-query";
@@ -9,6 +9,7 @@ import { USER_ENDPOINTS } from "@constants/api.constants";
 type UserDataContextValue = {
   user: () => User | null;
   folders: () => Folder[];
+  releases: () => UserRelease[];
   isLoading: () => boolean;
   error: () => string | null;
   updateUser: (user: User) => void;
@@ -23,7 +24,7 @@ export function UserDataProvider(props: { children: JSX.Element }) {
   const auth = useAuth();
   const queryClient = useQueryClient();
 
-  const userQuery = useApiQuery<UserWithFoldersResponse>(
+  const userQuery = useApiQuery<UserWithFoldersAndReleasesResponse>(
     ["user"],
     USER_ENDPOINTS.ME,
     undefined,
@@ -40,7 +41,7 @@ export function UserDataProvider(props: { children: JSX.Element }) {
     // Optimistic update - update cache with new user data
     queryClient.setQueryData(
       ["user"],
-      (oldData: UserWithFoldersResponse | undefined) => {
+      (oldData: UserWithFoldersAndReleasesResponse | undefined) => {
         if (!oldData) return oldData;
         return {
           ...oldData,
@@ -64,6 +65,7 @@ export function UserDataProvider(props: { children: JSX.Element }) {
       value={{
         user: () => userQuery.data?.user || null,
         folders: () => userQuery.data?.folders || [],
+        releases: () => userQuery.data?.releases || [],
         isLoading: () => userQuery.isLoading,
         error: () => userQuery.error?.message || null,
         updateUser,

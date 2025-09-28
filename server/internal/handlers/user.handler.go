@@ -15,7 +15,7 @@ type UpdateDiscogsTokenRequest struct {
 }
 
 type UpdateSelectedFolderRequest struct {
-	FolderID int `json:"folderId"`
+	FolderID string `json:"folderId"`
 }
 
 type UserHandler struct {
@@ -53,16 +53,24 @@ func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
 		})
 	}
 
-	folders, err := h.userController.GetUser(c.Context(), user.ID)
+	// Check if user has a selected folder
+	if user.Configuration == nil || user.Configuration.SelectedFolderID == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "No folder selected",
+		})
+	}
+
+	userData, err := h.userController.GetUser(c.Context(), user)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to retrieve user folders",
+			"error": "Failed to retrieve user data",
 		})
 	}
 
 	return c.JSON(fiber.Map{
-		"user":    user,
-		"folders": folders,
+		"user":     user,
+		"folders":  userData.Folders,
+		"releases": userData.Releases,
 	})
 }
 

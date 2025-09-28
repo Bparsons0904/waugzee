@@ -13,13 +13,19 @@ import (
 )
 
 type UserController struct {
-	userRepo       repositories.UserRepository
-	userConfigRepo repositories.UserConfigurationRepository
-	folderRepo     repositories.FolderRepository
-	discogsService *services.DiscogsService
-	db             database.DB
-	Config         config.Config
-	log            logger.Logger
+	userRepo        repositories.UserRepository
+	userConfigRepo  repositories.UserConfigurationRepository
+	folderRepo      repositories.FolderRepository
+	userReleaseRepo repositories.UserReleaseRepository
+	discogsService  *services.DiscogsService
+	db              database.DB
+	Config          config.Config
+	log             logger.Logger
+}
+
+type GetUserResponse struct {
+	Folders  []*Folder      `json:"folders"`
+	Releases []*UserRelease `json:"releases"`
 }
 
 type UserControllerInterface interface {
@@ -28,11 +34,11 @@ type UserControllerInterface interface {
 		user *User,
 		token string,
 	) (*User, error)
-	GetUser(ctx context.Context, userID uuid.UUID) ([]*Folder, error)
+	GetUser(ctx context.Context, user *User) (*GetUserResponse, error)
 	UpdateSelectedFolder(
 		ctx context.Context,
 		user *User,
-		folderID int,
+		folderID string,
 	) (*User, error)
 }
 
@@ -43,13 +49,14 @@ func New(
 	db database.DB,
 ) UserControllerInterface {
 	return &UserController{
-		userRepo:       repos.User,
-		userConfigRepo: repos.UserConfiguration,
-		folderRepo:     repos.Folder,
-		discogsService: services.Discogs,
-		db:             db,
-		Config:         config,
-		log:            logger.New("userController"),
+		userRepo:        repos.User,
+		userConfigRepo:  repos.UserConfiguration,
+		folderRepo:      repos.Folder,
+		userReleaseRepo: repos.UserRelease,
+		discogsService:  services.Discogs,
+		db:              db,
+		Config:          config,
+		log:             logger.New("userController"),
 	}
 }
 
@@ -95,19 +102,79 @@ func (uc *UserController) UpdateDiscogsToken(
 
 func (uc *UserController) GetUser(
 	ctx context.Context,
-	userID uuid.UUID,
-) ([]*Folder, error) {
-	return uc.folderRepo.GetUserFolders(ctx, uc.db.SQL, userID)
+	user *User,
+) (*GetUserResponse, error) {
+	log := uc.log.Function("GetUser")
+
+	// Get user folders
+	folders, err := uc.folderRepo.GetUserFolders(ctx, uc.db.SQL, user.ID)
+	if err != nil {
+		return nil, log.Err("failed to get user folders", err, "userID", user.ID)
+	}
+
+	// Get user releases for selected folder
+	var releases []*UserRelease
+	if user.Configuration.SelectedFolderID != nil {
+		// Get the folder to find its discogId for the UserRelease query
+		selectedFolder, err := uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, user.Configuration.SelectedFolderID.String())
+		if err != nil {
+			return nil, log.Err(
+				"failed to get selected folder",
+				err,
+				"userID",
+				user.ID,
+				"folderID",
+				*user.Configuration.SelectedFolderID,
+			)
+		}
+
+		// Use the folder's discogId to query user releases
+		releases, err = uc.userReleaseRepo.GetUserReleasesByFolderID(
+			ctx,
+			uc.db.SQL,
+			user.ID,
+			*selectedFolder.DiscogID,
+		)
+		if err != nil {
+			return nil, log.Err(
+				"failed to get user releases",
+				err,
+				"userID",
+				user.ID,
+				"folderID",
+				*user.Configuration.SelectedFolderID,
+				"discogID",
+				*selectedFolder.DiscogID,
+			)
+		}
+	}
+
+	return &GetUserResponse{
+		Folders:  folders,
+		Releases: releases,
+	}, nil
 }
 
 func (uc *UserController) UpdateSelectedFolder(
 	ctx context.Context,
 	user *User,
-	folderID int,
+	folderID string,
 ) (*User, error) {
 	log := uc.log.Function("UpdateSelectedFolder")
 
-	user.Configuration.SelectedFolderID = &folderID
+	// Parse the folder ID string to UUID
+	folderUUID, err := uuid.Parse(folderID)
+	if err != nil {
+		return nil, log.Err("invalid folder ID format", err)
+	}
+
+	// Validate that the folder exists and belongs to the user
+	_, err = uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, folderID)
+	if err != nil {
+		return nil, log.Err("folder not found or not owned by user", err)
+	}
+
+	user.Configuration.SelectedFolderID = &folderUUID
 
 	if err := uc.userConfigRepo.Update(ctx, uc.db.SQL, user.Configuration, uc.userRepo); err != nil {
 		return nil, log.Err("failed to update user configuration with selected folder", err)

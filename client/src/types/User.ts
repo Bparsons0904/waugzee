@@ -3,11 +3,11 @@ export interface UserConfiguration {
   userId: string;
   discogsToken?: string;
   discogsUsername?: string;
-  selectedFolderId?: number;
+  selectedFolderId?: string;
 }
 
 export interface Folder {
-  id: number;
+  id: string;
   name: string;
   count: number;
   public: boolean;
@@ -74,9 +74,49 @@ export interface UpdateDiscogsTokenResponse {
 }
 
 export interface UpdateSelectedFolderRequest {
-  folderId: number;
+  folderId: string;
 }
 
 export interface UpdateSelectedFolderResponse {
   user: User;
+}
+
+// Release and UserRelease Types
+export interface Release {
+  id: number;
+  title: string;
+  labelId?: number;
+  masterId?: number;
+  year?: number;
+  country?: string;
+  format: string;
+  trackCount?: number;
+  notes?: string;
+  resourceUrl?: string;
+  uri?: string;
+  dateAdded?: string;
+  dateChanged?: string;
+  lastSynced?: string;
+  thumb?: string;
+  coverImage?: string;
+  data?: any; // JSON data
+}
+
+export interface UserRelease {
+  id: string;
+  userId: string;
+  releaseId: number;
+  release: Release;
+  instanceId: number;
+  folderId: number;
+  rating?: number;
+  notes?: any; // JSON data
+  dateAdded: string;
+  active: boolean;
+}
+
+export interface UserWithFoldersAndReleasesResponse {
+  user: User;
+  folders: Folder[];
+  releases: UserRelease[];
 }

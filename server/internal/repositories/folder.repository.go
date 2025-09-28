@@ -27,6 +27,12 @@ type FolderRepository interface {
 		userID uuid.UUID,
 		discogID int,
 	) (*Folder, error)
+	GetFolderByID(
+		ctx context.Context,
+		tx *gorm.DB,
+		userID uuid.UUID,
+		folderID string,
+	) (*Folder, error)
 	ClearUserFoldersCache(ctx context.Context, userID uuid.UUID) error
 }
 
@@ -187,6 +193,34 @@ func (r *folderRepository) GetFolderByDiscogID(
 			userID,
 			"discogID",
 			discogID,
+		)
+	}
+
+	return &folder, nil
+}
+
+func (r *folderRepository) GetFolderByID(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+	folderID string,
+) (*Folder, error) {
+	log := r.log.Function("GetFolderByID")
+
+	var folder Folder
+	if err := tx.WithContext(ctx).
+		Where("user_id = ? AND id = ?", userID, folderID).
+		First(&folder).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, log.Err("folder not found", err, "userID", userID, "folderID", folderID)
+		}
+		return nil, log.Err(
+			"failed to get folder by ID",
+			err,
+			"userID",
+			userID,
+			"folderID",
+			folderID,
 		)
 	}
 
