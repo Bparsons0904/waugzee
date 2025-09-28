@@ -1,6 +1,7 @@
 import "./App.scss";
 import { Component } from "solid-js";
 import { AuthProvider } from "./context/AuthContext";
+import { UserDataProvider } from "./context/UserDataContext";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { WebSocketProvider } from "@context/WebSocketContext";
 import { ToastProvider } from "./context/ToastContext";
@@ -21,11 +22,13 @@ const App: Component<RouteSectionProps<unknown>> = (props) => {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <AuthProvider>
-          <WebSocketProvider>
-            <ProxyService />
-            <NavBar />
-            <main class="content">{props.children}</main>
-          </WebSocketProvider>
+          <UserDataProvider>
+            <WebSocketProvider>
+              <ProxyService />
+              <NavBar />
+              <main class="content">{props.children}</main>
+            </WebSocketProvider>
+          </UserDataProvider>
         </AuthProvider>
       </ToastProvider>
     </QueryClientProvider>

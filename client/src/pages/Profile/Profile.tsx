@@ -1,9 +1,11 @@
 import { Component } from "solid-js";
 import { useAuth } from "@context/AuthContext";
+import { useUserData } from "@context/UserDataContext";
 import { Button } from "@components/common/ui/Button/Button";
 
 const Profile: Component = () => {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
+  const { user } = useUserData();
 
   return (
     <div style={{ padding: "2rem", "max-width": "600px", margin: "0 auto" }}>

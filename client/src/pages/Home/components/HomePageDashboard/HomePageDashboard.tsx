@@ -1,6 +1,6 @@
 import { Component, createSignal, onMount } from "solid-js";
 import { A } from "@solidjs/router";
-import { useAuth } from "@context/AuthContext";
+import { useUserData } from "@context/UserDataContext";
 import { Button } from "@components/common/ui/Button/Button";
 import { ROUTES } from "@constants/api.constants";
 import styles from "./HomePageDashboard.module.scss";
@@ -21,7 +21,7 @@ interface RecentActivity {
 }
 
 const HomePageDashboard: Component = () => {
-  const { user } = useAuth();
+  const { user } = useUserData();
 
   const [stats, setStats] = createSignal<DashboardStats>({
     totalRecords: 0,

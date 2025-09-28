@@ -36,6 +36,8 @@ export function useApiQuery<T>(
   config?: AxiosRequestConfig,
   options?: ApiQueryOptions<T>,
 ): UseQueryResult<T, Error> {
+  const { enabled, ...restOptions } = options || {};
+
   return useQuery(() => ({
     queryKey,
     queryFn: () => api.get<T>(url, config),
@@ -50,7 +52,8 @@ export function useApiQuery<T>(
     //   return failureCount < 3;
     // },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    ...options,
+    enabled: typeof enabled === "function" ? enabled() : enabled,
+    ...restOptions,
   }));
 }
 

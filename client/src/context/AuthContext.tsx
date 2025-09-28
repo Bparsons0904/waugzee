@@ -11,14 +11,11 @@ import { createStore } from "solid-js/store";
 import {
   User,
   AuthConfig,
-  Folder,
-  UserWithFoldersResponse,
 } from "src/types/User";
 import { api, setTokenGetter } from "@services/api";
 import { oidcService } from "@services/oidc.service";
 import {
   AUTH_ENDPOINTS,
-  USER_ENDPOINTS,
   ROUTES,
 } from "@constants/api.constants";
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
@@ -42,8 +39,6 @@ interface CallbackResponse {
 
 type AuthState = {
   status: AuthStatus;
-  user: User | null;
-  folders: Folder[];
   token: string | null;
   config: AuthConfig | null;
   configLoading: boolean;
@@ -54,15 +49,11 @@ type AuthState = {
 type AuthContextValue = {
   authState: AuthState;
   isAuthenticated: () => boolean;
-  user: () => User | null;
-  folders: () => Folder[];
   authToken: () => string | null;
   authConfig: () => AuthConfig | null;
   loginWithOIDC: () => Promise<void>;
   handleOIDCCallback: () => Promise<void>;
   logout: () => void;
-  refreshUser: () => Promise<void>;
-  updateUser: (user: User) => void;
 };
 
 const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
@@ -72,8 +63,6 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
   const [authState, setAuthState] = createStore<AuthState>({
     status: "loading",
-    user: null,
-    folders: [],
     token: null,
     config: null,
     configLoading: true,
@@ -92,8 +81,6 @@ export function AuthProvider(props: { children: JSX.Element }) {
     // Clear all local state
     setAuthState({
       status: "unauthenticated",
-      user: null,
-      folders: [],
       token: null,
       error: null,
     });
@@ -201,43 +188,20 @@ export function AuthProvider(props: { children: JSX.Element }) {
           console.debug("No valid OIDC session found");
           setAuthState({
             status: "unauthenticated",
-            user: null,
             token: null,
             error: null,
           });
           return;
         }
 
-        // Get user info from backend
-        const response = await api.get<UserWithFoldersResponse>(
-          USER_ENDPOINTS.ME,
-          {
-            signal: controller.signal,
-          },
-        );
-
-        if (!cancelled && response?.user) {
-          console.info("Authentication successful", {
-            userId: response.user.id,
-            email: response.user.email,
-          });
+        // Set authenticated status with token
+        if (!cancelled) {
+          console.info("Authentication successful");
 
           setAuthState({
             status: "authenticated",
-            user: response.user,
-            folders: response.folders || [],
             token: oidcUser.access_token,
             error: null,
-          });
-        } else if (!cancelled) {
-          console.warn("Backend user info not found, clearing session");
-          await oidcService.clearUserSession();
-          setAuthState({
-            status: "unauthenticated",
-            user: null,
-            folders: [],
-            token: null,
-            error: { type: "auth_failed", message: "Failed to get user info" },
           });
         }
       } catch (error) {
@@ -245,8 +209,6 @@ export function AuthProvider(props: { children: JSX.Element }) {
           console.warn("Authentication check failed:", error);
           setAuthState({
             status: "unauthenticated",
-            user: null,
-            folders: [],
             token: null,
             error: {
               type: "network",
@@ -330,31 +292,19 @@ export function AuthProvider(props: { children: JSX.Element }) {
         throw new Error("Failed to register user with backend");
       }
 
-      // Finally, get the user info from our backend (which should now exist)
-      const response = await api.get<UserWithFoldersResponse>(
-        USER_ENDPOINTS.ME,
-      );
+      // Set authenticated status after successful backend callback
+      setAuthState({
+        status: "authenticated",
+        token: oidcUser.access_token,
+        error: null,
+      });
 
-      if (response?.user) {
-        setAuthState({
-          status: "authenticated",
-          user: response.user,
-          folders: response.folders || [],
-          token: oidcUser.access_token,
-          error: null,
-        });
-
-        navigate(ROUTES.HOME);
-      } else {
-        throw new Error("Failed to get user info from backend after callback");
-      }
+      navigate(ROUTES.HOME);
     } catch (error) {
       console.error("OIDC callback failed:", error);
 
       setAuthState({
         status: "unauthenticated",
-        user: null,
-        folders: [],
         token: null,
         error: {
           type: "auth_failed",
@@ -369,37 +319,6 @@ export function AuthProvider(props: { children: JSX.Element }) {
     }
   };
 
-  const updateUser = (user: User) => {
-    if (!isAuthenticated()) {
-      console.warn("Cannot update user - not authenticated");
-      return;
-    }
-    setAuthState("user", user);
-    console.debug("User state updated directly");
-  };
-
-  const refreshUser = async () => {
-    if (!isAuthenticated()) {
-      console.warn("Cannot refresh user - not authenticated");
-      return;
-    }
-
-    try {
-      const response = await api.get<UserWithFoldersResponse>(
-        USER_ENDPOINTS.ME,
-      );
-
-      if (response?.user) {
-        setAuthState("user", response.user);
-        setAuthState("folders", response.folders || []);
-        console.debug("User refreshed successfully");
-      } else {
-        console.warn("Failed to refresh user - no user data returned");
-      }
-    } catch (error) {
-      console.error("Failed to refresh user:", error);
-    }
-  };
 
   const logout = async () => {
     console.info("Logout initiated");
@@ -459,15 +378,11 @@ export function AuthProvider(props: { children: JSX.Element }) {
       value={{
         authState,
         isAuthenticated,
-        user: () => authState.user,
-        folders: () => authState.folders,
         authToken: () => authState.token,
         authConfig: () => authState.config,
         loginWithOIDC,
         handleOIDCCallback,
         logout,
-        refreshUser,
-        updateUser,
       }}
     >
       <Show

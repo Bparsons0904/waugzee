@@ -1,5 +1,5 @@
 import { Component, createSignal, Show } from "solid-js";
-import { useAuth } from "../../../../context/AuthContext";
+import { useUserData } from "../../../../context/UserDataContext";
 import { TextInput } from "../../forms/TextInput/TextInput";
 import { updateDiscogsToken } from "../../../../services/user.service";
 import styles from "./DiscogsTokenModal.module.scss";
@@ -9,7 +9,7 @@ interface DiscogsTokenModalProps {
 }
 
 export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
-  const { updateUser } = useAuth();
+  const { updateUser } = useUserData();
   const [token, setToken] = createSignal("");
   const [localError, setLocalError] = createSignal<string | null>(null);
 

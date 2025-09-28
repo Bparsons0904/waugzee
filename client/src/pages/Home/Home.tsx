@@ -1,6 +1,6 @@
 import { Component, createSignal, onMount, createMemo } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { useAuth } from "@context/AuthContext";
+import { useUserData } from "@context/UserDataContext";
 import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import { DiscogsTokenModal } from "@components/common/ui/DiscogsTokenModal";
 import {
@@ -25,7 +25,7 @@ interface DashboardStats {
 
 const Home: Component = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useUserData();
   const toast = useToast();
 
   const [stats, setStats] = createSignal<DashboardStats>({

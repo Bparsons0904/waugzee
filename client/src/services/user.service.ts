@@ -1,7 +1,6 @@
 import { api } from './api';
 import { USER_ENDPOINTS } from '../constants/api.constants';
 import type {
-  User,
   UpdateDiscogsTokenRequest,
   UpdateDiscogsTokenResponse,
   UpdateSelectedFolderRequest,

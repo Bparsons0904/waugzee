@@ -1,5 +1,5 @@
 import { Component, createSignal, Show, For } from "solid-js";
-import { useAuth } from "@context/AuthContext";
+import { useUserData } from "@context/UserDataContext";
 import { updateSelectedFolder } from "@services/user.service";
 import { useToast } from "@context/ToastContext";
 import styles from "./FolderSelector.module.scss";
@@ -12,13 +12,12 @@ interface FolderSelectorProps {
 }
 
 export const FolderSelector: Component<FolderSelectorProps> = (props) => {
-  const auth = useAuth();
+  const userData = useUserData();
   const toast = useToast();
   const [isUpdating, setIsUpdating] = createSignal(false);
 
-  // Claude I don't think we should destructure auth here, won't this break reactivity?
-  const user = auth.user;
-  const folders = auth.folders;
+  const user = userData.user;
+  const folders = userData.folders;
 
   const selectedFolderId = () => user()?.configuration?.selectedFolderId;
 
@@ -46,8 +45,8 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
     try {
       const response = await updateSelectedFolder({ folderId });
 
-      // Update user in auth context with optimistic update
-      auth.updateUser(response.user);
+      // Update user in user data context with optimistic update
+      userData.updateUser(response.user);
 
       const selectedFolderName =
         folders().find((f) => f.id === folderId)?.name || "Unknown";
