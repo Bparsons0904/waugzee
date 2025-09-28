@@ -56,12 +56,14 @@ type App struct {
 - Extract authenticated users from middleware context
 - Convert HTTP status codes and format responses
 - Handle rate limiting and security headers
+- **Explicitly construct response structures with fiber.Map for clarity**
 
 **❌ DON'T**:
 - Implement business logic
 - Directly access databases or caches
 - Perform complex data transformations
 - Handle authentication logic (use middleware)
+- **Return complex response objects directly - always use explicit fiber.Map**
 
 ### Handler Structure Pattern
 
@@ -103,16 +105,27 @@ func (h *ExampleHandler) HandleRequest(c *fiber.Ctx) error {
         })
     }
 
-    // 3. Delegate to controller
-    result, err := h.exampleController.ProcessRequest(c.Context(), user, req)
+    // 3. Get data from controller(s) - controllers return data, not responses
+    userData, err := h.userController.GetUser(c.Context(), user.ID)
     if err != nil {
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "error": err.Error(),
+            "error": "Failed to retrieve user data",
         })
     }
 
-    // 4. Return response
-    return c.JSON(result)
+    folderData, err := h.folderController.GetUserFolders(c.Context(), user.ID)
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to retrieve folder data",
+        })
+    }
+
+    // 4. Handler explicitly constructs response - clear what's being returned
+    return c.JSON(fiber.Map{
+        "user":    userData,
+        "folders": folderData,
+        "meta":    fiber.Map{"timestamp": time.Now()},
+    })
 }
 ```
 
@@ -127,13 +140,15 @@ func (h *ExampleHandler) HandleRequest(c *fiber.Ctx) error {
 - Handle data transformation and business rule validation
 - Manage transaction boundaries when needed
 - Process complex workflows and orchestration
-- Convert between internal models and API responses
+- **Return raw data objects that handlers can use to construct responses**
+- **Pass database connections to repositories (controller owns transaction management)**
 
 **❌ DON'T**:
 - Directly execute SQL queries or cache operations
 - Handle HTTP-specific concerns (status codes, headers)
 - Implement authentication/authorization logic
-- Manage database connections
+- **Create or return HTTP response objects (leave that to handlers)**
+- **Create overly-specific methods (prefer generic, reusable methods)**
 
 ### Controller Structure Pattern
 
@@ -162,11 +177,23 @@ func New(
 ### Business Logic Pattern
 
 ```go
+// ✅ GOOD - Generic, reusable method that returns data
+func (uc *UserController) GetUserFolders(
+    ctx context.Context,
+    userID uuid.UUID,
+) ([]*Folder, error) {
+    log := uc.log.Function("GetUserFolders")
+
+    // Controller passes database connection to repository
+    return uc.folderRepo.GetUserFolders(ctx, uc.db.SQL, userID)
+}
+
+// ✅ GOOD - Business logic coordination returning data
 func (uc *ExampleController) ProcessBusinessLogic(
     ctx context.Context,
     user *User,
     req ExampleRequest,
-) (*ExampleResponse, error) {
+) (*ProcessedData, error) {
     log := uc.log.Function("ProcessBusinessLogic")
 
     // 1. Validate business rules
@@ -174,8 +201,8 @@ func (uc *ExampleController) ProcessBusinessLogic(
         return nil, log.ErrMsg("required field missing")
     }
 
-    // 2. Coordinate multiple repository/service calls
-    data, err := uc.exampleRepo.GetByUserID(ctx, user.ID.String())
+    // 2. Coordinate multiple repository calls (controller passes DB connection)
+    data, err := uc.exampleRepo.GetByUserID(ctx, uc.db.SQL, user.ID)
     if err != nil {
         return nil, log.Err("failed to fetch data", err)
     }
@@ -183,12 +210,22 @@ func (uc *ExampleController) ProcessBusinessLogic(
     // 3. Apply business logic transformations
     processed := uc.processData(data, req)
 
-    // 4. Save results
-    if err := uc.exampleRepo.Update(ctx, processed); err != nil {
+    // 4. Save results (controller manages transaction)
+    if err := uc.exampleRepo.Update(ctx, uc.db.SQL, processed); err != nil {
         return nil, log.Err("failed to save results", err)
     }
 
-    return &ExampleResponse{...}, nil
+    // Return data object, not response object
+    return processed, nil
+}
+
+// ❌ BAD - Overly specific method name and returning response object
+func (uc *UserController) GetUserWithFoldersResponse(
+    ctx context.Context,
+    user *User,
+) (*UserWithFoldersResponse, error) {
+    // This creates tight coupling and makes the response structure
+    // hidden from the handler where it should be explicit
 }
 ```
 
@@ -229,15 +266,18 @@ func NewExampleRepository(db database.DB) ExampleRepository {
 **✅ DO**:
 - Execute database queries with proper error handling
 - Implement caching patterns with TTL management
-- Handle database transactions when needed
+- Accept database connections from controllers (repositories don't manage connections)
 - Provide minimal, focused methods for current requirements
 - Use proper indexing and query optimization
+- **Handle ONLY database operations - no response object creation**
 
 **❌ DON'T**:
 - Implement business logic or data transformation
 - Handle HTTP concerns or user authentication
 - Create methods for future requirements that don't exist yet
 - Expose internal database implementation details
+- **Create or return HTTP response objects (UserWithFoldersResponse, etc.)**
+- **Mix different entity operations in single repository methods**
 
 ### Dual-Layer Caching Pattern
 
@@ -285,48 +325,247 @@ func (r *userRepository) GetByOIDCUserID(ctx context.Context, oidcUserID string)
 
 ### CacheBuilder Usage Pattern
 
-**Rule**: Let CacheBuilder handle key formatting internally - provide base pattern and key separately
+**CRITICAL RULE: Manual cache key construction is ABSOLUTELY FORBIDDEN.**
 
-**✅ CORRECT Usage**:
+**Zero tolerance policy for any form of manual key construction or concatenation.**
+
+### Required Patterns
+
+**✅ CORRECT - Simple prefix (most common case)**:
 ```go
-// Set operation
-if err := database.NewCacheBuilder(cache, requestID).
-    WithHashPattern("api_request").
-    WithStruct(metadata).
-    WithTTL(APIRequestTTL).
+// Get operation
+var cachedResponse UserWithFoldersResponse
+found, err := database.NewCacheBuilder(uc.db.Cache.User, user.OIDCUserID).
     WithContext(ctx).
-    Set(); err != nil {
-    return err
-}
+    WithHash(constants.UserWithFoldersCachePrefix).
+    Get(&cachedResponse)
 
+// Set operation with identical pattern
+err := database.NewCacheBuilder(uc.db.Cache.User, user.OIDCUserID).
+    WithContext(ctx).
+    WithHash(constants.UserWithFoldersCachePrefix).
+    Set(response, time.Hour)
+```
+
+**✅ CORRECT - Complex pattern (only when truly needed)**:
+```go
 // Get operation
 var metadata RequestMetadata
 found, err := database.NewCacheBuilder(cache, requestID).
-    WithHashPattern("api_request").
     WithContext(ctx).
+    WithHashPattern("api_request").
     Get(&metadata)
+
+// Set operation with identical pattern
+err := database.NewCacheBuilder(cache, requestID).
+    WithContext(ctx).
+    WithHashPattern("api_request").
+    Set(metadata, time.Hour)
 ```
 
-**❌ INCORRECT Usage**:
+### FORBIDDEN Patterns
+
+**❌ ABSOLUTELY FORBIDDEN - Manual key construction**:
 ```go
-// Don't format the key manually
-cacheKey := fmt.Sprintf("api_request:%s", requestID) // ❌ DON'T DO THIS
-if err := database.NewCacheBuilder(cache, cacheKey).
-    WithHashPattern("api_request:%s"). // ❌ DON'T DO THIS
-    Set(); err != nil {
-    return err
-}
+// ❌ NEVER DO THIS - Manual concatenation
+cacheKey := constants.UserWithFoldersCachePrefix + user.OIDCUserID
+found, err := database.NewCacheBuilder(uc.db.Cache.User, cacheKey).Get(&cachedResponse)
+
+// ❌ NEVER DO THIS - Any form of manual concatenation
+cacheKey := fmt.Sprintf("%s:%s", prefix, id)
+found, err := database.NewCacheBuilder(cache, cacheKey).Get(&response)
+
+// ❌ NEVER DO THIS - Direct string building
+cacheKey := prefix + ":" + id
+found, err := database.NewCacheBuilder(cache, cacheKey).Get(&response)
+
+// ❌ NEVER DO THIS - Constants with embedded separators
+cacheKey := constants.SomePrefixWithColon + id  // Even if constant has ":"
+found, err := database.NewCacheBuilder(cache, cacheKey).Get(&response)
 ```
+
+### Critical Requirements
+
+1. **Never construct cache keys manually** - Any form of concatenation is forbidden
+2. **Use WithHash() for simple prefixes** - This is the most common pattern
+3. **Use WithHashPattern() only for complex scenarios** - Reserved for truly complex needs
+4. **Ensure Set/Get consistency** - Both operations must use identical builder patterns
+5. **No exceptions** - This rule applies to ALL cache operations without exception
+
+### Pattern Decision Guide
+
+**Use WithHash() when**:
+- Simple prefix + identifier pattern
+- Most common caching scenarios
+- Clean constant-based prefixes
+
+**Use WithHashPattern() when**:
+- Truly complex multi-part keys are required
+- Advanced caching scenarios with multiple components
+
+### Enforcement
+
+- **Code reviews MUST catch these violations**
+- **Any manual key construction requires immediate refactoring**
+- **No PRs approved with manual cache key construction**
+- **Linting rules should flag manual concatenation patterns**
 
 **How CacheBuilder Works**:
-- **Input**: `NewCacheBuilder(cache, "12345").WithHashPattern("api_request")`
+- **WithHash Input**: `NewCacheBuilder(cache, "12345").WithHash("user_prefix")`
+- **Internal Processing**: CacheBuilder formats as `"user_prefix:12345"`
+- **WithHashPattern Input**: `NewCacheBuilder(cache, "12345").WithHashPattern("api_request")`
 - **Internal Processing**: CacheBuilder formats as `"api_request:12345"`
 - **Result**: Consistent key formatting between Set and Get operations
 
 **Key Benefits**:
 - **Consistency**: Identical key formatting across Set/Get operations
-- **Simplicity**: No manual string formatting required
-- **Error Prevention**: Eliminates key mismatch bugs
+- **Error Prevention**: Eliminates key mismatch bugs that cause cache misses
+- **Maintainability**: Centralized key formatting logic
+- **Performance**: Prevents cache misses due to inconsistent keys
+
+## 4a. Clean Architecture Pattern - Data Flow
+
+### CRITICAL: Explicit Response Construction in Handlers
+
+**Problem**: Repository methods that create response objects violate clean architecture
+
+**Solution**: Repositories return data, handlers explicitly construct responses
+
+### Flow Pattern
+
+```
+┌─────────────┐    ┌──────────────┐    ┌─────────────┐
+│   Handler   │───▶│ Controller   │───▶│ Repository  │
+│             │    │              │    │             │
+│ Constructs  │◄───│ Returns Data │◄───│ Returns Raw │
+│ Response    │    │              │    │ Data        │
+└─────────────┘    └──────────────┘    └─────────────┘
+```
+
+### ✅ CORRECT Implementation
+
+```go
+// Handler - Explicitly constructs response (GOOD)
+func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
+    user := middleware.GetUser(c)
+
+    // Get data from controller
+    folders, err := h.userController.GetUserFolders(c.Context(), user.ID)
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Failed to retrieve user folders",
+        })
+    }
+
+    // Handler explicitly shows what's being returned
+    return c.JSON(fiber.Map{
+        "user":    user,
+        "folders": folders,
+    })
+}
+
+// Controller - Returns data only (GOOD)
+func (uc *UserController) GetUserFolders(ctx context.Context, userID uuid.UUID) ([]*Folder, error) {
+    return uc.folderRepo.GetUserFolders(ctx, uc.db.SQL, userID)
+}
+
+// Repository - Database operations only (GOOD)
+func (r *folderRepository) GetUserFolders(ctx context.Context, tx *gorm.DB, userID uuid.UUID) ([]*Folder, error) {
+    // 1. Check cache
+    var cachedFolders []*Folder
+    found, err := database.NewCacheBuilder(r.cache.Cache.User, userID.String()).
+        WithContext(ctx).
+        WithHash(constants.UserFoldersCachePrefix).
+        Get(&cachedFolders)
+    if err == nil && found {
+        return cachedFolders, nil
+    }
+
+    // 2. Query database
+    var folders []*Folder
+    if err := tx.WithContext(ctx).Where("user_id = ?", userID).Find(&folders).Error; err != nil {
+        return nil, err
+    }
+
+    // 3. Cache result
+    r.cacheUserFolders(ctx, userID, folders)
+
+    return folders, nil
+}
+```
+
+### ❌ WRONG Implementation (What We Fixed)
+
+```go
+// Repository creating response objects (BAD)
+func (r *userRepository) GetUserWithFolders(
+    ctx context.Context,
+    user *User,
+    folderRepo FolderRepository,
+) (*UserWithFoldersResponse, error) {
+    folders, err := folderRepo.GetUserFolders(ctx, user.ID)
+
+    // ❌ Repository creating response object - WRONG LAYER
+    response := &UserWithFoldersResponse{
+        User:    user,
+        Folders: folders,
+    }
+    return response, nil
+}
+
+// Handler not showing what's returned (BAD)
+func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
+    userWithFolders, err := h.userController.GetUserWithFolders(c.Context(), user)
+
+    // ❌ Handler can't see what's being returned without checking 3 files
+    return c.JSON(userWithFolders)
+}
+```
+
+### Benefits of Correct Pattern
+
+1. **Explicit Response Structure**: Handler shows exactly what API returns
+2. **Repository Purity**: Repositories only handle database operations
+3. **Controller Flexibility**: Generic methods can be reused for different responses
+4. **Clear Separation**: Each layer has single responsibility
+5. **Cache Proper Placement**: Folders cached by userID in folder repository
+
+### Key Rules
+
+- **Handlers**: Must explicitly construct all response structures with `fiber.Map`
+- **Controllers**: Return raw data objects, never HTTP response objects
+- **Repositories**: Database operations only, accept `*gorm.DB` from controllers
+- **Cache Keys**: Use proper separation - user cache by OIDC, folders cache by userID
+
+### Cache Separation Pattern
+
+**CRITICAL**: Different entities should be cached separately with appropriate keys
+
+```go
+// ✅ CORRECT - User cached by OIDC in user repository
+const UserCachePrefix = "user_oidc"
+database.NewCacheBuilder(cache, user.OIDCUserID).
+    WithHash(constants.UserCachePrefix).
+    Set(user, constants.UserCacheExpiry)
+
+// ✅ CORRECT - Folders cached by userID in folder repository
+const UserFoldersCachePrefix = "user_folders"
+database.NewCacheBuilder(cache, userID.String()).
+    WithHash(constants.UserFoldersCachePrefix).
+    Set(folders, constants.UserCacheExpiry)
+
+// ❌ WRONG - Mixed entity caching with response objects
+const UserWithFoldersCachePrefix = "user_folders_oidc"
+response := &UserWithFoldersResponse{User: user, Folders: folders}
+database.NewCacheBuilder(cache, user.OIDCUserID).
+    WithHash(constants.UserWithFoldersCachePrefix).
+    Set(response, constants.UserCacheExpiry)
+```
+
+**Benefits**:
+- **Proper Invalidation**: Can clear user cache and folder cache independently
+- **Repository Ownership**: Each repository manages its own entity's cache
+- **Flexible Composition**: Handler can combine cached data from multiple sources
 
 ## 5. Model Standards
 
@@ -633,5 +872,27 @@ This architecture scales well while maintaining simplicity and allows for easy t
 4. **Clean**: Remove defunct code immediately during iteration
 5. **Document**: Use self-documenting code over comments
 6. **Optimize**: Implement caching and performance patterns as needed
+
+## CRITICAL Architectural Requirements
+
+### Zero Tolerance Rules
+
+1. **Manual Cache Key Construction**: ABSOLUTELY FORBIDDEN - use CacheBuilder patterns only
+2. **Repository Response Objects**: FORBIDDEN - repositories return data, not response objects
+3. **Hidden Handler Responses**: FORBIDDEN - handlers must explicitly show response structure with fiber.Map
+4. **Mixed Entity Caching**: FORBIDDEN - each repository caches its own entity with appropriate keys
+
+### Required Patterns
+
+- **Handler**: `c.JSON(fiber.Map{"user": user, "folders": folders})`
+- **Controller**: `return uc.folderRepo.GetUserFolders(ctx, uc.db.SQL, userID)`
+- **Repository**: `return folders, nil` (raw data only)
+- **Cache**: `WithHash(constants.EntityCachePrefix)` (never manual keys)
+
+### Enforcement
+
+- **Code reviews MUST enforce these patterns**
+- **Any violation requires immediate refactoring**
+- **No PRs approved with architectural violations**
 
 This document serves as the definitive guide for maintaining consistency in Waugzee Go backend development.

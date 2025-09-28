@@ -85,6 +85,14 @@ func (cb *CacheBuilder) WithHashPattern(hashPattern string) *CacheBuilder {
 	return cb
 }
 
+func (cb *CacheBuilder) WithHash(hash string) *CacheBuilder {
+	if hash != "" {
+		cb.key = fmt.Sprintf("%s:%s", hash, cb.key)
+	}
+
+	return cb
+}
+
 func (cb *CacheBuilder) WithTTL(ttl time.Duration) *CacheBuilder {
 	cb.ttl = ttl
 	return cb

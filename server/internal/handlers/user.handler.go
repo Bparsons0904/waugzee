@@ -10,6 +10,14 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+type UpdateDiscogsTokenRequest struct {
+	Token string `json:"token"`
+}
+
+type UpdateSelectedFolderRequest struct {
+	FolderID int `json:"folderId"`
+}
+
 type UserHandler struct {
 	Handler
 	zitadelService *services.ZitadelService
@@ -45,28 +53,30 @@ func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get user with folders
-	userWithFolders, err := h.userController.GetUserWithFolders(c.Context(), user)
+	folders, err := h.userController.GetUser(c.Context(), user.ID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to retrieve user data",
+			"error": "Failed to retrieve user folders",
 		})
 	}
 
-	return c.JSON(userWithFolders)
+	return c.JSON(fiber.Map{
+		"user":    user,
+		"folders": folders,
+	})
 }
 
 func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
 	user := middleware.GetUser(c)
 
-	var req userController.UpdateDiscogsTokenRequest
+	var req UpdateDiscogsTokenRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
 
-	user, err := h.userController.UpdateDiscogsToken(c.Context(), user, req)
+	user, err := h.userController.UpdateDiscogsToken(c.Context(), user, req.Token)
 	if err != nil {
 		if err.Error() == "token is required" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -94,14 +104,14 @@ func (h *UserHandler) updateSelectedFolder(c *fiber.Ctx) error {
 		})
 	}
 
-	var req userController.UpdateSelectedFolderRequest
+	var req UpdateSelectedFolderRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
 
-	updatedUser, err := h.userController.UpdateSelectedFolder(c.Context(), user, req)
+	updatedUser, err := h.userController.UpdateSelectedFolder(c.Context(), user, req.FolderID)
 	if err != nil {
 		if err.Error() == "folder not found or not owned by user" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{

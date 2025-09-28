@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"context"
+	"waugzee/internal/constants"
+	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
@@ -25,15 +27,18 @@ type FolderRepository interface {
 		userID uuid.UUID,
 		discogID int,
 	) (*Folder, error)
+	ClearUserFoldersCache(ctx context.Context, userID uuid.UUID) error
 }
 
 type folderRepository struct {
-	log logger.Logger
+	cache database.DB
+	log   logger.Logger
 }
 
-func NewFolderRepository() FolderRepository {
+func NewFolderRepository(cache database.DB) FolderRepository {
 	return &folderRepository{
-		log: logger.New("folderRepository"),
+		cache: cache,
+		log:   logger.New("folderRepository"),
 	}
 }
 
@@ -129,6 +134,17 @@ func (r *folderRepository) GetUserFolders(
 ) ([]*Folder, error) {
 	log := r.log.Function("GetUserFolders")
 
+	// Try to get from cache first
+	var cachedFolders []*Folder
+	found, err := database.NewCacheBuilder(r.cache.Cache.User, userID.String()).
+		WithContext(ctx).
+		WithHash(constants.UserFoldersCachePrefix).
+		Get(&cachedFolders)
+	if err == nil && found {
+		log.Info("user folders found in cache", "userID", userID)
+		return cachedFolders, nil
+	}
+
 	var folders []*Folder
 	if err := tx.WithContext(ctx).
 		Where("user_id = ?", userID).
@@ -137,6 +153,17 @@ func (r *folderRepository) GetUserFolders(
 		return nil, log.Err("failed to get user folders", err, "userID", userID)
 	}
 
+	// Cache the folders
+	if err := database.NewCacheBuilder(r.cache.Cache.User, userID.String()).
+		WithContext(ctx).
+		WithHash(constants.UserFoldersCachePrefix).
+		WithStruct(folders).
+		WithTTL(constants.UserCacheExpiry).
+		Set(); err != nil {
+		log.Warn("failed to cache user folders", "userID", userID, "error", err)
+	}
+
+	log.Info("Retrieved user folders", "userID", userID, "folderCount", len(folders))
 	return folders, nil
 }
 
@@ -166,4 +193,19 @@ func (r *folderRepository) GetFolderByDiscogID(
 	}
 
 	return &folder, nil
+}
+
+func (r *folderRepository) ClearUserFoldersCache(ctx context.Context, userID uuid.UUID) error {
+	log := r.log.Function("ClearUserFoldersCache")
+
+	if err := database.NewCacheBuilder(r.cache.Cache.User, userID.String()).
+		WithContext(ctx).
+		WithHash(constants.UserFoldersCachePrefix).
+		Delete(); err != nil {
+		log.Warn("failed to clear user folders cache", "userID", userID, "error", err)
+		return err
+	}
+
+	log.Info("cleared user folders cache", "userID", userID)
+	return nil
 }

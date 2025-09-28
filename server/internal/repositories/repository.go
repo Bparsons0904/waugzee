@@ -26,7 +26,7 @@ func New(db database.DB) Repository {
 		Release:                 NewReleaseRepository(),
 		Genre:                   NewGenreRepository(),
 		Label:                   NewLabelRepository(),
-		Folder:                  NewFolderRepository(),
+		Folder:                  NewFolderRepository(db), // Folder repo needs cache for caching
 		UserRelease:             NewUserReleaseRepository(),
 		DiscogsDataProcessing:   NewDiscogsDataProcessingRepository(db.SQL),
 	}

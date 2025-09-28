@@ -90,3 +90,8 @@ func (u *User) UpdateFromOIDC(
 		u.ProfileVerified = true
 	}
 }
+
+type UserWithFoldersResponse struct {
+	User    *User     `json:"user"`
+	Folders []*Folder `json:"folders"`
+}

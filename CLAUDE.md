@@ -61,10 +61,37 @@ When writing or fixing tests, follow these principles:
 
 ### Cache Operations
 
-- **Use CacheBuilder Pattern**: Always use `database.NewCacheBuilder(cache, key)` - never construct cache keys manually
-- **Hash Pattern**: Provide only the hash name to `WithHashPattern()` - the builder constructs the full hash
-- **Never Manual Keys**: The builder handles all key construction and formatting
-- **Example**: `WithHashPattern("api_request")` not `WithHashPattern("api_request:specific_key")`
+**CRITICAL: Manual cache key construction is ABSOLUTELY FORBIDDEN.**
+
+- **NEVER construct cache keys manually**: Manual concatenation like `constants.SomePrefix + someValue` is FORBIDDEN
+- **ALWAYS use CacheBuilder pattern**: Use `database.NewCacheBuilder(cache, identifier)` with builder methods
+- **Use WithHash() for simple prefixes**: Most common pattern for prefix + identifier
+- **Use WithHashPattern() only for complex patterns**: Reserved for truly complex scenarios
+- **Consistent Set/Get operations**: Ensure identical patterns between cache writes and reads
+
+**Required Patterns:**
+
+```go
+// ✅ CORRECT - Simple prefix (most common case)
+var cachedResponse SomeResponse
+found, err := database.NewCacheBuilder(cache, userID).
+    WithContext(ctx).
+    WithHash(constants.SomeCachePrefix).
+    Get(&cachedResponse)
+
+// ✅ CORRECT - Setting with same pattern
+err := database.NewCacheBuilder(cache, userID).
+    WithContext(ctx).
+    WithHash(constants.SomeCachePrefix).
+    Set(response, time.Hour)
+
+// ❌ FORBIDDEN - Manual key construction
+cacheKey := constants.SomeCachePrefix + userID
+found, err := database.NewCacheBuilder(cache, cacheKey).Get(&cachedResponse)
+
+// ❌ FORBIDDEN - Any form of manual concatenation
+found, err := database.NewCacheBuilder(cache, prefix + ":" + id).Get(&cachedResponse)
+```
 
 ### Service Architecture
 
@@ -77,13 +104,13 @@ When writing or fixing tests, follow these principles:
 
 ❌ **Manual SQL migrations for schema changes**
 ❌ **Business logic in repository methods**
-❌ **Manually constructed cache keys**
+❌ **MANUALLY CONSTRUCTED CACHE KEYS (ABSOLUTE ZERO TOLERANCE)**
 ❌ **Repository methods with complex business decisions**
 ❌ **Creating repository methods "just in case"**
 
 ✅ **GORM model updates + AutoMigrate**
 ✅ **Business logic in service layer**
-✅ **CacheBuilder for all cache operations**
+✅ **CacheBuilder pattern with WithHash() for ALL cache operations**
 ✅ **Simple, focused repository methods**
 ✅ **Create methods only when needed**
 

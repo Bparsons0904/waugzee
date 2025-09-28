@@ -4,7 +4,7 @@ import "time"
 
 // User cache constants
 const (
-	UserCachePrefix         = "user_oidc:"               // Single cache by OIDC ID
-	UserWithFoldersCachePrefix = "user_folders_oidc:"   // User with folders cache by OIDC ID
+	UserCachePrefix         = "user_oidc"               // Single cache by OIDC ID (CacheBuilder adds colon)
+	UserFoldersCachePrefix  = "user_folders"           // User folders cache by userID (CacheBuilder adds colon)
 	UserCacheExpiry         = 7 * 24 * time.Hour        // 7 days
 )

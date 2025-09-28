@@ -63,8 +63,10 @@ func (r *userRepository) Update(ctx context.Context, tx *gorm.DB, user *User) er
 }
 
 func (r *userRepository) getCacheByOIDC(ctx context.Context, oidcUserID string, user *User) error {
-	cacheKey := constants.UserCachePrefix + oidcUserID
-	found, err := database.NewCacheBuilder(r.cache.Cache.User, cacheKey).WithContext(ctx).Get(user)
+	found, err := database.NewCacheBuilder(r.cache.Cache.User, oidcUserID).
+		WithContext(ctx).
+		WithHash(constants.UserCachePrefix).
+		Get(user)
 	if err != nil {
 		return r.log.Function("getCacheByOIDC").
 			Err("failed to get user from cache", err, "oidcUserID", oidcUserID)
@@ -79,11 +81,11 @@ func (r *userRepository) getCacheByOIDC(ctx context.Context, oidcUserID string, 
 }
 
 func (r *userRepository) addUserToCache(ctx context.Context, user *User) error {
-	cacheKey := constants.UserCachePrefix + user.OIDCUserID
-	if err := database.NewCacheBuilder(r.cache.Cache.User, cacheKey).
+	if err := database.NewCacheBuilder(r.cache.Cache.User, user.OIDCUserID).
+		WithContext(ctx).
+		WithHash(constants.UserCachePrefix).
 		WithStruct(user).
 		WithTTL(constants.UserCacheExpiry).
-		WithContext(ctx).
 		Set(); err != nil {
 		return r.log.Function("addUserToCache").
 			Err("failed to add user to cache", err, "oidcUserID", user.OIDCUserID)
@@ -181,8 +183,10 @@ func (r *userRepository) FindOrCreateOIDCUser(
 func (r *userRepository) ClearUserCacheByOIDC(ctx context.Context, oidcUserID string) error {
 	log := r.log.Function("ClearUserCacheByOIDC")
 
-	userCacheKey := constants.UserCachePrefix + oidcUserID
-	if err := database.NewCacheBuilder(r.cache.Cache.User, userCacheKey).WithContext(ctx).Delete(); err != nil {
+	if err := database.NewCacheBuilder(r.cache.Cache.User, oidcUserID).
+		WithContext(ctx).
+		WithHash(constants.UserCachePrefix).
+		Delete(); err != nil {
 		log.Warn("failed to remove user from cache", "oidcUserID", oidcUserID, "error", err)
 		return err
 	}
@@ -205,3 +209,4 @@ func (r *userRepository) ClearUserCacheByUserID(ctx context.Context, tx *gorm.DB
 
 	return r.ClearUserCacheByOIDC(ctx, user.OIDCUserID)
 }
+
