@@ -76,6 +76,16 @@ docker_build(
     ]
 )
 
+# PostgreSQL database service
+docker_build(
+    'waugzee-postgres-' + DOCKER_ENV,
+    context='.',
+    dockerfile_contents="""
+FROM postgres:18
+# Minimal Dockerfile - PostgreSQL image already configured
+"""
+)
+
 # Valkey database service
 docker_build(
     'waugzee-valkey-' + DOCKER_ENV,
@@ -104,19 +114,24 @@ docker_compose('./docker-compose.' + DOCKER_ENV + '.yml')
 # CORE SERVICES
 # ==========================================
 
-dc_resource('server',
+dc_resource('postgres',
     labels=['1-services'],
-    resource_deps=['valkey'],
-)
-
-dc_resource('client',
-    labels=['1-services'],
-    resource_deps=['server']
+    resource_deps=[],
 )
 
 dc_resource('valkey',
     labels=['1-services'],
     resource_deps=[],
+)
+
+dc_resource('server',
+    labels=['1-services'],
+    resource_deps=['postgres', 'valkey'],
+)
+
+dc_resource('client',
+    labels=['1-services'],
+    resource_deps=['server']
 )
 
 # Development utilities
@@ -233,14 +248,24 @@ if DEV_MODE:
     )
 
     # ==========================================
-    # VALKEY/DATABASE UTILITIES
+    # DATABASE UTILITIES
     # ==========================================
-    
+
+    # PostgreSQL utilities
+    local_resource(
+        'postgres-info',
+        cmd='docker compose -f docker-compose.' + DOCKER_ENV + '.yml exec postgres psql -U ' + os.getenv('DB_USER', 'waugzee_dev_user') + ' -d ' + os.getenv('DB_NAME', 'waugzee_dev') + ' -c "\\l"',
+        labels=['4-database'],
+        auto_init=False,
+        trigger_mode=TRIGGER_MODE_MANUAL,
+        resource_deps=['postgres']
+    )
+
     # Valkey utilities
     local_resource(
         'valkey-info',
         cmd='docker compose -f docker-compose.' + DOCKER_ENV + '.yml exec valkey valkey-cli info',
-        labels=['4-valkey'],
+        labels=['4-database'],
         auto_init=False,
         trigger_mode=TRIGGER_MODE_MANUAL
     )
@@ -251,10 +276,10 @@ if DEV_MODE:
         cmd='docker compose -f docker-compose.' + DOCKER_ENV + '.yml exec server go run cmd/migration/main.go up',
         deps=['./server/cmd/migration', './server/internal', './server/config'],
         ignore=['./server/tmp', './server/*.log', './server/main'],
-        labels=['4-valkey'],
+        labels=['4-database'],
         auto_init=False,
         trigger_mode=TRIGGER_MODE_MANUAL,
-        resource_deps=['server'] 
+        resource_deps=['server']
     )
 
     local_resource(
@@ -262,7 +287,7 @@ if DEV_MODE:
         cmd='docker compose -f docker-compose.' + DOCKER_ENV + '.yml exec server go run cmd/migration/main.go down 1',
         deps=['./server/cmd/migration', './server/internal', './server/config'],
         ignore=['./server/tmp', './server/*.log', './server/main'],
-        labels=['4-valkey'],
+        labels=['4-database'],
         auto_init=False,
         trigger_mode=TRIGGER_MODE_MANUAL,
         resource_deps=['server']
@@ -273,7 +298,7 @@ if DEV_MODE:
         cmd='docker compose -f docker-compose.' + DOCKER_ENV + '.yml exec server go run cmd/migration/main.go seed',
         deps=['./server/cmd/migration', './server/internal', './server/config'],
         ignore=['./server/tmp', './server/*.log', './server/main'],
-        labels=['4-valkey'],
+        labels=['4-database'],
         auto_init=False,
         trigger_mode=TRIGGER_MODE_MANUAL,
         resource_deps=['server']
@@ -284,6 +309,7 @@ print("🚀 Waugzee Development Environment (Environment: %s)" % DOCKER_ENV)
 print("📊 Tilt Dashboard: http://localhost:%s" % TILT_PORT)
 print("🔧 Server API: http://localhost:%s" % SERVER_PORT)
 print("🎨 Client App: http://localhost:%s" % CLIENT_PORT)
+print("🐘 PostgreSQL: localhost:%s" % os.getenv('DB_PORT', '5432'))
 print("💾 Valkey DB: localhost:%s" % DB_CACHE_PORT)
 print("💡 Hot reloading enabled for all services!")
 print("🧪 Manual test/lint resources available in Tilt UI")
@@ -301,10 +327,11 @@ print("• tilt trigger client-1-check-all     - Run ALL client checks (tests + 
 print("• tilt trigger client-2-tests         - Run frontend tests")
 print("• tilt trigger client-3-lint          - Run frontend linting") 
 print("• tilt trigger client-4-typecheck     - Run TypeScript checking")
-print("\n💾 VALKEY (Database):")
+print("\n💾 DATABASE:")
 print("• tilt trigger migrate-up             - Run database migrations")
 print("• tilt trigger migrate-down           - Rollback 1 migration")
 print("• tilt trigger migrate-seed           - Reset and seed database")
+print("• tilt trigger postgres-info          - Show PostgreSQL info")
 print("• tilt trigger valkey-info            - Show Valkey info")
 print("\n⚡ GENERAL:")
 print("• tilt down                           - Stop all services")

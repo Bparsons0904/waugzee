@@ -26,7 +26,10 @@ services:
       - dev-network-dev
     restart: unless-stopped
     depends_on:
-      - valkey
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_started
 
   client:
     build:
@@ -53,6 +56,53 @@ services:
     restart: unless-stopped
     depends_on:
       - server
+
+  postgres:
+    image: postgres:18
+    hostname: waugzee-postgres
+    container_name: waugzee-postgres-${DOCKER_ENV:-dev}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-waugzee_dev}
+      POSTGRES_USER: ${DB_USER:-waugzee_dev_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+      TZ: "UTC"
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c work_mem=8MB
+      -c maintenance_work_mem=128MB
+      -c effective_cache_size=1GB
+      -c wal_buffers=8MB
+      -c checkpoint_completion_target=0.9
+      -c max_connections=100
+      -c max_worker_processes=4
+      -c max_parallel_workers=2
+      -c max_parallel_workers_per_gather=2
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c log_statement=mod
+      -c log_min_duration_statement=1000
+      -c log_line_prefix='%t [%p]: user=%u,db=%d '
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    networks:
+      - dev-network-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-waugzee_dev_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 1GB
+        reservations:
+          memory: 256MB
 
   valkey:
     image: valkey/valkey:8.0-alpine
@@ -84,6 +134,7 @@ volumes:
   discogs_data:
   client_node_modules:
   client_dist:
+  postgres_data:
   valkey_data:
   valkey_logs:
 
