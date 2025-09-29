@@ -135,7 +135,7 @@ func (f *FoldersService) ProcessFoldersResponse(
 	folders := make([]*Folder, 0, len(discogsFoldersResponse.Data.Folders))
 	for _, discogsFolder := range discogsFoldersResponse.Data.Folders {
 		folder := &Folder{
-			DiscogID:    &discogsFolder.ID,
+			ID:          &discogsFolder.ID,
 			UserID:      metadata.UserID,
 			Name:        discogsFolder.Name,
 			Count:       discogsFolder.Count,
@@ -144,7 +144,7 @@ func (f *FoldersService) ProcessFoldersResponse(
 		folders = append(folders, folder)
 	}
 
-	keepDiscogIDs, _ := f.extractFolderSyncData(folders)
+	keepFolderIDs, _ := f.extractFolderSyncData(folders)
 
 	// Execute folder upsert
 	err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
@@ -158,7 +158,7 @@ func (f *FoldersService) ProcessFoldersResponse(
 
 	// Execute orphan cleanup in separate transaction
 	err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
-		return f.repos.Folder.DeleteOrphanFolders(txCtx, tx, metadata.UserID, keepDiscogIDs)
+		return f.repos.Folder.DeleteOrphanFolders(txCtx, tx, metadata.UserID, keepFolderIDs)
 	})
 	if err != nil {
 		return log.Err("failed to delete orphan folders", err,
@@ -261,17 +261,17 @@ func (f *FoldersService) processReleasesToSyncState(
 
 func (f *FoldersService) extractFolderSyncData(
 	folders []*Folder,
-) (keepDiscogIDs []int, allFolderDiscogID *int) {
-	keepDiscogIDs = make([]int, 0, len(folders))
+) (keepFolderIDs []int, allFolderID *int) {
+	keepFolderIDs = make([]int, 0, len(folders))
 	for _, folder := range folders {
-		if folder.DiscogID != nil {
-			keepDiscogIDs = append(keepDiscogIDs, *folder.DiscogID)
+		if folder.ID != nil {
+			keepFolderIDs = append(keepFolderIDs, *folder.ID)
 			if folder.Name == "All" {
-				allFolderDiscogID = folder.DiscogID
+				allFolderID = folder.ID
 			}
 		}
 	}
-	return keepDiscogIDs, allFolderDiscogID
+	return keepFolderIDs, allFolderID
 }
 
 func (f *FoldersService) updateUserConfigWithUncategorizedFolderIfNotSet(
@@ -737,7 +737,7 @@ func (f *FoldersService) SyncAllUserFolders(
 	// Filter to folders excluding the "All" folder (read-only)
 	syncFolders := make([]*Folder, 0)
 	for _, folder := range folders {
-		if folder.DiscogID != nil && *folder.DiscogID > AllFolderID {
+		if folder.ID != nil && *folder.ID > AllFolderID {
 			syncFolders = append(syncFolders, folder)
 		}
 	}
@@ -780,14 +780,14 @@ func (f *FoldersService) SyncAllUserFolders(
 
 	// Start sync for each folder (page 1)
 	for _, folder := range syncFolders {
-		if folder.DiscogID == nil {
+		if folder.ID == nil {
 			continue
 		}
 
-		_, err = f.RequestFolderReleases(ctx, user, *folder.DiscogID, 1)
+		_, err = f.RequestFolderReleases(ctx, user, *folder.ID, 1)
 		if err != nil {
 			log.Warn("Failed to start sync for folder",
-				"folderID", *folder.DiscogID,
+				"folderID", *folder.ID,
 				"error", err)
 		}
 	}

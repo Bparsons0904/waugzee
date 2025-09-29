@@ -3,11 +3,11 @@ export interface UserConfiguration {
   userId: string;
   discogsToken?: string;
   discogsUsername?: string;
-  selectedFolderId?: string;
+  selectedFolderId?: number;
 }
 
 export interface Folder {
-  id: string;
+  id: number;
   name: string;
   count: number;
   public: boolean;
@@ -74,7 +74,7 @@ export interface UpdateDiscogsTokenResponse {
 }
 
 export interface UpdateSelectedFolderRequest {
-  folderId: string;
+  folderId: number;
 }
 
 export interface UpdateSelectedFolderResponse {

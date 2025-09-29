@@ -9,5 +9,5 @@ type UserConfiguration struct {
 	UserID           uuid.UUID `gorm:"type:uuid;not null;index" json:"userId"`
 	DiscogsToken     *string   `gorm:"type:text"                json:"discogsToken"`
 	DiscogsUsername  *string   `gorm:"type:text"                json:"discogsUsername"`
-	SelectedFolderID *uuid.UUID `gorm:"type:uuid"               json:"selectedFolderId"`
+	SelectedFolderID *int      `gorm:"type:bigint"              json:"selectedFolderId"`
 }

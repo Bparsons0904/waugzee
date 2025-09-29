@@ -38,7 +38,7 @@ type UserControllerInterface interface {
 	UpdateSelectedFolder(
 		ctx context.Context,
 		user *User,
-		folderID string,
+		folderID int,
 	) (*User, error)
 }
 
@@ -115,8 +115,8 @@ func (uc *UserController) GetUser(
 	// Get user releases for selected folder
 	var releases []*UserRelease
 	if user.Configuration.SelectedFolderID != nil {
-		// Get the folder to find its discogId for the UserRelease query
-		selectedFolder, err := uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, user.Configuration.SelectedFolderID.String())
+		// Get the folder using the composite key lookup
+		selectedFolder, err := uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, *user.Configuration.SelectedFolderID)
 		if err != nil {
 			return nil, log.Err(
 				"failed to get selected folder",
@@ -128,12 +128,12 @@ func (uc *UserController) GetUser(
 			)
 		}
 
-		// Use the folder's discogId to query user releases
+		// Use the folder's ID to query user releases
 		releases, err = uc.userReleaseRepo.GetUserReleasesByFolderID(
 			ctx,
 			uc.db.SQL,
 			user.ID,
-			*selectedFolder.DiscogID,
+			*selectedFolder.ID,
 		)
 		if err != nil {
 			return nil, log.Err(
@@ -143,8 +143,8 @@ func (uc *UserController) GetUser(
 				user.ID,
 				"folderID",
 				*user.Configuration.SelectedFolderID,
-				"discogID",
-				*selectedFolder.DiscogID,
+				"folderID",
+				*selectedFolder.ID,
 			)
 		}
 	}
@@ -158,23 +158,17 @@ func (uc *UserController) GetUser(
 func (uc *UserController) UpdateSelectedFolder(
 	ctx context.Context,
 	user *User,
-	folderID string,
+	folderID int,
 ) (*User, error) {
 	log := uc.log.Function("UpdateSelectedFolder")
 
-	// Parse the folder ID string to UUID
-	folderUUID, err := uuid.Parse(folderID)
-	if err != nil {
-		return nil, log.Err("invalid folder ID format", err)
-	}
-
 	// Validate that the folder exists and belongs to the user
-	_, err = uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, folderID)
+	_, err := uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, folderID)
 	if err != nil {
 		return nil, log.Err("folder not found or not owned by user", err)
 	}
 
-	user.Configuration.SelectedFolderID = &folderUUID
+	user.Configuration.SelectedFolderID = &folderID
 
 	if err := uc.userConfigRepo.Update(ctx, uc.db.SQL, user.Configuration, uc.userRepo); err != nil {
 		return nil, log.Err("failed to update user configuration with selected folder", err)

@@ -15,7 +15,7 @@ type UpdateDiscogsTokenRequest struct {
 }
 
 type UpdateSelectedFolderRequest struct {
-	FolderID string `json:"folderId"`
+	FolderID int `json:"folderId"`
 }
 
 type UserHandler struct {
