@@ -3,7 +3,7 @@ import { A } from "@solidjs/router";
 import styles from "./NavBar.module.scss";
 import { useAuth } from "@context/AuthContext";
 import { ROUTES } from "@constants/api.constants";
-import { FolderSelector } from "@components/folders";
+import { FolderSelector } from "@components/folders/FolderSelector";
 
 export const NavBar: Component = () => {
   const { isAuthenticated, logout } = useAuth();
@@ -57,7 +57,7 @@ export const NavBar: Component = () => {
             <Switch>
               <Match when={isAuthenticated()}>
                 <div class={styles.navbarFolderSelector}>
-                  <FolderSelector navbar showCounts />
+                  <FolderSelector navbar />
                 </div>
               </Match>
             </Switch>
