@@ -1,5 +1,4 @@
-import { createContext, useContext, JSX, createEffect } from "solid-js";
-import { createSignal } from "solid-js";
+import { createContext, useContext, JSX } from "solid-js";
 import { User, Folder, UserRelease, UserWithFoldersAndReleasesResponse } from "src/types/User";
 import { useAuth } from "./AuthContext";
 import { useApiQuery } from "@services/apiHooks";

@@ -1,7 +1,9 @@
-import { Component, createSignal, Show, For } from "solid-js";
+import { Component, Show, For } from "solid-js";
 import { useUserData } from "@context/UserDataContext";
-import { updateSelectedFolder } from "@services/user.service";
+import { useApiPut } from "@services/apiHooks";
 import { useToast } from "@context/ToastContext";
+import { USER_ENDPOINTS } from "@constants/api.constants";
+import type { UpdateSelectedFolderRequest, UpdateSelectedFolderResponse } from "src/types/User";
 import styles from "./FolderSelector.module.scss";
 
 interface FolderSelectorProps {
@@ -14,7 +16,14 @@ interface FolderSelectorProps {
 export const FolderSelector: Component<FolderSelectorProps> = (props) => {
   const userData = useUserData();
   const toast = useToast();
-  const [isUpdating, setIsUpdating] = createSignal(false);
+
+  const updateFolderMutation = useApiPut<UpdateSelectedFolderResponse, UpdateSelectedFolderRequest>(
+    USER_ENDPOINTS.ME_FOLDER,
+    undefined,
+    {
+      invalidateQueries: [["user"]],
+    }
+  );
 
   const user = userData.user;
   const folders = userData.folders;
@@ -32,7 +41,7 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
   };
 
   const handleFolderChange = async (folderId: number) => {
-    if (isUpdating()) return;
+    if (updateFolderMutation.isPending) return;
 
     const currentUserId = user()?.id;
     if (!currentUserId) {
@@ -40,13 +49,8 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
       return;
     }
 
-    setIsUpdating(true);
-
     try {
-      const response = await updateSelectedFolder({ folderId });
-
-      // Update user in user data context with optimistic update
-      userData.updateUser(response.user);
+      await updateFolderMutation.mutateAsync({ folderId });
 
       const selectedFolderName =
         folders().find((f) => f.id === folderId)?.name || "Unknown";
@@ -54,8 +58,6 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
     } catch (error) {
       console.error("Failed to update selected folder:", error);
       toast.showError("Failed to update folder selection");
-    } finally {
-      setIsUpdating(false);
     }
   };
 
@@ -99,7 +101,7 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
                 <select
                   class={styles.folderSelect}
                   value={selectedFolderId() || selectedFolder()?.id || ""}
-                  disabled={isUpdating()}
+                  disabled={updateFolderMutation.isPending}
                   onChange={(e) => {
                     const value = parseInt(e.target.value);
                     if (!isNaN(value)) {
@@ -123,7 +125,7 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
                 </select>
                 <div class={styles.selectIcon}>
                   <Show
-                    when={isUpdating()}
+                    when={updateFolderMutation.isPending}
                     fallback={
                       <svg
                         width="16"
@@ -154,7 +156,7 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
             <select
               class={styles.navbarSelect}
               value={selectedFolderId() || selectedFolder()?.id || ""}
-              disabled={isUpdating()}
+              disabled={updateFolderMutation.isPending}
               onChange={(e) => {
                 const value = parseInt(e.target.value);
                 if (!isNaN(value)) {
@@ -175,7 +177,7 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
             </select>
             <div class={styles.navbarSelectIcon}>
               <Show
-                when={isUpdating()}
+                when={updateFolderMutation.isPending}
                 fallback={
                   <svg
                     width="14"

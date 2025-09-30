@@ -1,7 +1,8 @@
 import { Component, createSignal, Show } from "solid-js";
-import { useUserData } from "../../../../context/UserDataContext";
+import { useApiPut } from "@services/apiHooks";
 import { TextInput } from "../../forms/TextInput/TextInput";
-import { updateDiscogsToken } from "../../../../services/user.service";
+import { USER_ENDPOINTS } from "@constants/api.constants";
+import type { UpdateDiscogsTokenRequest, UpdateDiscogsTokenResponse } from "src/types/User";
 import styles from "./DiscogsTokenModal.module.scss";
 
 interface DiscogsTokenModalProps {
@@ -9,9 +10,16 @@ interface DiscogsTokenModalProps {
 }
 
 export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
-  const { updateUser } = useUserData();
   const [token, setToken] = createSignal("");
   const [localError, setLocalError] = createSignal<string | null>(null);
+
+  const updateTokenMutation = useApiPut<UpdateDiscogsTokenResponse, UpdateDiscogsTokenRequest>(
+    USER_ENDPOINTS.ME_DISCOGS,
+    undefined,
+    {
+      invalidateQueries: [["user"]],
+    }
+  );
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -25,11 +33,8 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
     setLocalError(null);
 
     try {
-      const response = await updateDiscogsToken({ token: tokenValue });
-      console.log("Discogs token saved successfully:", response.user);
-
-      // Update user state directly with the response data
-      updateUser(response.user);
+      await updateTokenMutation.mutateAsync({ token: tokenValue });
+      console.log("Discogs token saved successfully");
 
       setToken("");
       props.onClose();
@@ -99,9 +104,9 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
           <button
             type="submit"
             class={styles.primaryButton}
-            disabled={!token().trim()}
+            disabled={!token().trim() || updateTokenMutation.isPending}
           >
-            Save Token
+            {updateTokenMutation.isPending ? "Saving..." : "Save Token"}
           </button>
         </div>
       </form>

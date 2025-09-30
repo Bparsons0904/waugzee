@@ -130,8 +130,41 @@ found, err := database.NewCacheBuilder(cache, prefix + ":" + id).Get(&cachedResp
 - **Framework**: SolidJS with TypeScript
 - **Build Tool**: Vite
 - **Styling**: SCSS with CSS Modules
-- **State Management**: Solid Query + Context API
+- **State Management**: TanStack Query (Solid Query) + Context API
 - **Authentication**: OIDC flow integration
+
+**CRITICAL: Always use TanStack Query for API calls**
+
+- **NEVER use `api.ts` directly in components or services** - it's ONLY for:
+  - Internal use by `apiHooks.ts`
+  - Authentication operations in `AuthContext.tsx`
+- **ALWAYS use hooks from `@services/apiHooks`**:
+  - `useApiQuery` for GET requests
+  - `useApiPut` for PUT requests (with `invalidateQueries` for cache invalidation)
+  - `useApiPost` for POST requests (with `invalidateQueries` for cache invalidation)
+  - `useApiPatch` for PATCH requests (with `invalidateQueries` for cache invalidation)
+  - `useApiDelete` for DELETE requests (with `invalidateQueries` for cache invalidation)
+- **Use `invalidateQueries` option** to automatically refetch data after mutations
+- **No manual cache management** - TanStack Query handles caching, loading states, and error states
+
+**Example Pattern:**
+
+```typescript
+// ✅ CORRECT - Using TanStack Query mutation with cache invalidation
+const updateMutation = useApiPut<ResponseType, RequestType>(
+  API_ENDPOINT,
+  undefined,
+  {
+    invalidateQueries: [["queryKey"]], // Automatically refetch after success
+  }
+);
+
+await updateMutation.mutateAsync(data);
+
+// ❌ FORBIDDEN - Direct API usage in components
+import { api } from "@services/api";
+const response = await api.put(endpoint, data);
+```
 
 ### Infrastructure
 

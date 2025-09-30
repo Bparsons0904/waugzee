@@ -11,10 +11,14 @@ import {
   ActionsSection,
   ActionItem,
 } from "@components/dashboard/ActionsSection/ActionsSection";
-import { syncService } from "@services/sync.service";
-import { useToast } from "@context/ToastContext";
+import { useApiPost } from "@services/apiHooks";
 import styles from "./Home.module.scss";
 import { ROUTES } from "@constants/api.constants";
+
+interface SyncResponse {
+  status: string;
+  message: string;
+}
 
 interface DashboardStats {
   totalRecords: number;
@@ -26,7 +30,6 @@ interface DashboardStats {
 const Home: Component = () => {
   const navigate = useNavigate();
   const { user } = useUserData();
-  const toast = useToast();
 
   const [stats, setStats] = createSignal<DashboardStats>({
     totalRecords: 0,
@@ -37,7 +40,15 @@ const Home: Component = () => {
   const [isLoading, setIsLoading] = createSignal(true);
   const [showTokenModal, setShowTokenModal] = createSignal(false);
   const [syncStatus, setSyncStatus] = createSignal<string>("");
-  const [isSyncing, setIsSyncing] = createSignal(false);
+
+  const syncMutation = useApiPost<SyncResponse, void>(
+    "/sync/syncCollection",
+    undefined,
+    {
+      successMessage: "Collection sync started successfully!",
+      errorMessage: "Failed to start collection sync. Please try again.",
+    }
+  );
 
   const handleNavigation = (route: string) => {
     navigate(route);
@@ -49,21 +60,15 @@ const Home: Component = () => {
       return;
     }
 
-    setIsSyncing(true);
     setSyncStatus("Initiating collection sync...");
 
     try {
-      const response = await syncService.initiateCollectionSync();
-
+      const response = await syncMutation.mutateAsync();
       setSyncStatus(response.message);
-      toast.showSuccess("Collection sync started successfully!");
       console.log("Sync response:", response);
     } catch (error) {
       console.error("Sync failed:", error);
       setSyncStatus("Sync failed. Please try again.");
-      toast.showError("Failed to start collection sync. Please try again.");
-    } finally {
-      setIsSyncing(false);
     }
   };
 
@@ -134,12 +139,12 @@ const Home: Component = () => {
           "Sync your Waugzee collection with your Discogs library."
         : "Connect your Discogs account to sync your collection.",
       buttonText: user()?.configuration?.discogsToken
-        ? isSyncing()
+        ? syncMutation.isPending
           ? "Syncing..."
           : "Sync Collection"
         : "Connect Discogs",
       onClick: handleSyncCollection,
-      disabled: isSyncing(),
+      disabled: syncMutation.isPending,
     },
     {
       title: "View Analytics",

@@ -1,3 +1,26 @@
+/**
+ * DEPRECATION NOTICE: This file provides low-level API access.
+ *
+ * ⚠️ DO NOT USE THIS DIRECTLY IN COMPONENTS ⚠️
+ *
+ * Instead, use TanStack Query hooks from @services/apiHooks:
+ * - useApiQuery for GET requests
+ * - useApiPut for PUT requests
+ * - useApiPost for POST requests
+ * - useApiPatch for PATCH requests
+ * - useApiDelete for DELETE requests
+ *
+ * TanStack Query provides:
+ * - Automatic caching and cache invalidation
+ * - Loading and error states
+ * - Optimistic updates
+ * - Request deduplication
+ * - Retry logic
+ *
+ * This file should only be used internally by apiHooks.ts or for special cases
+ * that cannot be handled by TanStack Query.
+ */
+
 import { env } from "@services/env.service";
 import axios, { AxiosError, AxiosRequestConfig } from "axios";
 

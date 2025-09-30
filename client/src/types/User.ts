@@ -99,7 +99,7 @@ export interface Release {
   lastSynced?: string;
   thumb?: string;
   coverImage?: string;
-  data?: any; // JSON data
+  data?: Record<string, unknown>; // JSON data
 }
 
 export interface UserRelease {
@@ -110,7 +110,7 @@ export interface UserRelease {
   instanceId: number;
   folderId: number;
   rating?: number;
-  notes?: any; // JSON data
+  notes?: Record<string, unknown>; // JSON data
   dateAdded: string;
   active: boolean;
 }
