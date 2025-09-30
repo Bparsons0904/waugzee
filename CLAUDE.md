@@ -150,21 +150,48 @@ found, err := database.NewCacheBuilder(cache, prefix + ":" + id).Get(&cachedResp
 **Example Pattern:**
 
 ```typescript
-// ✅ CORRECT - Using TanStack Query mutation with cache invalidation
+// ✅ CORRECT - Declarative pattern with callbacks (preferred)
 const updateMutation = useApiPut<ResponseType, RequestType>(
   API_ENDPOINT,
   undefined,
   {
     invalidateQueries: [["queryKey"]], // Automatically refetch after success
+    successMessage: "Update successful!",  // Auto toast notification
+    errorMessage: "Update failed. Please try again.",  // Auto error toast
+    onSuccess: (data) => {
+      // Additional success logic (optional)
+      console.log("Success:", data);
+      someStateUpdate(data);
+    },
+    onError: (error) => {
+      // Additional error handling (optional)
+      console.error("Error:", error);
+    },
   }
 );
 
-await updateMutation.mutateAsync(data);
+// Simple mutation call - no try/catch needed
+updateMutation.mutate(data);
+
+// ❌ AVOID - Manual try/catch (unnecessary with onSuccess/onError)
+try {
+  await updateMutation.mutateAsync(data);
+  toast.showSuccess("Update successful!");
+} catch (error) {
+  toast.showError("Update failed");
+}
 
 // ❌ FORBIDDEN - Direct API usage in components
 import { api } from "@services/api";
 const response = await api.put(endpoint, data);
 ```
+
+**Key Benefits of Declarative Pattern:**
+- Automatic toast notifications via `successMessage` and `errorMessage`
+- No manual try/catch blocks needed
+- Cleaner, more readable code
+- Consistent error handling across the app
+- `onSuccess` and `onError` callbacks for additional logic
 
 ### Infrastructure
 

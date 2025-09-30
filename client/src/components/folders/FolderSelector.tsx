@@ -1,7 +1,6 @@
 import { Component, Show, For } from "solid-js";
 import { useUserData } from "@context/UserDataContext";
 import { useApiPut } from "@services/apiHooks";
-import { useToast } from "@context/ToastContext";
 import { USER_ENDPOINTS } from "@constants/api.constants";
 import type { UpdateSelectedFolderRequest, UpdateSelectedFolderResponse } from "src/types/User";
 import styles from "./FolderSelector.module.scss";
@@ -15,18 +14,22 @@ interface FolderSelectorProps {
 
 export const FolderSelector: Component<FolderSelectorProps> = (props) => {
   const userData = useUserData();
-  const toast = useToast();
+
+  const user = userData.user;
+  const folders = userData.folders;
 
   const updateFolderMutation = useApiPut<UpdateSelectedFolderResponse, UpdateSelectedFolderRequest>(
     USER_ENDPOINTS.ME_FOLDER,
     undefined,
     {
       invalidateQueries: [["user"]],
+      successMessage: (data, variables) => {
+        const folderName = folders().find((f) => f.id === variables.folderId)?.name || "Unknown";
+        return `Folder changed to "${folderName}"`;
+      },
+      errorMessage: "Failed to update folder selection",
     }
   );
-
-  const user = userData.user;
-  const folders = userData.folders;
 
   const selectedFolderId = () => user()?.configuration?.selectedFolderId;
 
@@ -40,25 +43,10 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
     return folders().find((folder) => folder.id === folderId) || null;
   };
 
-  const handleFolderChange = async (folderId: number) => {
+  const handleFolderChange = (folderId: number) => {
     if (updateFolderMutation.isPending) return;
 
-    const currentUserId = user()?.id;
-    if (!currentUserId) {
-      toast.showError("Authentication required");
-      return;
-    }
-
-    try {
-      await updateFolderMutation.mutateAsync({ folderId });
-
-      const selectedFolderName =
-        folders().find((f) => f.id === folderId)?.name || "Unknown";
-      toast.showSuccess(`Folder changed to "${selectedFolderName}"`);
-    } catch (error) {
-      console.error("Failed to update selected folder:", error);
-      toast.showError("Failed to update folder selection");
-    }
+    updateFolderMutation.mutate({ folderId });
   };
 
   return (

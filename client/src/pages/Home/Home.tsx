@@ -47,6 +47,14 @@ const Home: Component = () => {
     {
       successMessage: "Collection sync started successfully!",
       errorMessage: "Failed to start collection sync. Please try again.",
+      onSuccess: (data) => {
+        setSyncStatus(data.message);
+        console.log("Sync response:", data);
+      },
+      onError: (error) => {
+        console.error("Sync failed:", error);
+        setSyncStatus("Sync failed. Please try again.");
+      },
     }
   );
 
@@ -54,22 +62,14 @@ const Home: Component = () => {
     navigate(route);
   };
 
-  const handleSyncCollection = async () => {
+  const handleSyncCollection = () => {
     if (!user()?.configuration?.discogsToken) {
       setShowTokenModal(true);
       return;
     }
 
     setSyncStatus("Initiating collection sync...");
-
-    try {
-      const response = await syncMutation.mutateAsync();
-      setSyncStatus(response.message);
-      console.log("Sync response:", response);
-    } catch (error) {
-      console.error("Sync failed:", error);
-      setSyncStatus("Sync failed. Please try again.");
-    }
+    syncMutation.mutate();
   };
 
   const handleTokenModalClose = () => {

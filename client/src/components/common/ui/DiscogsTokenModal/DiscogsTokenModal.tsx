@@ -18,10 +18,25 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
     undefined,
     {
       invalidateQueries: [["user"]],
+      successMessage: "Discogs token saved successfully!",
+      errorMessage: "Failed to save token. Please try again.",
+      onSuccess: () => {
+        console.log("Discogs token saved successfully");
+        setToken("");
+        props.onClose();
+      },
+      onError: (error) => {
+        console.error("Token submission failed:", error);
+        setLocalError(
+          error instanceof Error
+            ? error.message
+            : "Failed to save token. Please try again.",
+        );
+      },
     }
   );
 
-  const handleSubmit = async (e: Event) => {
+  const handleSubmit = (e: Event) => {
     e.preventDefault();
     const tokenValue = token().trim();
 
@@ -31,21 +46,7 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
     }
 
     setLocalError(null);
-
-    try {
-      await updateTokenMutation.mutateAsync({ token: tokenValue });
-      console.log("Discogs token saved successfully");
-
-      setToken("");
-      props.onClose();
-    } catch (error) {
-      console.error("Token submission failed:", error);
-      setLocalError(
-        error instanceof Error
-          ? error.message
-          : "Failed to save token. Please try again.",
-      );
-    }
+    updateTokenMutation.mutate({ token: tokenValue });
   };
 
   const displayError = () => localError();
