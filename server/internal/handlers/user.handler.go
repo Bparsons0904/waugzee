@@ -53,13 +53,6 @@ func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check if user has a selected folder
-	if user.Configuration == nil || user.Configuration.SelectedFolderID == nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "No folder selected",
-		})
-	}
-
 	userData, err := h.userController.GetUser(c.Context(), user)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

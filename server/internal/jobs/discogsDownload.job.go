@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
@@ -186,7 +187,24 @@ func (j *DiscogsDownloadJob) Execute(ctx context.Context) error {
 
 	// Perform the actual download
 	if err := j.performDownload(ctx, processingRecord, yearMonth); err != nil {
-		// Update record with error information
+		// Check if it's a 404 error (data not available yet)
+		if strings.Contains(err.Error(), "status code: 404") {
+			log.Info(
+				"Data not available yet for this month, will try again next day",
+				"yearMonth",
+				yearMonth,
+			)
+			// Reset status back to not_started so it will be retried next day
+			if statusErr := processingRecord.UpdateStatus(models.ProcessingStatusNotStarted); statusErr != nil {
+				log.Warn("failed to reset processing record status", "error", statusErr)
+			}
+			if updateErr := j.repo.Update(ctx, processingRecord); updateErr != nil {
+				log.Warn("failed to update processing record", "error", updateErr)
+			}
+			return nil // Success - just not available yet
+		}
+
+		// For other errors, mark as failed
 		errorMsg := err.Error()
 		processingRecord.ErrorMessage = &errorMsg
 		if statusErr := processingRecord.UpdateStatus(models.ProcessingStatusFailed); statusErr != nil {

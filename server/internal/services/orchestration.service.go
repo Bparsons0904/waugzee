@@ -318,3 +318,7 @@ func (o *OrchestrationService) handleReleaseResponse(
 
 	return nil
 }
+
+func (o *OrchestrationService) ClearSyncState(ctx context.Context, userID uuid.UUID) error {
+	return o.foldersService.ClearSyncState(ctx, userID)
+}

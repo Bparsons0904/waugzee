@@ -350,17 +350,22 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 		return log.Err("failed to get or create processing record", err)
 	}
 
+	if processing == nil {
+		log.Info("No processing record available yet", "yearMonth", yearMonth)
+		return nil
+	}
+
 	// Validate processing status
 	if processing.Status != models.ProcessingStatusReadyForProcessing &&
 		processing.Status != models.ProcessingStatusProcessing {
-		return log.Err(
-			"processing not ready",
-			nil,
+		log.Info(
+			"Processing not ready yet",
 			"status",
 			processing.Status,
 			"yearMonth",
 			yearMonth,
 		)
+		return nil
 	}
 
 	// Update status to processing if not already
