@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"context"
-	"waugzee/internal/constants"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
@@ -10,6 +9,10 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+)
+
+const (
+	USER_FOLDERS_CACHE_PREFIX = "user_folders"
 )
 
 type FolderRepository interface {
@@ -137,7 +140,7 @@ func (r *folderRepository) GetUserFolders(
 	var cachedFolders []*Folder
 	found, err := database.NewCacheBuilder(r.cache.Cache.User, userID).
 		WithContext(ctx).
-		WithHash(constants.UserFoldersCachePrefix).
+		WithHash(USER_FOLDERS_CACHE_PREFIX).
 		Get(&cachedFolders)
 	if err == nil && found {
 		log.Info("user folders found in cache", "userID", userID)
@@ -154,9 +157,9 @@ func (r *folderRepository) GetUserFolders(
 
 	if err := database.NewCacheBuilder(r.cache.Cache.User, userID).
 		WithContext(ctx).
-		WithHash(constants.UserFoldersCachePrefix).
+		WithHash(USER_FOLDERS_CACHE_PREFIX).
 		WithStruct(folders).
-		WithTTL(constants.UserCacheExpiry).
+		WithTTL(USER_CACHE_EXPIRY).
 		Set(); err != nil {
 		log.Warn("failed to cache user folders", "userID", userID, "error", err)
 	}
@@ -199,7 +202,7 @@ func (r *folderRepository) ClearUserFoldersCache(ctx context.Context, userID uui
 
 	if err := database.NewCacheBuilder(r.cache.Cache.User, userID.String()).
 		WithContext(ctx).
-		WithHash(constants.UserFoldersCachePrefix).
+		WithHash(USER_FOLDERS_CACHE_PREFIX).
 		Delete(); err != nil {
 		log.Warn("failed to clear user folders cache", "userID", userID, "error", err)
 		return err

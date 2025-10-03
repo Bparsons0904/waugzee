@@ -30,6 +30,6 @@ func New(db database.DB) Repository {
 		Folder:                  NewFolderRepository(db), // Folder repo needs cache for caching
 		UserRelease:             NewUserReleaseRepository(),
 		DiscogsDataProcessing:   NewDiscogsDataProcessingRepository(db.SQL),
-		UserStylus:              NewUserStylusRepository(),
+		UserStylus:              NewUserStylusRepository(db.Cache.ClientAPI),
 	}
 }

@@ -3,13 +3,17 @@ package repositories
 import (
 	"context"
 	"time"
-	"waugzee/internal/constants"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+)
+
+const (
+	USER_CACHE_PREFIX = "user_oidc"
+	USER_CACHE_EXPIRY = 7 * 24 * time.Hour
 )
 
 
@@ -65,7 +69,7 @@ func (r *userRepository) Update(ctx context.Context, tx *gorm.DB, user *User) er
 func (r *userRepository) getCacheByOIDC(ctx context.Context, oidcUserID string, user *User) error {
 	found, err := database.NewCacheBuilder(r.cache.Cache.User, oidcUserID).
 		WithContext(ctx).
-		WithHash(constants.UserCachePrefix).
+		WithHash(USER_CACHE_PREFIX).
 		Get(user)
 	if err != nil {
 		return r.log.Function("getCacheByOIDC").
@@ -83,9 +87,9 @@ func (r *userRepository) getCacheByOIDC(ctx context.Context, oidcUserID string, 
 func (r *userRepository) addUserToCache(ctx context.Context, user *User) error {
 	if err := database.NewCacheBuilder(r.cache.Cache.User, user.OIDCUserID).
 		WithContext(ctx).
-		WithHash(constants.UserCachePrefix).
+		WithHash(USER_CACHE_PREFIX).
 		WithStruct(user).
-		WithTTL(constants.UserCacheExpiry).
+		WithTTL(USER_CACHE_EXPIRY).
 		Set(); err != nil {
 		return r.log.Function("addUserToCache").
 			Err("failed to add user to cache", err, "oidcUserID", user.OIDCUserID)
@@ -185,7 +189,7 @@ func (r *userRepository) ClearUserCacheByOIDC(ctx context.Context, oidcUserID st
 
 	if err := database.NewCacheBuilder(r.cache.Cache.User, oidcUserID).
 		WithContext(ctx).
-		WithHash(constants.UserCachePrefix).
+		WithHash(USER_CACHE_PREFIX).
 		Delete(); err != nil {
 		log.Warn("failed to remove user from cache", "oidcUserID", oidcUserID, "error", err)
 		return err

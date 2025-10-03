@@ -71,8 +71,7 @@ func (h *UserStylusHandler) createUserStylus(c *fiber.Ctx) error {
 		})
 	}
 
-	userStylus, err := h.userStylusController.CreateUserStylus(c.Context(), user, &req)
-	if err != nil {
+	if err := h.userStylusController.CreateUserStylus(c.Context(), user, &req); err != nil {
 		if err.Error() == "stylusId is required" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "stylusId is required",
@@ -84,7 +83,7 @@ func (h *UserStylusHandler) createUserStylus(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"stylus": userStylus,
+		"success": true,
 	})
 }
 
@@ -111,11 +110,15 @@ func (h *UserStylusHandler) updateUserStylus(c *fiber.Ctx) error {
 		})
 	}
 
-	userStylus, err := h.userStylusController.UpdateUserStylus(c.Context(), user, stylusID, &req)
-	if err != nil {
+	if err := h.userStylusController.UpdateUserStylus(c.Context(), user, stylusID, &req); err != nil {
 		if err.Error() == "user stylus not found or not owned by user" {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "User stylus not found or not owned by user",
+			})
+		}
+		if err.Error() == "no fields to update" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "No fields to update",
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -124,7 +127,7 @@ func (h *UserStylusHandler) updateUserStylus(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"stylus": userStylus,
+		"success": true,
 	})
 }
 

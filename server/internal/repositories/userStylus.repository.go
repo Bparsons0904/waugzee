@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"context"
+	"time"
+	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
@@ -9,22 +11,34 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	USER_STYLUSES_CACHE_PREFIX = "user_styluses"
+	USER_STYLUSES_CACHE_EXPIRY = 7 * 24 * time.Hour
+)
+
 type UserStylusRepository interface {
 	GetUserStyluses(ctx context.Context, tx *gorm.DB, userID uuid.UUID) ([]*UserStylus, error)
 	Create(ctx context.Context, tx *gorm.DB, userStylus *UserStylus) error
-	Update(ctx context.Context, tx *gorm.DB, userStylus *UserStylus) error
+	Update(
+		ctx context.Context,
+		tx *gorm.DB,
+		userID uuid.UUID,
+		stylusID uuid.UUID,
+		updates map[string]any,
+	) error
 	Delete(ctx context.Context, tx *gorm.DB, userID uuid.UUID, stylusID uuid.UUID) error
 	UnsetAllPrimary(ctx context.Context, tx *gorm.DB, userID uuid.UUID) error
-	GetByID(ctx context.Context, tx *gorm.DB, userID uuid.UUID, id uuid.UUID) (*UserStylus, error)
 }
 
 type userStylusRepository struct {
-	log logger.Logger
+	cache database.CacheClient
+	log   logger.Logger
 }
 
-func NewUserStylusRepository() UserStylusRepository {
+func NewUserStylusRepository(cache database.CacheClient) UserStylusRepository {
 	return &userStylusRepository{
-		log: logger.New("userStylusRepository"),
+		cache: cache,
+		log:   logger.New("userStylusRepository"),
 	}
 }
 
@@ -35,14 +49,46 @@ func (r *userStylusRepository) GetUserStyluses(
 ) ([]*UserStylus, error) {
 	log := r.log.Function("GetUserStyluses")
 
+	var cached []*UserStylus
+	found, err := database.NewCacheBuilder(r.cache, userID.String()).
+		WithContext(ctx).
+		WithHash(USER_STYLUSES_CACHE_PREFIX).
+		Get(&cached)
+	if err != nil {
+		log.Warn("failed to get user styluses from cache", "userID", userID, "error", err)
+	}
+
+	if found {
+		log.Info("User styluses retrieved from cache", "userID", userID, "count", len(cached))
+		return cached, nil
+	}
+
 	var styluses []*UserStylus
-	if err := tx.WithContext(ctx).
+	if err = tx.WithContext(ctx).
 		Preload("Stylus").
 		Where("user_id = ?", userID).
 		Order("created_at DESC").
 		Find(&styluses).Error; err != nil {
 		return nil, log.Err("failed to get user styluses", err, "userID", userID)
 	}
+
+	err = database.NewCacheBuilder(r.cache, userID.String()).
+		WithContext(ctx).
+		WithHash(USER_STYLUSES_CACHE_PREFIX).
+		WithStruct(styluses).
+		WithTTL(USER_STYLUSES_CACHE_EXPIRY).
+		Set()
+	if err != nil {
+		log.Warn("failed to set user styluses in cache", "userID", userID, "error", err)
+	}
+
+	log.Info(
+		"User styluses retrieved from database and cached",
+		"userID",
+		userID,
+		"count",
+		len(styluses),
+	)
 
 	return styluses, nil
 }
@@ -65,26 +111,47 @@ func (r *userStylusRepository) Create(
 		)
 	}
 
+	r.clearUserStylusCache(ctx, userStylus.UserID)
+
 	return nil
 }
 
 func (r *userStylusRepository) Update(
 	ctx context.Context,
 	tx *gorm.DB,
-	userStylus *UserStylus,
+	userID uuid.UUID,
+	stylusID uuid.UUID,
+	updates map[string]any,
 ) error {
 	log := r.log.Function("Update")
 
-	if err := tx.WithContext(ctx).Save(userStylus).Error; err != nil {
+	result := tx.WithContext(ctx).
+		Model(&UserStylus{}).
+		Where("id = ? AND user_id = ?", stylusID, userID).
+		Updates(updates)
+
+	if result.Error != nil {
 		return log.Err(
 			"failed to update user stylus",
-			err,
+			result.Error,
 			"id",
-			userStylus.ID,
+			stylusID,
 			"userID",
-			userStylus.UserID,
+			userID,
 		)
 	}
+
+	if result.RowsAffected == 0 {
+		return log.Error(
+			"user stylus not found or not owned by user",
+			"id",
+			stylusID,
+			"userID",
+			userID,
+		)
+	}
+
+	r.clearUserStylusCache(ctx, userID)
 
 	return nil
 }
@@ -122,6 +189,8 @@ func (r *userStylusRepository) Delete(
 		)
 	}
 
+	r.clearUserStylusCache(ctx, userID)
+
 	return nil
 }
 
@@ -142,24 +211,12 @@ func (r *userStylusRepository) UnsetAllPrimary(
 	return nil
 }
 
-func (r *userStylusRepository) GetByID(
-	ctx context.Context,
-	tx *gorm.DB,
-	userID uuid.UUID,
-	id uuid.UUID,
-) (*UserStylus, error) {
-	log := r.log.Function("GetByID")
-
-	var userStylus UserStylus
-	if err := tx.WithContext(ctx).
-		Preload("Stylus").
-		Where("id = ? AND user_id = ?", id, userID).
-		First(&userStylus).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, log.Error("user stylus not found", "id", id, "userID", userID)
-		}
-		return nil, log.Err("failed to get user stylus by ID", err, "id", id, "userID", userID)
+func (r *userStylusRepository) clearUserStylusCache(ctx context.Context, userID uuid.UUID) {
+	err := database.NewCacheBuilder(r.cache, userID.String()).
+		WithContext(ctx).
+		WithHash(USER_STYLUSES_CACHE_PREFIX).
+		Delete()
+	if err != nil {
+		r.log.Warn("failed to clear user stylus cache", "userID", userID, "error", err)
 	}
-
-	return &userStylus, nil
 }

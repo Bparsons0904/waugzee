@@ -8,16 +8,19 @@ import (
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
+	"waugzee/internal/services"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+	"gorm.io/gorm"
 )
 
 type UserStylusController struct {
-	userStylusRepo repositories.UserStylusRepository
-	db             database.DB
-	Config         config.Config
-	log            logger.Logger
+	userStylusRepo     repositories.UserStylusRepository
+	transactionService *services.TransactionService
+	db                 database.DB
+	Config             config.Config
+	log                logger.Logger
 }
 
 type CreateUserStylusRequest struct {
@@ -37,33 +40,38 @@ type UpdateUserStylusRequest struct {
 	IsActive     *bool            `json:"isActive,omitempty"`
 }
 
+type UpdateUserStylusResponse struct {
+	Success bool `json:"success"`
+}
+
 type UserStylusControllerInterface interface {
 	GetUserStyluses(ctx context.Context, user *User) ([]*UserStylus, error)
 	CreateUserStylus(
 		ctx context.Context,
 		user *User,
 		request *CreateUserStylusRequest,
-	) (*UserStylus, error)
+	) error
 	UpdateUserStylus(
 		ctx context.Context,
 		user *User,
 		stylusID uuid.UUID,
 		request *UpdateUserStylusRequest,
-	) (*UserStylus, error)
+	) error
 	DeleteUserStylus(ctx context.Context, user *User, stylusID uuid.UUID) error
 }
 
 func New(
 	repos repositories.Repository,
-	_ any,
+	services services.Service,
 	config config.Config,
 	db database.DB,
 ) UserStylusControllerInterface {
 	return &UserStylusController{
-		userStylusRepo: repos.UserStylus,
-		db:             db,
-		Config:         config,
-		log:            logger.New("userStylusController"),
+		userStylusRepo:     repos.UserStylus,
+		transactionService: services.Transaction,
+		db:                 db,
+		Config:             config,
+		log:                logger.New("userStylusController"),
 	}
 }
 
@@ -85,11 +93,11 @@ func (c *UserStylusController) CreateUserStylus(
 	ctx context.Context,
 	user *User,
 	request *CreateUserStylusRequest,
-) (*UserStylus, error) {
+) error {
 	log := c.log.Function("CreateUserStylus")
 
 	if request.StylusID == uuid.Nil {
-		return nil, log.ErrMsg("stylusId is required")
+		return log.ErrMsg("stylusId is required")
 	}
 
 	userStylus := &UserStylus{
@@ -106,24 +114,23 @@ func (c *UserStylusController) CreateUserStylus(
 		userStylus.IsActive = *request.IsActive
 	}
 
-	if userStylus.IsActive {
-		if err := c.userStylusRepo.UnsetAllPrimary(ctx, c.db.SQL, user.ID); err != nil {
-			return nil, log.Err("failed to unset all primary styluses", err, "userID", user.ID)
+	err := c.transactionService.Execute(ctx, func(ctx context.Context, tx *gorm.DB) error {
+		if userStylus.IsActive {
+			if err := c.userStylusRepo.UnsetAllPrimary(ctx, tx, user.ID); err != nil {
+				return err
+			}
 		}
-	}
 
-	if err := c.userStylusRepo.Create(ctx, c.db.SQL, userStylus); err != nil {
-		return nil, log.Err("failed to create user stylus", err, "userID", user.ID)
-	}
+		return c.userStylusRepo.Create(ctx, tx, userStylus)
+	})
 
-	createdStylus, err := c.userStylusRepo.GetByID(ctx, c.db.SQL, user.ID, userStylus.ID)
 	if err != nil {
-		return nil, log.Err("failed to get created user stylus", err, "id", userStylus.ID)
+		return log.Err("failed to create user stylus", err, "userID", user.ID)
 	}
 
 	log.Info("User stylus created successfully", "userID", user.ID, "stylusID", userStylus.ID)
 
-	return createdStylus, nil
+	return nil
 }
 
 func (c *UserStylusController) UpdateUserStylus(
@@ -131,48 +138,48 @@ func (c *UserStylusController) UpdateUserStylus(
 	user *User,
 	stylusID uuid.UUID,
 	request *UpdateUserStylusRequest,
-) (*UserStylus, error) {
+) error {
 	log := c.log.Function("UpdateUserStylus")
 
-	userStylus, err := c.userStylusRepo.GetByID(ctx, c.db.SQL, user.ID, stylusID)
-	if err != nil {
-		return nil, log.Err("user stylus not found or not owned by user", err)
-	}
-
-	if request.IsActive != nil && *request.IsActive {
-		if err = c.userStylusRepo.UnsetAllPrimary(ctx, c.db.SQL, user.ID); err != nil {
-			return nil, log.Err("failed to unset all primary styluses", err, "userID", user.ID)
-		}
-	}
+	updates := make(map[string]interface{})
 
 	if request.PurchaseDate != nil {
-		userStylus.PurchaseDate = request.PurchaseDate
+		updates["purchase_date"] = request.PurchaseDate
 	}
 	if request.InstallDate != nil {
-		userStylus.InstallDate = request.InstallDate
+		updates["install_date"] = request.InstallDate
 	}
 	if request.HoursUsed != nil {
-		userStylus.HoursUsed = request.HoursUsed
+		updates["hours_used"] = request.HoursUsed
 	}
 	if request.Notes != nil {
-		userStylus.Notes = request.Notes
+		updates["notes"] = request.Notes
 	}
 	if request.IsActive != nil {
-		userStylus.IsActive = *request.IsActive
+		updates["is_active"] = *request.IsActive
 	}
 
-	if err = c.userStylusRepo.Update(ctx, c.db.SQL, userStylus); err != nil {
-		return nil, log.Err("failed to update user stylus", err, "id", stylusID)
+	if len(updates) == 0 {
+		return log.ErrMsg("no fields to update")
 	}
 
-	updatedStylus, err := c.userStylusRepo.GetByID(ctx, c.db.SQL, user.ID, stylusID)
+	err := c.transactionService.Execute(ctx, func(ctx context.Context, tx *gorm.DB) error {
+		if request.IsActive != nil && *request.IsActive {
+			if err := c.userStylusRepo.UnsetAllPrimary(ctx, tx, user.ID); err != nil {
+				return err
+			}
+		}
+
+		return c.userStylusRepo.Update(ctx, tx, user.ID, stylusID, updates)
+	})
+
 	if err != nil {
-		return nil, log.Err("failed to get updated user stylus", err, "id", stylusID)
+		return log.Err("failed to update user stylus", err, "id", stylusID, "userID", user.ID)
 	}
 
 	log.Info("User stylus updated successfully", "userID", user.ID, "stylusID", stylusID)
 
-	return updatedStylus, nil
+	return nil
 }
 
 func (c *UserStylusController) DeleteUserStylus(
