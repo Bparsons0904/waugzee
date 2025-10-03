@@ -1,5 +1,5 @@
 import "./App.scss";
-import { Component } from "solid-js";
+import { Component, Suspense } from "solid-js";
 import { AuthProvider } from "./context/AuthContext";
 import { UserDataProvider } from "./context/UserDataContext";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
@@ -26,7 +26,11 @@ const App: Component<RouteSectionProps<unknown>> = (props) => {
             <WebSocketProvider>
               <ProxyService />
               <NavBar />
-              <main class="content">{props.children}</main>
+              <main class="content">
+                <Suspense fallback={<div />}>
+                  {props.children}
+                </Suspense>
+              </main>
             </WebSocketProvider>
           </UserDataProvider>
         </AuthProvider>

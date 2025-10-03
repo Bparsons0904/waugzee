@@ -16,7 +16,8 @@ const (
 	USER_STYLUSES_CACHE_EXPIRY = 7 * 24 * time.Hour
 )
 
-type UserStylusRepository interface {
+type StylusRepository interface {
+	GetAllStyluses(ctx context.Context, tx *gorm.DB) ([]*Stylus, error)
 	GetUserStyluses(ctx context.Context, tx *gorm.DB, userID uuid.UUID) ([]*UserStylus, error)
 	Create(ctx context.Context, tx *gorm.DB, userStylus *UserStylus) error
 	Update(
@@ -30,19 +31,37 @@ type UserStylusRepository interface {
 	UnsetAllPrimary(ctx context.Context, tx *gorm.DB, userID uuid.UUID) error
 }
 
-type userStylusRepository struct {
+type stylusRepository struct {
 	cache database.CacheClient
 	log   logger.Logger
 }
 
-func NewUserStylusRepository(cache database.CacheClient) UserStylusRepository {
-	return &userStylusRepository{
+func NewStylusRepository(cache database.CacheClient) StylusRepository {
+	return &stylusRepository{
 		cache: cache,
-		log:   logger.New("userStylusRepository"),
+		log:   logger.New("stylusRepository"),
 	}
 }
 
-func (r *userStylusRepository) GetUserStyluses(
+func (r *stylusRepository) GetAllStyluses(
+	ctx context.Context,
+	tx *gorm.DB,
+) ([]*Stylus, error) {
+	log := r.log.Function("GetAllStyluses")
+
+	var styluses []*Stylus
+	if err := tx.WithContext(ctx).
+		Order("brand ASC, model ASC").
+		Find(&styluses).Error; err != nil {
+		return nil, log.Err("failed to get all styluses", err)
+	}
+
+	log.Info("All styluses retrieved from database", "count", len(styluses))
+
+	return styluses, nil
+}
+
+func (r *stylusRepository) GetUserStyluses(
 	ctx context.Context,
 	tx *gorm.DB,
 	userID uuid.UUID,
@@ -93,7 +112,7 @@ func (r *userStylusRepository) GetUserStyluses(
 	return styluses, nil
 }
 
-func (r *userStylusRepository) Create(
+func (r *stylusRepository) Create(
 	ctx context.Context,
 	tx *gorm.DB,
 	userStylus *UserStylus,
@@ -116,7 +135,7 @@ func (r *userStylusRepository) Create(
 	return nil
 }
 
-func (r *userStylusRepository) Update(
+func (r *stylusRepository) Update(
 	ctx context.Context,
 	tx *gorm.DB,
 	userID uuid.UUID,
@@ -156,7 +175,7 @@ func (r *userStylusRepository) Update(
 	return nil
 }
 
-func (r *userStylusRepository) Delete(
+func (r *stylusRepository) Delete(
 	ctx context.Context,
 	tx *gorm.DB,
 	userID uuid.UUID,
@@ -194,7 +213,7 @@ func (r *userStylusRepository) Delete(
 	return nil
 }
 
-func (r *userStylusRepository) UnsetAllPrimary(
+func (r *stylusRepository) UnsetAllPrimary(
 	ctx context.Context,
 	tx *gorm.DB,
 	userID uuid.UUID,
@@ -211,7 +230,7 @@ func (r *userStylusRepository) UnsetAllPrimary(
 	return nil
 }
 
-func (r *userStylusRepository) clearUserStylusCache(ctx context.Context, userID uuid.UUID) {
+func (r *stylusRepository) clearUserStylusCache(ctx context.Context, userID uuid.UUID) {
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).
 		WithHash(USER_STYLUSES_CACHE_PREFIX).

@@ -10,9 +10,7 @@ const LoginPage = lazy(() => import("@pages/Auth/Login"));
 const OidcCallbackPage = lazy(() => import("@pages/Auth/OidcCallback"));
 const SilentCallbackPage = lazy(() => import("@pages/Auth/SilentCallback"));
 const ProfilePage = lazy(() => import("@pages/Profile/Profile"));
-
-const LogPlayPageLoader = () => import("@pages/LogPlay/LogPlay");
-const LogPlayPage = lazy(LogPlayPageLoader);
+const LogPlayPage = lazy(() => import("@pages/LogPlay/LogPlay"));
 
 const ProtectedRoute = (Component: Component) => {
   return () => {
@@ -22,8 +20,6 @@ const ProtectedRoute = (Component: Component) => {
     createEffect(() => {
       if (isAuthenticated() === false) {
         navigate(ROUTES.HOME, { replace: true });
-      } else if (isAuthenticated() === true) {
-        LogPlayPageLoader();
       }
     });
 

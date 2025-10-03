@@ -164,7 +164,10 @@ func (r *userReleaseRepository) GetUserReleasesByFolderID(
 	log := r.log.Function("GetUserReleasesByFolderID")
 
 	var userReleases []*UserRelease
-	if err := tx.Debug().WithContext(ctx).
+	if err := tx.WithContext(ctx).
+		Preload("Release.Artists").
+		Preload("Release.Genres").
+		Preload("Release.Labels").
 		Preload("Release").
 		Where("user_id = ? AND folder_id = ? AND active = ?", userID, folderID, true).
 		Order("date_added DESC").

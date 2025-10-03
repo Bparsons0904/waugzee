@@ -24,7 +24,7 @@ func Router(router fiber.Router, app *app.App) (err error) {
 	api.Use(app.Middleware.RequireAuth(app.Services.Zitadel))
 	NewUserHandler(*app, api).Register()
 	NewSyncHandler(*app, api).Register()
-	NewUserStylusHandler(*app, api).Register()
+	NewStylusHandler(*app, api).Register()
 
 	return nil
 }

@@ -17,7 +17,7 @@ type UserController struct {
 	userConfigRepo  repositories.UserConfigurationRepository
 	folderRepo      repositories.FolderRepository
 	userReleaseRepo repositories.UserReleaseRepository
-	userStylusRepo  repositories.UserStylusRepository
+	userStylusRepo  repositories.StylusRepository
 	discogsService  *services.DiscogsService
 	db              database.DB
 	Config          config.Config
@@ -55,7 +55,7 @@ func New(
 		userConfigRepo:  repos.UserConfiguration,
 		folderRepo:      repos.Folder,
 		userReleaseRepo: repos.UserRelease,
-		userStylusRepo:  repos.UserStylus,
+		userStylusRepo:  repos.Stylus,
 		discogsService:  services.Discogs,
 		db:              db,
 		Config:          config,

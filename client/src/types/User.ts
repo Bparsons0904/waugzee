@@ -82,6 +82,24 @@ export interface UpdateSelectedFolderResponse {
 }
 
 // Release and UserRelease Types
+export interface Artist {
+  id: number;
+  name: string;
+  resourceUrl?: string;
+}
+
+export interface Genre {
+  id: number;
+  name: string;
+}
+
+export interface Label {
+  id: number;
+  name: string;
+  resourceUrl?: string;
+  entityType?: string;
+}
+
 export interface Release {
   id: number;
   title: string;
@@ -100,6 +118,9 @@ export interface Release {
   thumb?: string;
   coverImage?: string;
   data?: Record<string, unknown>; // JSON data
+  artists?: Artist[];
+  genres?: Genre[];
+  labels?: Label[];
 }
 
 export interface UserRelease {

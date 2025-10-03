@@ -1,4 +1,4 @@
-package userStylusController
+package stylusController
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 	"gorm.io/gorm"
 )
 
-type UserStylusController struct {
-	userStylusRepo     repositories.UserStylusRepository
+type StylusController struct {
+	stylusRepo         repositories.StylusRepository
 	transactionService *services.TransactionService
 	db                 database.DB
 	Config             config.Config
@@ -44,7 +44,8 @@ type UpdateUserStylusResponse struct {
 	Success bool `json:"success"`
 }
 
-type UserStylusControllerInterface interface {
+type StylusControllerInterface interface {
+	GetAvailableStyluses(ctx context.Context) ([]*Stylus, error)
 	GetUserStyluses(ctx context.Context, user *User) ([]*UserStylus, error)
 	CreateUserStylus(
 		ctx context.Context,
@@ -65,23 +66,34 @@ func New(
 	services services.Service,
 	config config.Config,
 	db database.DB,
-) UserStylusControllerInterface {
-	return &UserStylusController{
-		userStylusRepo:     repos.UserStylus,
+) StylusControllerInterface {
+	return &StylusController{
+		stylusRepo:         repos.Stylus,
 		transactionService: services.Transaction,
 		db:                 db,
 		Config:             config,
-		log:                logger.New("userStylusController"),
+		log:                logger.New("stylusController"),
 	}
 }
 
-func (c *UserStylusController) GetUserStyluses(
+func (c *StylusController) GetAvailableStyluses(ctx context.Context) ([]*Stylus, error) {
+	log := c.log.Function("GetAvailableStyluses")
+
+	styluses, err := c.stylusRepo.GetAllStyluses(ctx, c.db.SQL)
+	if err != nil {
+		return nil, log.Err("failed to get available styluses", err)
+	}
+
+	return styluses, nil
+}
+
+func (c *StylusController) GetUserStyluses(
 	ctx context.Context,
 	user *User,
 ) ([]*UserStylus, error) {
 	log := c.log.Function("GetUserStyluses")
 
-	styluses, err := c.userStylusRepo.GetUserStyluses(ctx, c.db.SQL, user.ID)
+	styluses, err := c.stylusRepo.GetUserStyluses(ctx, c.db.SQL, user.ID)
 	if err != nil {
 		return nil, log.Err("failed to get user styluses", err, "userID", user.ID)
 	}
@@ -89,7 +101,7 @@ func (c *UserStylusController) GetUserStyluses(
 	return styluses, nil
 }
 
-func (c *UserStylusController) CreateUserStylus(
+func (c *StylusController) CreateUserStylus(
 	ctx context.Context,
 	user *User,
 	request *CreateUserStylusRequest,
@@ -116,12 +128,12 @@ func (c *UserStylusController) CreateUserStylus(
 
 	err := c.transactionService.Execute(ctx, func(ctx context.Context, tx *gorm.DB) error {
 		if userStylus.IsActive {
-			if err := c.userStylusRepo.UnsetAllPrimary(ctx, tx, user.ID); err != nil {
+			if err := c.stylusRepo.UnsetAllPrimary(ctx, tx, user.ID); err != nil {
 				return err
 			}
 		}
 
-		return c.userStylusRepo.Create(ctx, tx, userStylus)
+		return c.stylusRepo.Create(ctx, tx, userStylus)
 	})
 
 	if err != nil {
@@ -133,7 +145,7 @@ func (c *UserStylusController) CreateUserStylus(
 	return nil
 }
 
-func (c *UserStylusController) UpdateUserStylus(
+func (c *StylusController) UpdateUserStylus(
 	ctx context.Context,
 	user *User,
 	stylusID uuid.UUID,
@@ -165,12 +177,12 @@ func (c *UserStylusController) UpdateUserStylus(
 
 	err := c.transactionService.Execute(ctx, func(ctx context.Context, tx *gorm.DB) error {
 		if request.IsActive != nil && *request.IsActive {
-			if err := c.userStylusRepo.UnsetAllPrimary(ctx, tx, user.ID); err != nil {
+			if err := c.stylusRepo.UnsetAllPrimary(ctx, tx, user.ID); err != nil {
 				return err
 			}
 		}
 
-		return c.userStylusRepo.Update(ctx, tx, user.ID, stylusID, updates)
+		return c.stylusRepo.Update(ctx, tx, user.ID, stylusID, updates)
 	})
 
 	if err != nil {
@@ -182,14 +194,14 @@ func (c *UserStylusController) UpdateUserStylus(
 	return nil
 }
 
-func (c *UserStylusController) DeleteUserStylus(
+func (c *StylusController) DeleteUserStylus(
 	ctx context.Context,
 	user *User,
 	stylusID uuid.UUID,
 ) error {
 	log := c.log.Function("DeleteUserStylus")
 
-	if err := c.userStylusRepo.Delete(ctx, c.db.SQL, user.ID, stylusID); err != nil {
+	if err := c.stylusRepo.Delete(ctx, c.db.SQL, user.ID, stylusID); err != nil {
 		return log.Err("failed to delete user stylus", err, "userID", user.ID, "stylusID", stylusID)
 	}
 

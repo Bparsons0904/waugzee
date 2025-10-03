@@ -11,7 +11,7 @@ import {} from // getLastPlayDate,
 // countPlaysSinceCleaning,
 // getLastCleaningDate,
 "@utils/playStatus";
-// import { fuzzySearchReleases } from "@utils/fuzzy";
+import { fuzzySearchUserReleases } from "@utils/fuzzy";
 import { useUserData } from "@context/UserDataContext";
 import { UserRelease } from "@models/User";
 
@@ -74,11 +74,7 @@ const LogPlay: Component = () => {
     let filtered = releases();
 
     if (searchTerm()) {
-      filtered = filtered.filter(
-        (r) =>
-          r.release.title?.toLowerCase().includes(searchTerm().toLowerCase()) ||
-          false,
-      );
+      filtered = fuzzySearchUserReleases(filtered, searchTerm());
     }
 
     return sortReleases(filtered, sortBy());
@@ -193,7 +189,7 @@ const LogPlay: Component = () => {
                           {userRelease.release.title}
                         </h3>
                         <p class={styles.releaseArtist}>
-                          {userRelease.release.format || "Unknown Format"}
+                          {userRelease.release.artists?.[0]?.name || "Unknown Artist"}
                         </p>
 
                         <div class={styles.statusSection}>

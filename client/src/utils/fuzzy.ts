@@ -1,10 +1,11 @@
 import Fuse from "fuse.js";
 import { Release } from "@models/Release";
+import { UserRelease } from "@models/User";
 
 const defaultOptions = {
   keys: [
-    { name: "title", weight: 2 },
-    { name: "artists.artist.name", weight: 1.5 },
+    { name: "artists.artist.name", weight: 2.0 },
+    { name: "title", weight: 1.8 },
     { name: "genres.name", weight: 1 },
     { name: "labels.label.name", weight: 0.8 },
   ],
@@ -47,4 +48,43 @@ export const customSearchReleases = (
   }
 
   return fuzzySearchReleases(filteredReleases, searchTerm);
+};
+
+const userReleaseOptions = {
+  keys: [
+    { name: "release.title", weight: 2 },
+    { name: "release.artists.name", weight: 1.5 },
+    { name: "release.genres.name", weight: 1 },
+    { name: "release.labels.name", weight: 0.8 },
+    { name: "release.format", weight: 0.5 },
+    { name: "release.country", weight: 0.3 },
+  ],
+  isCaseSensitive: false,
+  includeScore: true,
+  shouldSort: true,
+  threshold: 0.4,
+  distance: 100,
+  minMatchCharLength: 2,
+};
+
+export const createUserReleaseFuseInstance = (
+  userReleases: UserRelease[],
+  options = {},
+) => {
+  return new Fuse(userReleases, { ...userReleaseOptions, ...options });
+};
+
+export const fuzzySearchUserReleases = (
+  userReleases: UserRelease[],
+  searchTerm: string,
+  options = {},
+): UserRelease[] => {
+  if (!searchTerm.trim()) {
+    return userReleases;
+  }
+
+  const fuse = createUserReleaseFuseInstance(userReleases, options);
+  const results = fuse.search(searchTerm);
+
+  return results.map((result) => result.item);
 };

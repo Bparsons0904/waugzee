@@ -8,16 +8,16 @@ import (
 	"waugzee/internal/services"
 
 	authController "waugzee/internal/controllers/auth"
+	stylusController "waugzee/internal/controllers/stylus"
 	syncController "waugzee/internal/controllers/sync"
 	userController "waugzee/internal/controllers/users"
-	userStylusController "waugzee/internal/controllers/userStylus"
 )
 
 type Controllers struct {
-	User       userController.UserControllerInterface
-	Auth       authController.AuthControllerInterface
-	Sync       syncController.SyncControllerInterface
-	UserStylus userStylusController.UserStylusControllerInterface
+	User   userController.UserControllerInterface
+	Auth   authController.AuthControllerInterface
+	Sync   syncController.SyncControllerInterface
+	Stylus stylusController.StylusControllerInterface
 }
 
 func New(
@@ -28,9 +28,9 @@ func New(
 	db database.DB,
 ) Controllers {
 	return Controllers{
-		User:       userController.New(repos, services, config, db),
-		Auth:       authController.New(services, repos, db),
-		Sync:       syncController.New(repos, services, eventBus, config),
-		UserStylus: userStylusController.New(repos, services, config, db),
+		User:   userController.New(repos, services, config, db),
+		Auth:   authController.New(services, repos, db),
+		Sync:   syncController.New(repos, services, eventBus, config),
+		Stylus: stylusController.New(repos, services, config, db),
 	}
 }

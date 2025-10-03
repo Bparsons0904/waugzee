@@ -15,6 +15,9 @@ import { useApiPost } from "@services/apiHooks";
 import styles from "./Home.module.scss";
 import { ROUTES } from "@constants/api.constants";
 
+// Preload LogPlay page for instant navigation
+const preloadLogPlay = () => import("@pages/LogPlay/LogPlay");
+
 interface SyncResponse {
   status: string;
   message: string;
@@ -156,6 +159,9 @@ const Home: Component = () => {
   ]);
 
   onMount(async () => {
+    // Preload LogPlay page immediately for instant navigation
+    preloadLogPlay();
+
     try {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 

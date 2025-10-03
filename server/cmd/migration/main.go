@@ -27,6 +27,7 @@ var MODELS_TO_MIGRATE = []any{
 	&User{},
 	&Folder{},
 	&Stylus{},
+	&UserStylus{},
 	&Genre{},
 	&Label{},
 	&Artist{},

@@ -15,21 +15,21 @@ type Repository struct {
 	Folder                  FolderRepository
 	UserRelease             UserReleaseRepository
 	DiscogsDataProcessing   DiscogsDataProcessingRepository
-	UserStylus              UserStylusRepository
+	Stylus                  StylusRepository
 }
 
 func New(db database.DB) Repository {
 	return Repository{
-		User:                    NewUserRepository(db), // User repo needs cache for caching
+		User:                    NewUserRepository(db),
 		UserConfiguration:       NewUserConfigurationRepository(),
 		Artist:                  NewArtistRepository(),
 		Master:                  NewMasterRepository(),
 		Release:                 NewReleaseRepository(),
 		Genre:                   NewGenreRepository(),
 		Label:                   NewLabelRepository(),
-		Folder:                  NewFolderRepository(db), // Folder repo needs cache for caching
+		Folder:                  NewFolderRepository(db),
 		UserRelease:             NewUserReleaseRepository(),
 		DiscogsDataProcessing:   NewDiscogsDataProcessingRepository(db.SQL),
-		UserStylus:              NewUserStylusRepository(db.Cache.ClientAPI),
+		Stylus:                  NewStylusRepository(db.Cache.ClientAPI),
 	}
 }
