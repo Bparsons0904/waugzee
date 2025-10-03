@@ -27,7 +27,7 @@ export interface SelectProps {
 
 export const Select: Component<SelectProps> = (props) => {
   const id = createUniqueId();
-  
+
   const validation = useValidation({
     initialValue: props.defaultValue,
     required: props.required,
@@ -44,7 +44,7 @@ export const Select: Component<SelectProps> = (props) => {
   const handleChange = (event: Event) => {
     const target = event.target as HTMLSelectElement;
     const newValue = target.value;
-    
+
     validation.setValue(newValue);
     props.onChange?.(newValue);
   };
@@ -52,7 +52,7 @@ export const Select: Component<SelectProps> = (props) => {
   const handleBlur = (event: FocusEvent) => {
     const target = event.target as HTMLSelectElement;
     const value = target.value;
-    
+
     validation.markAsBlurred();
     const validationResult = validation.validate(value, true);
 
@@ -69,6 +69,7 @@ export const Select: Component<SelectProps> = (props) => {
 
   return (
     <div class={`${styles.selectContainer} ${props.class || ""}`}>
+      {/* Claude should this be part of the Field component?  */}
       <Show when={props.label}>
         <label for={id} class={styles.label}>
           {props.label}
@@ -77,7 +78,7 @@ export const Select: Component<SelectProps> = (props) => {
           </Show>
         </label>
       </Show>
-      
+
       <div class={styles.selectWrapper}>
         <select
           id={id}
@@ -94,12 +95,9 @@ export const Select: Component<SelectProps> = (props) => {
               {props.placeholder}
             </option>
           </Show>
-          
+
           {props.options.map((option) => (
-            <option 
-              value={option.value} 
-              disabled={option.disabled}
-            >
+            <option value={option.value} disabled={option.disabled}>
               {option.label}
             </option>
           ))}
@@ -132,3 +130,4 @@ export const Select: Component<SelectProps> = (props) => {
     </div>
   );
 };
+

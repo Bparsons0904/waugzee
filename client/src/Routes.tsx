@@ -10,13 +10,9 @@ const LoginPage = lazy(() => import("@pages/Auth/Login"));
 const OidcCallbackPage = lazy(() => import("@pages/Auth/OidcCallback"));
 const SilentCallbackPage = lazy(() => import("@pages/Auth/SilentCallback"));
 const ProfilePage = lazy(() => import("@pages/Profile/Profile"));
-// const WorkstationComponent = lazy(() => import("@pages/Workstation/Workstation"));
-// const LoadTestPage = lazy(() => import("@pages/LoadTest/LoadTest"));
 
-// // Create a 7x7 workstation wrapper
-// const WorkstationPage: Component = () => {
-//   return <WorkstationComponent gridRows={7} gridCols={7} />;
-// };
+const LogPlayPageLoader = () => import("@pages/LogPlay/LogPlay");
+const LogPlayPage = lazy(LogPlayPageLoader);
 
 const ProtectedRoute = (Component: Component) => {
   return () => {
@@ -26,6 +22,8 @@ const ProtectedRoute = (Component: Component) => {
     createEffect(() => {
       if (isAuthenticated() === false) {
         navigate(ROUTES.HOME, { replace: true });
+      } else if (isAuthenticated() === true) {
+        LogPlayPageLoader();
       }
     });
 
@@ -41,8 +39,7 @@ export const Routes: Component = () => {
       <Route path={ROUTES.CALLBACK} component={OidcCallbackPage} />
       <Route path={ROUTES.SILENT_CALLBACK} component={SilentCallbackPage} />
       <Route path={ROUTES.PROFILE} component={ProtectedRoute(ProfilePage)} />
-      {/* <Route path="/workstation" component={ProtectedRoute(WorkstationPage)} /> */}
-      {/* <Route path="/loadtest" component={ProtectedRoute(LoadTestPage)} /> */}
+      <Route path={ROUTES.LOG_PLAY} component={ProtectedRoute(LogPlayPage)} />
     </>
   );
 };
