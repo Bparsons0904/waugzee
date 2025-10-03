@@ -64,6 +64,7 @@ func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
 		"user":     user,
 		"folders":  userData.Folders,
 		"releases": userData.Releases,
+		"styluses": userData.Styluses,
 	})
 }
 

@@ -115,8 +115,33 @@ export interface UserRelease {
   active: boolean;
 }
 
+export interface Stylus {
+  id: string;
+  name: string;
+  manufacturer?: string;
+  modelNumber?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserStylus {
+  id: string;
+  userId: string;
+  stylusId: string;
+  stylus?: Stylus;
+  purchaseDate?: string;
+  installDate?: string;
+  hoursUsed?: number;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface UserWithFoldersAndReleasesResponse {
   user: User;
   folders: Folder[];
   releases: UserRelease[];
+  styluses: UserStylus[];
 }

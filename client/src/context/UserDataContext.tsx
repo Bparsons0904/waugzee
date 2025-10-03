@@ -1,5 +1,5 @@
 import { createContext, useContext, JSX } from "solid-js";
-import { User, Folder, UserRelease, UserWithFoldersAndReleasesResponse } from "src/types/User";
+import { User, Folder, UserRelease, UserStylus, UserWithFoldersAndReleasesResponse } from "src/types/User";
 import { useAuth } from "./AuthContext";
 import { useApiQuery } from "@services/apiHooks";
 import { useQueryClient } from "@tanstack/solid-query";
@@ -9,6 +9,7 @@ type UserDataContextValue = {
   user: () => User | null;
   folders: () => Folder[];
   releases: () => UserRelease[];
+  styluses: () => UserStylus[];
   isLoading: () => boolean;
   error: () => string | null;
   updateUser: (user: User) => void;
@@ -65,6 +66,7 @@ export function UserDataProvider(props: { children: JSX.Element }) {
         user: () => userQuery.data?.user || null,
         folders: () => userQuery.data?.folders || [],
         releases: () => userQuery.data?.releases || [],
+        styluses: () => userQuery.data?.styluses || [],
         isLoading: () => userQuery.isLoading,
         error: () => userQuery.error?.message || null,
         updateUser,

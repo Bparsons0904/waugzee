@@ -17,6 +17,7 @@ type UserController struct {
 	userConfigRepo  repositories.UserConfigurationRepository
 	folderRepo      repositories.FolderRepository
 	userReleaseRepo repositories.UserReleaseRepository
+	userStylusRepo  repositories.UserStylusRepository
 	discogsService  *services.DiscogsService
 	db              database.DB
 	Config          config.Config
@@ -26,6 +27,7 @@ type UserController struct {
 type GetUserResponse struct {
 	Folders  []*Folder      `json:"folders"`
 	Releases []*UserRelease `json:"releases"`
+	Styluses []*UserStylus  `json:"styluses"`
 }
 
 type UserControllerInterface interface {
@@ -53,6 +55,7 @@ func New(
 		userConfigRepo:  repos.UserConfiguration,
 		folderRepo:      repos.Folder,
 		userReleaseRepo: repos.UserRelease,
+		userStylusRepo:  repos.UserStylus,
 		discogsService:  services.Discogs,
 		db:              db,
 		Config:          config,
@@ -149,9 +152,16 @@ func (uc *UserController) GetUser(
 		}
 	}
 
+	// Get user styluses
+	styluses, err := uc.userStylusRepo.GetUserStyluses(ctx, uc.db.SQL, user.ID)
+	if err != nil {
+		return nil, log.Err("failed to get user styluses", err, "userID", user.ID)
+	}
+
 	return &GetUserResponse{
 		Folders:  folders,
 		Releases: releases,
+		Styluses: styluses,
 	}, nil
 }
 
