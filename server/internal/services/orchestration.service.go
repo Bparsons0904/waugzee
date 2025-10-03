@@ -145,7 +145,7 @@ func (o *OrchestrationService) HandleAPIResponse(
 		WithContext(ctx).
 		Delete()
 	if err != nil {
-		log.Err("failed to cleanup cache entry", err, "requestID", requestID)
+		log.Er("failed to cleanup cache entry", err, "requestID", requestID)
 	}
 
 	switch metadata.RequestType {

@@ -30,7 +30,6 @@ const sortOptions: SelectOption[] = [
 const LogPlay: Component = () => {
   const userData = useUserData();
   const releases = () => userData.releases();
-  console.log("releases", releases());
   const [searchTerm, setSearchTerm] = createSignal("");
   const [selectedRelease, setSelectedRelease] =
     createSignal<UserRelease | null>(null);

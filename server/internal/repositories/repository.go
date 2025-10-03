@@ -15,6 +15,7 @@ type Repository struct {
 	Folder                  FolderRepository
 	UserRelease             UserReleaseRepository
 	DiscogsDataProcessing   DiscogsDataProcessingRepository
+	UserStylus              UserStylusRepository
 }
 
 func New(db database.DB) Repository {
@@ -29,5 +30,6 @@ func New(db database.DB) Repository {
 		Folder:                  NewFolderRepository(db), // Folder repo needs cache for caching
 		UserRelease:             NewUserReleaseRepository(),
 		DiscogsDataProcessing:   NewDiscogsDataProcessingRepository(db.SQL),
+		UserStylus:              NewUserStylusRepository(),
 	}
 }

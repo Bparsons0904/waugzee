@@ -413,10 +413,9 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		return log.Err("failed to extract folder ID", err)
 	}
 
-	missingReleaseIDs := make([]int64, 0)
-
 	// Get current sync state from cache
 	var syncState CollectionSyncState
+	var missingReleaseIDs []int64
 	found, err := database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).
 		WithHashPattern(COLLECTION_SYNC_HASH).
 		WithContext(ctx).
