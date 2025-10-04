@@ -94,10 +94,12 @@ func (o *OrchestrationService) SyncUserFoldersAndCollection(
 	}
 
 	// Step 2: Start collection sync for all user folders
-	// This will process folders 1+ and coordinate with folder responses
+	// Only start if folders already exist - otherwise wait for folder response to trigger sync
 	err = o.foldersService.SyncAllUserFolders(ctx, user)
 	if err != nil {
-		return log.Err("failed to initiate collection sync", err)
+		// If no folders exist yet, that's OK - folder response will trigger sync
+		log.Info("Collection sync will be triggered after folder discovery completes")
+		return nil
 	}
 
 	return nil

@@ -183,6 +183,20 @@ func (f *FoldersService) ProcessFoldersResponse(
 			"requestID", metadata.RequestID)
 	}
 
+	// Trigger collection sync now that folders are saved
+	user, err := f.repos.User.GetByID(ctx, f.db.SQLWithContext(ctx), metadata.UserID)
+	if err != nil {
+		log.Warn("Failed to fetch user for collection sync trigger", "error", err)
+		return nil
+	}
+
+	err = f.SyncAllUserFolders(ctx, user)
+	if err != nil {
+		log.Warn("Failed to trigger collection sync after folder discovery",
+			"userID", metadata.UserID,
+			"error", err)
+	}
+
 	return nil
 }
 

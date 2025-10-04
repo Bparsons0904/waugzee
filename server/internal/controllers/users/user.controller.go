@@ -121,34 +121,34 @@ func (uc *UserController) GetUser(
 		// Get the folder using the composite key lookup
 		selectedFolder, err := uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, *user.Configuration.SelectedFolderID)
 		if err != nil {
-			return nil, log.Err(
-				"failed to get selected folder",
-				err,
+			log.Warn(
+				"selected folder not found, returning empty releases (likely needs sync)",
 				"userID",
 				user.ID,
 				"folderID",
 				*user.Configuration.SelectedFolderID,
 			)
-		}
-
-		// Use the folder's ID to query user releases
-		releases, err = uc.userReleaseRepo.GetUserReleasesByFolderID(
-			ctx,
-			uc.db.SQL,
-			user.ID,
-			*selectedFolder.ID,
-		)
-		if err != nil {
-			return nil, log.Err(
-				"failed to get user releases",
-				err,
-				"userID",
+			releases = []*UserRelease{}
+		} else {
+			// Use the folder's ID to query user releases
+			releases, err = uc.userReleaseRepo.GetUserReleasesByFolderID(
+				ctx,
+				uc.db.SQL,
 				user.ID,
-				"folderID",
-				*user.Configuration.SelectedFolderID,
-				"folderID",
 				*selectedFolder.ID,
 			)
+			if err != nil {
+				return nil, log.Err(
+					"failed to get user releases",
+					err,
+					"userID",
+					user.ID,
+					"folderID",
+					*user.Configuration.SelectedFolderID,
+					"folderID",
+					*selectedFolder.ID,
+				)
+			}
 		}
 	}
 
