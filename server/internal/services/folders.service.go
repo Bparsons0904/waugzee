@@ -353,6 +353,7 @@ func (f *FoldersService) RequestFolderReleases(
 		RequestType:  "folder_releases",
 		Timestamp:    time.Now(),
 		DiscogsToken: *user.Configuration.DiscogsToken,
+		FolderID:     &folderID,
 	}
 
 	if err := database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
@@ -418,14 +419,11 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		return nil // Don't return error as this is an expected API failure
 	}
 
-	folderID, err := f.folderValidationService.ExtractFolderID(
-		responseData,
-		discogsFolderReleasesResponse,
-	)
-	if err != nil {
-		f.clearSyncStateOnError(ctx, metadata.UserID, "failed to extract folder ID")
-		return log.Err("failed to extract folder ID", err)
+	if metadata.FolderID == nil {
+		f.clearSyncStateOnError(ctx, metadata.UserID, "missing folder ID in request metadata")
+		return log.ErrMsg("missing folder ID in request metadata")
 	}
+	folderID := *metadata.FolderID
 
 	// Get current sync state from cache
 	var syncState CollectionSyncState
@@ -480,6 +478,7 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 				RequestType:  "folder_releases",
 				Timestamp:    time.Now(),
 				DiscogsToken: metadata.DiscogsToken,
+				FolderID:     &folderID,
 			}
 
 			if err = database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).

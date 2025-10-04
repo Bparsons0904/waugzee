@@ -1,9 +1,14 @@
 import { Component, createSignal, Show } from "solid-js";
-import { useApiPut } from "@services/apiHooks";
+import { useApiPut, useApiPost } from "@services/apiHooks";
 import { TextInput } from "../../forms/TextInput/TextInput";
 import { USER_ENDPOINTS } from "@constants/api.constants";
 import type { UpdateDiscogsTokenRequest, UpdateDiscogsTokenResponse } from "src/types/User";
 import styles from "./DiscogsTokenModal.module.scss";
+
+interface SyncResponse {
+  status: string;
+  message: string;
+}
 
 interface DiscogsTokenModalProps {
   onClose: () => void;
@@ -13,17 +18,27 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
   const [token, setToken] = createSignal("");
   const [localError, setLocalError] = createSignal<string | null>(null);
 
+  const syncMutation = useApiPost<SyncResponse, void>(
+    "/sync/syncCollection",
+    undefined,
+    {
+      successMessage: "Collection sync started successfully!",
+      errorMessage: "Failed to start collection sync. You can sync manually from the dashboard.",
+    }
+  );
+
   const updateTokenMutation = useApiPut<UpdateDiscogsTokenResponse, UpdateDiscogsTokenRequest>(
     USER_ENDPOINTS.ME_DISCOGS,
     undefined,
     {
       invalidateQueries: [["user"]],
-      successMessage: "Discogs token saved successfully!",
+      successMessage: "Discogs token saved! Starting collection sync...",
       errorMessage: "Failed to save token. Please try again.",
       onSuccess: () => {
-        console.log("Discogs token saved successfully");
+        console.log("Discogs token saved successfully, triggering sync");
         setToken("");
         props.onClose();
+        syncMutation.mutate();
       },
       onError: (error) => {
         console.error("Token submission failed:", error);

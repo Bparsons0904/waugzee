@@ -20,6 +20,7 @@ type RequestMetadata struct {
 	RequestType  string    `json:"requestType"`
 	Timestamp    time.Time `json:"timestamp"`
 	DiscogsToken string    `json:"discogsToken,omitempty"`
+	FolderID     *int      `json:"folderId,omitempty"`
 }
 
 type OrchestrationService struct {
