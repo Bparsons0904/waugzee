@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/shopspring/decimal"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -18,10 +18,12 @@ const (
 
 type Stylus struct {
 	BaseUUIDModel
-	Brand                   string           `gorm:"type:text;not null"         json:"brand"                             validate:"required"`
-	Model                   string           `gorm:"type:text;not null"         json:"model"                             validate:"required"`
-	Type                    StylusType       `gorm:"type:text;default:'elliptical'" json:"type"`
-	RecommendedReplaceHours *decimal.Decimal `gorm:"type:decimal(8,2)"          json:"recommendedReplaceHours,omitempty"`
+	Brand                   string     `gorm:"type:text;not null"                        json:"brand"`
+	Model                   string     `gorm:"type:text;not null"                        json:"model"`
+	Type                    StylusType `gorm:"type:text;default:'elliptical'"            json:"type"`
+	RecommendedReplaceHours *int       `gorm:"type:integer"                              json:"recommendedReplaceHours,omitempty"`
+	UserGeneratedID         *uuid.UUID `gorm:"type:uuid;index:idx_stylus_user_generated" json:"userGeneratedId,omitempty"`
+	IsVerified              bool       `gorm:"type:bool;default:false;not null"          json:"isVerified"`
 }
 
 func (s *Stylus) BeforeCreate(tx *gorm.DB) (err error) {

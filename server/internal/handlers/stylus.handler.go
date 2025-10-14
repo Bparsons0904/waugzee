@@ -31,6 +31,7 @@ func (h *StylusHandler) Register() {
 	styluses := h.router.Group("/styluses")
 
 	styluses.Get("/available", h.getAvailableStyluses)
+	styluses.Post("/custom", h.createCustomStylus)
 	styluses.Get("", h.getUserStyluses)
 	styluses.Post("", h.createUserStylus)
 	styluses.Patch("/:id", h.updateUserStylus)
@@ -38,7 +39,14 @@ func (h *StylusHandler) Register() {
 }
 
 func (h *StylusHandler) getAvailableStyluses(c *fiber.Ctx) error {
-	styluses, err := h.stylusController.GetAvailableStyluses(c.Context())
+	user := middleware.GetUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authentication required",
+		})
+	}
+
+	styluses, err := h.stylusController.GetAvailableStyluses(c.Context(), user)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to retrieve available styluses",
@@ -47,6 +55,38 @@ func (h *StylusHandler) getAvailableStyluses(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"styluses": styluses,
+	})
+}
+
+func (h *StylusHandler) createCustomStylus(c *fiber.Ctx) error {
+	user := middleware.GetUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authentication required",
+		})
+	}
+
+	var req stylusController.CreateCustomStylusRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	stylus, err := h.stylusController.CreateCustomStylus(c.Context(), user, &req)
+	if err != nil {
+		if err.Error() == "brand is required" || err.Error() == "model is required" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to create custom stylus",
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"stylus": stylus,
 	})
 }
 

@@ -23,6 +23,13 @@ type StylusController struct {
 	log                logger.Logger
 }
 
+type CreateCustomStylusRequest struct {
+	Brand                   string `json:"brand"                             validate:"required"`
+	Model                   string `json:"model"                             validate:"required"`
+	Type                    string `json:"type,omitempty"`
+	RecommendedReplaceHours *int   `json:"recommendedReplaceHours,omitempty"`
+}
+
 type CreateUserStylusRequest struct {
 	StylusID     uuid.UUID        `json:"stylusId"               validate:"required"`
 	PurchaseDate *time.Time       `json:"purchaseDate,omitempty"`
@@ -45,8 +52,13 @@ type UpdateUserStylusResponse struct {
 }
 
 type StylusControllerInterface interface {
-	GetAvailableStyluses(ctx context.Context) ([]*Stylus, error)
+	GetAvailableStyluses(ctx context.Context, user *User) ([]*Stylus, error)
 	GetUserStyluses(ctx context.Context, user *User) ([]*UserStylus, error)
+	CreateCustomStylus(
+		ctx context.Context,
+		user *User,
+		request *CreateCustomStylusRequest,
+	) (*Stylus, error)
 	CreateUserStylus(
 		ctx context.Context,
 		user *User,
@@ -76,12 +88,14 @@ func New(
 	}
 }
 
-func (c *StylusController) GetAvailableStyluses(ctx context.Context) ([]*Stylus, error) {
-	log := c.log.Function("GetAvailableStyluses")
-
-	styluses, err := c.stylusRepo.GetAllStyluses(ctx, c.db.SQL)
+func (c *StylusController) GetAvailableStyluses(
+	ctx context.Context,
+	user *User,
+) ([]*Stylus, error) {
+	styluses, err := c.stylusRepo.GetAllStyluses(ctx, c.db.SQL, &user.ID)
 	if err != nil {
-		return nil, log.Err("failed to get available styluses", err)
+		return nil, c.log.Function("GetAvailableStyluses").
+			Err("failed to get available styluses", err, "userID", user.ID)
 	}
 
 	return styluses, nil
@@ -99,6 +113,42 @@ func (c *StylusController) GetUserStyluses(
 	}
 
 	return styluses, nil
+}
+
+func (c *StylusController) CreateCustomStylus(
+	ctx context.Context,
+	user *User,
+	request *CreateCustomStylusRequest,
+) (*Stylus, error) {
+	log := c.log.Function("CreateCustomStylus")
+
+	if request.Brand == "" {
+		return nil, log.ErrMsg("brand is required")
+	}
+	if request.Model == "" {
+		return nil, log.ErrMsg("model is required")
+	}
+
+	stylusType := StylusTypeElliptical
+	if request.Type != "" {
+		stylusType = StylusType(request.Type)
+	}
+
+	stylus := &Stylus{
+		Brand:                   request.Brand,
+		Model:                   request.Model,
+		Type:                    stylusType,
+		RecommendedReplaceHours: request.RecommendedReplaceHours,
+		UserGeneratedID:         &user.ID,
+		IsVerified:              false,
+	}
+
+	err := c.stylusRepo.CreateCustomStylus(ctx, c.db.SQL, stylus)
+	if err != nil {
+		return nil, log.Err("failed to create custom stylus", err, "userID", user.ID)
+	}
+
+	return stylus, nil
 }
 
 func (c *StylusController) CreateUserStylus(
@@ -135,7 +185,6 @@ func (c *StylusController) CreateUserStylus(
 
 		return c.stylusRepo.Create(ctx, tx, userStylus)
 	})
-
 	if err != nil {
 		return log.Err("failed to create user stylus", err, "userID", user.ID)
 	}
@@ -184,7 +233,6 @@ func (c *StylusController) UpdateUserStylus(
 
 		return c.stylusRepo.Update(ctx, tx, user.ID, stylusID, updates)
 	})
-
 	if err != nil {
 		return log.Err("failed to update user stylus", err, "id", stylusID, "userID", user.ID)
 	}

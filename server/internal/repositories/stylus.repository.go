@@ -17,8 +17,9 @@ const (
 )
 
 type StylusRepository interface {
-	GetAllStyluses(ctx context.Context, tx *gorm.DB) ([]*Stylus, error)
+	GetAllStyluses(ctx context.Context, tx *gorm.DB, userID *uuid.UUID) ([]*Stylus, error)
 	GetUserStyluses(ctx context.Context, tx *gorm.DB, userID uuid.UUID) ([]*UserStylus, error)
+	CreateCustomStylus(ctx context.Context, tx *gorm.DB, stylus *Stylus) error
 	Create(ctx context.Context, tx *gorm.DB, userStylus *UserStylus) error
 	Update(
 		ctx context.Context,
@@ -46,17 +47,24 @@ func NewStylusRepository(cache database.CacheClient) StylusRepository {
 func (r *stylusRepository) GetAllStyluses(
 	ctx context.Context,
 	tx *gorm.DB,
+	userID *uuid.UUID,
 ) ([]*Stylus, error) {
 	log := r.log.Function("GetAllStyluses")
 
 	var styluses []*Stylus
-	if err := tx.WithContext(ctx).
-		Order("brand ASC, model ASC").
+	query := tx.WithContext(ctx)
+
+	if userID == nil {
+		query = query.Where("user_generated_id IS NULL")
+	} else {
+		query = query.Where("user_generated_id IS NULL OR user_generated_id = ?", userID)
+	}
+
+	if err := query.
+		Order("is_verified DESC, brand ASC, model ASC").
 		Find(&styluses).Error; err != nil {
 		return nil, log.Err("failed to get all styluses", err)
 	}
-
-	log.Info("All styluses retrieved from database", "count", len(styluses))
 
 	return styluses, nil
 }
@@ -110,6 +118,35 @@ func (r *stylusRepository) GetUserStyluses(
 	)
 
 	return styluses, nil
+}
+
+func (r *stylusRepository) CreateCustomStylus(
+	ctx context.Context,
+	tx *gorm.DB,
+	stylus *Stylus,
+) error {
+	log := r.log.Function("CreateCustomStylus")
+
+	if err := tx.WithContext(ctx).Create(stylus).Error; err != nil {
+		return log.Err(
+			"failed to create custom stylus",
+			err,
+			"brand",
+			stylus.Brand,
+			"model",
+			stylus.Model,
+		)
+	}
+
+	log.Info(
+		"Custom stylus created successfully",
+		"id",
+		stylus.ID,
+		"userID",
+		stylus.UserGeneratedID,
+	)
+
+	return nil
 }
 
 func (r *stylusRepository) Create(
