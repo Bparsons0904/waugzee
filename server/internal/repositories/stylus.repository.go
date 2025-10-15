@@ -257,12 +257,13 @@ func (r *stylusRepository) UnsetAllPrimary(
 ) error {
 	log := r.log.Function("UnsetAllPrimary")
 
-	if err := tx.WithContext(ctx).
-		Model(&UserStylus{}).
-		Where("user_id = ? AND is_active = ?", userID, true).
-		Update("is_active", false).Error; err != nil {
+	if _, err := gorm.G[UserStylus](tx).
+		Where(UserStylus{UserID: userID}).
+		Update(ctx, "is_primary", false); err != nil {
 		return log.Err("failed to unset all primary styluses", err, "userID", userID)
 	}
+
+	r.clearUserStylusCache(ctx, userID)
 
 	return nil
 }

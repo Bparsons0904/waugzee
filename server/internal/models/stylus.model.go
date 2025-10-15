@@ -8,12 +8,12 @@ import (
 type StylusType string
 
 const (
-	StylusTypeConical     StylusType = "conical"
-	StylusTypeElliptical  StylusType = "elliptical"
-	StylusTypeMicroLine   StylusType = "microline"
-	StylusTypeShibata     StylusType = "shibata"
-	StylusTypeLineContact StylusType = "line_contact"
-	StylusTypeOther       StylusType = "other"
+	StylusTypeConical     StylusType = "Conical"
+	StylusTypeElliptical  StylusType = "Elliptical"
+	StylusTypeMicroLine   StylusType = "Microline"
+	StylusTypeShibata     StylusType = "Shibata"
+	StylusTypeLineContact StylusType = "Line Contact"
+	StylusTypeOther       StylusType = "Other"
 )
 
 type Stylus struct {
@@ -21,7 +21,7 @@ type Stylus struct {
 	Brand                   string     `gorm:"type:text;not null"                        json:"brand"`
 	Model                   string     `gorm:"type:text;not null"                        json:"model"`
 	Type                    StylusType `gorm:"type:text;default:'elliptical'"            json:"type"`
-	RecommendedReplaceHours *int       `gorm:"type:integer"                              json:"recommendedReplaceHours,omitempty"`
+	RecommendedReplaceHours *int       `gorm:"type:integer;default:1000"                 json:"recommendedReplaceHours"`
 	UserGeneratedID         *uuid.UUID `gorm:"type:uuid;index:idx_stylus_user_generated" json:"userGeneratedId,omitempty"`
 	IsVerified              bool       `gorm:"type:bool;default:false;not null"          json:"isVerified"`
 }

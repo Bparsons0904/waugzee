@@ -117,7 +117,7 @@ func (uc *UserController) GetUser(
 
 	// Get user releases for selected folder
 	var releases []*UserRelease
-	if user.Configuration.SelectedFolderID != nil {
+	if user.Configuration != nil && user.Configuration.SelectedFolderID != nil {
 		// Get the folder using the composite key lookup
 		selectedFolder, err := uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, *user.Configuration.SelectedFolderID)
 		if err != nil {
@@ -176,6 +176,10 @@ func (uc *UserController) UpdateSelectedFolder(
 	_, err := uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, folderID)
 	if err != nil {
 		return nil, log.Err("folder not found or not owned by user", err)
+	}
+
+	if user.Configuration == nil {
+		return nil, log.ErrMsg("user configuration not found, please set up Discogs integration first")
 	}
 
 	user.Configuration.SelectedFolderID = &folderID
