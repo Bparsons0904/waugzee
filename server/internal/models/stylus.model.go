@@ -16,14 +16,24 @@ const (
 	StylusTypeOther       StylusType = "Other"
 )
 
+type CartridgeType string
+
+const (
+	CartridgeTypeMovingMagnet CartridgeType = "Moving Magnet"
+	CartridgeTypeMovingCoil   CartridgeType = "Moving Coil"
+	CartridgeTypeCeramic      CartridgeType = "Ceramic"
+	CartridgeTypeOther        CartridgeType = "Other"
+)
+
 type Stylus struct {
 	BaseUUIDModel
-	Brand                   string     `gorm:"type:text;not null"                        json:"brand"`
-	Model                   string     `gorm:"type:text;not null"                        json:"model"`
-	Type                    StylusType `gorm:"type:text;default:'elliptical'"            json:"type"`
-	RecommendedReplaceHours *int       `gorm:"type:integer;default:1000"                 json:"recommendedReplaceHours"`
-	UserGeneratedID         *uuid.UUID `gorm:"type:uuid;index:idx_stylus_user_generated" json:"userGeneratedId,omitempty"`
-	IsVerified              bool       `gorm:"type:bool;default:false;not null"          json:"isVerified"`
+	Brand                   string         `gorm:"type:text;not null"                        json:"brand"`
+	Model                   string         `gorm:"type:text;not null"                        json:"model"`
+	Type                    StylusType     `gorm:"type:text;default:'elliptical'"            json:"type"`
+	CartridgeType           *CartridgeType `gorm:"type:text"                                 json:"cartridgeType,omitempty"`
+	RecommendedReplaceHours *int           `gorm:"type:integer;default:1000"                 json:"recommendedReplaceHours"`
+	UserGeneratedID         *uuid.UUID     `gorm:"type:uuid;index:idx_stylus_user_generated" json:"userGeneratedId,omitempty"`
+	IsVerified              bool           `gorm:"type:bool;default:false;not null"          json:"isVerified"`
 }
 
 func (s *Stylus) BeforeCreate(tx *gorm.DB) (err error) {

@@ -90,12 +90,20 @@ func (r *stylusRepository) GetUserStyluses(
 		return cached, nil
 	}
 
-	var styluses []*UserStylus
-	if err = tx.WithContext(ctx).
-		Preload("Stylus").
-		Where("user_id = ?", userID).
+	// var styluses []*UserStylus
+	// if err = tx.WithContext(ctx).
+	// 	Preload("Stylus").
+	// 	Where("user_id = ?", userID).
+	// 	Order("created_at DESC").
+	// 	Find(&styluses).Error; err != nil {
+	// 	return nil, log.Err("failed to get user styluses", err, "userID", userID)
+	// }
+	styluses, err := gorm.G[*UserStylus](tx).
+		Preload("Stylus", nil).
+		Where(UserStylus{UserID: userID}).
 		Order("created_at DESC").
-		Find(&styluses).Error; err != nil {
+		Find(ctx)
+	if err != nil {
 		return nil, log.Err("failed to get user styluses", err, "userID", userID)
 	}
 

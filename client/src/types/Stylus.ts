@@ -7,6 +7,7 @@ export interface AvailableStylus {
   brand: string;
   model: string;
   type?: string;
+  cartridgeType?: string;
   recommendedReplaceHours?: number;
   isVerified: boolean;
   userGeneratedId?: string;
@@ -47,6 +48,7 @@ export interface CreateCustomStylusRequest {
   brand: string;
   model: string;
   type?: string;
+  cartridgeType?: string;
   recommendedReplaceHours?: number;
 }
 
