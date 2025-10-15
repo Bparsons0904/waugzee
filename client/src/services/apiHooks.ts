@@ -12,6 +12,15 @@ import { Accessor } from "solid-js";
 import { useToast } from "../context/ToastContext";
 import { AxiosRequestConfig } from "axios";
 import { api } from "./api";
+import { STYLUS_ENDPOINTS } from "@constants/api.constants";
+import type {
+  AvailableStylusResponse,
+  UserStylusesResponse,
+  CreateUserStylusRequest,
+  CreateCustomStylusRequest,
+  CreateCustomStylusResponse,
+  UpdateUserStylusRequest,
+} from "@models/Stylus";
 
 // Enhanced query options
 export interface ApiQueryOptions<T>
@@ -199,6 +208,86 @@ export function useApiSearch<T>(
     { q: searchQuery() },
     {
       enabled: () => searchQuery().length >= minLength,
+      ...options,
+    },
+  );
+}
+
+// Stylus API Hooks
+export function useAvailableStyluses(options?: ApiQueryOptions<AvailableStylusResponse>) {
+  return useApiGet<AvailableStylusResponse>(
+    ["styluses", "available"],
+    STYLUS_ENDPOINTS.AVAILABLE,
+    undefined,
+    options,
+  );
+}
+
+export function useUserStyluses(options?: ApiQueryOptions<UserStylusesResponse>) {
+  return useApiGet<UserStylusesResponse>(
+    ["styluses", "user"],
+    STYLUS_ENDPOINTS.USER_STYLUSES,
+    undefined,
+    options,
+  );
+}
+
+export function useCreateUserStylus(
+  options?: ApiMutationOptions<{ success: boolean }, CreateUserStylusRequest>,
+) {
+  return useApiPost<{ success: boolean }, CreateUserStylusRequest>(
+    STYLUS_ENDPOINTS.CREATE,
+    undefined,
+    {
+      invalidateQueries: [["styluses", "user"]],
+      successMessage: "Stylus added to equipment successfully!",
+      errorMessage: "Failed to add stylus to equipment. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useCreateCustomStylus(
+  options?: ApiMutationOptions<CreateCustomStylusResponse, CreateCustomStylusRequest>,
+) {
+  return useApiPost<CreateCustomStylusResponse, CreateCustomStylusRequest>(
+    STYLUS_ENDPOINTS.CUSTOM,
+    undefined,
+    {
+      invalidateQueries: [["styluses", "user"], ["styluses", "available"]],
+      successMessage: "Custom stylus created and added to equipment!",
+      errorMessage: "Failed to create custom stylus. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useUpdateUserStylus(
+  options?: ApiMutationOptions<{ success: boolean }, { id: string; data: UpdateUserStylusRequest }>,
+) {
+  return useApiPatch<{ success: boolean }, { id: string; data: UpdateUserStylusRequest }>(
+    (variables) => STYLUS_ENDPOINTS.UPDATE(variables.id),
+    undefined,
+    {
+      invalidateQueries: [["styluses", "user"]],
+      successMessage: "Stylus updated successfully!",
+      errorMessage: "Failed to update stylus. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useDeleteUserStylus(
+  options?: ApiMutationOptions<void, string>,
+) {
+  return useApiMutation<void, string>(
+    "DELETE",
+    (id) => STYLUS_ENDPOINTS.DELETE(id),
+    undefined,
+    {
+      invalidateQueries: [["styluses", "user"]],
+      successMessage: "Stylus removed from equipment successfully!",
+      errorMessage: "Failed to remove stylus. Please try again.",
       ...options,
     },
   );

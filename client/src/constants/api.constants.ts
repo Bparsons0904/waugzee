@@ -26,6 +26,16 @@ export const USER_ENDPOINTS = {
   PROFILE: (id: string) => `${API_PATHS.USERS}/${id}`,
 } as const;
 
+// Stylus endpoints
+export const STYLUS_ENDPOINTS = {
+  AVAILABLE: "/styluses/available",
+  USER_STYLUSES: "/styluses",
+  CREATE: "/styluses",
+  CUSTOM: "/styluses/custom",
+  UPDATE: (id: string) => `/styluses/${id}`,
+  DELETE: (id: string) => `/styluses/${id}`,
+} as const;
+
 // Health endpoints
 export const HEALTH_ENDPOINTS = {
   CHECK: API_PATHS.HEALTH,

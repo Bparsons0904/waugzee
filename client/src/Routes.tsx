@@ -11,6 +11,7 @@ const OidcCallbackPage = lazy(() => import("@pages/Auth/OidcCallback"));
 const SilentCallbackPage = lazy(() => import("@pages/Auth/SilentCallback"));
 const ProfilePage = lazy(() => import("@pages/Profile/Profile"));
 const LogPlayPage = lazy(() => import("@pages/LogPlay/LogPlay"));
+const EquipmentPage = lazy(() => import("@pages/Equipment/Equipment"));
 
 const ProtectedRoute = (Component: Component) => {
   return () => {
@@ -36,6 +37,10 @@ export const Routes: Component = () => {
       <Route path={ROUTES.SILENT_CALLBACK} component={SilentCallbackPage} />
       <Route path={ROUTES.PROFILE} component={ProtectedRoute(ProfilePage)} />
       <Route path={ROUTES.LOG_PLAY} component={ProtectedRoute(LogPlayPage)} />
+      <Route
+        path={ROUTES.EQUIPMENT}
+        component={ProtectedRoute(EquipmentPage)}
+      />
     </>
   );
 };
