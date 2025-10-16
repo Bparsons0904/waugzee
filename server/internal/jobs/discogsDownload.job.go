@@ -244,8 +244,25 @@ func (j *DiscogsDownloadJob) performDownload(
 		return log.Err("failed to parse checksum file", err, "checksumFile", checksumFile)
 	}
 
-	// Update processing record with checksums and transition to ready_for_processing
+	// Update processing record with checksums
 	processingRecord.FileChecksums = checksums
+	if err := j.repo.Update(ctx, processingRecord); err != nil {
+		return log.Err("failed to update processing record with checksums", err, "yearMonth", yearMonth)
+	}
+
+	// Download all XML data files
+	log.Info("Starting XML file downloads", "yearMonth", yearMonth)
+
+	fileTypes := []string{"artists", "labels", "masters", "releases"}
+	for _, fileType := range fileTypes {
+		log.Info("Downloading XML file", "fileType", fileType, "yearMonth", yearMonth)
+		if err := j.download.DownloadXMLFile(ctx, yearMonth, fileType); err != nil {
+			return log.Err("failed to download XML file", err, "fileType", fileType, "yearMonth", yearMonth)
+		}
+		log.Info("Downloaded XML file successfully", "fileType", fileType, "yearMonth", yearMonth)
+	}
+
+	// Transition to ready_for_processing after all downloads complete
 	if err := processingRecord.UpdateStatus(models.ProcessingStatusReadyForProcessing); err != nil {
 		return log.Err("failed to transition to ready_for_processing status", err, "yearMonth", yearMonth)
 	}
@@ -258,7 +275,7 @@ func (j *DiscogsDownloadJob) performDownload(
 		return log.Err("failed to update processing record after download", err, "yearMonth", yearMonth)
 	}
 
-	// Clean up downloaded file to save space (we only need the parsed checksums)
+	// Clean up downloaded checksum file to save space (we only need the parsed checksums)
 	if err := os.Remove(checksumFile); err != nil {
 		log.Warn("failed to clean up checksum file", "error", err, "file", checksumFile)
 	}

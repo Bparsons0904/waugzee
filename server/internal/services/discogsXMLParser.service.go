@@ -382,6 +382,34 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 		return log.Err("failed to create download directory", err, "directory", downloadDir)
 	}
 
+	// Validate all required files exist before starting processing
+	requiredFiles := map[string]string{
+		"labels":   filepath.Join(downloadDir, "labels.xml.gz"),
+		"artists":  filepath.Join(downloadDir, "artists.xml.gz"),
+		"masters":  filepath.Join(downloadDir, "masters.xml.gz"),
+		"releases": filepath.Join(downloadDir, "releases.xml.gz"),
+	}
+
+	for fileType, filePath := range requiredFiles {
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			errorMsg := fmt.Sprintf("required file not found: %s", fileType)
+			processing.Status = models.ProcessingStatusFailed
+			processing.ErrorMessage = &errorMsg
+			if updateErr := s.repos.DiscogsDataProcessing.Update(ctx, processing); updateErr != nil {
+				log.Warn("failed to update processing status to failed", "error", updateErr)
+			}
+			return log.Err(
+				"required XML file does not exist",
+				err,
+				"fileType", fileType,
+				"filePath", filePath,
+				"yearMonth", yearMonth,
+			)
+		}
+	}
+
+	log.Info("All required XML files found, starting processing", "yearMonth", yearMonth)
+
 	// Process labels using the abstracted entity processor
 	labelsFilePath := filepath.Join(downloadDir, "labels.xml.gz")
 	err = s.executeProcessingStep(
