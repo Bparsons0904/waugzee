@@ -1,258 +1,141 @@
-@use "sass:color";
+@use "../../styles/variables" as *;
+@use "../../styles/colors" as *;
 
 .container {
-  max-width: 1200px;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: $spacing-xl;
+  background: $bg-surface;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-sm;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: $spacing-lg;
 }
 
 .title {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #333;
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
   margin: 0;
 }
 
 .headerButtons {
   display: flex;
-  gap: 1rem;
-}
-
-.addButton,
-.customButton {
-  padding: 0.6rem 1.2rem;
-  background-color: #3273dc;
-  color: white;
-  font-weight: 500;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: background-color 0.2s;
-
-  &:hover:not(:disabled) {
-    background-color: color.scale(#3273dc, $lightness: -5%);
-  }
-
-  &:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
-}
-
-.customButton {
-  background-color: #48c774;
-
-  &:hover:not(:disabled) {
-    background-color: color.scale(#48c774, $lightness: -5%);
-  }
+  gap: $spacing-md;
 }
 
 .loading {
   text-align: center;
-  padding: 2rem;
-  color: #666;
+  padding: $spacing-xl;
+  color: $text-muted;
   font-style: italic;
 }
 
 .section {
-  margin-bottom: 3rem;
+  margin-bottom: $spacing-2xl;
 }
 
 .sectionTitle {
-  font-size: 1.3rem;
-  font-weight: 600;
-  color: #444;
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #eee;
-}
-
-.formContainer {
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  padding: 2rem;
-  margin-bottom: 2rem;
-
-  h3 {
-    font-size: 1.3rem;
-    font-weight: 600;
-    color: #444;
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-  }
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+  margin-bottom: $spacing-md;
 }
 
 .form {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
-}
-
-.formGroup {
-  margin-bottom: 1rem;
-}
-
-.label {
-  display: block;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-  color: #444;
-}
-
-.input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-
-  &:focus {
-    outline: none;
-    border-color: #3273dc;
-    box-shadow: 0 0 0 2px rgba(50, 115, 220, 0.25);
-  }
-}
-
-.textarea {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-  resize: vertical;
-
-  &:focus {
-    outline: none;
-    border-color: #3273dc;
-    box-shadow: 0 0 0 2px rgba(50, 115, 220, 0.25);
-  }
-}
-
-.checkboxGroup {
-  margin-bottom: 1rem;
-}
-
-.checkboxLabel {
   display: flex;
-  align-items: center;
-  cursor: pointer;
-  font-size: 1rem;
-  color: #444;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
 
-  input[type="checkbox"] {
-    margin-right: 0.5rem;
-    cursor: pointer;
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-md;
 
-    &:disabled {
-      cursor: not-allowed;
-    }
+  &.full {
+    grid-template-columns: 1fr;
   }
+}
+
+.statusSection {
+  background-color: $bg-subtle;
+  border: $border-width-thin solid $border-default;
+  border-radius: $border-radius-md;
+  padding: $spacing-md;
+  margin-bottom: $spacing-lg;
+
+  h3 {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: $text-default;
+    margin: 0 0 $spacing-md 0;
+  }
+}
+
+.toggleGroup {
+  display: flex;
+  gap: $spacing-lg;
 }
 
 .formActions {
-  grid-column: 1 / -1;
   display: flex;
   justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 1rem;
+  gap: $spacing-md;
+  margin-top: $spacing-md;
 }
 
-.cancelButton {
-  padding: 0.75rem 1.5rem;
-  background-color: #f5f5f5;
-  color: #333;
-  font-weight: 500;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.2s;
-
-  &:hover:not(:disabled) {
-    background-color: #e8e8e8;
-  }
-
-  &:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
-}
-
-.submitButton {
-  padding: 0.75rem 1.5rem;
-  background-color: #3273dc;
-  color: white;
-  font-weight: 500;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.2s;
-
-  &:hover:not(:disabled) {
-    background-color: color.scale(#3273dc, $lightness: -5%);
-  }
-
-  &:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
-}
 
 .stylusList {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
+  gap: $spacing-lg;
 }
 
 .stylusCard {
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  padding: 1.5rem;
+  background-color: $bg-surface;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-md;
+  padding: $spacing-lg;
   display: flex;
   flex-direction: column;
   transition:
-    transform 0.2s,
-    box-shadow 0.2s;
+    transform $transition-fast $transition-timing-default,
+    box-shadow $transition-fast $transition-timing-default;
   position: relative;
-  border-left: 4px solid transparent;
+  border-left: $border-width-thicker solid transparent;
 
   &:hover {
     transform: translateY(-3px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: $shadow-lg;
   }
 }
 
 .stylusInfo {
   flex-grow: 1;
-  margin-bottom: 1rem;
+  margin-bottom: $spacing-md;
 }
 
 .stylusName {
-  font-size: 1.3rem;
-  font-weight: 600;
-  color: #333;
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
   margin-top: 0;
-  margin-bottom: 0.75rem;
+  margin-bottom: $spacing-md;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: $spacing-sm;
 }
 
 .tagsContainer {
   display: flex;
-  gap: 0.5rem;
+  gap: $spacing-sm;
   margin-left: auto;
 }
 
@@ -260,145 +143,104 @@
 .primaryTag,
 .archivedTag {
   display: inline-block;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $border-radius-md;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: $letter-spacing-wide;
 }
 
 .activeTag {
-  background-color: #e3fcef;
-  color: #2f855a;
+  background-color: $bg-success-subtle;
+  color: $text-success;
 }
 
 .primaryTag {
-  background-color: #ebf8ff;
-  color: #2b6cb0;
+  background-color: $bg-info-subtle;
+  color: $text-info;
 }
 
 .archivedTag {
-  background-color: #eee;
-  color: #666;
+  background-color: $bg-muted;
+  color: $text-muted;
 }
 
 .stylusDetail {
-  margin: 0.5rem 0;
-  font-size: 0.9rem;
-  color: #666;
+  margin: $spacing-sm 0;
+  font-size: $font-size-sm;
+  color: $text-muted;
 
   strong {
-    color: #555;
-    font-weight: 600;
+    color: $text-default;
+    font-weight: $font-weight-semibold;
   }
 }
 
 .stylusActions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.75rem;
+  gap: $spacing-md;
   margin-top: auto;
-}
-
-.editButton {
-  padding: 0.5rem 1rem;
-  background-color: #ebf8ff;
-  color: #2b6cb0;
-  font-weight: 500;
-  border: 1px solid #bee3f8;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: background-color 0.2s;
-
-  &:hover:not(:disabled) {
-    background-color: color.scale(#ebf8ff, $lightness: -5%);
-  }
-
-  &:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
-}
-
-.deleteButton {
-  padding: 0.5rem 1rem;
-  background-color: #fff5f5;
-  color: #c53030;
-  font-weight: 500;
-  border: 1px solid #fed7d7;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: background-color 0.2s;
-
-  &:hover:not(:disabled) {
-    background-color: color.scale(#fff5f5, $lightness: -5%);
-  }
-
-  &:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
 }
 
 .noStyluses {
   text-align: center;
-  padding: 2rem;
-  color: #666;
+  padding: $spacing-xl;
+  color: $text-muted;
   font-style: italic;
-  background-color: #f5f5f5;
-  border-radius: 8px;
+  background-color: $bg-subtle;
+  border-radius: $border-radius-lg;
 }
 
 .successMessage,
 .errorMessage {
-  margin: 1rem 0;
-  padding: 0.75rem;
-  border-radius: 4px;
+  margin: $spacing-md 0;
+  padding: $spacing-md;
+  border-radius: $border-radius-md;
 }
 
 .successMessage {
-  background-color: #f0fff4;
-  color: #2f855a;
-  border-left: 4px solid #2f855a;
+  background-color: $bg-success-subtle;
+  color: $text-success;
+  border-left: $border-width-thicker solid $border-success;
 }
 
 .errorMessage {
-  background-color: #fff5f5;
-  color: #c53030;
-  border-left: 4px solid #c53030;
+  background-color: $bg-error-subtle;
+  color: $text-error;
+  border-left: $border-width-thicker solid $border-error;
 }
 
-@media (max-width: 768px) {
+@media (max-width: $breakpoint-md) {
   .container {
-    padding: 1.5rem;
+    padding: $spacing-lg;
   }
 
-  .form {
+  .formRow {
     grid-template-columns: 1fr;
   }
+
+  .toggleGroup {
+    flex-direction: column;
+    gap: $spacing-md;
+  }
 }
 
-@media (max-width: 480px) {
+@media (max-width: $breakpoint-sm) {
   .container {
-    padding: 1rem;
+    padding: $spacing-md;
   }
 
   .header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 1rem;
+    gap: $spacing-md;
   }
 
   .headerButtons {
     width: 100%;
     justify-content: space-between;
-  }
-
-  .formContainer {
-    padding: 1.5rem;
   }
 
   .stylusList {

@@ -4,8 +4,10 @@ import { UserRelease } from "@models/User";
 import { Stylus } from "@models/Release";
 import { formatDateForInput } from "@utils/dates";
 import { Image } from "@components/common/ui/Image/Image";
-import { Select, SelectOption } from "@components/common/forms/Select/Select";
-import { Field } from "@components/common/forms/Field/Field";
+import {
+  SearchableSelect,
+  SearchableSelectOption,
+} from "@components/common/forms/SearchableSelect/SearchableSelect";
 
 interface RecordActionModalProps {
   isOpen: boolean;
@@ -20,7 +22,6 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
   );
   const [notes, setNotes] = createSignal("");
 
-  // TODO: Replace with actual stylus data
   const mockStyluses: Stylus[] = [
     {
       id: 1,
@@ -74,11 +75,12 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
     setNotes("");
   };
 
-  const stylusOptions = (): SelectOption[] => [
+  const stylusOptions = (): SearchableSelectOption[] => [
     { value: "", label: "None" },
     ...mockStyluses.map((s) => ({
       value: s.id.toString(),
-      label: `${s.name}${s.primary ? " (Primary)" : ""}`,
+      label: `${s.manufacturer} ${s.name}`,
+      metadata: s.primary ? "Primary" : undefined,
     })),
   ];
 
@@ -129,16 +131,18 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
               </div>
 
               <div class={styles.formGroup}>
-                <Field label="Stylus Used" htmlFor="stylusSelect">
-                  <Select
-                    name="stylusSelect"
-                    options={stylusOptions()}
-                    value={selectedStylusId()?.toString() || ""}
-                    onChange={(val) =>
-                      setSelectedStylusId(val ? parseInt(val) : null)
-                    }
-                  />
-                </Field>
+                <SearchableSelect
+                  label="Stylus Used"
+                  name="stylusSelect"
+                  placeholder="Select a stylus"
+                  searchPlaceholder="Search styluses..."
+                  options={stylusOptions()}
+                  value={selectedStylusId()?.toString() || ""}
+                  onChange={(val) =>
+                    setSelectedStylusId(val ? parseInt(val) : null)
+                  }
+                  emptyMessage="No styluses found"
+                />
               </div>
             </div>
 
