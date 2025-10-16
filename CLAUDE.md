@@ -381,6 +381,11 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 - **Error boundaries**: Handle error states gracefully with fallbacks
 - **Accessibility**: Proper alt text, ARIA labels, keyboard navigation
 - **Testing**: Comprehensive test coverage for component behavior
+- **SVG Icons**: NEVER use inline SVG elements - always create reusable icon components in `client/src/components/icons/`
+  - ✅ **Good**: `<ChevronDownIcon class={styles.icon} />` or `<CheckIcon size={12} />`
+  - ❌ **Avoid**: Inline `<svg>` elements with hardcoded paths
+  - **Pattern**: Create components with `size` and `class` props for reusability
+  - **Location**: All icon components should live in `client/src/components/icons/`
 
 ### Naming Conventions
 

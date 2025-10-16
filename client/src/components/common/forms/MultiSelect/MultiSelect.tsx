@@ -1,9 +1,17 @@
-import { Component, createSignal, createUniqueId, For, Show, createEffect } from "solid-js";
-import { useFormField } from "@hooks/useFormField";
-import { useValidation } from "@hooks/useValidation";
+import {
+  Component,
+  createSignal,
+  createUniqueId,
+  For,
+  Show,
+  createEffect,
+} from "solid-js";
 import { ValidatorFunction } from "../../../../utils/validation";
+import { useSelectBase } from "@hooks/useSelectBase";
 import clsx from "clsx";
 import styles from "./MultiSelect.module.scss";
+import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
+import { CheckIcon } from "@components/icons/CheckIcon";
 
 export interface MultiSelectOption {
   value: string;
@@ -32,28 +40,32 @@ export const MultiSelect: Component<MultiSelectProps> = (props) => {
   const [selectedValues, setSelectedValues] = createSignal<string[]>(
     props.value || props.defaultValue || [],
   );
-  const [isOpen, setIsOpen] = createSignal(false);
-  const [focusedIndex, setFocusedIndex] = createSignal(-1);
 
-  // Sync internal state with external value prop changes
   createEffect(() => {
     if (props.value !== undefined) {
       setSelectedValues(props.value);
     }
   });
 
-  const validation = useValidation({
-    initialValue: (props.value || props.defaultValue)?.join(","),
-    required: props.required,
-    customValidators: props.customValidators,
-    fieldName: props.label,
-  });
-
-  const formField = useFormField({
-    name: props.name,
-    required: props.required,
-    initialValue: (props.value || props.defaultValue)?.join(","),
-  });
+  const {
+    isOpen,
+    setIsOpen,
+    focusedIndex,
+    setFocusedIndex,
+    validation,
+    formField,
+  } = useSelectBase(
+    {
+      name: props.name,
+      label: props.label,
+      required: props.required,
+      disabled: props.disabled,
+      customValidators: props.customValidators,
+      onBlur: props.onBlur,
+    },
+    props.value || props.defaultValue,
+    (values) => values.join(",")
+  );
 
   const handleOptionToggle = (optionValue: string) => {
     if (props.disabled) return;
@@ -86,18 +98,13 @@ export const MultiSelect: Component<MultiSelectProps> = (props) => {
   };
 
   const handleBlur = (event: FocusEvent) => {
-    // Don't close if focus is moving to an option within the dropdown
     const relatedTarget = event.relatedTarget as HTMLElement;
-    if (relatedTarget?.closest('[data-multiselect-options]')) {
-      return;
-    }
+    if (relatedTarget?.closest("[data-multiselect-options]")) return;
 
     setIsOpen(false);
     setFocusedIndex(-1);
-    
-    const values = selectedValues();
-    const stringValue = values.join(",");
 
+    const stringValue = selectedValues().join(",");
     validation.markAsBlurred();
     const validationResult = validation.validate(stringValue, true);
 
@@ -115,12 +122,12 @@ export const MultiSelect: Component<MultiSelectProps> = (props) => {
   const handleKeyDown = (event: KeyboardEvent) => {
     if (props.disabled) return;
 
-    const availableOptions = props.options.filter(option => !option.disabled);
+    const availableOptions = props.options.filter((option) => !option.disabled);
     const maxIndex = availableOptions.length - 1;
 
     switch (event.key) {
-      case 'Enter':
-      case ' ':
+      case "Enter":
+      case " ":
         event.preventDefault();
         if (!isOpen()) {
           setIsOpen(true);
@@ -130,31 +137,31 @@ export const MultiSelect: Component<MultiSelectProps> = (props) => {
           handleOptionToggle(option.value);
         }
         break;
-        
-      case 'Escape':
+
+      case "Escape":
         event.preventDefault();
         setIsOpen(false);
         setFocusedIndex(-1);
         break;
-        
-      case 'ArrowDown':
+
+      case "ArrowDown":
         event.preventDefault();
         if (!isOpen()) {
           setIsOpen(true);
           setFocusedIndex(0);
         } else {
-          setFocusedIndex(prev => Math.min(prev + 1, maxIndex));
+          setFocusedIndex((prev) => Math.min(prev + 1, maxIndex));
         }
         break;
-        
-      case 'ArrowUp':
+
+      case "ArrowUp":
         event.preventDefault();
         if (isOpen()) {
-          setFocusedIndex(prev => Math.max(prev - 1, 0));
+          setFocusedIndex((prev) => Math.max(prev - 1, 0));
         }
         break;
-        
-      case 'Tab':
+
+      case "Tab":
         if (isOpen()) {
           setIsOpen(false);
           setFocusedIndex(-1);
@@ -172,13 +179,15 @@ export const MultiSelect: Component<MultiSelectProps> = (props) => {
 
   const getDisplayText = () => {
     const selectedLabels = getSelectedLabels();
-    if (selectedLabels.length === 0) {
-      return props.placeholder || "Select options...";
+
+    switch (selectedLabels.length) {
+      case 0:
+        return props.placeholder || "Select options...";
+      case 1:
+        return selectedLabels[0];
+      default:
+        return `${selectedLabels.length} items selected`;
     }
-    if (selectedLabels.length === 1) {
-      return selectedLabels[0];
-    }
-    return `${selectedLabels.length} items selected`;
   };
 
   return (
@@ -217,27 +226,12 @@ export const MultiSelect: Component<MultiSelectProps> = (props) => {
           </span>
 
           <div class={styles.selectIcon}>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              class={clsx({ [styles.iconRotated]: isOpen() })}
-            >
-              <path
-                d="M4 6L8 10L12 6"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
+            <ChevronDownIcon class={clsx({ [styles.iconRotated]: isOpen() })} />
           </div>
         </div>
 
         <Show when={isOpen()}>
-          <div 
+          <div
             class={styles.optionsContainer}
             data-multiselect-options
             id={`${id}-listbox`}
@@ -245,49 +239,15 @@ export const MultiSelect: Component<MultiSelectProps> = (props) => {
             aria-multiselectable="true"
           >
             <For each={props.options}>
-              {(option) => {
-                const availableOptions = props.options.filter(opt => !opt.disabled);
-                const availableIndex = availableOptions.findIndex(opt => opt.value === option.value);
-                const isFocused = availableIndex === focusedIndex() && !option.disabled;
-                
-                return (
-                  <div
-                    class={clsx(styles.option, {
-                      [styles.selected]: selectedValues().includes(option.value),
-                      [styles.disabled]: option.disabled,
-                      [styles.focused]: isFocused,
-                    })}
-                    onClick={() =>
-                      !option.disabled && handleOptionToggle(option.value)
-                    }
-                    role="option"
-                    aria-selected={selectedValues().includes(option.value)}
-                    aria-disabled={option.disabled}
-                    tabIndex={-1}
-                  >
-                    <div class={styles.checkbox}>
-                      <Show when={selectedValues().includes(option.value)}>
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 12 12"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M2 6L5 9L10 3"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                        </svg>
-                      </Show>
-                    </div>
-                    <span class={styles.optionLabel}>{option.label}</span>
-                  </div>
-                );
-              }}
+              {(option) => (
+                <MultiSelectOptionItem
+                  option={option}
+                  allOptions={props.options}
+                  isSelected={selectedValues().includes(option.value)}
+                  focusedIndex={focusedIndex()}
+                  onClick={() => handleOptionToggle(option.value)}
+                />
+              )}
             </For>
           </div>
         </Show>
@@ -305,6 +265,47 @@ export const MultiSelect: Component<MultiSelectProps> = (props) => {
         name={props.name}
         value={selectedValues().join(",")}
       />
+    </div>
+  );
+};
+
+interface MultiSelectOptionItemProps {
+  option: MultiSelectOption;
+  allOptions: MultiSelectOption[];
+  isSelected: boolean;
+  focusedIndex: number;
+  onClick: () => void;
+}
+
+const MultiSelectOptionItem: Component<MultiSelectOptionItemProps> = (
+  props,
+) => {
+  const availableOptions = () =>
+    props.allOptions.filter((opt) => !opt.disabled);
+  const availableIndex = () =>
+    availableOptions().findIndex((opt) => opt.value === props.option.value);
+  const isFocused = () =>
+    availableIndex() === props.focusedIndex && !props.option.disabled;
+
+  return (
+    <div
+      class={clsx(styles.option, {
+        [styles.selected]: props.isSelected,
+        [styles.disabled]: props.option.disabled,
+        [styles.focused]: isFocused(),
+      })}
+      onClick={() => !props.option.disabled && props.onClick()}
+      role="option"
+      aria-selected={props.isSelected}
+      aria-disabled={props.option.disabled}
+      tabIndex={-1}
+    >
+      <div class={styles.checkbox}>
+        <Show when={props.isSelected}>
+          <CheckIcon />
+        </Show>
+      </div>
+      <span class={styles.optionLabel}>{props.option.label}</span>
     </div>
   );
 };
