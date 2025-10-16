@@ -27,6 +27,7 @@ type CreateCustomStylusRequest struct {
 	Brand                   string `json:"brand"                             validate:"required"`
 	Model                   string `json:"model"                             validate:"required"`
 	Type                    string `json:"type,omitempty"`
+	CartridgeType           string `json:"cartridgeType,omitempty"`
 	RecommendedReplaceHours *int   `json:"recommendedReplaceHours,omitempty"`
 }
 
@@ -144,10 +145,17 @@ func (c *StylusController) CreateCustomStylus(
 		stylusType = StylusType(request.Type)
 	}
 
+	var cartridgeType *CartridgeType
+	if request.CartridgeType != "" {
+		ct := CartridgeType(request.CartridgeType)
+		cartridgeType = &ct
+	}
+
 	stylus := &Stylus{
 		Brand:                   request.Brand,
 		Model:                   request.Model,
 		Type:                    stylusType,
+		CartridgeType:           cartridgeType,
 		RecommendedReplaceHours: request.RecommendedReplaceHours,
 		UserGeneratedID:         &user.ID,
 		IsVerified:              false,

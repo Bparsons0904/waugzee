@@ -28,6 +28,7 @@ const Equipment: Component = () => {
   const [brand, setBrand] = createSignal("");
   const [model, setModel] = createSignal("");
   const [type, setType] = createSignal("");
+  const [cartridgeType, setCartridgeType] = createSignal("");
   const [recommendedReplaceHours, setRecommendedReplaceHours] = createSignal<number | undefined>();
   const [purchaseDate, setPurchaseDate] = createSignal("");
   const [installDate, setInstallDate] = createSignal("");
@@ -46,6 +47,7 @@ const Equipment: Component = () => {
     setBrand("");
     setModel("");
     setType("");
+    setCartridgeType("");
     setRecommendedReplaceHours(undefined);
     setPurchaseDate("");
     setInstallDate("");
@@ -121,6 +123,7 @@ const Equipment: Component = () => {
       brand: brand(),
       model: model(),
       type: type() || undefined,
+      cartridgeType: cartridgeType() || undefined,
       recommendedReplaceHours: recommendedReplaceHours(),
     };
 
@@ -359,7 +362,7 @@ const Equipment: Component = () => {
 
             <div class={styles.formGroup}>
               <label for="type" class={styles.label}>
-                Type
+                Stylus Type
               </label>
               <select
                 id="type"
@@ -373,6 +376,24 @@ const Equipment: Component = () => {
                 <option value="Microline">Microline</option>
                 <option value="Shibata">Shibata</option>
                 <option value="Line Contact">Line Contact</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div class={styles.formGroup}>
+              <label for="cartridgeType" class={styles.label}>
+                Cartridge Type
+              </label>
+              <select
+                id="cartridgeType"
+                class={styles.input}
+                value={cartridgeType()}
+                onChange={(e) => setCartridgeType(e.target.value)}
+              >
+                <option value="">-- Select cartridge type --</option>
+                <option value="Moving Magnet">Moving Magnet (MM)</option>
+                <option value="Moving Coil">Moving Coil (MC)</option>
+                <option value="Ceramic">Ceramic</option>
                 <option value="Other">Other</option>
               </select>
             </div>
@@ -545,7 +566,13 @@ const Equipment: Component = () => {
 
                     <Show when={stylus.stylus?.type}>
                       <p class={styles.stylusDetail}>
-                        <strong>Type:</strong> {stylus.stylus?.type}
+                        <strong>Stylus Type:</strong> {stylus.stylus?.type}
+                      </p>
+                    </Show>
+
+                    <Show when={stylus.stylus?.cartridgeType}>
+                      <p class={styles.stylusDetail}>
+                        <strong>Cartridge Type:</strong> {stylus.stylus?.cartridgeType}
                       </p>
                     </Show>
 
@@ -611,7 +638,13 @@ const Equipment: Component = () => {
 
                     <Show when={stylus.stylus?.type}>
                       <p class={styles.stylusDetail}>
-                        <strong>Type:</strong> {stylus.stylus?.type}
+                        <strong>Stylus Type:</strong> {stylus.stylus?.type}
+                      </p>
+                    </Show>
+
+                    <Show when={stylus.stylus?.cartridgeType}>
+                      <p class={styles.stylusDetail}>
+                        <strong>Cartridge Type:</strong> {stylus.stylus?.cartridgeType}
                       </p>
                     </Show>
 
