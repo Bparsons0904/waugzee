@@ -47,7 +47,7 @@
   margin-bottom: $spacing-md;
 }
 
-.form {
+.editForm {
   display: flex;
   flex-direction: column;
   gap: $spacing-lg;
@@ -89,7 +89,6 @@
   gap: $spacing-md;
   margin-top: $spacing-md;
 }
-
 
 .stylusList {
   display: grid;
@@ -191,25 +190,6 @@
   font-style: italic;
   background-color: $bg-subtle;
   border-radius: $border-radius-lg;
-}
-
-.successMessage,
-.errorMessage {
-  margin: $spacing-md 0;
-  padding: $spacing-md;
-  border-radius: $border-radius-md;
-}
-
-.successMessage {
-  background-color: $bg-success-subtle;
-  color: $text-success;
-  border-left: $border-width-thicker solid $border-success;
-}
-
-.errorMessage {
-  background-color: $bg-error-subtle;
-  color: $text-error;
-  border-left: $border-width-thicker solid $border-error;
 }
 
 @media (max-width: $breakpoint-md) {
