@@ -1,0 +1,42 @@
+@import "@styles/variables.scss";
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-md;
+
+  &.full {
+    grid-template-columns: 1fr;
+  }
+}
+
+.statusSection {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+
+  h3 {
+    font-size: $font-size-base;
+    font-weight: $font-weight-semibold;
+    margin: 0;
+    color: $text-default;
+  }
+}
+
+.toggleGroup {
+  display: flex;
+  gap: $spacing-xl;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-md;
+  margin-top: $spacing-md;
+}

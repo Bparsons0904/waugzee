@@ -1,16 +1,12 @@
 import { Component } from "solid-js";
 import { createStore } from "solid-js/store";
-import {
-  useAvailableStyluses,
-  useCreateUserStylus,
-} from "@services/apiHooks";
+import { useAvailableStyluses, useCreateUserStylus } from "@services/apiHooks";
 import type { CreateUserStylusRequest } from "@models/Stylus";
 import {
   SearchableSelect,
   SearchableSelectOption,
 } from "@components/common/forms/SearchableSelect/SearchableSelect";
 import { Button } from "@components/common/ui/Button/Button";
-import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import { DateInput } from "@components/common/forms/DateInput/DateInput";
 import { Textarea } from "@components/common/forms/Textarea/Textarea";
 import { Toggle } from "@components/common/forms/Toggle/Toggle";
@@ -18,7 +14,6 @@ import styles from "./AddEquipmentModal.module.scss";
 import { formatDateForInput } from "@utils/dates";
 
 interface AddEquipmentModalProps {
-  isOpen: boolean;
   onClose: () => void;
 }
 
@@ -91,91 +86,84 @@ const AddEquipmentModal: Component<AddEquipmentModalProps> = (props) => {
   };
 
   return (
-    <Modal
-      isOpen={props.isOpen}
-      onClose={handleClose}
-      title="Add Equipment"
-      size={ModalSize.Medium}
-    >
-      <form class={styles.form} onSubmit={handleSubmit}>
-        <div class={styles.formRow}>
-          <SearchableSelect
-            label="Select Stylus"
-            name="stylusSelect"
-            placeholder="-- Select a stylus --"
-            searchPlaceholder="Search styluses..."
-            options={stylusSelectOptions()}
-            value={formState.selectedStylusId}
-            onChange={(value) => setFormState("selectedStylusId", value)}
-            required
-            emptyMessage="No styluses found"
+    <form class={styles.form} onSubmit={handleSubmit}>
+      <div class={styles.formRow}>
+        <SearchableSelect
+          label="Select Stylus"
+          name="stylusSelect"
+          placeholder="-- Select a stylus --"
+          searchPlaceholder="Search styluses..."
+          options={stylusSelectOptions()}
+          value={formState.selectedStylusId}
+          onChange={(value) => setFormState("selectedStylusId", value)}
+          required
+          emptyMessage="No styluses found"
+        />
+      </div>
+
+      <div class={styles.formRow}>
+        <DateInput
+          name="purchaseDate"
+          label="Purchase Date"
+          value={formState.purchaseDate}
+          onChange={(value) => setFormState("purchaseDate", value)}
+        />
+
+        <DateInput
+          name="installDate"
+          label="Install Date"
+          value={formState.installDate}
+          onChange={(value) => setFormState("installDate", value)}
+        />
+      </div>
+
+      <div class={`${styles.formRow} ${styles.full}`}>
+        <Textarea
+          name="notes"
+          label="Notes"
+          value={formState.notes}
+          onChange={(value) => setFormState("notes", value)}
+          rows={3}
+        />
+      </div>
+
+      <div class={styles.statusSection}>
+        <h3>Status</h3>
+        <div class={styles.toggleGroup}>
+          <Toggle
+            label="Active"
+            checked={formState.isActive}
+            onChange={(checked) => setFormState("isActive", checked)}
+          />
+
+          <Toggle
+            label="Primary"
+            checked={formState.isPrimary}
+            onChange={(checked) => setFormState("isPrimary", checked)}
           />
         </div>
+      </div>
 
-        <div class={styles.formRow}>
-          <DateInput
-            name="purchaseDate"
-            label="Purchase Date"
-            value={formState.purchaseDate}
-            onChange={(value) => setFormState("purchaseDate", value)}
-          />
-
-          <DateInput
-            name="installDate"
-            label="Install Date"
-            value={formState.installDate}
-            onChange={(value) => setFormState("installDate", value)}
-          />
-        </div>
-
-        <div class={`${styles.formRow} ${styles.full}`}>
-          <Textarea
-            name="notes"
-            label="Notes"
-            value={formState.notes}
-            onChange={(value) => setFormState("notes", value)}
-            rows={3}
-          />
-        </div>
-
-        <div class={styles.statusSection}>
-          <h3>Status</h3>
-          <div class={styles.toggleGroup}>
-            <Toggle
-              label="Active"
-              checked={formState.isActive}
-              onChange={(checked) => setFormState("isActive", checked)}
-            />
-
-            <Toggle
-              label="Primary"
-              checked={formState.isPrimary}
-              onChange={(checked) => setFormState("isPrimary", checked)}
-            />
-          </div>
-        </div>
-
-        <div class={styles.formActions}>
-          <Button
-            type="button"
-            variant="tertiary"
-            onClick={handleClose}
-            disabled={createUserStylusMutation.isPending}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={createUserStylusMutation.isPending}
-          >
-            {createUserStylusMutation.isPending
-              ? "Adding..."
-              : "Add to Equipment"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+      <div class={styles.formActions}>
+        <Button
+          type="button"
+          variant="tertiary"
+          onClick={handleClose}
+          disabled={createUserStylusMutation.isPending}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={createUserStylusMutation.isPending}
+        >
+          {createUserStylusMutation.isPending
+            ? "Adding..."
+            : "Add to Equipment"}
+        </Button>
+      </div>
+    </form>
   );
 };
 
