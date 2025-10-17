@@ -106,7 +106,7 @@ func (r *genreRepository) Delete(ctx context.Context, tx *gorm.DB, id string) er
 	}
 
 	if rowsAffected == 0 {
-		return log.Err("genre not found", nil, "id", id)
+		return gorm.ErrRecordNotFound
 	}
 
 	return nil

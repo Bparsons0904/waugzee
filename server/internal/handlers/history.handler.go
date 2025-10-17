@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strings"
 	"waugzee/internal/app"
 	historyController "waugzee/internal/controllers/history"
 	"waugzee/internal/handlers/middleware"
@@ -54,10 +55,14 @@ func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
 
 	playHistory, err := h.historyController.LogPlay(c.Context(), user, &req)
 	if err != nil {
-		if err.Error() == "releaseId is required" ||
-			err.Error() == "user stylus not found or not owned by user" {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "required") ||
+			strings.Contains(errMsg, "not found") ||
+			strings.Contains(errMsg, "invalid") ||
+			strings.Contains(errMsg, "cannot be") ||
+			strings.Contains(errMsg, "exceed") {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": err.Error(),
+				"error": errMsg,
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -87,14 +92,15 @@ func (h *HistoryHandler) deletePlayHistory(c *fiber.Ctx) error {
 	}
 
 	if err := h.historyController.DeletePlayHistory(c.Context(), user, playHistoryID); err != nil {
-		if err.Error() == "playHistoryId is required" {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "required") {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Play history ID is required",
+				"error": errMsg,
 			})
 		}
-		if err.Error() == "play history not found or not owned by user" {
+		if strings.Contains(errMsg, "not found") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "Play history not found or not owned by user",
+				"error": errMsg,
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -122,9 +128,13 @@ func (h *HistoryHandler) logCleaning(c *fiber.Ctx) error {
 
 	cleaningHistory, err := h.historyController.LogCleaning(c.Context(), user, &req)
 	if err != nil {
-		if err.Error() == "releaseId is required" {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "required") ||
+			strings.Contains(errMsg, "invalid") ||
+			strings.Contains(errMsg, "cannot be") ||
+			strings.Contains(errMsg, "exceed") {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": err.Error(),
+				"error": errMsg,
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -154,14 +164,15 @@ func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
 	}
 
 	if err := h.historyController.DeleteCleaningHistory(c.Context(), user, cleaningHistoryID); err != nil {
-		if err.Error() == "cleaningHistoryId is required" {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "required") {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Cleaning history ID is required",
+				"error": errMsg,
 			})
 		}
-		if err.Error() == "cleaning history not found or not owned by user" {
+		if strings.Contains(errMsg, "not found") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "Cleaning history not found or not owned by user",
+				"error": errMsg,
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

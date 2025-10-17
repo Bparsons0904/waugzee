@@ -14,8 +14,13 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	MaxNotesLength = 1000
+)
+
 type HistoryController struct {
 	historyRepo         repositories.HistoryRepository
+	stylusRepo          repositories.StylusRepository
 	transactionService  *services.TransactionService
 	db                  database.DB
 	Config              config.Config
@@ -54,6 +59,7 @@ func New(
 ) HistoryControllerInterface {
 	return &HistoryController{
 		historyRepo:         repos.History,
+		stylusRepo:          repos.Stylus,
 		transactionService:  services.Transaction,
 		db:                  db,
 		Config:              config,
@@ -65,23 +71,20 @@ func parseDateTime(dateStr string) (*time.Time, error) {
 	if dateStr == "" {
 		return nil, nil
 	}
-	
-	// Try ISO 8601 format first
-	if t, err := time.Parse(time.RFC3339, dateStr); err == nil {
-		return &t, nil
+
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02",
+		"2006-01-02 15:04:05",
 	}
-	
-	// Try date-only format
-	if t, err := time.Parse("2006-01-02", dateStr); err == nil {
-		return &t, nil
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, dateStr); err == nil {
+			return &t, nil
+		}
 	}
-	
-	// Try datetime format
-	if t, err := time.Parse("2006-01-02 15:04:05", dateStr); err == nil {
-		return &t, nil
-	}
-	
-	return nil, logger.New("parseDateTime").Error("invalid date format", "dateStr", dateStr)
+
+	return nil, nil
 }
 
 func (c *HistoryController) LogPlay(
@@ -92,7 +95,11 @@ func (c *HistoryController) LogPlay(
 	log := c.log.Function("LogPlay")
 
 	if request.ReleaseID == 0 {
-		return nil, log.ErrMsg("releaseId is required")
+		return nil, log.Error("releaseId is required")
+	}
+
+	if request.Notes != nil && len(*request.Notes) > MaxNotesLength {
+		return nil, log.Error("notes exceed maximum length", "length", len(*request.Notes), "max", MaxNotesLength)
 	}
 
 	var playedAt time.Time
@@ -100,25 +107,26 @@ func (c *HistoryController) LogPlay(
 	if request.PlayedAt != nil && *request.PlayedAt != "" {
 		parsed, err := parseDateTime(*request.PlayedAt)
 		if err != nil {
-			return nil, log.Err("invalid playedAt format", err)
+			return nil, err
 		}
-		if parsed != nil {
-			playedAt = *parsed
+		if parsed == nil {
+			return nil, log.Error("invalid date format", "playedAt", *request.PlayedAt)
 		}
+		playedAt = *parsed
 	} else {
 		playedAt = time.Now()
 	}
 
-	// Verify user owns the stylus if provided
+	if playedAt.After(time.Now()) {
+		return nil, log.Error("playedAt cannot be in the future")
+	}
+
 	if request.UserStylusID != nil {
-		var userStylus UserStylus
-		if err := c.db.SQL.WithContext(ctx).
-			Where("id = ? AND user_id = ?", *request.UserStylusID, user.ID).
-			First(&userStylus).Error; err != nil {
+		if err := c.stylusRepo.VerifyUserOwnership(ctx, c.db.SQL, *request.UserStylusID, user.ID); err != nil {
 			if err == gorm.ErrRecordNotFound {
-				return nil, log.ErrMsg("user stylus not found or not owned by user")
+				return nil, log.Error("user stylus not found or not owned by user")
 			}
-			return nil, log.Err("failed to verify user stylus ownership", err)
+			return nil, log.Error("failed to verify user stylus ownership", "error", err)
 		}
 	}
 
@@ -127,7 +135,6 @@ func (c *HistoryController) LogPlay(
 		ReleaseID:    request.ReleaseID,
 		UserStylusID: request.UserStylusID,
 		PlayedAt:     playedAt,
-		Notes:        "",
 	}
 
 	if request.Notes != nil {
@@ -135,7 +142,7 @@ func (c *HistoryController) LogPlay(
 	}
 
 	if err := c.historyRepo.CreatePlayHistory(ctx, c.db.SQL, playHistory); err != nil {
-		return nil, log.Err("failed to create play history", err, "userID", user.ID, "releaseID", request.ReleaseID)
+		return nil, log.Error("failed to create play history", "error", err, "userID", user.ID, "releaseID", request.ReleaseID)
 	}
 
 	log.Info("Play history created successfully", "userID", user.ID, "releaseID", request.ReleaseID, "playHistoryID", playHistory.ID)
@@ -151,11 +158,11 @@ func (c *HistoryController) DeletePlayHistory(
 	log := c.log.Function("DeletePlayHistory")
 
 	if playHistoryID == uuid.Nil {
-		return log.ErrMsg("playHistoryId is required")
+		return log.Error("playHistoryId is required")
 	}
 
 	if err := c.historyRepo.DeletePlayHistory(ctx, c.db.SQL, user.ID, playHistoryID); err != nil {
-		return log.Err("failed to delete play history", err, "userID", user.ID, "playHistoryID", playHistoryID)
+		return err
 	}
 
 	log.Info("Play history deleted successfully", "userID", user.ID, "playHistoryID", playHistoryID)
@@ -171,7 +178,11 @@ func (c *HistoryController) LogCleaning(
 	log := c.log.Function("LogCleaning")
 
 	if request.ReleaseID == 0 {
-		return nil, log.ErrMsg("releaseId is required")
+		return nil, log.Error("releaseId is required")
+	}
+
+	if request.Notes != nil && len(*request.Notes) > MaxNotesLength {
+		return nil, log.Error("notes exceed maximum length", "length", len(*request.Notes), "max", MaxNotesLength)
 	}
 
 	var cleanedAt time.Time
@@ -179,21 +190,24 @@ func (c *HistoryController) LogCleaning(
 	if request.CleanedAt != nil && *request.CleanedAt != "" {
 		parsed, err := parseDateTime(*request.CleanedAt)
 		if err != nil {
-			return nil, log.Err("invalid cleanedAt format", err)
+			return nil, err
 		}
-		if parsed != nil {
-			cleanedAt = *parsed
+		if parsed == nil {
+			return nil, log.Error("invalid date format", "cleanedAt", *request.CleanedAt)
 		}
+		cleanedAt = *parsed
 	} else {
 		cleanedAt = time.Now()
 	}
 
+	if cleanedAt.After(time.Now()) {
+		return nil, log.Error("cleanedAt cannot be in the future")
+	}
+
 	cleaningHistory := &CleaningHistory{
-		UserID:      user.ID,
-		ReleaseID:   request.ReleaseID,
-		CleanedAt:   cleanedAt,
-		Notes:       "",
-		IsDeepClean: false,
+		UserID:    user.ID,
+		ReleaseID: request.ReleaseID,
+		CleanedAt: cleanedAt,
 	}
 
 	if request.Notes != nil {
@@ -205,7 +219,7 @@ func (c *HistoryController) LogCleaning(
 	}
 
 	if err := c.historyRepo.CreateCleaningHistory(ctx, c.db.SQL, cleaningHistory); err != nil {
-		return nil, log.Err("failed to create cleaning history", err, "userID", user.ID, "releaseID", request.ReleaseID)
+		return nil, log.Error("failed to create cleaning history", "error", err, "userID", user.ID, "releaseID", request.ReleaseID)
 	}
 
 	log.Info("Cleaning history created successfully", "userID", user.ID, "releaseID", request.ReleaseID, "cleaningHistoryID", cleaningHistory.ID)
@@ -221,11 +235,11 @@ func (c *HistoryController) DeleteCleaningHistory(
 	log := c.log.Function("DeleteCleaningHistory")
 
 	if cleaningHistoryID == uuid.Nil {
-		return log.ErrMsg("cleaningHistoryId is required")
+		return log.Error("cleaningHistoryId is required")
 	}
 
 	if err := c.historyRepo.DeleteCleaningHistory(ctx, c.db.SQL, user.ID, cleaningHistoryID); err != nil {
-		return log.Err("failed to delete cleaning history", err, "userID", user.ID, "cleaningHistoryID", cleaningHistoryID)
+		return err
 	}
 
 	log.Info("Cleaning history deleted successfully", "userID", user.ID, "cleaningHistoryID", cleaningHistoryID)

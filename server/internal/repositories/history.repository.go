@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"fmt"
 	"time"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
@@ -208,13 +209,7 @@ func (r *historyRepository) DeletePlayHistory(
 	}
 
 	if rowsAffected == 0 {
-		return log.Error(
-			"play history not found or not owned by user",
-			"userID",
-			userID,
-			"playHistoryID",
-			playHistoryID,
-		)
+		return fmt.Errorf("play history not found or not owned by user")
 	}
 
 	r.clearUserPlayHistoryCache(ctx, userID)
@@ -351,13 +346,7 @@ func (r *historyRepository) DeleteCleaningHistory(
 	}
 
 	if rowsAffected == 0 {
-		return log.Error(
-			"cleaning history not found or not owned by user",
-			"userID",
-			userID,
-			"cleaningHistoryID",
-			cleaningHistoryID,
-		)
+		return fmt.Errorf("cleaning history not found or not owned by user")
 	}
 
 	r.clearUserCleaningHistoryCache(ctx, userID)

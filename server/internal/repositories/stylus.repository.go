@@ -30,6 +30,7 @@ type StylusRepository interface {
 	) error
 	Delete(ctx context.Context, tx *gorm.DB, userID uuid.UUID, stylusID uuid.UUID) error
 	UnsetAllPrimary(ctx context.Context, tx *gorm.DB, userID uuid.UUID) error
+	VerifyUserOwnership(ctx context.Context, tx *gorm.DB, stylusID uuid.UUID, userID uuid.UUID) error
 }
 
 type stylusRepository struct {
@@ -272,6 +273,27 @@ func (r *stylusRepository) UnsetAllPrimary(
 	}
 
 	r.clearUserStylusCache(ctx, userID)
+
+	return nil
+}
+
+func (r *stylusRepository) VerifyUserOwnership(
+	ctx context.Context,
+	tx *gorm.DB,
+	stylusID uuid.UUID,
+	userID uuid.UUID,
+) error {
+	log := r.log.Function("VerifyUserOwnership")
+
+	var userStylus UserStylus
+	if err := tx.WithContext(ctx).
+		Where("id = ? AND user_id = ?", stylusID, userID).
+		First(&userStylus).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return gorm.ErrRecordNotFound
+		}
+		return log.Err("failed to verify user stylus ownership", err, "stylusID", stylusID, "userID", userID)
+	}
 
 	return nil
 }
