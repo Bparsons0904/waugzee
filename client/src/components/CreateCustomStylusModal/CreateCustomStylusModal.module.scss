@@ -1,0 +1,31 @@
+@use "../../styles/variables" as *;
+@use "../../styles/colors" as *;
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-md;
+
+  &.full {
+    grid-template-columns: 1fr;
+  }
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-md;
+  margin-top: $spacing-md;
+}
+
+@media (max-width: $breakpoint-md) {
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+}

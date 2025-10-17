@@ -1,0 +1,56 @@
+@use "../../styles/variables" as *;
+@use "../../styles/colors" as *;
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-md;
+
+  &.full {
+    grid-template-columns: 1fr;
+  }
+}
+
+.statusSection {
+  background-color: $bg-subtle;
+  border: $border-width-thin solid $border-default;
+  border-radius: $border-radius-md;
+  padding: $spacing-md;
+  margin-bottom: $spacing-lg;
+
+  h3 {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: $text-default;
+    margin: 0 0 $spacing-md 0;
+  }
+}
+
+.toggleGroup {
+  display: flex;
+  gap: $spacing-lg;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-md;
+  margin-top: $spacing-md;
+}
+
+@media (max-width: $breakpoint-md) {
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+
+  .toggleGroup {
+    flex-direction: column;
+    gap: $spacing-md;
+  }
+}
