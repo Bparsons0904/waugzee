@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"strconv"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
@@ -40,17 +41,17 @@ func NewLabelRepository() LabelRepository {
 func (r *labelRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (*Label, error) {
 	log := r.log.Function("GetByID")
 
-	labelID, err := uuid.Parse(id)
+	labelID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		return nil, log.Err("failed to parse label ID", err, "id", id)
 	}
 
-	var label Label
-	if err := tx.WithContext(ctx).First(&label, "id = ?", labelID).Error; err != nil {
+	label, err := gorm.G[*Label](tx).Where(BaseDiscogModel{ID: labelID}).First(ctx)
+	if err != nil {
 		return nil, log.Err("failed to get label by ID", err, "id", id)
 	}
 
-	return &label, nil
+	return label, nil
 }
 
 func (r *labelRepository) GetByDiscogsID(
@@ -60,15 +61,15 @@ func (r *labelRepository) GetByDiscogsID(
 ) (*Label, error) {
 	log := r.log.Function("GetByDiscogsID")
 
-	var label Label
-	if err := tx.WithContext(ctx).First(&label, "id = ?", discogsID).Error; err != nil {
+	label, err := gorm.G[*Label](tx).Where(BaseDiscogModel{ID: discogsID}).First(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
 		return nil, log.Err("failed to get label by Discogs ID", err, "discogsID", discogsID)
 	}
 
-	return &label, nil
+	return label, nil
 }
 
 func (r *labelRepository) Create(ctx context.Context, tx *gorm.DB, label *Label) (*Label, error) {
@@ -99,8 +100,13 @@ func (r *labelRepository) Delete(ctx context.Context, tx *gorm.DB, id string) er
 		return log.Err("failed to parse label ID", err, "id", id)
 	}
 
-	if err := tx.WithContext(ctx).Delete(&Label{}, "id = ?", labelID).Error; err != nil {
+	rowsAffected, err := gorm.G[*Label](tx).Where("id = ?", labelID).Delete(ctx)
+	if err != nil {
 		return log.Err("failed to delete label", err, "id", id)
+	}
+
+	if rowsAffected == 0 {
+		return log.Err("label not found", nil, "id", id)
 	}
 
 	return nil
@@ -155,8 +161,8 @@ func (r *labelRepository) GetBatchByDiscogsIDs(
 		return make(map[int64]*Label), nil
 	}
 
-	var labels []*Label
-	if err := tx.WithContext(ctx).Where("id IN ?", discogsIDs).Find(&labels).Error; err != nil {
+	labels, err := gorm.G[*Label](tx).Where("id IN ?", discogsIDs).Find(ctx)
+	if err != nil {
 		return nil, log.Err("failed to get labels by Discogs IDs", err, "count", len(discogsIDs))
 	}
 

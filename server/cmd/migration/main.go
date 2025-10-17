@@ -221,36 +221,3 @@ func runMigrations(
 
 	return nil
 }
-
-func cleanDatabase(db *gorm.DB, log logger.Logger) error {
-	log = log.Function("cleanDatabase")
-	log.Info("Cleaning database before seeding")
-
-	// Drop junction tables first (many2many relationships)
-	junctionTables := []string{
-		"master_genres",
-		"master_artists",
-		"release_artists",
-		"release_labels",
-		"release_genres",
-		"artist_members",
-	}
-
-	for _, table := range junctionTables {
-		if db.Migrator().HasTable(table) {
-			log.Info("Dropping junction table", "table", table)
-			if err := db.Migrator().DropTable(table); err != nil {
-				return log.Err("failed to drop junction table", err, "table", table)
-			}
-		}
-	}
-
-	// Drop all model tables
-	if err := db.Migrator().DropTable(MODELS_TO_MIGRATE...); err != nil {
-		return log.Err("failed to drop tables", err)
-	}
-	log.Info("Dropped all tables successfully")
-
-	log.Info("Database cleaned successfully")
-	return nil
-}

@@ -68,15 +68,15 @@ func (r *masterRepository) GetByDiscogsID(
 ) (*Master, error) {
 	log := r.log.Function("GetByDiscogsID")
 
-	var master Master
-	if err := tx.WithContext(ctx).First(&master, "id = ?", discogsID).Error; err != nil {
+	master, err := gorm.G[*Master](tx).Where(BaseDiscogModel{ID: discogsID}).First(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
 		return nil, log.Err("failed to get master by Discogs ID", err, "discogsID", discogsID)
 	}
 
-	return &master, nil
+	return master, nil
 }
 
 
