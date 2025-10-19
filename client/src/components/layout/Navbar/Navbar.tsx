@@ -1,9 +1,9 @@
-import { Component, Match, Switch } from "solid-js";
-import { A } from "@solidjs/router";
-import styles from "./NavBar.module.scss";
-import { useAuth } from "@context/AuthContext";
-import { ROUTES } from "@constants/api.constants";
 import { FolderSelector } from "@components/folders/FolderSelector";
+import { ROUTES } from "@constants/api.constants";
+import { useAuth } from "@context/AuthContext";
+import { A } from "@solidjs/router";
+import { type Component, Match, Switch } from "solid-js";
+import styles from "./NavBar.module.scss";
 
 export const NavBar: Component = () => {
   const { isAuthenticated, logout } = useAuth();
@@ -20,23 +20,14 @@ export const NavBar: Component = () => {
           <div class={styles.navbarMenu}>
             <ul class={styles.navbarItems}>
               <li class={styles.navbarItem}>
-                <A
-                  href="/"
-                  class={styles.navbarLink}
-                  activeClass={styles.active}
-                  end
-                >
+                <A href="/" class={styles.navbarLink} activeClass={styles.active} end>
                   Home
                 </A>
               </li>
               <Switch>
                 <Match when={isAuthenticated()}>
                   <li class={styles.navbarItem}>
-                    <A
-                      href={ROUTES.PROFILE}
-                      class={styles.navbarLink}
-                      activeClass={styles.active}
-                    >
+                    <A href={ROUTES.PROFILE} class={styles.navbarLink} activeClass={styles.active}>
                       Profile
                     </A>
                   </li>
@@ -66,20 +57,12 @@ export const NavBar: Component = () => {
               <li class={styles.navbarItem}>
                 <Switch>
                   <Match when={!isAuthenticated()}>
-                    <A
-                      href={ROUTES.LOGIN}
-                      class={styles.navbarLink}
-                      activeClass={styles.active}
-                    >
+                    <A href={ROUTES.LOGIN} class={styles.navbarLink} activeClass={styles.active}>
                       Login
                     </A>
                   </Match>
                   <Match when={isAuthenticated()}>
-                    <A
-                      href={ROUTES.HOME}
-                      class={styles.navbarLink}
-                      onClick={logout}
-                    >
+                    <A href={ROUTES.HOME} class={styles.navbarLink} onClick={logout}>
                       Logout
                     </A>
                   </Match>

@@ -128,6 +128,9 @@ client/.parcel-cache/
 # Stylelint cache
 .stylelintcache
 
+# Biome cache
+.biome-cache/
+
 # Package manager locks (keep package-lock.json, ignore others if needed)
 # Uncomment the ones you don't want to track:
 # package-lock.json

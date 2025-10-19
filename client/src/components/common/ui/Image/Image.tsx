@@ -1,4 +1,4 @@
-import { Component, createSignal, Show } from "solid-js";
+import { type Component, createSignal, Show } from "solid-js";
 import styles from "./Image.module.scss";
 
 export interface ImageProps {
@@ -60,14 +60,14 @@ export const Image: Component<ImageProps> = (props) => {
   };
 
   return (
-    <div 
+    <div
       class={`${styles.imageContainer} ${getAspectRatioClass()} ${props.className || ""}`}
       onClick={props.onClick}
     >
       <Show when={props.showSkeleton && !loaded()}>
         <div class={styles.skeleton} />
       </Show>
-      
+
       <Show when={!imageError()}>
         <img
           src={currentSrc()}

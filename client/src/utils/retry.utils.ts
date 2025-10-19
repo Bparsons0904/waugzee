@@ -41,7 +41,7 @@ const calculateDelay = (
   maxDelay: number,
   exponentialBase: number,
 ): number => {
-  const exponentialDelay = baseDelay * Math.pow(exponentialBase, attempt - 1);
+  const exponentialDelay = baseDelay * exponentialBase ** (attempt - 1);
   const delayWithCap = Math.min(exponentialDelay, maxDelay);
 
   // Add jitter (±25% randomness)
@@ -87,21 +87,13 @@ export async function retryWithExponentialBackoff<T>(
       }
 
       // Calculate and apply delay
-      const delay = calculateDelay(
-        attempt,
-        baseDelayMs,
-        maxDelayMs,
-        exponentialBase,
-      );
+      const delay = calculateDelay(attempt, baseDelayMs, maxDelayMs, exponentialBase);
 
-      console.debug(
-        `Retry attempt ${attempt}/${maxAttempts} failed, retrying in ${delay}ms:`,
-        {
-          error: lastError.message,
-          attempt,
-          delay,
-        },
-      );
+      console.debug(`Retry attempt ${attempt}/${maxAttempts} failed, retrying in ${delay}ms:`, {
+        error: lastError.message,
+        attempt,
+        delay,
+      });
 
       await sleep(delay);
     }
@@ -128,4 +120,3 @@ export const dataRetryConfig: RetryConfig = {
   maxAttempts: RETRY_CONFIG.MAX_ATTEMPTS,
   shouldRetry: defaultShouldRetry,
 };
-

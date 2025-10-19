@@ -1,19 +1,19 @@
-import { Component, Show } from "solid-js";
+import { formatLocalDate } from "@utils/dates";
 import {
-  getCleanlinessScore,
-  getCleanlinessColor,
-  getPlayRecencyScore,
-  getPlayRecencyColor,
-  getPlayRecencyText,
-  getCleanlinessText,
   countPlaysSinceCleaning,
+  getCleanlinessColor,
+  getCleanlinessScore,
+  getCleanlinessText,
   getLastCleaningDate,
   getLastPlayDate,
+  getPlayRecencyColor,
+  getPlayRecencyScore,
+  getPlayRecencyText,
 } from "@utils/playStatus";
-import { formatLocalDate } from "@utils/dates";
-import styles from "./StatusIndicators.module.scss";
-import { TbWashTemperature5 } from "solid-icons/tb";
 import { ImHeadphones } from "solid-icons/im";
+import { TbWashTemperature5 } from "solid-icons/tb";
+import { type Component, Show } from "solid-js";
+import styles from "./StatusIndicators.module.scss";
 
 export interface StatusIndicatorProps {
   playHistory?: { playedAt: string }[];
@@ -23,17 +23,14 @@ export interface StatusIndicatorProps {
   onCleanClick?: () => void;
 }
 
-export const RecordStatusIndicator: Component<StatusIndicatorProps> = (
-  props,
-) => {
+export const RecordStatusIndicator: Component<StatusIndicatorProps> = (props) => {
   const lastPlayDate = () => getLastPlayDate(props.playHistory);
   const lastCleanDate = () => getLastCleaningDate(props.cleaningHistory);
 
   const playsSinceCleaning = () =>
     countPlaysSinceCleaning(props.playHistory || [], lastCleanDate());
 
-  const cleanlinessScore = () =>
-    getCleanlinessScore(lastCleanDate(), playsSinceCleaning());
+  const cleanlinessScore = () => getCleanlinessScore(lastCleanDate(), playsSinceCleaning());
 
   const playRecencyScore = () => getPlayRecencyScore(lastPlayDate());
 
@@ -59,15 +56,11 @@ export const RecordStatusIndicator: Component<StatusIndicatorProps> = (
         <div class={styles.detailsSection}>
           <div class={styles.detailRow}>
             <span class={styles.detailLabel}>Last played:</span>
-            <span class={styles.detailValue}>
-              {formatLocalDate(lastPlayDate())}
-            </span>
+            <span class={styles.detailValue}>{formatLocalDate(lastPlayDate())}</span>
           </div>
           <div class={styles.detailRow}>
             <span class={styles.detailLabel}>Last cleaned:</span>
-            <span class={styles.detailValue}>
-              {formatLocalDate(lastCleanDate())}
-            </span>
+            <span class={styles.detailValue}>{formatLocalDate(lastCleanDate())}</span>
           </div>
           <div class={styles.detailRow}>
             <span class={styles.detailLabel}>Plays since cleaning:</span>

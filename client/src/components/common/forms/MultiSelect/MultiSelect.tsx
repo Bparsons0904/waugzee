@@ -1,17 +1,10 @@
-import {
-  Component,
-  createSignal,
-  createUniqueId,
-  For,
-  Show,
-  createEffect,
-} from "solid-js";
-import { ValidatorFunction } from "../../../../utils/validation";
+import { CheckIcon } from "@components/icons/CheckIcon";
+import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import { useSelectBase } from "@hooks/useSelectBase";
 import clsx from "clsx";
+import { type Component, createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
+import type { ValidatorFunction } from "../../../../utils/validation";
 import styles from "./MultiSelect.module.scss";
-import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
-import { CheckIcon } from "@components/icons/CheckIcon";
 
 export interface MultiSelectOption {
   value: string;
@@ -47,14 +40,7 @@ export const MultiSelect: Component<MultiSelectProps> = (props) => {
     }
   });
 
-  const {
-    isOpen,
-    setIsOpen,
-    focusedIndex,
-    setFocusedIndex,
-    validation,
-    formField,
-  } = useSelectBase(
+  const { isOpen, setIsOpen, focusedIndex, setFocusedIndex, validation, formField } = useSelectBase(
     {
       name: props.name,
       label: props.label,
@@ -64,7 +50,7 @@ export const MultiSelect: Component<MultiSelectProps> = (props) => {
       onBlur: props.onBlur,
     },
     props.value || props.defaultValue,
-    (values) => values.join(",")
+    (values) => values.join(","),
   );
 
   const handleOptionToggle = (optionValue: string) => {
@@ -260,11 +246,7 @@ export const MultiSelect: Component<MultiSelectProps> = (props) => {
       </Show>
 
       {/* Hidden input for form submission */}
-      <input
-        type="hidden"
-        name={props.name}
-        value={selectedValues().join(",")}
-      />
+      <input type="hidden" name={props.name} value={selectedValues().join(",")} />
     </div>
   );
 };
@@ -277,15 +259,11 @@ interface MultiSelectOptionItemProps {
   onClick: () => void;
 }
 
-const MultiSelectOptionItem: Component<MultiSelectOptionItemProps> = (
-  props,
-) => {
-  const availableOptions = () =>
-    props.allOptions.filter((opt) => !opt.disabled);
+const MultiSelectOptionItem: Component<MultiSelectOptionItemProps> = (props) => {
+  const availableOptions = () => props.allOptions.filter((opt) => !opt.disabled);
   const availableIndex = () =>
     availableOptions().findIndex((opt) => opt.value === props.option.value);
-  const isFocused = () =>
-    availableIndex() === props.focusedIndex && !props.option.disabled;
+  const isFocused = () => availableIndex() === props.focusedIndex && !props.option.disabled;
 
   return (
     <div

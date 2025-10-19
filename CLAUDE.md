@@ -132,6 +132,7 @@ found, err := database.NewCacheBuilder(cache, prefix + ":" + id).Get(&cachedResp
 - **Styling**: SCSS with CSS Modules
 - **State Management**: TanStack Query (Solid Query) + Context API
 - **Authentication**: OIDC flow integration
+- **Linting & Formatting**: Biome (fast, unified linter and formatter)
 
 **CRITICAL: Always use TanStack Query for API calls**
 
@@ -213,7 +214,8 @@ const response = await api.put(endpoint, data);
 - **Server tests**: `tilt trigger server-tests` or `go test -C ./server ./...`
 - **Server test coverage**: `go test -C ./server -coverprofile=coverage.out ./... && go tool cover -html=coverage.out -o coverage.html`
 - **Server linting**: `tilt trigger server-lint` or `\cd server && golangci-lint run`
-- **Client linting**: `tilt trigger client-lint` or `npm run lint:check -C ./client`
+- **Client linting**: `tilt trigger client-lint` or `npm run lint:check -C ./client` (uses Biome)
+- **Client formatting**: `npm run format -C ./client` (Biome auto-fix)
 - **Client tests**: `tilt trigger client-tests` or `npm run test -C ./client`
 - **TypeScript check**: `npm run typecheck -C ./client`
 
@@ -416,7 +418,7 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 
 **Enforcement:**
 - **Code Reviews**: All PRs must follow these naming conventions
-- **Linting**: ESLint and Go linting rules enforce these standards
+- **Linting**: Biome (frontend) and golangci-lint (backend) enforce these standards
 - **Immediate Fix Required**: Any kebab-case discovered should be fixed immediately
 - **No Exceptions**: Only CSS variables may use kebab-case due to CSS specification requirements
 

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Textarea } from "./Textarea";
 
 describe("Textarea", () => {
@@ -10,9 +10,7 @@ describe("Textarea", () => {
   it("calls onChange when text is input", () => {
     const mockOnChange = vi.fn();
 
-    render(() => (
-      <Textarea label="Test Textarea" name="test" onChange={mockOnChange} />
-    ));
+    render(() => <Textarea label="Test Textarea" name="test" onChange={mockOnChange} />);
 
     const textarea = screen.getByRole("textbox");
     fireEvent.input(textarea, { target: { value: "Hello world" } });
@@ -23,9 +21,7 @@ describe("Textarea", () => {
   it("calls onInput when text is input", () => {
     const mockOnInput = vi.fn();
 
-    render(() => (
-      <Textarea label="Test Textarea" name="test" onInput={mockOnInput} />
-    ));
+    render(() => <Textarea label="Test Textarea" name="test" onInput={mockOnInput} />);
 
     const textarea = screen.getByRole("textbox");
     fireEvent.input(textarea, { target: { value: "Hello" } });
@@ -36,9 +32,7 @@ describe("Textarea", () => {
   it("calls onBlur when focus is lost", () => {
     const mockOnBlur = vi.fn();
 
-    render(() => (
-      <Textarea label="Test Textarea" name="test" onBlur={mockOnBlur} />
-    ));
+    render(() => <Textarea label="Test Textarea" name="test" onBlur={mockOnBlur} />);
 
     const textarea = screen.getByRole("textbox");
     fireEvent.blur(textarea);
@@ -47,12 +41,9 @@ describe("Textarea", () => {
   });
 
   it("displays current value correctly", () => {
-    render(() => (
-      <Textarea label="Test Textarea" name="test" value="Current value" />
-    ));
+    render(() => <Textarea label="Test Textarea" name="test" value="Current value" />);
 
     const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
     expect(textarea.value).toBe("Current value");
   });
 });
-

@@ -1,7 +1,7 @@
-import { Component, createUniqueId, JSX, Show } from "solid-js";
 import { useFormField } from "@hooks/useFormField";
 import { useValidation } from "@hooks/useValidation";
-import { ValidatorFunction } from "../../../../utils/validation";
+import { type Component, createUniqueId, type JSX, Show } from "solid-js";
+import type { ValidatorFunction } from "../../../../utils/validation";
 import styles from "./Checkbox.module.scss";
 
 export interface CheckboxProps {
@@ -96,6 +96,7 @@ export const Checkbox: Component<CheckboxProps> = (props) => {
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
             >
+              <title>Checkmark</title>
               <path
                 d="M10 3L4.5 8.5L2 6"
                 stroke="currentColor"
@@ -129,4 +130,3 @@ export const Checkbox: Component<CheckboxProps> = (props) => {
     </div>
   );
 };
-

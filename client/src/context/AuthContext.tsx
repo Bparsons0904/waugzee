@@ -1,23 +1,11 @@
-import { useNavigate } from "@solidjs/router";
-import {
-  createContext,
-  useContext,
-  JSX,
-  createEffect,
-  Show,
-  onCleanup,
-} from "solid-js";
-import { createStore } from "solid-js/store";
-import {
-  User,
-  AuthConfig,
-} from "src/types/User";
+import { AUTH_ENDPOINTS, ROUTES } from "@constants/api.constants";
 import { api, setTokenGetter } from "@services/api";
 import { oidcService } from "@services/oidc.service";
-import {
-  AUTH_ENDPOINTS,
-  ROUTES,
-} from "@constants/api.constants";
+import { useNavigate } from "@solidjs/router";
+import { createContext, createEffect, type JSX, onCleanup, Show, useContext } from "solid-js";
+import { createStore } from "solid-js/store";
+import type { AuthConfig, User } from "src/types/User";
+
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
 type AuthError =
@@ -121,10 +109,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
             performLocalLogout();
           },
           onSilentRenewError: (error) => {
-            console.error(
-              "OIDC silent renewal failed - performing logout:",
-              error,
-            );
+            console.error("OIDC silent renewal failed - performing logout:", error);
             performLocalLogout();
           },
           onUserSignedOut: () => {
@@ -155,21 +140,14 @@ export function AuthProvider(props: { children: JSX.Element }) {
         oidcInitialized: false,
         error: {
           type: "config_error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Failed to load auth configuration",
+          message: error instanceof Error ? error.message : "Failed to load auth configuration",
         },
       });
     }
   });
 
   createEffect(() => {
-    if (
-      authState.configLoading ||
-      !authState.config?.configured ||
-      !authState.oidcInitialized
-    ) {
+    if (authState.configLoading || !authState.config?.configured || !authState.oidcInitialized) {
       return;
     }
 
@@ -212,10 +190,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
             token: null,
             error: {
               type: "network",
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Authentication check failed",
+              message: error instanceof Error ? error.message : "Authentication check failed",
             },
           });
         }
@@ -261,9 +236,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       const oidcUser = await oidcService.signInRedirectCallback();
 
       if (!oidcUser?.access_token || !oidcUser?.id_token) {
-        throw new Error(
-          "Failed to complete OIDC authentication - missing tokens",
-        );
+        throw new Error("Failed to complete OIDC authentication - missing tokens");
       }
 
       // Temporarily update the token in auth state so the API call can use it
@@ -271,17 +244,12 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
       // Call our backend's callback endpoint with the ID token to create/update the user
       try {
-        const callbackResponse = await api.post<CallbackResponse>(
-          AUTH_ENDPOINTS.CALLBACK,
-          {
-            id_token: oidcUser.id_token,
-            access_token: oidcUser.access_token,
-            state:
-              typeof oidcUser.state === "string"
-                ? oidcUser.state
-                : JSON.stringify(oidcUser.state),
-          },
-        );
+        const callbackResponse = await api.post<CallbackResponse>(AUTH_ENDPOINTS.CALLBACK, {
+          id_token: oidcUser.id_token,
+          access_token: oidcUser.access_token,
+          state:
+            typeof oidcUser.state === "string" ? oidcUser.state : JSON.stringify(oidcUser.state),
+        });
 
         console.info("Backend callback successful:", {
           userId: callbackResponse?.user?.id,
@@ -308,17 +276,13 @@ export function AuthProvider(props: { children: JSX.Element }) {
         token: null,
         error: {
           type: "auth_failed",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Authentication callback failed",
+          message: error instanceof Error ? error.message : "Authentication callback failed",
         },
       });
 
       throw error;
     }
   };
-
 
   const logout = async () => {
     console.info("Logout initiated");
@@ -332,16 +296,11 @@ export function AuthProvider(props: { children: JSX.Element }) {
           console.debug("Backend logout completed successfully");
         }
       } catch (backendError) {
-        console.warn(
-          "Backend logout failed, continuing with OIDC logout:",
-          backendError,
-        );
+        console.warn("Backend logout failed, continuing with OIDC logout:", backendError);
       }
 
       if (!authState.oidcInitialized) {
-        console.warn(
-          "OIDC service not initialized, performing local logout only",
-        );
+        console.warn("OIDC service not initialized, performing local logout only");
         performLocalLogout();
         return;
       }
@@ -363,10 +322,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
       performLocalLogout();
     } catch (error) {
-      console.error(
-        "Logout process failed, performing emergency cleanup:",
-        error,
-      );
+      console.error("Logout process failed, performing emergency cleanup:", error);
 
       // Emergency cleanup - ensure we always clear local state
       performLocalLogout();

@@ -1,5 +1,5 @@
-import { Component, JSX } from "solid-js";
 import { NavBar } from "@layout/Navbar/Navbar";
+import type { Component, JSX } from "solid-js";
 
 interface LayoutProps {
   children: JSX.Element;

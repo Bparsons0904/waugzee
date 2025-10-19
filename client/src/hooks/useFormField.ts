@@ -1,5 +1,5 @@
-import { onMount, onCleanup } from "solid-js";
 import { useForm } from "@context/FormContext";
+import { onCleanup, onMount } from "solid-js";
 
 interface FieldValidation {
   isValid: boolean;
@@ -46,7 +46,7 @@ export const useFormField = (options: UseFormFieldOptions = {}) => {
     }
   });
 
-  const updateFormField = (validation: Omit<FieldValidation, 'isRequired'>) => {
+  const updateFormField = (validation: Omit<FieldValidation, "isRequired">) => {
     if (isConnectedToForm) {
       formContext!.updateField(fieldId, {
         ...validation,

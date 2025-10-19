@@ -1,4 +1,4 @@
-import { Component, JSX } from "solid-js";
+import type { Component, JSX } from "solid-js";
 import styles from "./Card.module.scss";
 
 export interface CardProps {
@@ -31,7 +31,6 @@ export const Card: Component<CardProps> = (props) => {
         return styles.paddingTight;
       case "loose":
         return styles.paddingLoose;
-      case "normal":
       default:
         return styles.paddingNormal;
     }
@@ -43,7 +42,6 @@ export const Card: Component<CardProps> = (props) => {
         return styles.cardElevated;
       case "outlined":
         return styles.cardOutlined;
-      case "default":
       default:
         return styles.cardDefault;
     }

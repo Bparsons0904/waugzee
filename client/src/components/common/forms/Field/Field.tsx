@@ -1,4 +1,4 @@
-import { Component, JSX } from "solid-js";
+import type { Component, JSX } from "solid-js";
 import styles from "./Field.module.scss";
 
 export interface FieldProps {

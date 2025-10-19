@@ -1,4 +1,4 @@
-import { Component, createContext, useContext, JSX } from "solid-js";
+import { type Component, createContext, type JSX, useContext } from "solid-js";
 import { createStore } from "solid-js/store";
 
 interface FieldValidation {
@@ -108,4 +108,3 @@ export const useForm = () => {
   }
   return context;
 };
-

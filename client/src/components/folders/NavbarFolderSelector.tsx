@@ -1,9 +1,9 @@
-import { Component, Show, For, Switch, Match, Accessor } from "solid-js";
 import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import { LoadingSpinner } from "@components/icons/LoadingSpinner";
-import styles from "./FolderSelector.module.scss";
 import clsx from "clsx";
+import { type Accessor, type Component, For, Match, Show, Switch } from "solid-js";
 import type { Folder } from "src/types/User";
+import styles from "./FolderSelector.module.scss";
 
 interface NavbarFolderSelectorProps {
   folders: Accessor<Folder[]>;
@@ -13,16 +13,8 @@ interface NavbarFolderSelectorProps {
   isLoading: boolean;
 }
 
-export const NavbarFolderSelector: Component<NavbarFolderSelectorProps> = (
-  props
-) => {
-  const {
-    folders,
-    selectedFolderId,
-    selectedFolder,
-    handleFolderChange,
-    isLoading,
-  } = props;
+export const NavbarFolderSelector: Component<NavbarFolderSelectorProps> = (props) => {
+  const { folders, selectedFolderId, selectedFolder, handleFolderChange, isLoading } = props;
 
   return (
     <div class={clsx(styles.folderSelector, styles.navbarMode)}>
@@ -65,4 +57,3 @@ export const NavbarFolderSelector: Component<NavbarFolderSelectorProps> = (
     </div>
   );
 };
-

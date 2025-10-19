@@ -1,6 +1,6 @@
-import { render, screen, fireEvent } from "@solidjs/testing-library";
-import { describe, it, expect, vi } from "vitest";
-import { SearchableSelect, SearchableSelectOption } from "./SearchableSelect";
+import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { describe, expect, it, vi } from "vitest";
+import { SearchableSelect, type SearchableSelectOption } from "./SearchableSelect";
 
 describe("SearchableSelect", () => {
   const mockOptions: SearchableSelectOption[] = [
@@ -12,31 +12,21 @@ describe("SearchableSelect", () => {
 
   it("renders with label", () => {
     render(() => (
-      <SearchableSelect
-        label="Select Stylus"
-        options={mockOptions}
-        placeholder="Choose a stylus"
-      />
+      <SearchableSelect label="Select Stylus" options={mockOptions} placeholder="Choose a stylus" />
     ));
 
     expect(screen.getByText("Select Stylus")).toBeInTheDocument();
   });
 
   it("shows placeholder when no value is selected", () => {
-    render(() => (
-      <SearchableSelect options={mockOptions} placeholder="Choose a stylus" />
-    ));
+    render(() => <SearchableSelect options={mockOptions} placeholder="Choose a stylus" />);
 
     expect(screen.getByText("Choose a stylus")).toBeInTheDocument();
   });
 
   it("displays selected option", () => {
     render(() => (
-      <SearchableSelect
-        options={mockOptions}
-        value="1"
-        placeholder="Choose a stylus"
-      />
+      <SearchableSelect options={mockOptions} value="1" placeholder="Choose a stylus" />
     ));
 
     expect(screen.getByText("Ortofon 2M Blue")).toBeInTheDocument();
@@ -156,24 +146,14 @@ describe("SearchableSelect", () => {
   });
 
   it("shows required indicator when required prop is true", () => {
-    render(() => (
-      <SearchableSelect
-        label="Select Stylus"
-        options={mockOptions}
-        required={true}
-      />
-    ));
+    render(() => <SearchableSelect label="Select Stylus" options={mockOptions} required={true} />);
 
     expect(screen.getByText("*")).toBeInTheDocument();
   });
 
   it("disables trigger when disabled prop is true", () => {
     render(() => (
-      <SearchableSelect
-        options={mockOptions}
-        placeholder="Choose a stylus"
-        disabled={true}
-      />
+      <SearchableSelect options={mockOptions} placeholder="Choose a stylus" disabled={true} />
     ));
 
     const trigger = screen.getByRole("combobox");

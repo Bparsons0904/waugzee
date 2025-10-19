@@ -23,8 +23,7 @@ export function getPlayRecencyScore(lastPlayedDate: Date | null): number {
   if (!lastPlayedDate) return 0;
 
   const now = new Date();
-  const daysElapsed =
-    (now.getTime() - lastPlayedDate.getTime()) / (24 * 60 * 60 * 1000);
+  const daysElapsed = (now.getTime() - lastPlayedDate.getTime()) / (24 * 60 * 60 * 1000);
 
   if (daysElapsed <= 7) return 100;
   if (daysElapsed <= 30) return 80;
@@ -46,8 +45,7 @@ export function getPlayRecencyText(lastPlayedDate: Date | null): string {
   if (!lastPlayedDate) return "Never played";
 
   const now = new Date();
-  const daysElapsed =
-    (now.getTime() - lastPlayedDate.getTime()) / (24 * 60 * 60 * 1000);
+  const daysElapsed = (now.getTime() - lastPlayedDate.getTime()) / (24 * 60 * 60 * 1000);
 
   if (daysElapsed <= 7) return "Played this week";
   if (daysElapsed <= 30) return "Played this month";
@@ -95,9 +93,7 @@ export function getLastCleaningDate(
   return new Date(sortedHistory[0].cleanedAt);
 }
 
-export function getLastPlayDate(
-  playHistory: { playedAt: string }[] | undefined,
-): Date | null {
+export function getLastPlayDate(playHistory: { playedAt: string }[] | undefined): Date | null {
   if (!playHistory || playHistory.length === 0) return null;
 
   const sortedHistory = [...playHistory].sort((a, b) => {

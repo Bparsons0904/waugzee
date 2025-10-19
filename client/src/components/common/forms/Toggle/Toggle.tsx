@@ -1,4 +1,4 @@
-import { Component } from "solid-js";
+import type { Component } from "solid-js";
 import styles from "./Toggle.module.scss";
 
 export interface ToggleProps {
@@ -28,13 +28,8 @@ export const Toggle: Component<ToggleProps> = (props) => {
         aria-checked={props.checked}
         role="switch"
       />
-      <span
-        class={styles.switch}
-        aria-hidden="true"
-      />
-      {props.label && (
-        <span class={styles.label}>{props.label}</span>
-      )}
+      <span class={styles.switch} aria-hidden="true" />
+      {props.label && <span class={styles.label}>{props.label}</span>}
     </label>
   );
 };

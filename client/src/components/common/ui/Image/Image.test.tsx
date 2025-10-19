@@ -1,15 +1,10 @@
-import { render, screen, fireEvent, waitFor } from "@solidjs/testing-library";
-import { describe, it, expect, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { describe, expect, it, vi } from "vitest";
 import { Image } from "./Image";
 
 describe("Image Component", () => {
   it("renders with basic props", () => {
-    render(() => (
-      <Image
-        src="/test-image.jpg"
-        alt="Test image"
-      />
-    ));
+    render(() => <Image src="/test-image.jpg" alt="Test image" />);
 
     const img = screen.getByAltText("Test image");
     expect(img).toBeInTheDocument();
@@ -19,11 +14,7 @@ describe("Image Component", () => {
 
   it("shows skeleton when showSkeleton is true and image hasn't loaded", () => {
     const { container } = render(() => (
-      <Image
-        src="/test-image.jpg"
-        alt="Test image"
-        showSkeleton={true}
-      />
+      <Image src="/test-image.jpg" alt="Test image" showSkeleton={true} />
     ));
 
     const skeleton = container.querySelector("[class*='skeleton']");
@@ -32,11 +23,7 @@ describe("Image Component", () => {
 
   it("applies aspect ratio classes correctly", () => {
     const { container } = render(() => (
-      <Image
-        src="/test-image.jpg"
-        alt="Test image"
-        aspectRatio="album"
-      />
+      <Image src="/test-image.jpg" alt="Test image" aspectRatio="album" />
     ));
 
     const imageContainer = container.querySelector("[class*='imageContainer']");
@@ -44,19 +31,13 @@ describe("Image Component", () => {
   });
 
   it("handles image load event", async () => {
-    render(() => (
-      <Image
-        src="/test-image.jpg"
-        alt="Test image"
-        showSkeleton={true}
-      />
-    ));
+    render(() => <Image src="/test-image.jpg" alt="Test image" showSkeleton={true} />);
 
     const img = screen.getByAltText("Test image");
-    
+
     // Simulate image load
     fireEvent.load(img);
-    
+
     await waitFor(() => {
       expect(img.className).toContain("loaded");
     });
@@ -64,18 +45,14 @@ describe("Image Component", () => {
 
   it("handles image error with fallback", async () => {
     render(() => (
-      <Image
-        src="/nonexistent-image.jpg"
-        alt="Test image"
-        fallback="/fallback-image.jpg"
-      />
+      <Image src="/nonexistent-image.jpg" alt="Test image" fallback="/fallback-image.jpg" />
     ));
 
     const img = screen.getByAltText("Test image");
-    
+
     // Simulate image error
     fireEvent.error(img);
-    
+
     await waitFor(() => {
       expect(img).toHaveAttribute("src", "/fallback-image.jpg");
     });
@@ -83,25 +60,21 @@ describe("Image Component", () => {
 
   it("shows error state when both src and fallback fail", async () => {
     render(() => (
-      <Image
-        src="/nonexistent-image.jpg"
-        alt="Test image"
-        fallback="/nonexistent-fallback.jpg"
-      />
+      <Image src="/nonexistent-image.jpg" alt="Test image" fallback="/nonexistent-fallback.jpg" />
     ));
 
     const img = screen.getByAltText("Test image");
-    
+
     // Simulate first error (tries fallback)
     fireEvent.error(img);
-    
+
     await waitFor(() => {
       expect(img).toHaveAttribute("src", "/nonexistent-fallback.jpg");
     });
 
     // Simulate second error (shows error state)
     fireEvent.error(img);
-    
+
     await waitFor(() => {
       expect(screen.getByText("Image not available")).toBeInTheDocument();
     });
@@ -109,28 +82,20 @@ describe("Image Component", () => {
 
   it("handles click events", () => {
     const handleClick = vi.fn();
-    
+
     const { container } = render(() => (
-      <Image
-        src="/test-image.jpg"
-        alt="Test image"
-        onClick={handleClick}
-      />
+      <Image src="/test-image.jpg" alt="Test image" onClick={handleClick} />
     ));
 
     const imageContainer = container.querySelector("[class*='imageContainer']");
     fireEvent.click(imageContainer!);
-    
+
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
   it("applies custom className", () => {
     const { container } = render(() => (
-      <Image
-        src="/test-image.jpg"
-        alt="Test image"
-        className="custom-class"
-      />
+      <Image src="/test-image.jpg" alt="Test image" className="custom-class" />
     ));
 
     const imageContainer = container.querySelector("[class*='imageContainer']");
@@ -138,27 +103,14 @@ describe("Image Component", () => {
   });
 
   it("sets loading attribute correctly", () => {
-    render(() => (
-      <Image
-        src="/test-image.jpg"
-        alt="Test image"
-        loading="eager"
-      />
-    ));
+    render(() => <Image src="/test-image.jpg" alt="Test image" loading="eager" />);
 
     const img = screen.getByAltText("Test image");
     expect(img).toHaveAttribute("loading", "eager");
   });
 
   it("sets width and height attributes", () => {
-    render(() => (
-      <Image
-        src="/test-image.jpg"
-        alt="Test image"
-        width={300}
-        height={200}
-      />
-    ));
+    render(() => <Image src="/test-image.jpg" alt="Test image" width={300} height={200} />);
 
     const img = screen.getByAltText("Test image");
     expect(img).toHaveAttribute("width", "300");
@@ -167,11 +119,7 @@ describe("Image Component", () => {
 
   it("sets sizes attribute for responsive images", () => {
     render(() => (
-      <Image
-        src="/test-image.jpg"
-        alt="Test image"
-        sizes="(max-width: 768px) 100vw, 50vw"
-      />
+      <Image src="/test-image.jpg" alt="Test image" sizes="(max-width: 768px) 100vw, 50vw" />
     ));
 
     const img = screen.getByAltText("Test image");

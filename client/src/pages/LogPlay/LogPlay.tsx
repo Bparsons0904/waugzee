@@ -1,19 +1,19 @@
-import { Component, createSignal, createMemo, For, Show } from "solid-js";
-import styles from "./LogPlay.module.scss";
+import { Field } from "@components/common/forms/Field/Field";
+import { Select, type SelectOption } from "@components/common/forms/Select/Select";
+import { Toggle } from "@components/common/forms/Toggle/Toggle";
+import { Image } from "@components/common/ui/Image/Image";
 import RecordActionModal from "@components/RecordActionModal/RecordActionModal";
 import { RecordStatusIndicator } from "@components/StatusIndicators/StatusIndicators";
-import { Select, SelectOption } from "@components/common/forms/Select/Select";
-import { Field } from "@components/common/forms/Field/Field";
-import { Image } from "@components/common/ui/Image/Image";
-import { Toggle } from "@components/common/forms/Toggle/Toggle";
+import { useUserData } from "@context/UserDataContext";
+import type { UserRelease } from "@models/User";
+import { fuzzySearchUserReleases } from "@utils/fuzzy";
 import {} from // getLastPlayDate,
 // getCleanlinessScore,
 // countPlaysSinceCleaning,
 // getLastCleaningDate,
 "@utils/playStatus";
-import { fuzzySearchUserReleases } from "@utils/fuzzy";
-import { useUserData } from "@context/UserDataContext";
-import { UserRelease } from "@models/User";
+import { type Component, createMemo, createSignal, For, Show } from "solid-js";
+import styles from "./LogPlay.module.scss";
 
 const sortOptions: SelectOption[] = [
   { value: "album", label: "Album (A-Z)" },
@@ -31,23 +31,17 @@ const LogPlay: Component = () => {
   const userData = useUserData();
   const releases = () => userData.releases();
   const [searchTerm, setSearchTerm] = createSignal("");
-  const [selectedRelease, setSelectedRelease] =
-    createSignal<UserRelease | null>(null);
+  const [selectedRelease, setSelectedRelease] = createSignal<UserRelease | null>(null);
   const [isModalOpen, setIsModalOpen] = createSignal(false);
   const [showStatusDetails, setShowStatusDetails] = createSignal(false);
   const [sortBy, setSortBy] = createSignal("artist");
 
-  const sortReleases = (
-    releases: UserRelease[],
-    sortOption: string,
-  ): UserRelease[] => {
+  const sortReleases = (releases: UserRelease[], sortOption: string): UserRelease[] => {
     const sorted = [...releases];
 
     switch (sortOption) {
       case "album":
-        return sorted.sort((a, b) =>
-          (a.release.title || "").localeCompare(b.release.title || ""),
-        );
+        return sorted.sort((a, b) => (a.release.title || "").localeCompare(b.release.title || ""));
 
       case "year":
         return sorted.sort((a, b) => {
@@ -64,9 +58,7 @@ const LogPlay: Component = () => {
       case "playCount":
       case "needsCleaning":
       default:
-        return sorted.sort((a, b) =>
-          (a.release.title || "").localeCompare(b.release.title || ""),
-        );
+        return sorted.sort((a, b) => (a.release.title || "").localeCompare(b.release.title || ""));
     }
   };
 
@@ -106,9 +98,7 @@ const LogPlay: Component = () => {
   return (
     <div class={styles.container}>
       <h1 class={styles.title}>Log Play & Cleaning</h1>
-      <p class={styles.subtitle}>
-        Record when you play or clean records from your collection.
-      </p>
+      <p class={styles.subtitle}>Record when you play or clean records from your collection.</p>
 
       <div class={styles.logForm}>
         <div class={styles.controlsRow}>
@@ -139,10 +129,7 @@ const LogPlay: Component = () => {
 
         <div class={styles.optionsSection}>
           <Field label="Show status details">
-            <Toggle
-              checked={showStatusDetails()}
-              onChange={setShowStatusDetails}
-            />
+            <Toggle checked={showStatusDetails()} onChange={setShowStatusDetails} />
           </Field>
         </div>
 
@@ -167,11 +154,7 @@ const LogPlay: Component = () => {
                     <div class={styles.releaseCardContainer}>
                       <div class={styles.releaseImageContainer}>
                         <Image
-                          src={
-                            userRelease.release.thumb ||
-                            userRelease.release.coverImage ||
-                            ""
-                          }
+                          src={userRelease.release.thumb || userRelease.release.coverImage || ""}
                           alt={userRelease.release.title || "Release"}
                           aspectRatio="square"
                           showSkeleton={false}
@@ -179,15 +162,11 @@ const LogPlay: Component = () => {
                           className={styles.releaseImage}
                         />
                         {userRelease.release.year && (
-                          <div class={styles.releaseYear}>
-                            {userRelease.release.year}
-                          </div>
+                          <div class={styles.releaseYear}>{userRelease.release.year}</div>
                         )}
                       </div>
                       <div class={styles.releaseInfo}>
-                        <h3 class={styles.releaseTitle}>
-                          {userRelease.release.title}
-                        </h3>
+                        <h3 class={styles.releaseTitle}>{userRelease.release.title}</h3>
                         <p class={styles.releaseArtist}>
                           {userRelease.release.artists?.[0]?.name || "Unknown Artist"}
                         </p>
@@ -198,9 +177,7 @@ const LogPlay: Component = () => {
                             cleaningHistory={[]}
                             showDetails={false}
                             onPlayClick={() => handleQuickPlay(userRelease)}
-                            onCleanClick={() =>
-                              handleQuickCleaning(userRelease)
-                            }
+                            onCleanClick={() => handleQuickCleaning(userRelease)}
                           />
                         </div>
                       </div>

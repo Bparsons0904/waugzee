@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
-import { Select, SelectOption } from "./Select";
+import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Select, type SelectOption } from "./Select";
 
 const mockOptions: SelectOption[] = [
   { value: "", label: "Select an option..." },
@@ -18,12 +18,7 @@ describe("Select", () => {
     const mockOnChange = vi.fn();
 
     render(() => (
-      <Select
-        label="Test Select"
-        name="test"
-        options={mockOptions}
-        onChange={mockOnChange}
-      />
+      <Select label="Test Select" name="test" options={mockOptions} onChange={mockOnChange} />
     ));
 
     const select = screen.getByRole("combobox");
@@ -36,12 +31,7 @@ describe("Select", () => {
     const mockOnBlur = vi.fn();
 
     render(() => (
-      <Select
-        label="Test Select"
-        name="test"
-        options={mockOptions}
-        onBlur={mockOnBlur}
-      />
+      <Select label="Test Select" name="test" options={mockOptions} onBlur={mockOnBlur} />
     ));
 
     const select = screen.getByRole("combobox");
@@ -51,17 +41,9 @@ describe("Select", () => {
   });
 
   it("displays current value correctly", () => {
-    render(() => (
-      <Select
-        label="Test Select"
-        name="test"
-        options={mockOptions}
-        value="option2"
-      />
-    ));
+    render(() => <Select label="Test Select" name="test" options={mockOptions} value="option2" />);
 
     const select = screen.getByRole("combobox") as HTMLSelectElement;
     expect(select.value).toBe("option2");
   });
 });
-

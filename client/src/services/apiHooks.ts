@@ -1,30 +1,29 @@
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  UseQueryOptions,
-  UseMutationOptions,
-  UseQueryResult,
-  UseMutationResult,
-} from "@tanstack/solid-query";
-// import { api, ApiClientError } from "./api";
-import { Accessor } from "solid-js";
-import { useToast } from "../context/ToastContext";
-import { AxiosRequestConfig } from "axios";
-import { api } from "./api";
 import { STYLUS_ENDPOINTS } from "@constants/api.constants";
 import type {
   AvailableStylusResponse,
-  UserStylusesResponse,
-  CreateUserStylusRequest,
   CreateCustomStylusRequest,
   CreateCustomStylusResponse,
+  CreateUserStylusRequest,
   UpdateUserStylusRequest,
+  UserStylusesResponse,
 } from "@models/Stylus";
+import {
+  type UseMutationOptions,
+  type UseMutationResult,
+  type UseQueryOptions,
+  type UseQueryResult,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/solid-query";
+import type { AxiosRequestConfig } from "axios";
+// import { api, ApiClientError } from "./api";
+import type { Accessor } from "solid-js";
+import { useToast } from "../context/ToastContext";
+import { api } from "./api";
 
 // Enhanced query options
-export interface ApiQueryOptions<T>
-  extends Omit<UseQueryOptions<T>, "queryKey" | "queryFn"> {
+export interface ApiQueryOptions<T> extends Omit<UseQueryOptions<T>, "queryKey" | "queryFn"> {
   enabled?: boolean | Accessor<boolean>;
 }
 
@@ -182,11 +181,7 @@ export function useApiPaginatedQuery<T>(
   additionalParams?: Record<string, unknown>,
   options?: ApiQueryOptions<T>,
 ) {
-  const queryKey = [
-    ...baseQueryKey,
-    "paginated",
-    { page, limit, ...additionalParams },
-  ];
+  const queryKey = [...baseQueryKey, "paginated", { page, limit, ...additionalParams }];
   const params = { page, limit, ...additionalParams };
 
   return useApiGet<T>(queryKey, url, params, options);
@@ -254,7 +249,10 @@ export function useCreateCustomStylus(
     STYLUS_ENDPOINTS.CUSTOM,
     undefined,
     {
-      invalidateQueries: [["styluses", "user"], ["styluses", "available"]],
+      invalidateQueries: [
+        ["styluses", "user"],
+        ["styluses", "available"],
+      ],
       successMessage: "Custom stylus created and added to equipment!",
       errorMessage: "Failed to create custom stylus. Please try again.",
       ...options,
@@ -277,18 +275,11 @@ export function useUpdateUserStylus(
   );
 }
 
-export function useDeleteUserStylus(
-  options?: ApiMutationOptions<void, string>,
-) {
-  return useApiMutation<void, string>(
-    "DELETE",
-    (id) => STYLUS_ENDPOINTS.DELETE(id),
-    undefined,
-    {
-      invalidateQueries: [["styluses", "user"]],
-      successMessage: "Stylus removed from equipment successfully!",
-      errorMessage: "Failed to remove stylus. Please try again.",
-      ...options,
-    },
-  );
+export function useDeleteUserStylus(options?: ApiMutationOptions<void, string>) {
+  return useApiMutation<void, string>("DELETE", (id) => STYLUS_ENDPOINTS.DELETE(id), undefined, {
+    invalidateQueries: [["styluses", "user"]],
+    successMessage: "Stylus removed from equipment successfully!",
+    errorMessage: "Failed to remove stylus. Please try again.",
+    ...options,
+  });
 }

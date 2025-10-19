@@ -1,8 +1,15 @@
-import { Component, JSX } from "solid-js";
-import styles from "./Button.module.scss";
 import clsx from "clsx";
+import type { Component, JSX } from "solid-js";
+import styles from "./Button.module.scss";
 
-export type ButtonVariant = "primary" | "secondary" | "tertiary" | "danger" | "gradient" | "ghost" | "warning";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "tertiary"
+  | "danger"
+  | "gradient"
+  | "ghost"
+  | "warning";
 export type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps {
@@ -23,7 +30,7 @@ export const Button: Component<ButtonProps> = (props) => {
         styles.button,
         styles[props.variant || "primary"],
         styles[props.size || "md"],
-        props.class || props.className
+        props.class || props.className,
       )}
       type={props.type || "button"}
       disabled={props.disabled}

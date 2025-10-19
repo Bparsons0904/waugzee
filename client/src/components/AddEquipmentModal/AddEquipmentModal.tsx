@@ -1,17 +1,17 @@
-import { Component } from "solid-js";
-import { createStore } from "solid-js/store";
-import { useAvailableStyluses, useCreateUserStylus } from "@services/apiHooks";
-import type { CreateUserStylusRequest } from "@models/Stylus";
+import { DateInput } from "@components/common/forms/DateInput/DateInput";
 import {
   SearchableSelect,
-  SearchableSelectOption,
+  type SearchableSelectOption,
 } from "@components/common/forms/SearchableSelect/SearchableSelect";
-import { Button } from "@components/common/ui/Button/Button";
-import { DateInput } from "@components/common/forms/DateInput/DateInput";
 import { Textarea } from "@components/common/forms/Textarea/Textarea";
 import { Toggle } from "@components/common/forms/Toggle/Toggle";
-import styles from "./AddEquipmentModal.module.scss";
+import { Button } from "@components/common/ui/Button/Button";
+import type { CreateUserStylusRequest } from "@models/Stylus";
+import { useAvailableStyluses, useCreateUserStylus } from "@services/apiHooks";
 import { formatDateForInput } from "@utils/dates";
+import type { Component } from "solid-js";
+import { createStore } from "solid-js/store";
+import styles from "./AddEquipmentModal.module.scss";
 
 interface AddEquipmentModalProps {
   onClose: () => void;
@@ -153,14 +153,8 @@ const AddEquipmentModal: Component<AddEquipmentModalProps> = (props) => {
         >
           Cancel
         </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={createUserStylusMutation.isPending}
-        >
-          {createUserStylusMutation.isPending
-            ? "Adding..."
-            : "Add to Equipment"}
+        <Button type="submit" variant="primary" disabled={createUserStylusMutation.isPending}>
+          {createUserStylusMutation.isPending ? "Adding..." : "Add to Equipment"}
         </Button>
       </div>
     </form>

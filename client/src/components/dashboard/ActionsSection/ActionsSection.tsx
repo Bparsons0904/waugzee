@@ -1,5 +1,5 @@
-import { Component, For } from "solid-js";
 import { Card } from "@components/common/ui/Card/Card";
+import { type Component, For } from "solid-js";
 import styles from "./ActionsSection.module.scss";
 
 export interface ActionItem {
@@ -28,11 +28,7 @@ export const ActionsSection: Component<ActionsSectionProps> = (props) => {
                 <p>{action.description}</p>
               </div>
               <div class={styles.cardFooter}>
-                <button
-                  class={styles.button}
-                  onClick={action.onClick}
-                  disabled={action.disabled}
-                >
+                <button class={styles.button} onClick={action.onClick} disabled={action.disabled}>
                   {action.buttonText}
                 </button>
               </div>

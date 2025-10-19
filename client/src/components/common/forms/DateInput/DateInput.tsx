@@ -1,7 +1,7 @@
-import { Component, createUniqueId, Show } from "solid-js";
 import { useFormField } from "@hooks/useFormField";
 import { useValidation } from "@hooks/useValidation";
-import { ValidatorFunction } from "../../../../utils/validation";
+import { type Component, createUniqueId, Show } from "solid-js";
+import type { ValidatorFunction } from "../../../../utils/validation";
 import styles from "./DateInput.module.scss";
 
 export interface DateInputProps {

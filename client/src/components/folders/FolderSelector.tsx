@@ -1,13 +1,10 @@
-import { Component, Match, Switch } from "solid-js";
-import { CompactFolderSelector } from "./CompactFolderSelector";
-import { NavbarFolderSelector } from "./NavbarFolderSelector";
+import { USER_ENDPOINTS } from "@constants/api.constants";
 import { useUserData } from "@context/UserDataContext";
 import { useApiPut } from "@services/apiHooks";
-import { USER_ENDPOINTS } from "@constants/api.constants";
-import type {
-  UpdateSelectedFolderRequest,
-  UpdateSelectedFolderResponse,
-} from "src/types/User";
+import { type Component, Match, Switch } from "solid-js";
+import type { UpdateSelectedFolderRequest, UpdateSelectedFolderResponse } from "src/types/User";
+import { CompactFolderSelector } from "./CompactFolderSelector";
+import { NavbarFolderSelector } from "./NavbarFolderSelector";
 
 interface FolderSelectorProps {
   navbar?: boolean;
@@ -19,18 +16,18 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
   const user = userData.user;
   const folders = userData.folders;
 
-  const updateFolderMutation = useApiPut<
-    UpdateSelectedFolderResponse,
-    UpdateSelectedFolderRequest
-  >(USER_ENDPOINTS.ME_FOLDER, undefined, {
-    invalidateQueries: [["user"]],
-    successMessage: (_, variables) => {
-      const folderName =
-        folders().find((f) => f.id === variables.folderId)?.name || "Unknown";
-      return `Folder changed to "${folderName}"`;
+  const updateFolderMutation = useApiPut<UpdateSelectedFolderResponse, UpdateSelectedFolderRequest>(
+    USER_ENDPOINTS.ME_FOLDER,
+    undefined,
+    {
+      invalidateQueries: [["user"]],
+      successMessage: (_, variables) => {
+        const folderName = folders().find((f) => f.id === variables.folderId)?.name || "Unknown";
+        return `Folder changed to "${folderName}"`;
+      },
+      errorMessage: "Failed to update folder selection",
     },
-    errorMessage: "Failed to update folder selection",
-  });
+  );
 
   const selectedFolderId = () => user()?.configuration?.selectedFolderId;
 
@@ -66,4 +63,3 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
     </Switch>
   );
 };
-

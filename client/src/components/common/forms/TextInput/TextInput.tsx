@@ -1,10 +1,10 @@
-import { Component, createSignal, Show } from "solid-js";
-import clsx from "clsx";
-import styles from "./TextInput.module.scss";
-import { useValidation } from "@hooks/useValidation";
 import { useFormField } from "@hooks/useFormField";
+import { useValidation } from "@hooks/useValidation";
+import clsx from "clsx";
+import { type Component, createSignal, Show } from "solid-js";
+import type { ValidatorFunction } from "../../../../utils/validation";
 import { PasswordToggle } from "../PasswordToggle/PasswordToggle";
-import { ValidatorFunction } from "../../../../utils/validation";
+import styles from "./TextInput.module.scss";
 
 type TextInputType = "text" | "password" | "email";
 
@@ -34,42 +34,42 @@ interface TextInputProps {
 
 export const TextInput: Component<TextInputProps> = (props) => {
   const [showPassword, setShowPassword] = createSignal(false);
-  
+
   // Generate unique ID for input-label association
   const inputId = `input-${props.name || Math.random().toString(36).substr(2, 9)}`;
-  
+
   // Build custom validators including email validation
   const buildCustomValidators = () => {
     const validators = [];
-    
+
     // Add email validation if type is email
     if (props.type === "email") {
       const emailValidator: ValidatorFunction = (value: string) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (value && !emailRegex.test(value)) {
-          return { isValid: false, errorMessage: 'Please enter a valid email address' };
+          return { isValid: false, errorMessage: "Please enter a valid email address" };
         }
         return { isValid: true };
       };
       validators.push(emailValidator);
     }
-    
+
     // Add custom validation function
     if (props.validationFunction) {
       validators.push(props.validationFunction);
     }
-    
+
     // Add any additional custom validators
     if (props.customValidators) {
       validators.push(...props.customValidators);
     }
-    
+
     return validators;
   };
 
   // Determine if this is a controlled component
   const isControlled = () => props.value !== undefined;
-  
+
   // Use custom hooks
   const validation = useValidation({
     initialValue: props.value ?? props.defaultValue,
@@ -88,7 +88,7 @@ export const TextInput: Component<TextInputProps> = (props) => {
   });
 
   const isPasswordField = () => props.type === "password";
-  
+
   const getInputType = () => {
     if (isPasswordField() && showPassword()) {
       return "text";
@@ -96,10 +96,9 @@ export const TextInput: Component<TextInputProps> = (props) => {
     return props.type ?? "text";
   };
 
-
   const handleUpdate = (event: FocusEvent & { target: HTMLInputElement }) => {
     const value = event.target.value;
-    
+
     // Mark field as blurred and force validation
     validation.markAsBlurred();
     const validationResult = validation.validate(value, true);
@@ -141,7 +140,7 @@ export const TextInput: Component<TextInputProps> = (props) => {
               styles.input,
               isPasswordField() && styles.passwordInput,
               !validation.isValid() && styles.inputError,
-              props.class
+              props.class,
             )}
             value={isControlled() ? props.value : validation.value()}
             placeholder={props.placeholder}
@@ -158,10 +157,7 @@ export const TextInput: Component<TextInputProps> = (props) => {
             name={props.name}
           />
           <Show when={isPasswordField()}>
-            <PasswordToggle 
-              showPassword={showPassword()} 
-              onToggle={togglePasswordVisibility} 
-            />
+            <PasswordToggle showPassword={showPassword()} onToggle={togglePasswordVisibility} />
           </Show>
         </div>
         <Show when={!validation.isValid() && validation.errorMessage()}>

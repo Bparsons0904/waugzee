@@ -1,4 +1,4 @@
-import { Component, JSX, Show, createEffect, onCleanup } from "solid-js";
+import { type Component, createEffect, type JSX, onCleanup, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import styles from "./Modal.module.scss";
 
@@ -6,7 +6,7 @@ export enum ModalSize {
   Small = "sm",
   Medium = "md",
   Large = "lg",
-  ExtraLarge = "xl"
+  ExtraLarge = "xl",
 }
 
 interface ModalProps {
@@ -41,7 +41,7 @@ export const Modal: Component<ModalProps> = (props) => {
     if (!modalRef || e.key !== "Tab") return;
 
     const focusableElements = modalRef.querySelectorAll(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
     const firstElement = focusableElements[0] as HTMLElement;
     const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
@@ -64,10 +64,10 @@ export const Modal: Component<ModalProps> = (props) => {
       document.addEventListener("keydown", handleKeyDown);
       document.addEventListener("keydown", trapFocus);
       document.body.style.overflow = "hidden";
-      
+
       setTimeout(() => {
         const focusableElement = modalRef?.querySelector(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
         ) as HTMLElement;
         focusableElement?.focus();
       }, 100);
@@ -143,9 +143,7 @@ export const Modal: Component<ModalProps> = (props) => {
                 </Show>
               </div>
             </Show>
-            <div class={styles.content}>
-              {props.children}
-            </div>
+            <div class={styles.content}>{props.children}</div>
           </div>
         </div>
       </Portal>

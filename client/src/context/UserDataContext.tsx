@@ -1,9 +1,15 @@
-import { createContext, useContext, JSX } from "solid-js";
-import { User, Folder, UserRelease, UserStylus, UserWithFoldersAndReleasesResponse } from "src/types/User";
-import { useAuth } from "./AuthContext";
+import { USER_ENDPOINTS } from "@constants/api.constants";
 import { useApiQuery } from "@services/apiHooks";
 import { useQueryClient } from "@tanstack/solid-query";
-import { USER_ENDPOINTS } from "@constants/api.constants";
+import { createContext, type JSX, useContext } from "solid-js";
+import type {
+  Folder,
+  User,
+  UserRelease,
+  UserStylus,
+  UserWithFoldersAndReleasesResponse,
+} from "src/types/User";
+import { useAuth } from "./AuthContext";
 
 type UserDataContextValue = {
   user: () => User | null;
@@ -16,9 +22,7 @@ type UserDataContextValue = {
   refreshUser: () => Promise<void>;
 };
 
-const UserDataContext = createContext<UserDataContextValue>(
-  {} as UserDataContextValue,
-);
+const UserDataContext = createContext<UserDataContextValue>({} as UserDataContextValue);
 
 export function UserDataProvider(props: { children: JSX.Element }) {
   const auth = useAuth();

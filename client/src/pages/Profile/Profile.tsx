@@ -1,7 +1,7 @@
-import { Component } from "solid-js";
+import { Button } from "@components/common/ui/Button/Button";
 import { useAuth } from "@context/AuthContext";
 import { useUserData } from "@context/UserDataContext";
-import { Button } from "@components/common/ui/Button/Button";
+import type { Component } from "solid-js";
 
 const Profile: Component = () => {
   const { logout } = useAuth();
@@ -17,8 +17,7 @@ const Profile: Component = () => {
             <strong>Username:</strong> {user()?.displayName || "Not available"}
           </p>
           <p>
-            <strong>Name:</strong> {user()?.firstName || ""}{" "}
-            {user()?.lastName || ""}
+            <strong>Name:</strong> {user()?.firstName || ""} {user()?.lastName || ""}
           </p>
           <p>
             <strong>User ID:</strong> {user()?.id || "Not available"}
@@ -35,7 +34,9 @@ const Profile: Component = () => {
           </p>
           <p>
             <strong>Selected Folder:</strong>{" "}
-            {user()?.configuration?.selectedFolderId ? `Folder ID ${user()?.configuration?.selectedFolderId}` : "Not selected"}
+            {user()?.configuration?.selectedFolderId
+              ? `Folder ID ${user()?.configuration?.selectedFolderId}`
+              : "Not selected"}
           </p>
         </div>
       </div>
@@ -49,4 +50,3 @@ const Profile: Component = () => {
 };
 
 export default Profile;
-

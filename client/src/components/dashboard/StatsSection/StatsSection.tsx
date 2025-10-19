@@ -1,5 +1,5 @@
-import { Component, For } from "solid-js";
 import { Card } from "@components/common/ui/Card/Card";
+import { type Component, For } from "solid-js";
 import styles from "./StatsSection.module.scss";
 
 export interface StatItem {
@@ -22,9 +22,7 @@ export const StatsSection: Component<StatsSectionProps> = (props) => {
             <Card class={styles.statCard}>
               <div class={styles.statIcon}>{stat.icon}</div>
               <div class={styles.statContent}>
-                <h3 class={styles.statNumber}>
-                  {stat.isLoading ? "--" : stat.value}
-                </h3>
+                <h3 class={styles.statNumber}>{stat.isLoading ? "--" : stat.value}</h3>
                 <p class={styles.statLabel}>{stat.label}</p>
               </div>
             </Card>

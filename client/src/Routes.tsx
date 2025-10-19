@@ -1,10 +1,8 @@
-import { Route } from "@solidjs/router";
-import { Component, lazy } from "solid-js";
-import { useAuth } from "@context/AuthContext";
-import { useNavigate } from "@solidjs/router";
-import { createEffect } from "solid-js";
-import { ROUTES } from "@constants/api.constants";
 import { ConditionalRoot } from "@components/ConditionalRoot/ConditionalRoot";
+import { ROUTES } from "@constants/api.constants";
+import { useAuth } from "@context/AuthContext";
+import { Route, useNavigate } from "@solidjs/router";
+import { type Component, createEffect, lazy } from "solid-js";
 
 const LoginPage = lazy(() => import("@pages/Auth/Login"));
 const OidcCallbackPage = lazy(() => import("@pages/Auth/OidcCallback"));
@@ -37,10 +35,7 @@ export const Routes: Component = () => {
       <Route path={ROUTES.SILENT_CALLBACK} component={SilentCallbackPage} />
       <Route path={ROUTES.PROFILE} component={ProtectedRoute(ProfilePage)} />
       <Route path={ROUTES.LOG_PLAY} component={ProtectedRoute(LogPlayPage)} />
-      <Route
-        path={ROUTES.EQUIPMENT}
-        component={ProtectedRoute(EquipmentPage)}
-      />
+      <Route path={ROUTES.EQUIPMENT} component={ProtectedRoute(EquipmentPage)} />
     </>
   );
 };

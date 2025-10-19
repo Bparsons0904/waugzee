@@ -68,4 +68,3 @@ export const TOKEN_CONFIG = {
   EXPIRY_BUFFER_MINUTES: 5, // Refresh token 5 minutes before expiry
   MAX_RETRY_ATTEMPTS: 2,
 } as const;
-

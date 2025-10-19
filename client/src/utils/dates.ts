@@ -13,9 +13,7 @@ function parseLocalDate(date: string | Date | null | undefined): Date | null {
   }
 }
 
-export function useFormattedMediumDate(
-  date: string | Date | null | undefined,
-): string {
+export function useFormattedMediumDate(date: string | Date | null | undefined): string {
   if (!date) return "Never synced";
 
   const dateObj = parseLocalDate(date);
@@ -31,9 +29,7 @@ export function useFormattedMediumDate(
   });
 }
 
-export function useFormattedShortDate(
-  date: string | Date | null | undefined,
-): string {
+export function useFormattedShortDate(date: string | Date | null | undefined): string {
   if (!date) return "";
 
   const dateObj = parseLocalDate(date);
@@ -47,9 +43,7 @@ export function useFormattedShortDate(
 }
 
 // Claude this is essentially the same as getLocalDateGroupKey
-export function formatDateForInput(
-  date: Date | string | null | undefined,
-): string {
+export function formatDateForInput(date: Date | string | null | undefined): string {
   const dateObj = parseLocalDate(date);
   if (!dateObj) return "";
 
@@ -86,10 +80,7 @@ export function getLocalDateGroupKey(date: string | Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function isSameLocalDay(
-  date1: string | Date | null,
-  date2: string | Date | null,
-): boolean {
+export function isSameLocalDay(date1: string | Date | null, date2: string | Date | null): boolean {
   if (!date1 || !date2) return false;
 
   const dateObj1 = parseLocalDate(date1);

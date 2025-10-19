@@ -3,7 +3,7 @@
  * Provides helpers for mocking Tiptap Editor and testing rich text functionality
  */
 
-import { vi, expect } from "vitest";
+import { expect, vi } from "vitest";
 import { stripHtml } from "../../../../utils/htmlUtils";
 
 export interface MockEditorInstance {
@@ -63,9 +63,7 @@ export const createMockEditor = (
 /**
  * Mock Editor constructor that returns a mock instance
  */
-export const createMockEditorConstructor = (
-  mockInstance?: MockEditorInstance,
-) => {
+export const createMockEditorConstructor = (mockInstance?: MockEditorInstance) => {
   const instance = mockInstance || createMockEditor();
   return vi.fn(() => instance as unknown as MockEditorInstance);
 };
@@ -89,13 +87,8 @@ export const simulateEditorUpdate = (
 /**
  * Helper to simulate active formatting states
  */
-export const simulateActiveStates = (
-  mockEditor: MockEditorInstance,
-  activeFormats: string[],
-) => {
-  mockEditor.isActive.mockImplementation((format: string) =>
-    activeFormats.includes(format),
-  );
+export const simulateActiveStates = (mockEditor: MockEditorInstance, activeFormats: string[]) => {
+  mockEditor.isActive.mockImplementation((format: string) => activeFormats.includes(format));
 };
 
 /**
@@ -123,28 +116,14 @@ export const simulateKeyboardEvent = (
 /**
  * Helper to get editor configuration from Editor mock calls
  */
-export const getEditorConfig = (
-  EditorMock: { mock: { calls: unknown[][] } },
-  callIndex = 0,
-) => {
+export const getEditorConfig = (EditorMock: { mock: { calls: unknown[][] } }, callIndex = 0) => {
   return EditorMock.mock.calls[callIndex]?.[0] || {};
 };
 
 /**
  * Test data for emoji picker
  */
-export const TEST_EMOJIS = [
-  "😊",
-  "😂",
-  "🎉",
-  "❤️",
-  "👍",
-  "🔥",
-  "💯",
-  "✨",
-  "🚀",
-  "💡",
-];
+export const TEST_EMOJIS = ["😊", "😂", "🎉", "❤️", "👍", "🔥", "💯", "✨", "🚀", "💡"];
 
 /**
  * HTML content samples for testing
@@ -167,10 +146,7 @@ export const accessibilityHelpers = {
   /**
    * Check if element has proper ARIA attributes
    */
-  checkAriaAttributes: (
-    element: HTMLElement,
-    expectedAttributes: Record<string, string>,
-  ) => {
+  checkAriaAttributes: (element: HTMLElement, expectedAttributes: Record<string, string>) => {
     Object.entries(expectedAttributes).forEach(([attr, value]) => {
       expect(element).toHaveAttribute(attr, value);
     });
@@ -242,4 +218,3 @@ export const integrationHelpers = {
     }
   },
 };
-

@@ -1,8 +1,8 @@
-import { Component, createSignal, onMount } from "solid-js";
-import { A } from "@solidjs/router";
-import { useUserData } from "@context/UserDataContext";
 import { Button } from "@components/common/ui/Button/Button";
 import { ROUTES } from "@constants/api.constants";
+import { useUserData } from "@context/UserDataContext";
+import { A } from "@solidjs/router";
+import { type Component, createSignal, onMount } from "solid-js";
 import styles from "./HomePageDashboard.module.scss";
 
 interface DashboardStats {
@@ -29,9 +29,7 @@ const HomePageDashboard: Component = () => {
     listeningHours: 0,
     favoriteGenre: "Loading...",
   });
-  const [recentActivity, setRecentActivity] = createSignal<RecentActivity[]>(
-    [],
-  );
+  const [recentActivity, setRecentActivity] = createSignal<RecentActivity[]>([]);
   const [isLoading, setIsLoading] = createSignal(true);
 
   onMount(async () => {
@@ -123,12 +121,8 @@ const HomePageDashboard: Component = () => {
     <div class={styles.homePageDashboard}>
       <div class={styles.container}>
         <section class={styles.hero}>
-          <h1 class={styles.heroTitle}>
-            Welcome back, {user()?.firstName || "User"}!
-          </h1>
-          <p class={styles.heroSubtitle}>
-            Ready to dive into your vinyl collection?
-          </p>
+          <h1 class={styles.heroTitle}>Welcome back, {user()?.firstName || "User"}!</h1>
+          <p class={styles.heroSubtitle}>Ready to dive into your vinyl collection?</p>
         </section>
 
         <section class={styles.statsSection}>
@@ -166,9 +160,7 @@ const HomePageDashboard: Component = () => {
             <div class={styles.statCard}>
               <div class={styles.statIcon}>🎯</div>
               <div class={styles.statContent}>
-                <h3 class={styles.statNumber}>
-                  {isLoading() ? "--" : stats().favoriteGenre}
-                </h3>
+                <h3 class={styles.statNumber}>{isLoading() ? "--" : stats().favoriteGenre}</h3>
                 <p class={styles.statLabel}>Top Genre</p>
               </div>
             </div>
@@ -217,9 +209,7 @@ const HomePageDashboard: Component = () => {
             ) : (
               recentActivity().map((activity) => (
                 <div class={styles.activityItem}>
-                  <div class={styles.activityIcon}>
-                    {getActivityIcon(activity.type)}
-                  </div>
+                  <div class={styles.activityIcon}>{getActivityIcon(activity.type)}</div>
                   <div class={styles.activityContent}>
                     <h4 class={styles.activityTitle}>{activity.title}</h4>
                     <p class={styles.activitySubtitle}>{activity.subtitle}</p>
@@ -235,8 +225,7 @@ const HomePageDashboard: Component = () => {
           <div class={styles.ctaCard}>
             <h2 class={styles.ctaTitle}>Explore Your Collection</h2>
             <p class={styles.ctaDescription}>
-              Discover new insights about your listening habits and collection
-              patterns.
+              Discover new insights about your listening habits and collection patterns.
             </p>
             <A href={ROUTES.DASHBOARD} class={styles.ctaLink}>
               <Button variant="gradient" size="lg">

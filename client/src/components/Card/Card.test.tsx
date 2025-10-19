@@ -1,7 +1,7 @@
-import { render } from "@solidjs/testing-library";
-import { Card } from "./Card";
-import { describe, expect, vi } from "vitest";
 import test from "node:test";
+import { render } from "@solidjs/testing-library";
+import { describe, expect, vi } from "vitest";
+import { Card } from "./Card";
 
 describe("Card", () => {
   test("renders children correctly", () => {
@@ -49,4 +49,3 @@ describe("Card", () => {
     expect(handleClick).toHaveBeenCalledOnce();
   });
 });
-

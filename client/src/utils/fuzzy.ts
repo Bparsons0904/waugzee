@@ -1,6 +1,6 @@
+import type { Release } from "@models/Release";
+import type { UserRelease } from "@models/User";
 import Fuse from "fuse.js";
-import { Release } from "@models/Release";
-import { UserRelease } from "@models/User";
 
 const defaultOptions = {
   keys: [
@@ -67,10 +67,7 @@ const userReleaseOptions = {
   minMatchCharLength: 2,
 };
 
-export const createUserReleaseFuseInstance = (
-  userReleases: UserRelease[],
-  options = {},
-) => {
+export const createUserReleaseFuseInstance = (userReleases: UserRelease[], options = {}) => {
   return new Fuse(userReleases, { ...userReleaseOptions, ...options });
 };
 

@@ -1,7 +1,7 @@
-import { Component, Match, Switch } from "solid-js";
 import { useAuth } from "@context/AuthContext";
-import LandingPage from "@pages/LandingPage/LandingPage";
 import HomePage from "@pages/Home/Home";
+import LandingPage from "@pages/LandingPage/LandingPage";
+import { type Component, Match, Switch } from "solid-js";
 import styles from "./ConditionalRoot.module.scss";
 
 export const ConditionalRoot: Component = () => {

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@solidjs/testing-library";
+import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { describe, expect, it, vi } from "vitest";
 import { ConfirmPopup } from "./ConfirmPopup";
 
 describe("ConfirmPopup", () => {
@@ -7,16 +7,12 @@ describe("ConfirmPopup", () => {
     const mockOnClose = vi.fn();
     const mockOnConfirm = vi.fn();
 
-    render(() => (
-      <ConfirmPopup
-        isOpen={true}
-        onClose={mockOnClose}
-        onConfirm={mockOnConfirm}
-      />
-    ));
+    render(() => <ConfirmPopup isOpen={true} onClose={mockOnClose} onConfirm={mockOnConfirm} />);
 
     expect(screen.getByText("Confirm Action")).toBeInTheDocument();
-    expect(screen.getByText("Are you sure you want to proceed with this action?")).toBeInTheDocument();
+    expect(
+      screen.getByText("Are you sure you want to proceed with this action?"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Cancel")).toBeInTheDocument();
     expect(screen.getByText("Confirm")).toBeInTheDocument();
   });
@@ -48,13 +44,7 @@ describe("ConfirmPopup", () => {
     const mockOnClose = vi.fn();
     const mockOnConfirm = vi.fn();
 
-    render(() => (
-      <ConfirmPopup
-        isOpen={true}
-        onClose={mockOnClose}
-        onConfirm={mockOnConfirm}
-      />
-    ));
+    render(() => <ConfirmPopup isOpen={true} onClose={mockOnClose} onConfirm={mockOnConfirm} />);
 
     fireEvent.click(screen.getByText("Confirm"));
     expect(mockOnConfirm).toHaveBeenCalledTimes(1);
@@ -64,13 +54,7 @@ describe("ConfirmPopup", () => {
     const mockOnClose = vi.fn();
     const mockOnConfirm = vi.fn();
 
-    render(() => (
-      <ConfirmPopup
-        isOpen={true}
-        onClose={mockOnClose}
-        onConfirm={mockOnConfirm}
-      />
-    ));
+    render(() => <ConfirmPopup isOpen={true} onClose={mockOnClose} onConfirm={mockOnConfirm} />);
 
     fireEvent.click(screen.getByText("Cancel"));
     expect(mockOnClose).toHaveBeenCalledTimes(1);
@@ -80,13 +64,7 @@ describe("ConfirmPopup", () => {
     const mockOnClose = vi.fn();
     const mockOnConfirm = vi.fn();
 
-    render(() => (
-      <ConfirmPopup
-        isOpen={false}
-        onClose={mockOnClose}
-        onConfirm={mockOnConfirm}
-      />
-    ));
+    render(() => <ConfirmPopup isOpen={false} onClose={mockOnClose} onConfirm={mockOnConfirm} />);
 
     expect(screen.queryByText("Confirm Action")).not.toBeInTheDocument();
   });

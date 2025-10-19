@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup } from "@solidjs/testing-library";
+import { cleanup, render, screen } from "@solidjs/testing-library";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Button } from "./Button";
 
 describe("Button", () => {
@@ -9,7 +9,7 @@ describe("Button", () => {
 
   it("renders with default props", () => {
     render(() => <Button>Click me</Button>);
-    
+
     const button = screen.getByRole("button");
     expect(button).toBeInTheDocument();
     expect(button).toHaveTextContent("Click me");
@@ -67,7 +67,7 @@ describe("Button", () => {
 
   it("handles disabled state", () => {
     render(() => <Button disabled>Disabled</Button>);
-    
+
     const button = screen.getByRole("button");
     expect(button).toBeDisabled();
   });
@@ -75,34 +75,38 @@ describe("Button", () => {
   it("handles click events", () => {
     const handleClick = vi.fn();
     render(() => <Button onClick={handleClick}>Click me</Button>);
-    
+
     const button = screen.getByRole("button");
     button.click();
-    
+
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
   it("renders with submit type", () => {
     render(() => <Button type="submit">Submit</Button>);
-    
+
     const button = screen.getByRole("button");
     expect(button).toHaveAttribute("type", "submit");
   });
 
   it("renders with reset type", () => {
     render(() => <Button type="reset">Reset</Button>);
-    
+
     const button = screen.getByRole("button");
     expect(button).toHaveAttribute("type", "reset");
   });
 
   it("does not trigger click when disabled", () => {
     const handleClick = vi.fn();
-    render(() => <Button disabled onClick={handleClick}>Disabled</Button>);
-    
+    render(() => (
+      <Button disabled onClick={handleClick}>
+        Disabled
+      </Button>
+    ));
+
     const button = screen.getByRole("button");
     button.click();
-    
+
     expect(handleClick).not.toHaveBeenCalled();
   });
 

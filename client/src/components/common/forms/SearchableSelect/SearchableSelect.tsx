@@ -1,18 +1,11 @@
-import {
-  Component,
-  createSignal,
-  createUniqueId,
-  For,
-  Show,
-  createEffect,
-} from "solid-js";
-import { ValidatorFunction } from "../../../../utils/validation";
-import { useSelectBase } from "@hooks/useSelectBase";
-import { useSelectKeyboard } from "@hooks/useSelectKeyboard";
 import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import { SearchIcon } from "@components/icons/SearchIcon";
-import Fuse from "fuse.js";
+import { useSelectBase } from "@hooks/useSelectBase";
+import { useSelectKeyboard } from "@hooks/useSelectKeyboard";
 import clsx from "clsx";
+import Fuse from "fuse.js";
+import { type Component, createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
+import type { ValidatorFunction } from "../../../../utils/validation";
 import styles from "./SearchableSelect.module.scss";
 
 export interface SearchableSelectOption {
@@ -72,7 +65,7 @@ export const SearchableSelect: Component<SearchableSelectProps> = (props) => {
       customValidators: props.customValidators,
       onBlur: props.onBlur,
     },
-    props.value || props.defaultValue
+    props.value || props.defaultValue,
   );
 
   registerClickOutsideListener(containerRef);
@@ -172,10 +165,7 @@ export const SearchableSelect: Component<SearchableSelectProps> = (props) => {
   };
 
   return (
-    <div
-      ref={containerRef}
-      class={clsx(styles.searchableSelectContainer, props.class)}
-    >
+    <div ref={containerRef} class={clsx(styles.searchableSelectContainer, props.class)}>
       <Show when={props.label}>
         <label for={id} class={styles.label}>
           {props.label}
@@ -242,9 +232,7 @@ export const SearchableSelect: Component<SearchableSelectProps> = (props) => {
               <Show
                 when={filteredOptions().length > 0}
                 fallback={
-                  <div class={styles.emptyMessage}>
-                    {props.emptyMessage || "No options found"}
-                  </div>
+                  <div class={styles.emptyMessage}>{props.emptyMessage || "No options found"}</div>
                 }
               >
                 <For each={filteredOptions()}>
@@ -285,15 +273,11 @@ interface SearchableSelectOptionItemProps {
   onClick: () => void;
 }
 
-const SearchableSelectOptionItem: Component<SearchableSelectOptionItemProps> = (
-  props,
-) => {
-  const availableOptions = () =>
-    props.allOptions.filter((opt) => !opt.disabled);
+const SearchableSelectOptionItem: Component<SearchableSelectOptionItemProps> = (props) => {
+  const availableOptions = () => props.allOptions.filter((opt) => !opt.disabled);
   const availableIndex = () =>
     availableOptions().findIndex((opt) => opt.value === props.option.value);
-  const isFocused = () =>
-    availableIndex() === props.focusedIndex && !props.option.disabled;
+  const isFocused = () => availableIndex() === props.focusedIndex && !props.option.disabled;
 
   return (
     <div

@@ -1,13 +1,13 @@
-import { Component } from "solid-js";
-import { createStore } from "solid-js/store";
-import { useUpdateUserStylus } from "@services/apiHooks";
-import type { UserStylus } from "@models/Stylus";
-import { Button } from "@components/common/ui/Button/Button";
 import { DateInput } from "@components/common/forms/DateInput/DateInput";
 import { Textarea } from "@components/common/forms/Textarea/Textarea";
 import { Toggle } from "@components/common/forms/Toggle/Toggle";
-import styles from "./EditEquipmentModal.module.scss";
+import { Button } from "@components/common/ui/Button/Button";
+import type { UserStylus } from "@models/Stylus";
+import { useUpdateUserStylus } from "@services/apiHooks";
 import { formatDateForInput } from "@utils/dates";
+import type { Component } from "solid-js";
+import { createStore } from "solid-js/store";
+import styles from "./EditEquipmentModal.module.scss";
 
 interface EditEquipmentModalProps {
   stylus: UserStylus;
@@ -26,12 +26,8 @@ const EditEquipmentModal: Component<EditEquipmentModalProps> = (props) => {
   const updateUserStylusMutation = useUpdateUserStylus();
 
   const [formState, setFormState] = createStore<EditFormState>({
-    purchaseDate: props.stylus.purchaseDate
-      ? formatDateForInput(props.stylus.purchaseDate)
-      : "",
-    installDate: props.stylus.installDate
-      ? formatDateForInput(props.stylus.installDate)
-      : "",
+    purchaseDate: props.stylus.purchaseDate ? formatDateForInput(props.stylus.purchaseDate) : "",
+    installDate: props.stylus.installDate ? formatDateForInput(props.stylus.installDate) : "",
     notes: props.stylus.notes || "",
     isActive: props.stylus.isActive,
     isPrimary: props.stylus.isPrimary,
@@ -113,11 +109,7 @@ const EditEquipmentModal: Component<EditEquipmentModalProps> = (props) => {
         >
           Cancel
         </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={updateUserStylusMutation.isPending}
-        >
+        <Button type="submit" variant="primary" disabled={updateUserStylusMutation.isPending}>
           {updateUserStylusMutation.isPending ? "Updating..." : "Update"}
         </Button>
       </div>

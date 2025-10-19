@@ -1,13 +1,13 @@
-import { Component, Show, createSignal } from "solid-js";
-import styles from "./RecordActionModal.module.scss";
-import { UserRelease } from "@models/User";
-import { Stylus } from "@models/Release";
-import { formatDateForInput } from "@utils/dates";
-import { Image } from "@components/common/ui/Image/Image";
 import {
   SearchableSelect,
-  SearchableSelectOption,
+  type SearchableSelectOption,
 } from "@components/common/forms/SearchableSelect/SearchableSelect";
+import { Image } from "@components/common/ui/Image/Image";
+import type { Stylus } from "@models/Release";
+import type { UserRelease } from "@models/User";
+import { formatDateForInput } from "@utils/dates";
+import { type Component, createSignal, Show } from "solid-js";
+import styles from "./RecordActionModal.module.scss";
 
 interface RecordActionModalProps {
   isOpen: boolean;
@@ -17,9 +17,7 @@ interface RecordActionModalProps {
 
 const RecordActionModal: Component<RecordActionModalProps> = (props) => {
   const [date, setDate] = createSignal(formatDateForInput(new Date()));
-  const [selectedStylusId, setSelectedStylusId] = createSignal<number | null>(
-    null,
-  );
+  const [selectedStylusId, setSelectedStylusId] = createSignal<number | null>(null);
   const [notes, setNotes] = createSignal("");
 
   const mockStyluses: Stylus[] = [
@@ -106,9 +104,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
             </div>
             <div class={styles.recordInfo}>
               <h3 class={styles.recordTitle}>{props.release.release.title}</h3>
-              <p class={styles.recordArtist}>
-                {props.release.release.format || "Unknown Format"}
-              </p>
+              <p class={styles.recordArtist}>{props.release.release.format || "Unknown Format"}</p>
               {props.release.release.year && (
                 <p class={styles.recordYear}>{props.release.release.year}</p>
               )}
@@ -138,9 +134,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
                   searchPlaceholder="Search styluses..."
                   options={stylusOptions()}
                   value={selectedStylusId()?.toString() || ""}
-                  onChange={(val) =>
-                    setSelectedStylusId(val ? parseInt(val) : null)
-                  }
+                  onChange={(val) => setSelectedStylusId(val ? parseInt(val) : null)}
                   emptyMessage="No styluses found"
                 />
               </div>
@@ -177,9 +171,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
             <h3 class={styles.historyTitle}>Record History</h3>
 
             <div class={styles.historyList}>
-              <div class={styles.noHistory}>
-                No play or cleaning history for this record yet.
-              </div>
+              <div class={styles.noHistory}>No play or cleaning history for this record yet.</div>
             </div>
           </div>
         </div>

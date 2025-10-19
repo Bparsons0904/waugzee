@@ -1,8 +1,8 @@
-import { Component, createSignal, Show } from "solid-js";
-import { useApiPut, useApiPost } from "@services/apiHooks";
-import { TextInput } from "../../forms/TextInput/TextInput";
 import { USER_ENDPOINTS } from "@constants/api.constants";
+import { useApiPost, useApiPut } from "@services/apiHooks";
+import { type Component, createSignal, Show } from "solid-js";
 import type { UpdateDiscogsTokenRequest, UpdateDiscogsTokenResponse } from "src/types/User";
+import { TextInput } from "../../forms/TextInput/TextInput";
 import styles from "./DiscogsTokenModal.module.scss";
 
 interface SyncResponse {
@@ -18,14 +18,10 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
   const [token, setToken] = createSignal("");
   const [localError, setLocalError] = createSignal<string | null>(null);
 
-  const syncMutation = useApiPost<SyncResponse, void>(
-    "/sync/syncCollection",
-    undefined,
-    {
-      successMessage: "Collection sync started successfully!",
-      errorMessage: "Failed to start collection sync. You can sync manually from the dashboard.",
-    }
-  );
+  const syncMutation = useApiPost<SyncResponse, void>("/sync/syncCollection", undefined, {
+    successMessage: "Collection sync started successfully!",
+    errorMessage: "Failed to start collection sync. You can sync manually from the dashboard.",
+  });
 
   const updateTokenMutation = useApiPut<UpdateDiscogsTokenResponse, UpdateDiscogsTokenRequest>(
     USER_ENDPOINTS.ME_DISCOGS,
@@ -43,12 +39,10 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
       onError: (error) => {
         console.error("Token submission failed:", error);
         setLocalError(
-          error instanceof Error
-            ? error.message
-            : "Failed to save token. Please try again.",
+          error instanceof Error ? error.message : "Failed to save token. Please try again.",
         );
       },
-    }
+    },
   );
 
   const handleSubmit = (e: Event) => {
@@ -71,9 +65,9 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
       <div class={styles.infoSection}>
         <h3 class={styles.sectionTitle}>What is a Discogs Token?</h3>
         <p class={styles.text}>
-          A Discogs API token allows Waugzee to securely access your Discogs
-          collection, search the Discogs database, and sync your vinyl records
-          without requiring your full Discogs credentials.
+          A Discogs API token allows Waugzee to securely access your Discogs collection, search the
+          Discogs database, and sync your vinyl records without requiring your full Discogs
+          credentials.
         </p>
 
         <h3 class={styles.sectionTitle}>How to Get Your Token</h3>
@@ -89,13 +83,8 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
               Discogs Developer Settings
             </a>
           </li>
-          <li>
-            Sign in to your Discogs account if you're not already logged in
-          </li>
-          <li>
-            Under "Personal access token", generate a new token or copy your
-            existing one
-          </li>
+          <li>Sign in to your Discogs account if you're not already logged in</li>
+          <li>Under "Personal access token", generate a new token or copy your existing one</li>
           <li>Paste the token in the field below</li>
         </ol>
       </div>
@@ -129,9 +118,8 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
 
       <div class={styles.footer}>
         <p class={styles.footerText}>
-          Your token is stored securely and only used to access the Discogs API
-          on your behalf. We never share your token or use it for any other
-          purpose.
+          Your token is stored securely and only used to access the Discogs API on your behalf. We
+          never share your token or use it for any other purpose.
         </p>
       </div>
     </div>

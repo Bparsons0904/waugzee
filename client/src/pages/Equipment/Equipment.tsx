@@ -1,14 +1,14 @@
-import { Component, For, Show } from "solid-js";
-import { createStore } from "solid-js/store";
-import { useUserStyluses, useDeleteUserStylus } from "@services/apiHooks";
-import type { UserStylus } from "@models/Stylus";
-import { Button } from "@components/common/ui/Button/Button";
-import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import AddEquipmentModal from "@components/AddEquipmentModal/AddEquipmentModal";
 import CreateCustomStylusModal from "@components/CreateCustomStylusModal/CreateCustomStylusModal";
+import { Button } from "@components/common/ui/Button/Button";
+import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import EditEquipmentModal from "@components/EditEquipmentModal/EditEquipmentModal";
-import styles from "./Equipment.module.scss";
+import type { UserStylus } from "@models/Stylus";
+import { useDeleteUserStylus, useUserStyluses } from "@services/apiHooks";
 import { formatLocalDate } from "@utils/dates";
+import { type Component, For, Show } from "solid-js";
+import { createStore } from "solid-js/store";
+import styles from "./Equipment.module.scss";
 
 type ModalMode = "add" | "custom" | "edit" | null;
 
@@ -45,15 +45,9 @@ const Equipment: Component = () => {
   };
 
   const handleDelete = (stylus: UserStylus) => {
-    const displayName = stylus.stylus
-      ? `${stylus.stylus.brand} ${stylus.stylus.model}`
-      : "Unknown";
+    const displayName = stylus.stylus ? `${stylus.stylus.brand} ${stylus.stylus.model}` : "Unknown";
 
-    if (
-      !confirm(
-        `Are you sure you want to remove "${displayName}" from your equipment?`,
-      )
-    ) {
+    if (!confirm(`Are you sure you want to remove "${displayName}" from your equipment?`)) {
       return;
     }
 
@@ -70,11 +64,7 @@ const Equipment: Component = () => {
         <h2 class={styles.title}>Equipment Manager</h2>
         <div class={styles.headerButtons}>
           <Show when={!modalMode.current}>
-            <Button
-              variant="primary"
-              onClick={openAddModal}
-              disabled={userStylusesQuery.isLoading}
-            >
+            <Button variant="primary" onClick={openAddModal} disabled={userStylusesQuery.isLoading}>
               Add Equipment
             </Button>
 
@@ -113,26 +103,17 @@ const Equipment: Component = () => {
         title="Edit Equipment Details"
         size={ModalSize.Medium}
       >
-        <EditEquipmentModal
-          stylus={editingStylus.stylus!}
-          onClose={closeModal}
-        />
+        <EditEquipmentModal stylus={editingStylus.stylus!} onClose={closeModal} />
       </Modal>
 
       <Show when={!modalMode.current && userStylusesQuery.isLoading}>
         <p class={styles.loading}>Loading equipment...</p>
       </Show>
 
-      <Show
-        when={
-          !modalMode.current &&
-          !userStylusesQuery.isLoading &&
-          styluses().length === 0
-        }
-      >
+      <Show when={!modalMode.current && !userStylusesQuery.isLoading && styluses().length === 0}>
         <p class={styles.noStyluses}>
-          No equipment found. Click "Add Equipment" to select a stylus or
-          "Create Custom Stylus" to add your own.
+          No equipment found. Click "Add Equipment" to select a stylus or "Create Custom Stylus" to
+          add your own.
         </p>
       </Show>
 
@@ -216,22 +197,19 @@ const StylusCard: Component<StylusCardProps> = (props) => {
 
         <Show when={props.stylus.stylus?.cartridgeType}>
           <p class={styles.stylusDetail}>
-            <strong>Cartridge Type:</strong>{" "}
-            {props.stylus.stylus?.cartridgeType}
+            <strong>Cartridge Type:</strong> {props.stylus.stylus?.cartridgeType}
           </p>
         </Show>
 
         <Show when={props.stylus.purchaseDate}>
           <p class={styles.stylusDetail}>
-            <strong>Purchased:</strong>{" "}
-            {formatLocalDate(props.stylus.purchaseDate!)}
+            <strong>Purchased:</strong> {formatLocalDate(props.stylus.purchaseDate!)}
           </p>
         </Show>
 
         <Show when={props.showFullDetails && props.stylus.installDate}>
           <p class={styles.stylusDetail}>
-            <strong>Installed:</strong>{" "}
-            {formatLocalDate(props.stylus.installDate!)}
+            <strong>Installed:</strong> {formatLocalDate(props.stylus.installDate!)}
           </p>
         </Show>
 
@@ -249,11 +227,7 @@ const StylusCard: Component<StylusCardProps> = (props) => {
       </div>
 
       <div class={styles.stylusActions}>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => props.onEdit(props.stylus)}
-        >
+        <Button variant="secondary" size="sm" onClick={() => props.onEdit(props.stylus)}>
           Edit
         </Button>
         <Button

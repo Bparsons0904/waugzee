@@ -1,8 +1,8 @@
-import { Component, Show, For, Match, Switch, Accessor } from "solid-js";
 import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import { LoadingSpinner } from "@components/icons/LoadingSpinner";
-import styles from "./FolderSelector.module.scss";
+import { type Accessor, type Component, For, Match, Show, Switch } from "solid-js";
 import type { Folder } from "src/types/User";
+import styles from "./FolderSelector.module.scss";
 
 interface CompactFolderSelectorProps {
   folders: Accessor<Folder[]>;
@@ -12,16 +12,8 @@ interface CompactFolderSelectorProps {
   isLoading: boolean;
 }
 
-export const CompactFolderSelector: Component<CompactFolderSelectorProps> = (
-  props
-) => {
-  const {
-    folders,
-    selectedFolderId,
-    selectedFolder,
-    handleFolderChange,
-    isLoading,
-  } = props;
+export const CompactFolderSelector: Component<CompactFolderSelectorProps> = (props) => {
+  const { folders, selectedFolderId, selectedFolder, handleFolderChange, isLoading } = props;
 
   return (
     <div class={styles.folderSelector}>
@@ -42,9 +34,7 @@ export const CompactFolderSelector: Component<CompactFolderSelectorProps> = (
               >
                 <strong>{selectedFolder()?.name}</strong>
                 <Show when={selectedFolder()?.count}>
-                  <span class={styles.itemCount}>
-                    ({selectedFolder()?.count} items)
-                  </span>
+                  <span class={styles.itemCount}>({selectedFolder()?.count} items)</span>
                 </Show>
               </Show>
             </div>
@@ -84,4 +74,3 @@ export const CompactFolderSelector: Component<CompactFolderSelectorProps> = (
     </div>
   );
 };
-

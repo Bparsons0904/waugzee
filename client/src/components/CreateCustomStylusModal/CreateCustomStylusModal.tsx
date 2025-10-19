@@ -1,10 +1,10 @@
-import { Component } from "solid-js";
-import { createStore } from "solid-js/store";
-import { useCreateCustomStylus } from "@services/apiHooks";
-import type { CreateCustomStylusRequest } from "@models/Stylus";
-import { Button } from "@components/common/ui/Button/Button";
 import { Select } from "@components/common/forms/Select/Select";
 import { TextInput } from "@components/common/forms/TextInput/TextInput";
+import { Button } from "@components/common/ui/Button/Button";
+import type { CreateCustomStylusRequest } from "@models/Stylus";
+import { useCreateCustomStylus } from "@services/apiHooks";
+import type { Component } from "solid-js";
+import { createStore } from "solid-js/store";
 import styles from "./CreateCustomStylusModal.module.scss";
 
 interface CreateCustomStylusModalProps {

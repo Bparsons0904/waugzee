@@ -1,13 +1,13 @@
 import "./App.scss";
-import { Component, Suspense } from "solid-js";
-import { AuthProvider } from "./context/AuthContext";
-import { UserDataProvider } from "./context/UserDataContext";
-import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
-import { WebSocketProvider } from "@context/WebSocketContext";
-import { ToastProvider } from "./context/ToastContext";
-import { RouteSectionProps } from "@solidjs/router";
 import { NavBar } from "@components/layout/Navbar/Navbar";
 import { ProxyService } from "@components/ProxyService";
+import { WebSocketProvider } from "@context/WebSocketContext";
+import type { RouteSectionProps } from "@solidjs/router";
+import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
+import { type Component, Suspense } from "solid-js";
+import { AuthProvider } from "./context/AuthContext";
+import { ToastProvider } from "./context/ToastContext";
+import { UserDataProvider } from "./context/UserDataContext";
 
 const App: Component<RouteSectionProps<unknown>> = (props) => {
   const queryClient = new QueryClient({
@@ -27,9 +27,7 @@ const App: Component<RouteSectionProps<unknown>> = (props) => {
               <ProxyService />
               <NavBar />
               <main class="content">
-                <Suspense fallback={<div />}>
-                  {props.children}
-                </Suspense>
+                <Suspense fallback={<div />}>{props.children}</Suspense>
               </main>
             </WebSocketProvider>
           </UserDataProvider>

@@ -1,4 +1,4 @@
-import { Component } from "solid-js";
+import type { Component } from "solid-js";
 import styles from "./Avatar.module.scss";
 
 export interface AvatarProps {
@@ -15,9 +15,12 @@ export const Avatar: Component<AvatarProps> = (props) => {
 
   const sizeClass = () => {
     switch (props.size) {
-      case "sm": return styles.small;
-      case "lg": return styles.large;
-      default: return styles.medium;
+      case "sm":
+        return styles.small;
+      case "lg":
+        return styles.large;
+      default:
+        return styles.medium;
     }
   };
 
@@ -26,7 +29,7 @@ export const Avatar: Component<AvatarProps> = (props) => {
   };
 
   return (
-    <div 
+    <div
       class={`${styles.avatar} ${sizeClass()} ${variantClass()} ${props.class || ""}`}
       title={props.name}
     >

@@ -1,9 +1,9 @@
-import { Component } from "solid-js";
-import { A } from "@solidjs/router";
 import { Button } from "@components/common/ui/Button/Button";
-import { Image } from "@components/common/ui/Image/Image";
 import { Card } from "@components/common/ui/Card/Card";
+import { Image } from "@components/common/ui/Image/Image";
 import { ROUTES } from "@constants/api.constants";
+import { A } from "@solidjs/router";
+import type { Component } from "solid-js";
 import styles from "./LandingPage.module.scss";
 
 const LandingPage: Component = () => {
@@ -44,9 +44,8 @@ const LandingPage: Component = () => {
         <div class={styles.container}>
           <h1 class={styles.heroTitle}>Welcome to Waugzee</h1>
           <p class={styles.heroSubtitle}>
-            Your personal vinyl collection management system. Track your
-            records, log listening sessions, and maintain your equipment with
-            ease.
+            Your personal vinyl collection management system. Track your records, log listening
+            sessions, and maintain your equipment with ease.
           </p>
           <div class={styles.heroCta}>
             <A href={ROUTES.LOGIN} class={styles.btnLink}>
@@ -70,9 +69,7 @@ const LandingPage: Component = () => {
 
       <section class={styles.socialFun}>
         <div class={styles.container}>
-          <h2 class={styles.sectionTitle}>
-            Everything You Need for Vinyl Collection Management
-          </h2>
+          <h2 class={styles.sectionTitle}>Everything You Need for Vinyl Collection Management</h2>
           <div class={styles.socialGrid}>
             {featureCards.map((card) => (
               <Card class={styles.socialCardContent}>
@@ -97,8 +94,7 @@ const LandingPage: Component = () => {
         <div class={styles.container}>
           <h2 class={styles.footerTitle}>Ready to Organize Your Collection?</h2>
           <p class={styles.footerSubtitle}>
-            Start tracking your vinyl records today and never lose track of your
-            music again.
+            Start tracking your vinyl records today and never lose track of your music again.
           </p>
           <A href={ROUTES.LOGIN} class={styles.btnLink}>
             <Button variant="gradient" size="lg">
@@ -112,4 +108,3 @@ const LandingPage: Component = () => {
 };
 
 export default LandingPage;
-

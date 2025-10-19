@@ -1,7 +1,7 @@
-import { createSignal, createEffect, onCleanup, Accessor } from "solid-js";
 import { useFormField } from "@hooks/useFormField";
 import { useValidation } from "@hooks/useValidation";
-import { ValidatorFunction } from "../utils/validation";
+import { type Accessor, createEffect, createSignal, onCleanup } from "solid-js";
+import type { ValidatorFunction } from "../utils/validation";
 
 interface UseSelectBaseProps {
   name?: string;
@@ -20,13 +20,8 @@ interface UseSelectBaseReturn<T> {
   validation: ReturnType<typeof useValidation>;
   formField: ReturnType<typeof useFormField>;
   handleBlur: (event: FocusEvent, value: T) => void;
-  handleClickOutside: (
-    event: MouseEvent,
-    containerRef: HTMLDivElement | undefined,
-  ) => void;
-  registerClickOutsideListener: (
-    containerRef: HTMLDivElement | undefined,
-  ) => void;
+  handleClickOutside: (event: MouseEvent, containerRef: HTMLDivElement | undefined) => void;
+  registerClickOutsideListener: (containerRef: HTMLDivElement | undefined) => void;
 }
 
 export function useSelectBase<T>(
@@ -69,23 +64,17 @@ export function useSelectBase<T>(
     props.onBlur?.(event);
   };
 
-  const handleClickOutside = (
-    event: MouseEvent,
-    containerRef: HTMLDivElement | undefined,
-  ) => {
+  const handleClickOutside = (event: MouseEvent, containerRef: HTMLDivElement | undefined) => {
     if (containerRef && !containerRef.contains(event.target as Node)) {
       setIsOpen(false);
       setFocusedIndex(-1);
     }
   };
 
-  const registerClickOutsideListener = (
-    containerRef: HTMLDivElement | undefined,
-  ) => {
+  const registerClickOutsideListener = (containerRef: HTMLDivElement | undefined) => {
     createEffect(() => {
       if (isOpen()) {
-        const handler = (event: MouseEvent) =>
-          handleClickOutside(event, containerRef);
+        const handler = (event: MouseEvent) => handleClickOutside(event, containerRef);
         document.addEventListener("mousedown", handler);
         onCleanup(() => {
           document.removeEventListener("mousedown", handler);

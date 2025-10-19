@@ -1,11 +1,11 @@
+import { ROUTES } from "@constants/api.constants";
 import {
+  type User as OidcUser,
   UserManager,
-  UserManagerSettings,
-  User as OidcUser,
+  type UserManagerSettings,
   WebStorageStateStore,
 } from "oidc-client-ts";
-import { AuthConfig } from "src/types/User";
-import { ROUTES } from "@constants/api.constants";
+import type { AuthConfig } from "src/types/User";
 
 /**
  * Event callback types for OIDC service events
@@ -33,9 +33,7 @@ export class OIDCService {
   /**
    * Discover OIDC configuration from the provider
    */
-  private async discoverOIDCConfiguration(
-    instanceUrl: string,
-  ): Promise<Record<string, unknown>> {
+  private async discoverOIDCConfiguration(instanceUrl: string): Promise<Record<string, unknown>> {
     console.debug("Attempting OIDC discovery for:", instanceUrl);
 
     // Try multiple discovery URL patterns for Zitadel
@@ -74,9 +72,7 @@ export class OIDCService {
       }
     }
 
-    console.warn(
-      "All OIDC discovery URLs failed, falling back to Zitadel endpoints",
-    );
+    console.warn("All OIDC discovery URLs failed, falling back to Zitadel endpoints");
 
     // Fallback to hardcoded Zitadel endpoints
     return {
@@ -112,9 +108,7 @@ export class OIDCService {
     this.config = config;
 
     // Discover OIDC endpoints dynamically
-    const discoveredMetadata = await this.discoverOIDCConfiguration(
-      config.instanceUrl,
-    );
+    const discoveredMetadata = await this.discoverOIDCConfiguration(config.instanceUrl);
 
     const settings: UserManagerSettings = {
       // Core OIDC settings
@@ -191,9 +185,7 @@ export class OIDCService {
     this.userManager.events.addSilentRenewError((error) => {
       console.error("Silent token renewal failed - triggering logout:", error);
       if (this.eventCallbacks.onSilentRenewError) {
-        this.eventCallbacks.onSilentRenewError(
-          new Error(error.message || "Silent renewal failed"),
-        );
+        this.eventCallbacks.onSilentRenewError(new Error(error.message || "Silent renewal failed"));
       }
     });
 
@@ -251,9 +243,7 @@ export class OIDCService {
    */
   async isAuthenticated(): Promise<boolean> {
     if (!this.userManager) {
-      console.warn(
-        "OIDC service not initialized - isAuthenticated() called too early",
-      );
+      console.warn("OIDC service not initialized - isAuthenticated() called too early");
       return false;
     }
 
@@ -444,4 +434,3 @@ export class OIDCService {
 
 // Export singleton instance
 export const oidcService = new OIDCService();
-

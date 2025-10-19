@@ -1,4 +1,4 @@
-import { Accessor } from "solid-js";
+import type { Accessor } from "solid-js";
 
 interface SelectOption {
   value: string;
@@ -16,15 +16,11 @@ interface UseSelectKeyboardProps<T extends SelectOption> {
   onClose?: () => void;
 }
 
-export function useSelectKeyboard<T extends SelectOption>(
-  props: UseSelectKeyboardProps<T>,
-) {
+export function useSelectKeyboard<T extends SelectOption>(props: UseSelectKeyboardProps<T>) {
   const handleKeyDown = (event: KeyboardEvent) => {
     if (props.disabled) return;
 
-    const availableOptions = props
-      .options()
-      .filter((option) => !option.disabled);
+    const availableOptions = props.options().filter((option) => !option.disabled);
     const maxIndex = availableOptions.length - 1;
 
     switch (event.key) {

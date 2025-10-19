@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Checkbox } from "./Checkbox";
 
 describe("Checkbox", () => {
@@ -8,18 +8,14 @@ describe("Checkbox", () => {
   });
 
   it("is checked when checked prop is true", () => {
-    render(() => (
-      <Checkbox label="Checked Checkbox" name="checked" checked={true} />
-    ));
+    render(() => <Checkbox label="Checked Checkbox" name="checked" checked={true} />);
 
     const checkbox = screen.getByRole("checkbox") as HTMLInputElement;
     expect(checkbox.checked).toBe(true);
   });
 
   it("is unchecked when checked prop is false", () => {
-    render(() => (
-      <Checkbox label="Unchecked Checkbox" name="unchecked" checked={false} />
-    ));
+    render(() => <Checkbox label="Unchecked Checkbox" name="unchecked" checked={false} />);
 
     const checkbox = screen.getByRole("checkbox") as HTMLInputElement;
     expect(checkbox.checked).toBe(false);
@@ -28,9 +24,7 @@ describe("Checkbox", () => {
   it("calls onChange when clicked", () => {
     const mockOnChange = vi.fn();
 
-    render(() => (
-      <Checkbox label="Test Checkbox" name="test" onChange={mockOnChange} />
-    ));
+    render(() => <Checkbox label="Test Checkbox" name="test" onChange={mockOnChange} />);
 
     const checkbox = screen.getByRole("checkbox");
     fireEvent.click(checkbox);
@@ -41,9 +35,7 @@ describe("Checkbox", () => {
   it("calls onChange when label is clicked", () => {
     const mockOnChange = vi.fn();
 
-    render(() => (
-      <Checkbox label="Test Checkbox" name="test" onChange={mockOnChange} />
-    ));
+    render(() => <Checkbox label="Test Checkbox" name="test" onChange={mockOnChange} />);
 
     const label = screen.getByText("Test Checkbox");
     fireEvent.click(label);
@@ -54,9 +46,7 @@ describe("Checkbox", () => {
   it("calls onBlur when focus is lost", () => {
     const mockOnBlur = vi.fn();
 
-    render(() => (
-      <Checkbox label="Test Checkbox" name="test" onBlur={mockOnBlur} />
-    ));
+    render(() => <Checkbox label="Test Checkbox" name="test" onBlur={mockOnBlur} />);
 
     const checkbox = screen.getByRole("checkbox");
     fireEvent.blur(checkbox);
@@ -68,12 +58,7 @@ describe("Checkbox", () => {
     const mockOnChange = vi.fn();
 
     render(() => (
-      <Checkbox
-        label="Disabled Checkbox"
-        name="disabled"
-        disabled
-        onChange={mockOnChange}
-      />
+      <Checkbox label="Disabled Checkbox" name="disabled" disabled onChange={mockOnChange} />
     ));
 
     const label = screen.getByText("Disabled Checkbox");
@@ -85,9 +70,7 @@ describe("Checkbox", () => {
   it("toggles state correctly on multiple clicks", () => {
     const mockOnChange = vi.fn();
 
-    render(() => (
-      <Checkbox label="Toggle Checkbox" name="toggle" onChange={mockOnChange} />
-    ));
+    render(() => <Checkbox label="Toggle Checkbox" name="toggle" onChange={mockOnChange} />);
 
     const checkbox = screen.getByRole("checkbox");
 
@@ -100,4 +83,3 @@ describe("Checkbox", () => {
     expect(mockOnChange).toHaveBeenCalledWith(false);
   });
 });
-
