@@ -79,7 +79,8 @@
       "style": {
         "noUnusedTemplateLiteral": "warn",
         "useConst": "error",
-        "useTemplate": "warn"
+        "useTemplate": "warn",
+        "noNestedTernary": "error"
       }
     }
   },
