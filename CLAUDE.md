@@ -375,6 +375,93 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 - **Consistent spacing**: Use spacing scale variables (`$spacing-xs` through `$spacing-3xl`)
 - **No magic numbers**: All values should reference design system variables
 
+**CRITICAL: SCSS Design System Reference**
+
+All SCSS files MUST use variables from `client/src/styles/_variables.scss` and `client/src/styles/_colors.scss`. NEVER use hardcoded values.
+
+**Available Variables:**
+
+**Spacing** (use these instead of hardcoded rem/px values):
+- `$spacing-xs` (0.25rem / 4px)
+- `$spacing-sm` (0.5rem / 8px)
+- `$spacing-md` (1rem / 16px)
+- `$spacing-lg` (1.5rem / 24px)
+- `$spacing-xl` (2rem / 32px)
+- `$spacing-2xl` (3rem / 48px)
+- `$spacing-3xl` (4rem / 64px)
+
+**Typography** (use these instead of hardcoded font sizes):
+- `$font-size-xs` (0.75rem / 12px)
+- `$font-size-sm` (0.875rem / 14px)
+- `$font-size-md` (1rem / 16px) - **BASE font size, use instead of non-existent `$font-size-base`**
+- `$font-size-lg` (1.125rem / 18px)
+- `$font-size-xl` (1.25rem / 20px)
+- `$font-size-2xl` (1.5rem / 24px)
+- `$font-size-3xl` (1.875rem / 30px)
+- `$font-size-4xl` (2.25rem / 36px)
+- `$font-size-5xl` (3rem / 48px)
+
+**Font Weights:**
+- `$font-weight-light` (300)
+- `$font-weight-normal` (400)
+- `$font-weight-medium` (500)
+- `$font-weight-semibold` (600)
+- `$font-weight-bold` (700)
+
+**Text Colors** (use these instead of hardcoded hex colors):
+- `$text-default` - Default text color (#111827)
+- `$text-muted` - Muted text (#4b5563)
+- `$text-light` - Light text (#6b7280)
+- `$text-disabled` - Disabled text (#9ca3af)
+- `$text-inverse` - White text on dark backgrounds
+- `$text-link` / `$text-link-hover` - Link colors
+- `$text-success` / `$text-warning` / `$text-error` / `$text-info` - Feedback colors
+
+**Background Colors:**
+- `$bg-body` / `$bg-surface` / `$bg-elevated` - Surface backgrounds
+- `$bg-subtle` / `$bg-muted` - Subtle backgrounds
+- `$bg-primary` / `$bg-primary-subtle` - Primary colors
+- `$bg-secondary` / `$bg-secondary-subtle` - Secondary colors
+- `$bg-success` / `$bg-warning` / `$bg-error` / `$bg-info` - Feedback backgrounds
+
+**Border Radius:**
+- `$border-radius-sm` (0.125rem / 2px)
+- `$border-radius-md` (0.25rem / 4px)
+- `$border-radius-lg` (0.5rem / 8px)
+- `$border-radius-xl` (0.75rem / 12px)
+- `$border-radius-2xl` (1rem / 16px)
+- `$border-radius-full` (9999px for circles)
+
+**Border Colors:**
+- `$border-default` / `$border-strong` - Default borders
+- `$border-focus` - Focus state borders
+- `$border-primary` / `$border-secondary` / `$border-accent` - Colored borders
+- `$border-success` / `$border-warning` / `$border-error` - Feedback borders
+
+**Shadows:**
+- `$shadow-sm` / `$shadow-md` / `$shadow-lg` / `$shadow-xl` / `$shadow-2xl` - Box shadows
+- `$shadow-inner` - Inset shadow
+- `$focus-ring` - Focus ring effect
+
+**Transitions:**
+- `$transition-fast` (150ms)
+- `$transition-normal` (300ms)
+- `$transition-slow` (500ms)
+
+**Common Mistakes to Avoid:**
+- ❌ `$font-size-base` - DOES NOT EXIST, use `$font-size-md` instead
+- ❌ `color: #333` - Use `$text-default` or appropriate text color variable
+- ❌ `padding: 1.5rem` - Use `$spacing-lg` instead
+- ❌ `border-radius: 8px` - Use `$border-radius-lg` instead
+- ❌ `font-weight: 600` - Use `$font-weight-semibold` instead
+
+**Correct Examples:**
+- ✅ `font-size: $font-size-md;` (not `$font-size-base`)
+- ✅ `color: $text-default;` (not `#111827`)
+- ✅ `padding: $spacing-lg;` (not `1.5rem`)
+- ✅ `border-radius: $border-radius-lg;` (not `8px`)
+- ✅ `font-weight: $font-weight-semibold;` (not `600`)
+
 **Component Development:**
 
 - **Single responsibility**: Each component should have one clear purpose

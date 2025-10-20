@@ -7,6 +7,22 @@
   gap: $spacing-lg;
 }
 
+.stylusSelectRow {
+  display: flex;
+  gap: $spacing-md;
+  align-items: flex-start;
+}
+
+.stylusSelectWrapper {
+  flex: 1;
+}
+
+.createCustomButton {
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin-top: calc($font-size-sm * 1.5 + $spacing-xs * 2);
+}
+
 .formRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -45,6 +61,16 @@
 }
 
 @media (max-width: $breakpoint-md) {
+  .stylusSelectRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .createCustomButton {
+    width: 100%;
+    margin-top: 0;
+  }
+
   .formRow {
     grid-template-columns: 1fr;
   }

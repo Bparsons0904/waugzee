@@ -29,7 +29,7 @@ export const NavbarFolderSelector: Component<NavbarFolderSelectorProps> = (props
           <div class={styles.navbarSelector}>
             <select
               class={styles.navbarSelect}
-              value={selectedFolderId() || selectedFolder()?.id || ""}
+              value={selectedFolderId() ?? 0}
               disabled={isLoading}
               onChange={(e) => {
                 const value = parseInt(e.target.value, 10);

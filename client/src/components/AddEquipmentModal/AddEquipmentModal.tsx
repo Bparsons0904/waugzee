@@ -15,6 +15,7 @@ import styles from "./AddEquipmentModal.module.scss";
 
 interface AddEquipmentModalProps {
   onClose: () => void;
+  onOpenCustomModal: () => void;
 }
 
 interface FormState {
@@ -87,18 +88,28 @@ const AddEquipmentModal: Component<AddEquipmentModalProps> = (props) => {
 
   return (
     <form class={styles.form} onSubmit={handleSubmit}>
-      <div class={styles.formRow}>
-        <SearchableSelect
-          label="Select Stylus"
-          name="stylusSelect"
-          placeholder="-- Select a stylus --"
-          searchPlaceholder="Search styluses..."
-          options={stylusSelectOptions()}
-          value={formState.selectedStylusId}
-          onChange={(value) => setFormState("selectedStylusId", value)}
-          required
-          emptyMessage="No styluses found"
-        />
+      <div class={styles.stylusSelectRow}>
+        <div class={styles.stylusSelectWrapper}>
+          <SearchableSelect
+            label="Select Stylus"
+            name="stylusSelect"
+            placeholder="-- Select a stylus --"
+            searchPlaceholder="Search styluses..."
+            options={stylusSelectOptions()}
+            value={formState.selectedStylusId}
+            onChange={(value) => setFormState("selectedStylusId", value)}
+            required
+            emptyMessage="No styluses found"
+          />
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={props.onOpenCustomModal}
+          class={styles.createCustomButton}
+        >
+          Create Custom
+        </Button>
       </div>
 
       <div class={styles.formRow}>
@@ -154,7 +165,7 @@ const AddEquipmentModal: Component<AddEquipmentModalProps> = (props) => {
           Cancel
         </Button>
         <Button type="submit" variant="primary" disabled={createUserStylusMutation.isPending}>
-          {createUserStylusMutation.isPending ? "Adding..." : "Add to Equipment"}
+          {createUserStylusMutation.isPending ? "Adding..." : "Add Stylus"}
         </Button>
       </div>
     </form>

@@ -65,15 +65,7 @@ const Equipment: Component = () => {
         <div class={styles.headerButtons}>
           <Show when={!modalMode.current}>
             <Button variant="primary" onClick={openAddModal} disabled={userStylusesQuery.isLoading}>
-              Add Equipment
-            </Button>
-
-            <Button
-              variant="secondary"
-              onClick={openCustomModal}
-              disabled={userStylusesQuery.isLoading}
-            >
-              Create Custom Stylus
+              Add Stylus
             </Button>
           </Show>
         </div>
@@ -82,10 +74,10 @@ const Equipment: Component = () => {
       <Modal
         isOpen={modalMode.current === "add"}
         onClose={closeModal}
-        title="Add Equipment"
+        title="Add Stylus"
         size={ModalSize.Medium}
       >
-        <AddEquipmentModal onClose={closeModal} />
+        <AddEquipmentModal onClose={closeModal} onOpenCustomModal={openCustomModal} />
       </Modal>
 
       <Modal
@@ -112,8 +104,7 @@ const Equipment: Component = () => {
 
       <Show when={!modalMode.current && !userStylusesQuery.isLoading && styluses().length === 0}>
         <p class={styles.noStyluses}>
-          No equipment found. Click "Add Equipment" to select a stylus or "Create Custom Stylus" to
-          add your own.
+          No styluses found. Click "Add Stylus" to get started.
         </p>
       </Show>
 
