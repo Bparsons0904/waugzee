@@ -27,13 +27,6 @@ type HistoryRepository interface {
 		userID uuid.UUID,
 		limit int,
 	) ([]*PlayHistory, error)
-	GetPlayHistoryByRelease(
-		ctx context.Context,
-		tx *gorm.DB,
-		userID uuid.UUID,
-		releaseID int64,
-		limit int,
-	) ([]*PlayHistory, error)
 	DeletePlayHistory(
 		ctx context.Context,
 		tx *gorm.DB,
@@ -47,13 +40,6 @@ type HistoryRepository interface {
 		ctx context.Context,
 		tx *gorm.DB,
 		userID uuid.UUID,
-		limit int,
-	) ([]*CleaningHistory, error)
-	GetCleaningHistoryByRelease(
-		ctx context.Context,
-		tx *gorm.DB,
-		userID uuid.UUID,
-		releaseID int64,
 		limit int,
 	) ([]*CleaningHistory, error)
 	DeleteCleaningHistory(
@@ -151,37 +137,6 @@ func (r *historyRepository) GetUserPlayHistory(
 		"count",
 		len(playHistory),
 	)
-
-	return playHistory, nil
-}
-
-func (r *historyRepository) GetPlayHistoryByRelease(
-	ctx context.Context,
-	tx *gorm.DB,
-	userID uuid.UUID,
-	releaseID int64,
-	limit int,
-) ([]*PlayHistory, error) {
-	log := r.log.Function("GetPlayHistoryByRelease")
-
-	playHistory, err := gorm.G[*PlayHistory](tx).
-		Preload("Release", nil).
-		Preload("UserStylus", nil).
-		Preload("UserStylus.Stylus", nil).
-		Where("user_id = ? AND release_id = ?", userID, releaseID).
-		Order("played_at DESC").
-		Limit(limit).
-		Find(ctx)
-	if err != nil {
-		return nil, log.Err(
-			"failed to get play history by release",
-			err,
-			"userID",
-			userID,
-			"releaseID",
-			releaseID,
-		)
-	}
 
 	return playHistory, nil
 }
@@ -290,35 +245,6 @@ func (r *historyRepository) GetUserCleaningHistory(
 		"count",
 		len(cleaningHistory),
 	)
-
-	return cleaningHistory, nil
-}
-
-func (r *historyRepository) GetCleaningHistoryByRelease(
-	ctx context.Context,
-	tx *gorm.DB,
-	userID uuid.UUID,
-	releaseID int64,
-	limit int,
-) ([]*CleaningHistory, error) {
-	log := r.log.Function("GetCleaningHistoryByRelease")
-
-	cleaningHistory, err := gorm.G[*CleaningHistory](tx).
-		Preload("Release", nil).
-		Where("user_id = ? AND release_id = ?", userID, releaseID).
-		Order("cleaned_at DESC").
-		Limit(limit).
-		Find(ctx)
-	if err != nil {
-		return nil, log.Err(
-			"failed to get cleaning history by release",
-			err,
-			"userID",
-			userID,
-			"releaseID",
-			releaseID,
-		)
-	}
 
 	return cleaningHistory, nil
 }

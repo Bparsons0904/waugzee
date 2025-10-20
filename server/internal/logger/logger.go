@@ -11,6 +11,7 @@ import (
 type Logger interface {
 	Errorf(msg string, errMessage string) error
 	Error(msg string, args ...any) error
+	ErrorWithType(errType error, msg string, args ...any) error
 	Err(msg string, err error, args ...any) error
 	ErrMsg(msg string) error
 	ErMsg(msg string)
@@ -61,6 +62,11 @@ func (l *SlogLogger) With(args ...any) Logger {
 func (l *SlogLogger) Error(msg string, args ...any) error {
 	l.logger.Error(msg, args...)
 	return fmt.Errorf("%s", msg)
+}
+
+func (l *SlogLogger) ErrorWithType(errType error, msg string, args ...any) error {
+	l.logger.Error(msg, args...)
+	return fmt.Errorf("%w: %s", errType, msg)
 }
 
 func (l *SlogLogger) File(name string) Logger {

@@ -24,15 +24,15 @@ type StylusController struct {
 }
 
 type CreateCustomStylusRequest struct {
-	Brand                   string `json:"brand"                             validate:"required"`
-	Model                   string `json:"model"                             validate:"required"`
+	Brand                   string `json:"brand"`
+	Model                   string `json:"model"`
 	Type                    string `json:"type,omitempty"`
 	CartridgeType           string `json:"cartridgeType,omitempty"`
 	RecommendedReplaceHours *int   `json:"recommendedReplaceHours,omitempty"`
 }
 
 type CreateUserStylusRequest struct {
-	StylusID     uuid.UUID        `json:"stylusId"               validate:"required"`
+	StylusID     uuid.UUID        `json:"stylusId"`
 	PurchaseDate *string          `json:"purchaseDate,omitempty"`
 	InstallDate  *string          `json:"installDate,omitempty"`
 	HoursUsed    *decimal.Decimal `json:"hoursUsed,omitempty"`

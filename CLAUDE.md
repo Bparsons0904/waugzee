@@ -100,6 +100,47 @@ found, err := database.NewCacheBuilder(cache, prefix + ":" + id).Get(&cachedResp
 - **No Cross-Service Business Logic**: Keep business logic within the appropriate service boundary
 - **Clear Separation**: Services determine WHAT to do, repositories determine HOW to store/retrieve
 
+### Struct Tags and Validation
+
+**CRITICAL: Do not add validation tags to structs - we do not use a validation library.**
+
+- **No `validate` tags**: Never add validation struct tags like `validate:"required"` or `validate:"email"`
+- **Validation in handlers**: Perform validation directly in handler/controller functions using explicit checks
+- **Clear error messages**: Return specific error messages to help users understand what's wrong
+- **Type safety first**: Rely on Go's type system and explicit validation logic
+
+**Anti-patterns:**
+
+```go
+// ❌ FORBIDDEN - Validation tags (we don't use a validator)
+type CreateUserRequest struct {
+    Email    string `json:"email"    validate:"required,email"`
+    Username string `json:"username" validate:"required,min=3,max=20"`
+}
+
+// ✅ CORRECT - Explicit validation in handler
+type CreateUserRequest struct {
+    Email    string `json:"email"`
+    Username string `json:"username"`
+}
+
+func (h *Handler) CreateUser(c *fiber.Ctx) error {
+    var req CreateUserRequest
+    if err := c.BodyParser(&req); err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+    }
+
+    if req.Email == "" {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Email is required"})
+    }
+    if req.Username == "" || len(req.Username) < 3 {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Username must be at least 3 characters"})
+    }
+
+    // ... continue with business logic
+}
+```
+
 ### Common Anti-Patterns to Avoid
 
 ❌ **Manual SQL migrations for schema changes**
@@ -107,12 +148,14 @@ found, err := database.NewCacheBuilder(cache, prefix + ":" + id).Get(&cachedResp
 ❌ **MANUALLY CONSTRUCTED CACHE KEYS (ABSOLUTE ZERO TOLERANCE)**
 ❌ **Repository methods with complex business decisions**
 ❌ **Creating repository methods "just in case"**
+❌ **Validation struct tags (we don't use a validation library)**
 
 ✅ **GORM model updates + AutoMigrate**
 ✅ **Business logic in service layer**
 ✅ **CacheBuilder pattern with WithHash() for ALL cache operations**
 ✅ **Simple, focused repository methods**
 ✅ **Create methods only when needed**
+✅ **Explicit validation in handlers with clear error messages**
 
 ## Technology Stack
 

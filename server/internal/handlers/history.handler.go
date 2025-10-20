@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"strings"
+	"errors"
 	"waugzee/internal/app"
 	historyController "waugzee/internal/controllers/history"
 	"waugzee/internal/handlers/middleware"
@@ -55,14 +55,14 @@ func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
 
 	playHistory, err := h.historyController.LogPlay(c.Context(), user, &req)
 	if err != nil {
-		errMsg := err.Error()
-		if strings.Contains(errMsg, "required") ||
-			strings.Contains(errMsg, "not found") ||
-			strings.Contains(errMsg, "invalid") ||
-			strings.Contains(errMsg, "cannot be") ||
-			strings.Contains(errMsg, "exceed") {
+		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": errMsg,
+				"error": err.Error(),
+			})
+		}
+		if errors.Is(err, historyController.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": err.Error(),
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -92,15 +92,14 @@ func (h *HistoryHandler) deletePlayHistory(c *fiber.Ctx) error {
 	}
 
 	if err := h.historyController.DeletePlayHistory(c.Context(), user, playHistoryID); err != nil {
-		errMsg := err.Error()
-		if strings.Contains(errMsg, "required") {
+		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": errMsg,
+				"error": err.Error(),
 			})
 		}
-		if strings.Contains(errMsg, "not found") {
+		if errors.Is(err, historyController.ErrNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": errMsg,
+				"error": err.Error(),
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -128,13 +127,14 @@ func (h *HistoryHandler) logCleaning(c *fiber.Ctx) error {
 
 	cleaningHistory, err := h.historyController.LogCleaning(c.Context(), user, &req)
 	if err != nil {
-		errMsg := err.Error()
-		if strings.Contains(errMsg, "required") ||
-			strings.Contains(errMsg, "invalid") ||
-			strings.Contains(errMsg, "cannot be") ||
-			strings.Contains(errMsg, "exceed") {
+		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": errMsg,
+				"error": err.Error(),
+			})
+		}
+		if errors.Is(err, historyController.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": err.Error(),
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -164,15 +164,14 @@ func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
 	}
 
 	if err := h.historyController.DeleteCleaningHistory(c.Context(), user, cleaningHistoryID); err != nil {
-		errMsg := err.Error()
-		if strings.Contains(errMsg, "required") {
+		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": errMsg,
+				"error": err.Error(),
 			})
 		}
-		if strings.Contains(errMsg, "not found") {
+		if errors.Is(err, historyController.ErrNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": errMsg,
+				"error": err.Error(),
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -182,5 +181,3 @@ func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusNoContent).Send(nil)
 }
-
-
