@@ -16,7 +16,10 @@ export const ChevronDownIcon: Component<ChevronDownIconProps> = (props) => {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       class={props.class}
+      role="img"
+      aria-label="Chevron down"
     >
+      <title>Chevron down</title>
       <path
         d="M4 6L8 10L12 6"
         stroke="currentColor"

@@ -19,9 +19,7 @@ interface FormState {
   recommendedReplaceHours?: number;
 }
 
-const CreateCustomStylusModal: Component<CreateCustomStylusModalProps> = (
-  props,
-) => {
+const CreateCustomStylusModal: Component<CreateCustomStylusModalProps> = (props) => {
   const createCustomStylusMutation = useCreateCustomStylus();
 
   const [formState, setFormState] = createStore<FormState>({
@@ -125,11 +123,8 @@ const CreateCustomStylusModal: Component<CreateCustomStylusModalProps> = (
           type="text"
           value={formState.recommendedReplaceHours?.toString() || ""}
           onInput={(value) => {
-            const num = parseInt(value);
-            setFormState(
-              "recommendedReplaceHours",
-              isNaN(num) ? undefined : num,
-            );
+            const num = parseInt(value, 10);
+            setFormState("recommendedReplaceHours", Number.isNaN(num) ? undefined : num);
           }}
         />
       </div>
@@ -143,14 +138,8 @@ const CreateCustomStylusModal: Component<CreateCustomStylusModalProps> = (
         >
           Cancel
         </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={createCustomStylusMutation.isPending}
-        >
-          {createCustomStylusMutation.isPending
-            ? "Creating..."
-            : "Create & Add"}
+        <Button type="submit" variant="primary" disabled={createCustomStylusMutation.isPending}>
+          {createCustomStylusMutation.isPending ? "Creating..." : "Create & Add"}
         </Button>
       </div>
     </form>

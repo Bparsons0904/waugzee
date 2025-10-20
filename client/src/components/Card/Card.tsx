@@ -17,7 +17,6 @@ export const Card: Component<CardProps> = (props) => {
         return styles.cardSmall;
       case "large":
         return styles.cardLarge;
-      case "medium":
       default:
         return styles.cardMedium;
     }

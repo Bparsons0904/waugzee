@@ -7,11 +7,13 @@ import { RecordStatusIndicator } from "@components/StatusIndicators/StatusIndica
 import { useUserData } from "@context/UserDataContext";
 import type { UserRelease } from "@models/User";
 import { fuzzySearchUserReleases } from "@utils/fuzzy";
-import {} from // getLastPlayDate,
+
+// import {} from // getLastPlayDate,
 // getCleanlinessScore,
 // countPlaysSinceCleaning,
 // getLastCleaningDate,
-"@utils/playStatus";
+("@utils/playStatus");
+
 import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import styles from "./LogPlay.module.scss";
 
@@ -50,15 +52,16 @@ const LogPlay: Component = () => {
           return yearB - yearA;
         });
 
-      case "artist":
-      case "genre":
-      case "lastPlayed":
-      case "longestUnplayed":
-      case "recentlyPlayed":
-      case "playCount":
-      case "needsCleaning":
-      default:
+      // case "artist":
+      // case "genre":
+      // case "lastPlayed":
+      // case "longestUnplayed":
+      // case "recentlyPlayed":
+      // case "playCount":
+      // case "needsCleaning":
+      default: {
         return sorted.sort((a, b) => (a.release.title || "").localeCompare(b.release.title || ""));
+      }
     }
   };
 
@@ -205,7 +208,7 @@ const LogPlay: Component = () => {
         <RecordActionModal
           isOpen={isModalOpen()}
           onClose={handleCloseModal}
-          release={selectedRelease()!}
+          release={selectedRelease() as never}
         />
       </Show>
     </div>

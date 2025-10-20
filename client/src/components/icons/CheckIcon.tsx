@@ -16,7 +16,10 @@ export const CheckIcon: Component<CheckIconProps> = (props) => {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       class={props.class}
+      role="img"
+      aria-label="Check"
     >
+      <title>Check</title>
       <path
         d="M2 6L5 9L10 3"
         stroke="currentColor"

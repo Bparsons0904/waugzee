@@ -36,8 +36,8 @@ export const FormProvider: Component<FormProviderProps> = (props) => {
   };
 
   const unregisterField = (fieldId: string) => {
-    setFields(fieldId, undefined!);
-    setFormDataStore(fieldId, undefined!);
+    setFields(fieldId, undefined as unknown as never);
+    setFormDataStore(fieldId, undefined as unknown as never);
   };
 
   const updateField = (fieldId: string, validation: FieldValidation) => {

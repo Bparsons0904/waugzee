@@ -87,7 +87,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
       <div class={styles.modalOverlay} onClick={props.onClose}>
         <div class={styles.modal} onClick={(e) => e.stopPropagation()}>
           <div class={styles.modalHeader}>
-            <button class={styles.closeButton} onClick={props.onClose}>
+            <button type="button" class={styles.closeButton} onClick={props.onClose}>
               ×
             </button>
             <h2 class={styles.modalTitle}>Record Actions</h2>
@@ -134,7 +134,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
                   searchPlaceholder="Search styluses..."
                   options={stylusOptions()}
                   value={selectedStylusId()?.toString() || ""}
-                  onChange={(val) => setSelectedStylusId(val ? parseInt(val) : null)}
+                  onChange={(val) => setSelectedStylusId(val ? parseInt(val, 10) : null)}
                   emptyMessage="No styluses found"
                 />
               </div>
@@ -156,13 +156,13 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
           </div>
 
           <div class={styles.actionButtons}>
-            <button class={styles.playButton} onClick={handleLogPlay}>
+            <button type="button" class={styles.playButton} onClick={handleLogPlay}>
               Log Play
             </button>
-            <button class={styles.bothButton} onClick={handleLogBoth}>
+            <button type="button" class={styles.bothButton} onClick={handleLogBoth}>
               Log Both
             </button>
-            <button class={styles.cleaningButton} onClick={handleLogCleaning}>
+            <button type="button" class={styles.cleaningButton} onClick={handleLogCleaning}>
               Log Cleaning
             </button>
           </div>

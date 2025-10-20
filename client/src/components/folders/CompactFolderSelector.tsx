@@ -45,8 +45,8 @@ export const CompactFolderSelector: Component<CompactFolderSelectorProps> = (pro
                 value={selectedFolderId() || selectedFolder()?.id || ""}
                 disabled={isLoading}
                 onChange={(e) => {
-                  const value = parseInt(e.target.value);
-                  if (!isNaN(value)) {
+                  const value = parseInt(e.target.value, 10);
+                  if (!Number.isNaN(value)) {
                     handleFolderChange(value);
                   }
                 }}

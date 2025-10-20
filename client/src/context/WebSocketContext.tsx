@@ -156,7 +156,6 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
         case Events.API_PROGRESS:
         case Events.API_COMPLETE:
         case Events.API_ERROR:
-        default:
           // All other messages are handled by services listening to lastMessage()
           break;
       }

@@ -103,6 +103,13 @@ const Home: Component = () => {
     },
   ]);
 
+  const getButtonText = () => {
+    if (!user()?.configuration?.discogsToken) {
+      return "Connect Discogs";
+    }
+    return syncMutation.isPending ? "Syncing..." : "Sync Collection";
+  };
+
   const actionItems = createMemo((): ActionItem[] => [
     {
       title: "Log Play",
@@ -133,11 +140,7 @@ const Home: Component = () => {
       description: user()?.configuration?.discogsToken
         ? syncStatus() || "Sync your Waugzee collection with your Discogs library."
         : "Connect your Discogs account to sync your collection.",
-      buttonText: user()?.configuration?.discogsToken
-        ? syncMutation.isPending
-          ? "Syncing..."
-          : "Sync Collection"
-        : "Connect Discogs",
+      buttonText: getButtonText(),
       onClick: handleSyncCollection,
       disabled: syncMutation.isPending,
     },
@@ -176,7 +179,7 @@ const Home: Component = () => {
           <h1 class={styles.title}>Welcome back, {user()?.firstName || "User"}!</h1>
           <p class={styles.subtitle}>Your personal vinyl collection tracker</p>
         </div>
-        <button class={styles.primaryButton} onClick={() => setShowTokenModal(true)}>
+        <button type="button" class={styles.primaryButton} onClick={() => setShowTokenModal(true)}>
           {user()?.configuration?.discogsToken ? "Update Discogs Token" : "Connect Discogs"}
         </button>
       </div>

@@ -36,8 +36,9 @@ export const useValidation = (options: UseValidationOptions = {}) => {
 
     // Min length validation
     if (options.minLength !== undefined) {
+      const minLength = options.minLength;
       nonEmptyValidators.push((val: string) => {
-        if (val.length < options.minLength!) {
+        if (val.length < minLength) {
           return {
             isValid: false,
             errorMessage: `${fieldName} must be at least ${options.minLength} characters`,
@@ -49,8 +50,9 @@ export const useValidation = (options: UseValidationOptions = {}) => {
 
     // Max length validation
     if (options.maxLength !== undefined) {
+      const maxLength = options.maxLength;
       nonEmptyValidators.push((val: string) => {
-        if (val.length > options.maxLength!) {
+        if (val.length > maxLength) {
           return {
             isValid: false,
             errorMessage: `${fieldName} must be no more than ${options.maxLength} characters`,
@@ -62,8 +64,9 @@ export const useValidation = (options: UseValidationOptions = {}) => {
 
     // Pattern validation
     if (options.pattern) {
+      const pattern = options.pattern;
       nonEmptyValidators.push((val: string) => {
-        const regex = new RegExp(options.pattern!);
+        const regex = new RegExp(pattern);
         if (!regex.test(val)) {
           return {
             isValid: false,

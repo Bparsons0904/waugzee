@@ -99,7 +99,7 @@ export async function retryWithExponentialBackoff<T>(
     }
   }
 
-  throw lastError!;
+  throw lastError as Error;
 }
 
 /**

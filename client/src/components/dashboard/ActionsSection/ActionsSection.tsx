@@ -28,7 +28,12 @@ export const ActionsSection: Component<ActionsSectionProps> = (props) => {
                 <p>{action.description}</p>
               </div>
               <div class={styles.cardFooter}>
-                <button class={styles.button} onClick={action.onClick} disabled={action.disabled}>
+                <button
+                  type="button"
+                  class={styles.button}
+                  onClick={action.onClick}
+                  disabled={action.disabled}
+                >
                   {action.buttonText}
                 </button>
               </div>

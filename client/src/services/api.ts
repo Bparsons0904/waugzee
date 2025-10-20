@@ -1,7 +1,7 @@
 /**
  * DEPRECATION NOTICE: This file provides low-level API access.
  *
- * ⚠️ DO NOT USE THIS DIRECTLY IN COMPONENTS ⚠️
+ * ! DO NOT USE THIS DIRECTLY IN COMPONENTS !
  *
  * Instead, use TanStack Query hooks from @services/apiHooks:
  * - useApiQuery for GET requests
@@ -61,7 +61,7 @@ export class NetworkError extends Error {
 
 // Create axios instance
 const axiosClient = axios.create({
-  baseURL: env.apiUrl + "/api",
+  baseURL: `${env.apiUrl}/api`,
   timeout: 10000,
   headers: {
     Accept: "application/json",
@@ -164,7 +164,7 @@ const retryRequest = async <T>(
     }
   }
 
-  throw lastError!;
+  throw lastError as Error;
 };
 
 // Core request function

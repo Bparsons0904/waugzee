@@ -413,7 +413,9 @@ describe("TextEditor", () => {
 
   describe("Error Handling", () => {
     it("handles editor initialization failure gracefully", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {
+        // Mock implementation
+      });
 
       // Mock Editor constructor to throw error
       vi.mocked(Editor).mockImplementationOnce(() => {

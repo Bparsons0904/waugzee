@@ -88,7 +88,9 @@ describe("Image Component", () => {
     ));
 
     const imageContainer = container.querySelector("[class*='imageContainer']");
-    fireEvent.click(imageContainer!);
+    if (imageContainer) {
+      fireEvent.click(imageContainer);
+    }
 
     expect(handleClick).toHaveBeenCalledTimes(1);
   });

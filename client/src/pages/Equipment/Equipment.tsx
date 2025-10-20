@@ -103,7 +103,7 @@ const Equipment: Component = () => {
         title="Edit Equipment Details"
         size={ModalSize.Medium}
       >
-        <EditEquipmentModal stylus={editingStylus.stylus!} onClose={closeModal} />
+        <EditEquipmentModal stylus={editingStylus.stylus as never} onClose={closeModal} />
       </Modal>
 
       <Show when={!modalMode.current && userStylusesQuery.isLoading}>
@@ -203,13 +203,13 @@ const StylusCard: Component<StylusCardProps> = (props) => {
 
         <Show when={props.stylus.purchaseDate}>
           <p class={styles.stylusDetail}>
-            <strong>Purchased:</strong> {formatLocalDate(props.stylus.purchaseDate!)}
+            <strong>Purchased:</strong> {formatLocalDate(props.stylus.purchaseDate as string)}
           </p>
         </Show>
 
         <Show when={props.showFullDetails && props.stylus.installDate}>
           <p class={styles.stylusDetail}>
-            <strong>Installed:</strong> {formatLocalDate(props.stylus.installDate!)}
+            <strong>Installed:</strong> {formatLocalDate(props.stylus.installDate as string)}
           </p>
         </Show>
 

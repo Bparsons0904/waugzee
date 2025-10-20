@@ -17,5 +17,5 @@ render(
       <Routes />
     </Router>
   ),
-  root!,
+  root as HTMLElement,
 );

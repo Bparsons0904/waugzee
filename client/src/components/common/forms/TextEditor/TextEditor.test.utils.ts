@@ -136,7 +136,7 @@ export const TEST_HTML_CONTENT = {
   mixedFormatting: "<p><strong>Bold</strong> and <em>italic</em> text</p>",
   multiParagraph: "<p>First paragraph</p><p>Second paragraph</p>",
   withEmoji: "<p>Hello 😊 world</p>",
-  longContent: "<p>" + "A".repeat(500) + "</p>",
+  longContent: `<p>${"A".repeat(500)}</p>`,
 };
 
 /**

@@ -3,7 +3,7 @@ function parseLocalDate(date: string | Date | null | undefined): Date | null {
 
   try {
     const dateObj = date instanceof Date ? date : new Date(date);
-    if (isNaN(dateObj.getTime())) {
+    if (Number.isNaN(dateObj.getTime())) {
       return null;
     }
     return dateObj;

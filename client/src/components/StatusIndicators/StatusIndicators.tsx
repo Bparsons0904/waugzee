@@ -82,7 +82,7 @@ interface PlayStatusProps {
 // Claude are both of the indicators needed?  Seems like there is a lot of shared logic between the 2 of them
 const PlayStatusIndicator: Component<PlayStatusProps> = (props) => {
   const getColorWithOpacity = (colorHex: string): string => {
-    return colorHex + "CC";
+    return `${colorHex}CC`;
   };
 
   const color = () => getColorWithOpacity(getPlayRecencyColor(props.score));
@@ -120,7 +120,7 @@ interface CleaningStatusProps {
 
 const CleaningStatusIndicator: Component<CleaningStatusProps> = (props) => {
   const getColorWithOpacity = (colorHex: string): string => {
-    return colorHex + "CC";
+    return `${colorHex}CC`;
   };
 
   const color = () => getColorWithOpacity(getCleanlinessColor(props.score));

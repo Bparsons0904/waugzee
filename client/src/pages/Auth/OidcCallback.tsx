@@ -29,20 +29,28 @@ const OidcCallback: Component = () => {
         </div>
 
         <div class={styles.authContent}>
-          {loading() ? (
+          {loading() && (
             <div class={styles.loadingContainer}>
               <div class={styles.spinner} />
               <p>Processing authentication...</p>
             </div>
-          ) : error() ? (
+          )}
+          {error() && (
             <div class={styles.errorContainer}>
               <h3>Authentication Error</h3>
               <p class={styles.errorMessage}>{error()}</p>
-              <button class={styles.retryButton} onClick={() => (window.location.href = "/login")}>
+              <button
+                type="button"
+                class={styles.retryButton}
+                onClick={() => {
+                  window.location.href = "/login";
+                }}
+              >
                 Try Again
               </button>
             </div>
-          ) : (
+          )}
+          {!loading() && !error() && (
             <div class={styles.successContainer}>
               <p>Authentication successful! Redirecting...</p>
             </div>
