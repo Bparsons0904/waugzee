@@ -2,6 +2,7 @@ import { useFormField } from "@hooks/useFormField";
 import { useValidation } from "@hooks/useValidation";
 import { type Component, createUniqueId, type JSX, Show } from "solid-js";
 import type { ValidatorFunction } from "../../../../utils/validation";
+import { CheckIcon } from "@components/icons/CheckIcon";
 import styles from "./Checkbox.module.scss";
 
 export interface CheckboxProps {
@@ -88,23 +89,7 @@ export const Checkbox: Component<CheckboxProps> = (props) => {
           onClick={handleLabelClick}
         >
           <Show when={props.checked}>
-            <svg
-              class={styles.checkboxIcon}
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <title>Checkmark</title>
-              <path
-                d="M10 3L4.5 8.5L2 6"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
+            <CheckIcon class={styles.checkboxIcon} size={12} />
           </Show>
         </div>
 

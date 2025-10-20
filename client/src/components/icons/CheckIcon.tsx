@@ -21,7 +21,7 @@ export const CheckIcon: Component<CheckIconProps> = (props) => {
     >
       <title>Check</title>
       <path
-        d="M2 6L5 9L10 3"
+        d="M10 3L4.5 8.5L2 6"
         stroke="currentColor"
         stroke-width="2"
         stroke-linecap="round"

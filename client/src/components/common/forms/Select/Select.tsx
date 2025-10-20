@@ -2,6 +2,7 @@ import { useFormField } from "@hooks/useFormField";
 import { useValidation } from "@hooks/useValidation";
 import { type Component, createUniqueId, Show } from "solid-js";
 import type { ValidatorFunction } from "../../../../utils/validation";
+import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import styles from "./Select.module.scss";
 
 export interface SelectOption {
@@ -104,24 +105,7 @@ export const Select: Component<SelectProps> = (props) => {
         </select>
 
         <div class={styles.selectIcon}>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            role="img"
-            aria-label="Dropdown"
-          >
-            <title>Dropdown</title>
-            <path
-              d="M4 6L8 10L12 6"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <ChevronDownIcon size={16} />
         </div>
       </div>
 
