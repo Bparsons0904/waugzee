@@ -1,5 +1,5 @@
 import AddEquipmentModal from "@components/AddEquipmentModal/AddEquipmentModal";
-import CreateCustomStylusModal from "@components/CreateCustomStylusModal/CreateCustomStylusModal";
+import CreateStylusModal from "@components/CreateStylusModal/CreateStylusModal";
 import { Button } from "@components/common/ui/Button/Button";
 import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import EditEquipmentModal from "@components/EditEquipmentModal/EditEquipmentModal";
@@ -83,10 +83,10 @@ const Equipment: Component = () => {
       <Modal
         isOpen={modalMode.current === "custom"}
         onClose={closeModal}
-        title="Create Custom Stylus"
+        title="Create Stylus"
         size={ModalSize.Medium}
       >
-        <CreateCustomStylusModal onClose={closeModal} />
+        <CreateStylusModal onClose={closeModal} />
       </Modal>
 
       <Modal

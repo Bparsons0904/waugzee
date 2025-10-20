@@ -106,9 +106,9 @@ const AddEquipmentModal: Component<AddEquipmentModalProps> = (props) => {
           type="button"
           variant="secondary"
           onClick={props.onOpenCustomModal}
-          class={styles.createCustomButton}
+          class={styles.createStylusButton}
         >
-          Create Custom
+          Create Stylus
         </Button>
       </div>
 

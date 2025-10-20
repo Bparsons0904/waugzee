@@ -17,7 +17,7 @@
   flex: 1;
 }
 
-.createCustomButton {
+.createStylusButton {
   flex-shrink: 0;
   white-space: nowrap;
   margin-top: calc($font-size-sm * 1.5 + $spacing-xs * 2);
@@ -66,7 +66,7 @@
     align-items: stretch;
   }
 
-  .createCustomButton {
+  .createStylusButton {
     width: 100%;
     margin-top: 0;
   }

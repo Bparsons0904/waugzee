@@ -5,9 +5,9 @@ import type { CreateCustomStylusRequest } from "@models/Stylus";
 import { useCreateCustomStylus } from "@services/apiHooks";
 import type { Component } from "solid-js";
 import { createStore } from "solid-js/store";
-import styles from "./CreateCustomStylusModal.module.scss";
+import styles from "./CreateStylusModal.module.scss";
 
-interface CreateCustomStylusModalProps {
+interface CreateStylusModalProps {
   onClose: () => void;
 }
 
@@ -19,7 +19,7 @@ interface FormState {
   recommendedReplaceHours?: number;
 }
 
-const CreateCustomStylusModal: Component<CreateCustomStylusModalProps> = (props) => {
+const CreateStylusModal: Component<CreateStylusModalProps> = (props) => {
   const createCustomStylusMutation = useCreateCustomStylus();
 
   const [formState, setFormState] = createStore<FormState>({
@@ -146,4 +146,4 @@ const CreateCustomStylusModal: Component<CreateCustomStylusModalProps> = (props)
   );
 };
 
-export default CreateCustomStylusModal;
+export default CreateStylusModal;
