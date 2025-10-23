@@ -1,8 +1,8 @@
+import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import { useFormField } from "@hooks/useFormField";
 import { useValidation } from "@hooks/useValidation";
 import { type Component, createUniqueId, Show } from "solid-js";
 import type { ValidatorFunction } from "../../../../utils/validation";
-import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import styles from "./Select.module.scss";
 
 export interface SelectOption {

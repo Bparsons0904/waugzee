@@ -103,9 +103,7 @@ const Equipment: Component = () => {
       </Show>
 
       <Show when={!modalMode.current && !userStylusesQuery.isLoading && styluses().length === 0}>
-        <p class={styles.noStyluses}>
-          No styluses found. Click "Add Stylus" to get started.
-        </p>
+        <p class={styles.noStyluses}>No styluses found. Click "Add Stylus" to get started.</p>
       </Show>
 
       <Show when={!modalMode.current && activeStyluses().length > 0}>

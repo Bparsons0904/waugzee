@@ -1,12 +1,18 @@
+import { DateInput } from "@components/common/forms/DateInput/DateInput";
 import {
   SearchableSelect,
   type SearchableSelectOption,
 } from "@components/common/forms/SearchableSelect/SearchableSelect";
+import { Textarea } from "@components/common/forms/Textarea/Textarea";
+import { Button } from "@components/common/ui/Button/Button";
 import { Image } from "@components/common/ui/Image/Image";
-import type { Stylus } from "@models/Release";
+import { useUserData } from "@context/UserDataContext";
+import type { CleaningHistory, PlayHistory } from "@models/Release";
 import type { UserRelease } from "@models/User";
+import { useLogCleaning, useLogPlay } from "@services/apiHooks";
 import { formatDateForInput } from "@utils/dates";
-import { type Component, createSignal, Show } from "solid-js";
+import { type Component, createMemo, For, Show } from "solid-js";
+import { createStore } from "solid-js/store";
 import styles from "./RecordActionModal.module.scss";
 
 interface RecordActionModalProps {
@@ -15,72 +21,139 @@ interface RecordActionModalProps {
   release: UserRelease;
 }
 
-const RecordActionModal: Component<RecordActionModalProps> = (props) => {
-  const [date, setDate] = createSignal(formatDateForInput(new Date()));
-  const [selectedStylusId, setSelectedStylusId] = createSignal<number | null>(null);
-  const [notes, setNotes] = createSignal("");
+type HistoryItem = (PlayHistory | CleaningHistory) & {
+  type: "play" | "cleaning";
+  timestamp: string;
+};
 
-  const mockStyluses: Stylus[] = [
-    {
-      id: 1,
-      name: "Ortofon 2M Blue",
-      manufacturer: "Ortofon",
-      active: true,
-      primary: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+const RecordActionModal: Component<RecordActionModalProps> = (props) => {
+  const userData = useUserData();
+
+  const [formState, setFormState] = createStore({
+    date: formatDateForInput(new Date()),
+    selectedStylusId: userData.styluses().find((s) => s.isPrimary && s.isActive)?.id,
+    notes: "",
+  });
+
+  const logPlayMutation = useLogPlay({
+    invalidateQueries: [["user"]],
+    onSuccess: () => {
+      resetForm();
+      props.onClose();
     },
-    {
-      id: 2,
-      name: "AT-VM95E",
-      manufacturer: "Audio-Technica",
-      active: true,
-      primary: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  });
+
+  const logCleaningMutation = useLogCleaning({
+    invalidateQueries: [["user"]],
+    onSuccess: () => {
+      resetForm();
+      props.onClose();
     },
-  ];
+  });
+
+  const resetForm = () => {
+    setFormState({
+      date: formatDateForInput(new Date()),
+      selectedStylusId: null,
+      notes: "",
+    });
+  };
 
   const handleLogPlay = () => {
-    console.log("Log Play:", {
+    const dateObj = new Date(formState.date);
+    logPlayMutation.mutate({
       releaseId: props.release.releaseId,
-      releaseTitle: props.release.release.title,
-      date: date(),
-      stylusId: selectedStylusId(),
-      notes: notes(),
+      playedAt: dateObj.toISOString(),
+      userStylusId: formState.selectedStylusId || undefined,
+      notes: formState.notes || undefined,
     });
-    setNotes("");
   };
 
   const handleLogCleaning = () => {
-    console.log("Log Cleaning:", {
+    const dateObj = new Date(formState.date);
+    logCleaningMutation.mutate({
       releaseId: props.release.releaseId,
-      releaseTitle: props.release.release.title,
-      date: date(),
-      notes: notes(),
+      cleanedAt: dateObj.toISOString(),
+      notes: formState.notes || undefined,
+      isDeepClean: false,
     });
-    setNotes("");
   };
 
   const handleLogBoth = () => {
-    console.log("Log Both:", {
+    const dateObj = new Date(formState.date);
+    const playData = {
       releaseId: props.release.releaseId,
-      releaseTitle: props.release.release.title,
-      date: date(),
-      stylusId: selectedStylusId(),
-      notes: notes(),
+      playedAt: dateObj.toISOString(),
+      userStylusId: formState.selectedStylusId || undefined,
+      notes: formState.notes || undefined,
+    };
+
+    const cleaningData = {
+      releaseId: props.release.releaseId,
+      cleanedAt: dateObj.toISOString(),
+      notes: formState.notes || undefined,
+      isDeepClean: false,
+    };
+
+    logPlayMutation.mutate(playData, {
+      onSuccess: () => {
+        logCleaningMutation.mutate(cleaningData);
+      },
     });
-    setNotes("");
   };
 
-  const stylusOptions = (): SearchableSelectOption[] => [
-    { value: "", label: "None" },
-    ...mockStyluses.map((s) => ({
-      value: s.id.toString(),
-      label: `${s.manufacturer} ${s.name}`,
-      metadata: s.primary ? "Primary" : undefined,
-    })),
-  ];
+  const stylusOptions = (): SearchableSelectOption[] => {
+    const styluses = userData.styluses();
+    return [
+      { value: "", label: "None" },
+      ...styluses
+        .filter((s) => s.isActive)
+        .map((s) => ({
+          value: s.id,
+          label: s.stylus
+            ? `${s.stylus.brand} ${s.stylus.model}`
+            : `Stylus ${s.id.substring(0, 8)}`,
+          metadata: s.isPrimary ? "Primary" : undefined,
+        })),
+    ];
+  };
+
+  const releaseHistory = createMemo((): HistoryItem[] => {
+    const plays = props.release.playHistory || [];
+    const cleanings = props.release.cleaningHistory || [];
+
+    const playItems: HistoryItem[] = plays.map((p) => ({
+      ...p,
+      type: "play" as const,
+      timestamp: p.playedAt,
+    }));
+
+    const cleaningItems: HistoryItem[] = cleanings.map((c) => ({
+      ...c,
+      type: "cleaning" as const,
+      timestamp: c.cleanedAt,
+    }));
+
+    return [...playItems, ...cleaningItems].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
+  });
+
+  const formatHistoryDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffInDays === 0) return "Today";
+    if (diffInDays === 1) return "Yesterday";
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+    });
+  };
 
   return (
     <Show when={props.isOpen}>
@@ -114,15 +187,11 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
           <div class={styles.formSection}>
             <div class={styles.formRow}>
               <div class={styles.formGroup}>
-                <label class={styles.label} for="actionDate">
-                  Date
-                </label>
-                <input
-                  type="date"
-                  id="actionDate"
-                  class={styles.dateInput}
-                  value={date()}
-                  onInput={(e) => setDate(e.target.value)}
+                <DateInput
+                  label="Date"
+                  name="actionDate"
+                  value={formState.date}
+                  onChange={(value) => setFormState("date", value)}
                 />
               </div>
 
@@ -133,45 +202,94 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
                   placeholder="Select a stylus"
                   searchPlaceholder="Search styluses..."
                   options={stylusOptions()}
-                  value={selectedStylusId()?.toString() || ""}
-                  onChange={(val) => setSelectedStylusId(val ? parseInt(val, 10) : null)}
+                  value={formState.selectedStylusId || ""}
+                  onChange={(val) => setFormState("selectedStylusId", val || null)}
                   emptyMessage="No styluses found"
                 />
               </div>
             </div>
 
             <div class={styles.formGroup}>
-              <label class={styles.label} for="notes">
-                Notes
-              </label>
-              <textarea
-                id="notes"
-                class={styles.textarea}
-                value={notes()}
-                onInput={(e) => setNotes(e.target.value)}
+              <Textarea
+                label="Notes"
+                name="notes"
+                value={formState.notes}
                 placeholder="Enter any notes about this play or cleaning..."
-                rows="3"
+                rows={3}
+                onChange={(value) => setFormState("notes", value)}
               />
             </div>
           </div>
 
           <div class={styles.actionButtons}>
-            <button type="button" class={styles.playButton} onClick={handleLogPlay}>
-              Log Play
-            </button>
-            <button type="button" class={styles.bothButton} onClick={handleLogBoth}>
-              Log Both
-            </button>
-            <button type="button" class={styles.cleaningButton} onClick={handleLogCleaning}>
-              Log Cleaning
-            </button>
+            <Button
+              variant="primary"
+              onClick={handleLogPlay}
+              disabled={logPlayMutation.isPending}
+              class={styles.playButton}
+            >
+              {logPlayMutation.isPending ? "Logging..." : "Log Play"}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleLogBoth}
+              disabled={logPlayMutation.isPending || logCleaningMutation.isPending}
+              class={styles.bothButton}
+            >
+              {logPlayMutation.isPending || logCleaningMutation.isPending
+                ? "Logging..."
+                : "Log Both"}
+            </Button>
+            <Button
+              variant="tertiary"
+              onClick={handleLogCleaning}
+              disabled={logCleaningMutation.isPending}
+              class={styles.cleaningButton}
+            >
+              {logCleaningMutation.isPending ? "Logging..." : "Log Cleaning"}
+            </Button>
           </div>
 
           <div class={styles.historySection}>
             <h3 class={styles.historyTitle}>Record History</h3>
 
             <div class={styles.historyList}>
-              <div class={styles.noHistory}>No play or cleaning history for this record yet.</div>
+              <Show
+                when={releaseHistory().length > 0}
+                fallback={
+                  <div class={styles.noHistory}>
+                    No play or cleaning history for this record yet.
+                  </div>
+                }
+              >
+                <For each={releaseHistory()}>
+                  {(item) => (
+                    <div class={styles.historyItem}>
+                      <div class={styles.historyItemHeader}>
+                        <span
+                          class={item.type === "play" ? styles.playBadge : styles.cleaningBadge}
+                        >
+                          {item.type === "play" ? "Play" : "Cleaning"}
+                        </span>
+                        <span class={styles.historyDate}>{formatHistoryDate(item.timestamp)}</span>
+                      </div>
+                      <Show when={item.type === "play" && "userStylus" in item && item.userStylus}>
+                        {(stylus) => (
+                          <div class={styles.historyStylus}>
+                            Stylus:{" "}
+                            {stylus().stylus
+                              ? `${stylus().stylus.brand} ${stylus().stylus.model}`
+                              : "Unknown"}
+                          </div>
+                        )}
+                      </Show>
+                      <Show when={item.notes}>
+                        <div class={styles.historyNotes}>{item.notes}</div>
+                      </Show>
+                    </div>
+                  )}
+                </For>
+              </Show>
             </div>
           </div>
         </div>

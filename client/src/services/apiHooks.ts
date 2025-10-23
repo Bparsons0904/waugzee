@@ -1,4 +1,14 @@
-import { STYLUS_ENDPOINTS } from "@constants/api.constants";
+import {
+  CLEANING_HISTORY_ENDPOINTS,
+  PLAY_HISTORY_ENDPOINTS,
+  STYLUS_ENDPOINTS,
+} from "@constants/api.constants";
+import type {
+  LogCleaningRequest,
+  LogCleaningResponse,
+  LogPlayRequest,
+  LogPlayResponse,
+} from "@models/Release";
 import type {
   AvailableStylusResponse,
   CreateCustomStylusRequest,
@@ -218,6 +228,7 @@ export function useAvailableStyluses(options?: ApiQueryOptions<AvailableStylusRe
   );
 }
 
+// Claude we should not need this, we already have this is UserDataContext
 export function useUserStyluses(options?: ApiQueryOptions<UserStylusesResponse>) {
   return useApiGet<UserStylusesResponse>(
     ["styluses", "user"],
@@ -282,4 +293,54 @@ export function useDeleteUserStylus(options?: ApiMutationOptions<void, string>) 
     errorMessage: "Failed to remove stylus. Please try again.",
     ...options,
   });
+}
+
+// Play History API Hooks
+export function useLogPlay(options?: ApiMutationOptions<LogPlayResponse, LogPlayRequest>) {
+  return useApiPost<LogPlayResponse, LogPlayRequest>(PLAY_HISTORY_ENDPOINTS.CREATE, undefined, {
+    successMessage: "Play logged successfully!",
+    errorMessage: "Failed to log play. Please try again.",
+    ...options,
+  });
+}
+
+export function useDeletePlay(options?: ApiMutationOptions<void, string>) {
+  return useApiMutation<void, string>(
+    "DELETE",
+    (id) => PLAY_HISTORY_ENDPOINTS.DELETE(id),
+    undefined,
+    {
+      successMessage: "Play deleted successfully!",
+      errorMessage: "Failed to delete play. Please try again.",
+      ...options,
+    },
+  );
+}
+
+// Cleaning History API Hooks
+export function useLogCleaning(
+  options?: ApiMutationOptions<LogCleaningResponse, LogCleaningRequest>,
+) {
+  return useApiPost<LogCleaningResponse, LogCleaningRequest>(
+    CLEANING_HISTORY_ENDPOINTS.CREATE,
+    undefined,
+    {
+      successMessage: "Cleaning logged successfully!",
+      errorMessage: "Failed to log cleaning. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useDeleteCleaning(options?: ApiMutationOptions<void, string>) {
+  return useApiMutation<void, string>(
+    "DELETE",
+    (id) => CLEANING_HISTORY_ENDPOINTS.DELETE(id),
+    undefined,
+    {
+      successMessage: "Cleaning deleted successfully!",
+      errorMessage: "Failed to delete cleaning. Please try again.",
+      ...options,
+    },
+  );
 }

@@ -46,38 +46,65 @@ export interface Style {
   name: string;
 }
 
-export interface Stylus {
-  id: number;
-  name: string;
-  manufacturer?: string;
-  expectedLifespan?: number;
-  purchaseDate?: string;
-  active: boolean;
-  primary: boolean;
+export interface PlayHistory {
+  id: string;
+  userId: string;
+  releaseId: number;
+  release?: Release;
+  userStylusId?: string;
+  userStylus?: import("./User").UserStylus;
+  playedAt: string;
+  notes: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface PlayHistory {
-  id: number;
+export interface LogPlayRequest {
   releaseId: number;
-  stylusId?: number;
+  userStylusId?: string;
   playedAt: string;
-  createdAt: string;
-  updatedAt: string;
-  release?: Release;
-  stylus?: Stylus;
   notes?: string;
+}
+
+export interface LogPlayResponse {
+  playHistory: PlayHistory;
+}
+
+export interface PlayHistoryListResponse {
+  playHistory: PlayHistory[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface CleaningHistory {
-  id: number;
+  id: string;
+  userId: string;
+  releaseId: number;
+  release?: Release;
+  cleanedAt: string;
+  notes: string;
+  isDeepClean: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LogCleaningRequest {
   releaseId: number;
   cleanedAt: string;
   notes?: string;
-  createdAt: string;
-  updatedAt: string;
-  release?: Release;
+  isDeepClean?: boolean;
+}
+
+export interface LogCleaningResponse {
+  cleaningHistory: CleaningHistory;
+}
+
+export interface CleaningHistoryListResponse {
+  cleaningHistory: CleaningHistory[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface Release {
@@ -99,8 +126,6 @@ export interface Release {
   formats: Format[];
   genres: Genre[];
   styles: Style[];
-  playHistory: PlayHistory[];
-  cleaningHistory: CleaningHistory[];
 }
 
 export interface EditItem {

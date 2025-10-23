@@ -1,6 +1,6 @@
-import { type Component, Show } from "solid-js";
 import { EyeIcon } from "@components/icons/EyeIcon";
 import { EyeOffIcon } from "@components/icons/EyeOffIcon";
+import { type Component, Show } from "solid-js";
 import styles from "./PasswordToggle.module.scss";
 
 interface PasswordToggleProps {

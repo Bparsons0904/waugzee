@@ -1,8 +1,8 @@
+import { CheckIcon } from "@components/icons/CheckIcon";
 import { useFormField } from "@hooks/useFormField";
 import { useValidation } from "@hooks/useValidation";
 import { type Component, createUniqueId, type JSX, Show } from "solid-js";
 import type { ValidatorFunction } from "../../../../utils/validation";
-import { CheckIcon } from "@components/icons/CheckIcon";
 import styles from "./Checkbox.module.scss";
 
 export interface CheckboxProps {

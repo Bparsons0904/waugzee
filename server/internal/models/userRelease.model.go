@@ -21,4 +21,7 @@ type UserRelease struct {
 	DateAdded  time.Time      `gorm:"type:timestamptz;not null"                        json:"dateAdded"`
 	Active     bool           `gorm:"type:bool;default:true"                           json:"active"`
 	DeletedAt  gorm.DeletedAt `gorm:"index"                                            json:"-"`
+
+	PlayHistory     []PlayHistory     `gorm:"foreignKey:ReleaseID;references:ReleaseID" json:"playHistory"`
+	CleaningHistory []CleaningHistory `gorm:"foreignKey:ReleaseID;references:ReleaseID" json:"cleaningHistory"`
 }

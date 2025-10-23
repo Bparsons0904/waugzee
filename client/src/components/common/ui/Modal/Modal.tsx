@@ -1,6 +1,6 @@
+import { XIcon } from "@components/icons/XIcon";
 import { type Component, createEffect, type JSX, onCleanup, Show } from "solid-js";
 import { Portal } from "solid-js/web";
-import { XIcon } from "@components/icons/XIcon";
 import styles from "./Modal.module.scss";
 
 export enum ModalSize {

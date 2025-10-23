@@ -14,7 +14,7 @@ interface NavbarFolderSelectorProps {
 }
 
 export const NavbarFolderSelector: Component<NavbarFolderSelectorProps> = (props) => {
-  const { folders, selectedFolderId, selectedFolder, handleFolderChange, isLoading } = props;
+  const { folders, selectedFolderId, handleFolderChange, isLoading } = props;
 
   return (
     <div class={clsx(styles.folderSelector, styles.navbarMode)}>

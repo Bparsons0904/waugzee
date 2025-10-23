@@ -1,3 +1,5 @@
+import type { CleaningHistory, PlayHistory } from "./Release";
+
 export interface UserConfiguration {
   id: string;
   userId: string;
@@ -134,14 +136,19 @@ export interface UserRelease {
   notes?: Record<string, unknown>; // JSON data
   dateAdded: string;
   active: boolean;
+  playHistory: PlayHistory[];
+  cleaningHistory: CleaningHistory[];
 }
 
 export interface Stylus {
   id: string;
-  name: string;
-  manufacturer?: string;
-  modelNumber?: string;
-  notes?: string;
+  brand: string;
+  model: string;
+  type?: string;
+  cartridgeType?: string;
+  recommendedReplaceHours?: number;
+  userGeneratedId?: string;
+  isVerified?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -156,6 +163,7 @@ export interface UserStylus {
   hoursUsed?: number;
   notes?: string;
   isActive: boolean;
+  isPrimary: boolean;
   createdAt: string;
   updatedAt: string;
 }

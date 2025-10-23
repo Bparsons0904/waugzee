@@ -36,6 +36,18 @@ export const STYLUS_ENDPOINTS = {
   DELETE: (id: string) => `/styluses/${id}`,
 } as const;
 
+// Play History endpoints
+export const PLAY_HISTORY_ENDPOINTS = {
+  CREATE: "/plays",
+  DELETE: (id: string) => `/plays/${id}`,
+} as const;
+
+// Cleaning History endpoints
+export const CLEANING_HISTORY_ENDPOINTS = {
+  CREATE: "/cleanings",
+  DELETE: (id: string) => `/cleanings/${id}`,
+} as const;
+
 // Health endpoints
 export const HEALTH_ENDPOINTS = {
   CHECK: API_PATHS.HEALTH,
