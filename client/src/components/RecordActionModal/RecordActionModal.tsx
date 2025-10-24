@@ -10,7 +10,7 @@ import { useUserData } from "@context/UserDataContext";
 import type { CleaningHistory, PlayHistory } from "@models/Release";
 import type { UserRelease } from "@models/User";
 import { useLogBoth, useLogCleaning, useLogPlay } from "@services/apiHooks";
-import { formatDateTimeForInput, parseDateTimeInputToISO } from "@utils/dates";
+import { formatDateTimeForInput } from "@utils/dates";
 import { type Component, createMemo, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import styles from "./RecordActionModal.module.scss";
@@ -70,7 +70,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
   const handleLogPlay = () => {
     logPlayMutation.mutate({
       releaseId: props.release.releaseId,
-      playedAt: parseDateTimeInputToISO(formState.dateTime),
+      playedAt: new Date(formState.dateTime).toISOString(),
       userStylusId: formState.selectedStylusId || undefined,
       notes: formState.notes || undefined,
     });
@@ -79,7 +79,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
   const handleLogCleaning = () => {
     logCleaningMutation.mutate({
       releaseId: props.release.releaseId,
-      cleanedAt: parseDateTimeInputToISO(formState.dateTime),
+      cleanedAt: new Date(formState.dateTime).toISOString(),
       notes: formState.notes || undefined,
       isDeepClean: false,
     });
@@ -89,7 +89,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
     logBothMutation.mutate({
       releaseId: props.release.releaseId,
       userStylusId: formState.selectedStylusId || undefined,
-      timestamp: parseDateTimeInputToISO(formState.dateTime),
+      timestamp: new Date(formState.dateTime).toISOString(),
       notes: formState.notes || undefined,
       isDeepClean: false,
     });

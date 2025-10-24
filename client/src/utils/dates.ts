@@ -90,3 +90,16 @@ export function isSameLocalDay(date1: string | Date | null, date2: string | Date
 
   return getLocalDateGroupKey(dateObj1) === getLocalDateGroupKey(dateObj2);
 }
+
+export function formatDateTimeForInput(date: Date | string | null | undefined): string {
+  const dateObj = parseLocalDate(date);
+  if (!dateObj) return "";
+
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const day = String(dateObj.getDate()).padStart(2, "0");
+  const hours = String(dateObj.getHours()).padStart(2, "0");
+  const minutes = String(dateObj.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
