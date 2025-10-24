@@ -48,6 +48,11 @@ export const CLEANING_HISTORY_ENDPOINTS = {
   DELETE: (id: string) => `/cleanings/${id}`,
 } as const;
 
+// Combined History endpoints
+export const HISTORY_ENDPOINTS = {
+  LOG_BOTH: "/logBoth",
+} as const;
+
 // Health endpoints
 export const HEALTH_ENDPOINTS = {
   CHECK: API_PATHS.HEALTH,

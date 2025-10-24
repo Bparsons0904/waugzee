@@ -47,6 +47,19 @@ type LogCleaningRequest struct {
 	IsDeepClean bool   `json:"isDeepClean,omitempty"`
 }
 
+type LogBothRequest struct {
+	ReleaseID    int64      `json:"releaseId"`
+	UserStylusID *uuid.UUID `json:"userStylusId,omitempty"`
+	Timestamp    string     `json:"timestamp"`
+	Notes        string     `json:"notes,omitempty"`
+	IsDeepClean  bool       `json:"isDeepClean,omitempty"`
+}
+
+type LogBothResponse struct {
+	PlayHistory     *PlayHistory     `json:"playHistory"`
+	CleaningHistory *CleaningHistory `json:"cleaningHistory"`
+}
+
 type HistoryControllerInterface interface {
 	LogPlay(ctx context.Context, user *User, request *LogPlayRequest) (*PlayHistory, error)
 	DeletePlayHistory(ctx context.Context, user *User, playHistoryID uuid.UUID) error
@@ -56,6 +69,7 @@ type HistoryControllerInterface interface {
 		request *LogCleaningRequest,
 	) (*CleaningHistory, error)
 	DeleteCleaningHistory(ctx context.Context, user *User, cleaningHistoryID uuid.UUID) error
+	LogBoth(ctx context.Context, user *User, request *LogBothRequest) (*LogBothResponse, error)
 }
 
 func New(
@@ -121,7 +135,10 @@ func (c *HistoryController) LogPlay(
 	if request.UserStylusID != nil {
 		if err := c.stylusRepo.VerifyUserOwnership(ctx, c.db.SQL, *request.UserStylusID, user.ID); err != nil {
 			if err == gorm.ErrRecordNotFound {
-				return nil, log.ErrorWithType(ErrNotFound, "user stylus not found or not owned by user")
+				return nil, log.ErrorWithType(
+					ErrNotFound,
+					"user stylus not found or not owned by user",
+				)
 			}
 			return nil, log.Error("failed to verify user stylus ownership", "error", err)
 		}
@@ -268,4 +285,115 @@ func (c *HistoryController) DeleteCleaningHistory(
 	)
 
 	return nil
+}
+
+func (c *HistoryController) LogBoth(
+	ctx context.Context,
+	user *User,
+	request *LogBothRequest,
+) (*LogBothResponse, error) {
+	log := c.log.Function("LogBoth")
+
+	if request.ReleaseID == 0 {
+		return nil, log.ErrorWithType(ErrValidation, "releaseId is required")
+	}
+
+	if len(request.Notes) > MaxNotesLength {
+		return nil, log.ErrorWithType(
+			ErrValidation,
+			"notes exceed maximum length",
+			"length",
+			len(request.Notes),
+			"max",
+			MaxNotesLength,
+		)
+	}
+
+	timestamp, err := parseDateTime(request.Timestamp)
+	if err != nil {
+		return nil, log.ErrorWithType(ErrValidation, "invalid timestamp", "error", err)
+	}
+
+	if timestamp.After(time.Now()) {
+		return nil, log.ErrorWithType(ErrValidation, "timestamp cannot be in the future")
+	}
+
+	if request.UserStylusID != nil {
+		if err = c.stylusRepo.VerifyUserOwnership(ctx, c.db.SQL, *request.UserStylusID, user.ID); err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return nil, log.ErrorWithType(
+					ErrNotFound,
+					"user stylus not found or not owned by user",
+				)
+			}
+			return nil, log.Error("failed to verify user stylus ownership", "error", err)
+		}
+	}
+
+	var playHistory *PlayHistory
+	var cleaningHistory *CleaningHistory
+
+	err = c.transactionService.Execute(ctx, func(ctx context.Context, tx *gorm.DB) error {
+		playHistory = &PlayHistory{
+			UserID:       user.ID,
+			ReleaseID:    request.ReleaseID,
+			UserStylusID: request.UserStylusID,
+			PlayedAt:     timestamp,
+			Notes:        request.Notes,
+		}
+
+		if err = c.historyRepo.CreatePlayHistory(ctx, tx, playHistory); err != nil {
+			return log.Error(
+				"failed to create play history in transaction",
+				"error",
+				err,
+				"userID",
+				user.ID,
+				"releaseID",
+				request.ReleaseID,
+			)
+		}
+
+		cleaningHistory = &CleaningHistory{
+			UserID:      user.ID,
+			ReleaseID:   request.ReleaseID,
+			CleanedAt:   timestamp,
+			Notes:       request.Notes,
+			IsDeepClean: request.IsDeepClean,
+		}
+
+		if err = c.historyRepo.CreateCleaningHistory(ctx, tx, cleaningHistory); err != nil {
+			return log.Error(
+				"failed to create cleaning history in transaction",
+				"error",
+				err,
+				"userID",
+				user.ID,
+				"releaseID",
+				request.ReleaseID,
+			)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info(
+		"Play and cleaning history created successfully",
+		"userID",
+		user.ID,
+		"releaseID",
+		request.ReleaseID,
+		"playHistoryID",
+		playHistory.ID,
+		"cleaningHistoryID",
+		cleaningHistory.ID,
+	)
+
+	return &LogBothResponse{
+		PlayHistory:     playHistory,
+		CleaningHistory: cleaningHistory,
+	}, nil
 }

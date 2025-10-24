@@ -36,6 +36,8 @@ func (h *HistoryHandler) Register() {
 	cleanings := h.router.Group("/cleanings")
 	cleanings.Post("", h.logCleaning)
 	cleanings.Delete("/:id", h.deleteCleaningHistory)
+
+	h.router.Post("/logBoth", h.logBoth)
 }
 
 func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
@@ -180,4 +182,39 @@ func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusNoContent).Send(nil)
+}
+
+func (h *HistoryHandler) logBoth(c *fiber.Ctx) error {
+	user := middleware.GetUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authentication required",
+		})
+	}
+
+	var req historyController.LogBothRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	response, err := h.historyController.LogBoth(c.Context(), user, &req)
+	if err != nil {
+		if errors.Is(err, historyController.ErrValidation) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+		if errors.Is(err, historyController.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to log play and cleaning",
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(response)
 }

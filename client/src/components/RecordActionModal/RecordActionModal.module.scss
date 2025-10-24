@@ -269,6 +269,7 @@
   }
 
   &:focus {
+    outline: none;
     box-shadow: 0 0 0 3px rgba(140, 109, 255, 0.4);
   }
 }
@@ -298,16 +299,27 @@
 
 .historyItem {
   padding: $spacing-md;
-  border-bottom: $border-width-thin solid $border-default;
-  transition: background-color $transition-fast;
+  border-radius: $border-radius-md;
+  margin-bottom: $spacing-sm;
+  transition: box-shadow $transition-fast;
 
   &:last-child {
-    border-bottom: none;
+    margin-bottom: 0;
   }
 
   &:hover {
-    background-color: $bg-subtle;
+    box-shadow: $shadow-md;
   }
+}
+
+.playItem {
+  background-color: $bg-primary-subtle;
+  border-left: 3px solid $color-primary-500;
+}
+
+.cleaningItem {
+  background-color: $bg-success-subtle;
+  border-left: 3px solid $color-success-500;
 }
 
 .historyItemHeader {
@@ -317,24 +329,10 @@
   margin-bottom: $spacing-xs;
 }
 
-.playBadge,
-.cleaningBadge {
-  font-size: $font-size-xs;
+.historyItemType {
   font-weight: $font-weight-semibold;
-  padding: $spacing-xs $spacing-sm;
-  border-radius: $border-radius-md;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.playBadge {
-  background-color: $bg-primary-subtle;
-  color: $color-primary-700;
-}
-
-.cleaningBadge {
-  background-color: $bg-success-subtle;
-  color: $text-success;
+  font-size: $font-size-sm;
+  color: $text-default;
 }
 
 .historyDate {

@@ -171,6 +171,7 @@ func (r *userReleaseRepository) GetUserReleasesByFolderID(
 		Preload("Release").
 		Preload("PlayHistory", "user_id = ?", userID).
 		Preload("PlayHistory.UserStylus").
+		Preload("PlayHistory.UserStylus.Stylus").
 		Preload("CleaningHistory", "user_id = ?", userID).
 		Where("user_id = ? AND folder_id = ? AND active = ?", userID, folderID, true).
 		Order("date_added DESC").

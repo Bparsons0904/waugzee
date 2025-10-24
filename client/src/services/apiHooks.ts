@@ -1,9 +1,12 @@
 import {
   CLEANING_HISTORY_ENDPOINTS,
+  HISTORY_ENDPOINTS,
   PLAY_HISTORY_ENDPOINTS,
   STYLUS_ENDPOINTS,
 } from "@constants/api.constants";
 import type {
+  LogBothRequest,
+  LogBothResponse,
   LogCleaningRequest,
   LogCleaningResponse,
   LogPlayRequest,
@@ -85,6 +88,15 @@ export function useApiMutation<T, V = unknown>(
   const queryClient = useQueryClient();
   const toast = useToast();
 
+  const {
+    onSuccess: userOnSuccess,
+    onError: userOnError,
+    invalidateQueries,
+    successMessage,
+    errorMessage,
+    ...restOptions
+  } = options || {};
+
   return useMutation(() => ({
     mutationFn: (variables: V) => {
       const requestUrl = typeof url === "function" ? url(variables) : url;
@@ -104,38 +116,33 @@ export function useApiMutation<T, V = unknown>(
     },
     onSuccess: (data, variables, context) => {
       // Invalidate specified queries
-      if (options?.invalidateQueries) {
-        options.invalidateQueries.forEach((queryKey) => {
+      if (invalidateQueries) {
+        invalidateQueries.forEach((queryKey) => {
           queryClient.invalidateQueries({ queryKey });
         });
       }
 
       // Handle success toast
-      if (options?.successMessage) {
+      if (successMessage) {
         const message =
-          typeof options.successMessage === "function"
-            ? options.successMessage(data, variables)
-            : options.successMessage;
+          typeof successMessage === "function" ? successMessage(data, variables) : successMessage;
         toast.showSuccess(message);
       }
 
-      // Call original onSuccess
-      options?.onSuccess?.(data, variables, context);
+      // Call user's onSuccess callback
+      userOnSuccess?.(data, variables, context);
     },
     onError: (error, variables, context) => {
       // Handle error toast
-      if (options?.errorMessage) {
-        const message =
-          typeof options.errorMessage === "function"
-            ? options.errorMessage(error)
-            : options.errorMessage;
+      if (errorMessage) {
+        const message = typeof errorMessage === "function" ? errorMessage(error) : errorMessage;
         toast.showError(message);
       }
 
-      // Call original onError
-      options?.onError?.(error, variables, context);
+      // Call user's onError callback
+      userOnError?.(error, variables, context);
     },
-    ...options,
+    ...restOptions,
   }));
 }
 
@@ -274,7 +281,7 @@ export function useCreateCustomStylus(
 export function useUpdateUserStylus(
   options?: ApiMutationOptions<{ success: boolean }, { id: string; data: UpdateUserStylusRequest }>,
 ) {
-  return useApiPatch<{ success: boolean }, { id: string; data: UpdateUserStylusRequest }>(
+  return useApiPut<{ success: boolean }, { id: string; data: UpdateUserStylusRequest }>(
     (variables) => STYLUS_ENDPOINTS.UPDATE(variables.id),
     undefined,
     {
@@ -343,4 +350,13 @@ export function useDeleteCleaning(options?: ApiMutationOptions<void, string>) {
       ...options,
     },
   );
+}
+
+// Combined Play & Cleaning History API Hook
+export function useLogBoth(options?: ApiMutationOptions<LogBothResponse, LogBothRequest>) {
+  return useApiPost<LogBothResponse, LogBothRequest>(HISTORY_ENDPOINTS.LOG_BOTH, undefined, {
+    successMessage: "Play and cleaning logged successfully!",
+    errorMessage: "Failed to log play and cleaning. Please try again.",
+    ...options,
+  });
 }

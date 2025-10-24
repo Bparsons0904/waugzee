@@ -9,7 +9,7 @@ import { Image } from "@components/common/ui/Image/Image";
 import { useUserData } from "@context/UserDataContext";
 import type { CleaningHistory, PlayHistory } from "@models/Release";
 import type { UserRelease } from "@models/User";
-import { useLogCleaning, useLogPlay } from "@services/apiHooks";
+import { useLogBoth, useLogCleaning, useLogPlay } from "@services/apiHooks";
 import { formatDateForInput } from "@utils/dates";
 import { type Component, createMemo, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
@@ -51,6 +51,14 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
     },
   });
 
+  const logBothMutation = useLogBoth({
+    invalidateQueries: [["user"]],
+    onSuccess: () => {
+      resetForm();
+      props.onClose();
+    },
+  });
+
   const resetForm = () => {
     setFormState({
       date: formatDateForInput(new Date()),
@@ -81,24 +89,12 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
 
   const handleLogBoth = () => {
     const dateObj = new Date(formState.date);
-    const playData = {
+    logBothMutation.mutate({
       releaseId: props.release.releaseId,
-      playedAt: dateObj.toISOString(),
       userStylusId: formState.selectedStylusId || undefined,
-      notes: formState.notes || undefined,
-    };
-
-    const cleaningData = {
-      releaseId: props.release.releaseId,
-      cleanedAt: dateObj.toISOString(),
+      timestamp: dateObj.toISOString(),
       notes: formState.notes || undefined,
       isDeepClean: false,
-    };
-
-    logPlayMutation.mutate(playData, {
-      onSuccess: () => {
-        logCleaningMutation.mutate(cleaningData);
-      },
     });
   };
 
@@ -144,15 +140,20 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
     const now = new Date();
     const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (diffInDays === 0) return "Today";
-    if (diffInDays === 1) return "Yesterday";
-    if (diffInDays < 7) return `${diffInDays} days ago`;
-
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
-    });
+    switch (true) {
+      case diffInDays === 0:
+        return "Today";
+      case diffInDays === 1:
+        return "Yesterday";
+      case diffInDays < 7:
+        return `${diffInDays} days ago`;
+      default:
+        return date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+        });
+    }
   };
 
   return (
@@ -233,12 +234,10 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
             <Button
               variant="secondary"
               onClick={handleLogBoth}
-              disabled={logPlayMutation.isPending || logCleaningMutation.isPending}
+              disabled={logBothMutation.isPending}
               class={styles.bothButton}
             >
-              {logPlayMutation.isPending || logCleaningMutation.isPending
-                ? "Logging..."
-                : "Log Both"}
+              {logBothMutation.isPending ? "Logging..." : "Log Both"}
             </Button>
             <Button
               variant="tertiary"
@@ -264,22 +263,22 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
               >
                 <For each={releaseHistory()}>
                   {(item) => (
-                    <div class={styles.historyItem}>
+                    <div
+                      class={`${styles.historyItem} ${item.type === "play" ? styles.playItem : styles.cleaningItem}`}
+                    >
                       <div class={styles.historyItemHeader}>
-                        <span
-                          class={item.type === "play" ? styles.playBadge : styles.cleaningBadge}
-                        >
-                          {item.type === "play" ? "Play" : "Cleaning"}
+                        <span class={styles.historyItemType}>
+                          {item.type === "play" ? "Played" : "Cleaned"}
                         </span>
                         <span class={styles.historyDate}>{formatHistoryDate(item.timestamp)}</span>
                       </div>
                       <Show when={item.type === "play" && "userStylus" in item && item.userStylus}>
-                        {(stylus) => (
+                        {(userStylusData) => (
                           <div class={styles.historyStylus}>
                             Stylus:{" "}
-                            {stylus().stylus
-                              ? `${stylus().stylus.brand} ${stylus().stylus.model}`
-                              : "Unknown"}
+                            {userStylusData().stylus
+                              ? `${userStylusData().stylus.brand} ${userStylusData().stylus.model}`
+                              : `Stylus ${userStylusData().id.substring(0, 8)}`}
                           </div>
                         )}
                       </Show>

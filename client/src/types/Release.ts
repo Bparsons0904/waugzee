@@ -1,3 +1,5 @@
+import type { UserStylus } from "./Stylus";
+
 export interface Artist {
   id: number;
   name: string;
@@ -52,7 +54,7 @@ export interface PlayHistory {
   releaseId: number;
   release?: Release;
   userStylusId?: string;
-  userStylus?: import("./User").UserStylus;
+  userStylus?: UserStylus;
   playedAt: string;
   notes: string;
   createdAt: string;
@@ -105,6 +107,19 @@ export interface CleaningHistoryListResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface LogBothRequest {
+  releaseId: number;
+  userStylusId?: string;
+  timestamp: string;
+  notes?: string;
+  isDeepClean?: boolean;
+}
+
+export interface LogBothResponse {
+  playHistory: PlayHistory;
+  cleaningHistory: CleaningHistory;
 }
 
 export interface Release {
