@@ -39,13 +39,12 @@ const EditEquipmentModal: Component<EditEquipmentModalProps> = (props) => {
     updateUserStylusMutation.mutate(
       {
         id: props.stylus.id,
-        data: {
-          purchaseDate: formState.purchaseDate || undefined,
-          installDate: formState.installDate || undefined,
-          notes: formState.notes || undefined,
-          isActive: formState.isActive,
-          isPrimary: formState.isPrimary,
-        },
+        purchaseDate: formState.purchaseDate,
+        installDate: formState.installDate,
+        hoursUsed: props.stylus.hoursUsed || 0,
+        notes: formState.notes,
+        isActive: formState.isActive,
+        isPrimary: formState.isPrimary,
       },
       {
         onSuccess: () => {

@@ -57,10 +57,10 @@ export interface CreateCustomStylusResponse {
 }
 
 export interface UpdateUserStylusRequest {
-  purchaseDate?: string;
-  installDate?: string;
-  hoursUsed?: number;
-  notes?: string;
-  isActive?: boolean;
-  isPrimary?: boolean;
+  purchaseDate: string;
+  installDate: string;
+  hoursUsed: number;
+  notes: string;
+  isActive: boolean;
+  isPrimary: boolean;
 }

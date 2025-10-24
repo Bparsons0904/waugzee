@@ -34,7 +34,7 @@ func (h *StylusHandler) Register() {
 	styluses.Post("/custom", h.createCustomStylus)
 	styluses.Get("", h.getUserStyluses)
 	styluses.Post("", h.createUserStylus)
-	styluses.Patch("/:id", h.updateUserStylus)
+	styluses.Put("/:id", h.updateUserStylus)
 	styluses.Delete("/:id", h.deleteUserStylus)
 }
 
@@ -142,8 +142,11 @@ func (h *StylusHandler) createUserStylus(c *fiber.Ctx) error {
 }
 
 func (h *StylusHandler) updateUserStylus(c *fiber.Ctx) error {
+	log := h.log.Function("updateUserStylus")
+
 	user := middleware.GetUser(c)
 	if user == nil {
+		log.ErMsg("Authentication required")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication required",
 		})
@@ -152,6 +155,7 @@ func (h *StylusHandler) updateUserStylus(c *fiber.Ctx) error {
 	stylusIDParam := c.Params("id")
 	stylusID, err := uuid.Parse(stylusIDParam)
 	if err != nil {
+		log.ErMsg("Invalid stylus ID")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid stylus ID",
 		})
@@ -159,20 +163,18 @@ func (h *StylusHandler) updateUserStylus(c *fiber.Ctx) error {
 
 	var req stylusController.UpdateUserStylusRequest
 	if err = c.BodyParser(&req); err != nil {
+		log.Err("Invalid request body", err, "stylusID", stylusID, "req", req)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
 
+	log.Info("Updating user stylus", "request", req)
+
 	if err := h.stylusController.UpdateUserStylus(c.Context(), user, stylusID, &req); err != nil {
 		if err.Error() == "user stylus not found or not owned by user" {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "User stylus not found or not owned by user",
-			})
-		}
-		if err.Error() == "no fields to update" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "No fields to update",
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

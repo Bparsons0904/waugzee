@@ -26,11 +26,16 @@ type StylusRepository interface {
 		tx *gorm.DB,
 		userID uuid.UUID,
 		stylusID uuid.UUID,
-		updates map[string]any,
+		updatedStylus *UserStylus,
 	) error
 	Delete(ctx context.Context, tx *gorm.DB, userID uuid.UUID, stylusID uuid.UUID) error
 	UnsetAllPrimary(ctx context.Context, tx *gorm.DB, userID uuid.UUID) error
-	VerifyUserOwnership(ctx context.Context, tx *gorm.DB, stylusID uuid.UUID, userID uuid.UUID) error
+	VerifyUserOwnership(
+		ctx context.Context,
+		tx *gorm.DB,
+		stylusID uuid.UUID,
+		userID uuid.UUID,
+	) error
 }
 
 type stylusRepository struct {
@@ -186,33 +191,33 @@ func (r *stylusRepository) Update(
 	tx *gorm.DB,
 	userID uuid.UUID,
 	stylusID uuid.UUID,
-	updates map[string]any,
+	updatedStylus *UserStylus,
 ) error {
 	log := r.log.Function("Update")
 
-	result := tx.WithContext(ctx).
-		Model(&UserStylus{}).
-		Where("id = ? AND user_id = ?", stylusID, userID).
-		Updates(updates)
-
-	if result.Error != nil {
+	rows, err := gorm.G[*UserStylus](tx).
+		Where(BaseUUIDModel{ID: stylusID}).
+		Updates(ctx, updatedStylus)
+	if err != nil {
 		return log.Err(
 			"failed to update user stylus",
-			result.Error,
-			"id",
-			stylusID,
+			err,
 			"userID",
 			userID,
+			"stylusID",
+			stylusID,
+			"rows",
+			rows,
 		)
 	}
 
-	if result.RowsAffected == 0 {
+	if rows == 0 {
 		return log.Error(
 			"user stylus not found or not owned by user",
-			"id",
-			stylusID,
 			"userID",
 			userID,
+			"stylusID",
+			stylusID,
 		)
 	}
 
@@ -292,7 +297,14 @@ func (r *stylusRepository) VerifyUserOwnership(
 		if err == gorm.ErrRecordNotFound {
 			return gorm.ErrRecordNotFound
 		}
-		return log.Err("failed to verify user stylus ownership", err, "stylusID", stylusID, "userID", userID)
+		return log.Err(
+			"failed to verify user stylus ownership",
+			err,
+			"stylusID",
+			stylusID,
+			"userID",
+			userID,
+		)
 	}
 
 	return nil

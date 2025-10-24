@@ -37,7 +37,7 @@ const AddEquipmentModal: Component<AddEquipmentModalProps> = (props) => {
     installDate: formatDateForInput(new Date()),
     notes: "",
     isActive: true,
-    isPrimary: false,
+    isPrimary: true,
   });
 
   const resetForm = () => {
@@ -47,7 +47,7 @@ const AddEquipmentModal: Component<AddEquipmentModalProps> = (props) => {
       installDate: formatDateForInput(new Date()),
       notes: "",
       isActive: true,
-      isPrimary: false,
+      isPrimary: true,
     });
   };
 

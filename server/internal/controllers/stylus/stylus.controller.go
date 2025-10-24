@@ -42,12 +42,12 @@ type CreateUserStylusRequest struct {
 }
 
 type UpdateUserStylusRequest struct {
-	PurchaseDate *string          `json:"purchaseDate,omitempty"`
-	InstallDate  *string          `json:"installDate,omitempty"`
-	HoursUsed    *decimal.Decimal `json:"hoursUsed,omitempty"`
-	Notes        *string          `json:"notes,omitempty"`
-	IsActive     *bool            `json:"isActive,omitempty"`
-	IsPrimary    *bool            `json:"isPrimary,omitempty"`
+	PurchaseDate string          `json:"purchaseDate"`
+	InstallDate  string          `json:"installDate"`
+	HoursUsed    decimal.Decimal `json:"hoursUsed"`
+	Notes        *string         `json:"notes"`
+	IsActive     bool            `json:"isActive"`
+	IsPrimary    bool            `json:"isPrimary"`
 }
 
 type UpdateUserStylusResponse struct {
@@ -241,47 +241,40 @@ func (c *StylusController) UpdateUserStylus(
 ) error {
 	log := c.log.Function("UpdateUserStylus")
 
-	updates := make(map[string]any)
-
-	if request.PurchaseDate != nil && *request.PurchaseDate != "" {
-		purchaseDate, err := parseDate(*request.PurchaseDate)
+	var purchaseDate, installDate *time.Time
+	var err error
+	if request.PurchaseDate != "" {
+		purchaseDate, err = parseDate(request.PurchaseDate)
 		if err != nil {
 			return log.Err("invalid purchase date format", err)
 		}
-		updates["purchase_date"] = purchaseDate
 	}
-	if request.InstallDate != nil && *request.InstallDate != "" {
-		installDate, err := parseDate(*request.InstallDate)
+
+	if request.InstallDate != "" {
+		installDate, err = parseDate(request.InstallDate)
 		if err != nil {
 			return log.Err("invalid install date format", err)
 		}
-		updates["install_date"] = installDate
-	}
-	if request.HoursUsed != nil {
-		updates["hours_used"] = request.HoursUsed
-	}
-	if request.Notes != nil {
-		updates["notes"] = request.Notes
-	}
-	if request.IsActive != nil {
-		updates["is_active"] = *request.IsActive
-	}
-	if request.IsPrimary != nil {
-		updates["is_primary"] = *request.IsPrimary
 	}
 
-	if len(updates) == 0 {
-		return log.ErrMsg("no fields to update")
+	updatedStylus := &UserStylus{
+		UserID:       user.ID,
+		PurchaseDate: purchaseDate,
+		InstallDate:  installDate,
+		HoursUsed:    &request.HoursUsed,
+		Notes:        request.Notes,
+		IsActive:     request.IsActive,
+		IsPrimary:    request.IsPrimary,
 	}
 
-	err := c.transactionService.Execute(ctx, func(ctx context.Context, tx *gorm.DB) error {
-		if request.IsPrimary != nil && *request.IsPrimary {
-			if err := c.stylusRepo.UnsetAllPrimary(ctx, tx, user.ID); err != nil {
+	err = c.transactionService.Execute(ctx, func(ctx context.Context, tx *gorm.DB) error {
+		if request.IsPrimary {
+			if err = c.stylusRepo.UnsetAllPrimary(ctx, tx, user.ID); err != nil {
 				return err
 			}
 		}
 
-		return c.stylusRepo.Update(ctx, tx, user.ID, stylusID, updates)
+		return c.stylusRepo.Update(ctx, tx, user.ID, stylusID, updatedStylus)
 	})
 	if err != nil {
 		return log.Err("failed to update user stylus", err, "id", stylusID, "userID", user.ID)
