@@ -297,64 +297,6 @@
   font-style: italic;
 }
 
-.historyItem {
-  padding: $spacing-md;
-  border-radius: $border-radius-md;
-  margin-bottom: $spacing-sm;
-  transition: box-shadow $transition-fast;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  &:hover {
-    box-shadow: $shadow-md;
-  }
-}
-
-.playItem {
-  background-color: $bg-primary-subtle;
-  border-left: 3px solid $color-primary-500;
-}
-
-.cleaningItem {
-  background-color: $bg-success-subtle;
-  border-left: 3px solid $color-success-500;
-}
-
-.historyItemHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: $spacing-xs;
-}
-
-.historyItemType {
-  font-weight: $font-weight-semibold;
-  font-size: $font-size-sm;
-  color: $text-default;
-}
-
-.historyDate {
-  font-size: $font-size-sm;
-  color: $text-muted;
-}
-
-.historyStylus {
-  font-size: $font-size-sm;
-  color: $text-muted;
-  margin-bottom: $spacing-xs;
-}
-
-.historyNotes {
-  font-size: $font-size-sm;
-  color: $text-default;
-  margin-top: $spacing-xs;
-  padding: $spacing-sm;
-  background-color: $bg-subtle;
-  border-radius: $border-radius-sm;
-}
-
 .loadingSkeleton {
   width: 100%;
   height: 60px;

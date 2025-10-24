@@ -1,0 +1,123 @@
+@import "@styles/variables";
+@import "@styles/colors";
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: $spacing-md;
+}
+
+.modal {
+  background-color: $bg-surface;
+  border-radius: $border-radius-lg;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: $shadow-2xl;
+  overflow: hidden;
+}
+
+.modalHeader {
+  padding: $spacing-lg;
+  border-bottom: 1px solid $border-default;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: $font-size-4xl;
+  color: $text-muted;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: $border-radius-md;
+  transition: all $transition-fast;
+
+  &:hover {
+    background-color: $bg-muted;
+    color: $text-default;
+  }
+}
+
+.modalBody {
+  padding: $spacing-lg;
+}
+
+.message {
+  margin: 0;
+  color: $text-default;
+  font-size: $font-size-md;
+  line-height: 1.5;
+}
+
+.modalFooter {
+  padding: $spacing-lg;
+  border-top: 1px solid $border-default;
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-md;
+}
+
+.cancelButton,
+.confirmButton {
+  padding: $spacing-sm $spacing-lg;
+  border: none;
+  border-radius: $border-radius-md;
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.cancelButton {
+  background-color: $bg-surface;
+  color: $text-default;
+  border: 1px solid $border-default;
+
+  &:hover:not(:disabled) {
+    background-color: $bg-muted;
+  }
+}
+
+.confirmButton {
+  background-color: $bg-primary;
+  color: $text-inverse;
+
+  &:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
+  &.destructive {
+    background-color: $bg-error;
+
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+  }
+}

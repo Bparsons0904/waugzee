@@ -103,3 +103,26 @@ export function formatDateTimeForInput(date: Date | string | null | undefined): 
 
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
+
+export function formatHistoryDate(dateString: string): string {
+  const date = parseLocalDate(dateString);
+  if (!date) return "Invalid date";
+
+  const now = new Date();
+  const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+  switch (true) {
+    case diffInDays === 0:
+      return "Today";
+    case diffInDays === 1:
+      return "Yesterday";
+    case diffInDays < 7:
+      return `${diffInDays} days ago`;
+    default:
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+      });
+  }
+}

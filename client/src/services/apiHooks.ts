@@ -11,6 +11,10 @@ import type {
   LogCleaningResponse,
   LogPlayRequest,
   LogPlayResponse,
+  UpdateCleaningRequest,
+  UpdateCleaningResponse,
+  UpdatePlayRequest,
+  UpdatePlayResponse,
 } from "@models/Release";
 import type {
   AvailableStylusResponse,
@@ -36,8 +40,10 @@ import { useToast } from "../context/ToastContext";
 import { api } from "./api";
 
 // Enhanced query options
-export interface ApiQueryOptions<T> extends Omit<UseQueryOptions<T>, "queryKey" | "queryFn"> {
+export interface ApiQueryOptions<T>
+  extends Omit<UseQueryOptions<T, Error, T, readonly unknown[]>, "queryKey" | "queryFn"> {
   enabled?: boolean | Accessor<boolean>;
+  placeholderData?: unknown;
 }
 
 // Enhanced mutation options with common patterns
@@ -311,6 +317,21 @@ export function useLogPlay(options?: ApiMutationOptions<LogPlayResponse, LogPlay
   });
 }
 
+export function useUpdatePlay(
+  id: string,
+  options?: ApiMutationOptions<UpdatePlayResponse, UpdatePlayRequest>,
+) {
+  return useApiPut<UpdatePlayResponse, UpdatePlayRequest>(
+    PLAY_HISTORY_ENDPOINTS.UPDATE(id),
+    undefined,
+    {
+      successMessage: "Play updated successfully!",
+      errorMessage: "Failed to update play. Please try again.",
+      ...options,
+    },
+  );
+}
+
 export function useDeletePlay(options?: ApiMutationOptions<void, string>) {
   return useApiMutation<void, string>(
     "DELETE",
@@ -334,6 +355,21 @@ export function useLogCleaning(
     {
       successMessage: "Cleaning logged successfully!",
       errorMessage: "Failed to log cleaning. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useUpdateCleaning(
+  id: string,
+  options?: ApiMutationOptions<UpdateCleaningResponse, UpdateCleaningRequest>,
+) {
+  return useApiPut<UpdateCleaningResponse, UpdateCleaningRequest>(
+    CLEANING_HISTORY_ENDPOINTS.UPDATE(id),
+    undefined,
+    {
+      successMessage: "Cleaning updated successfully!",
+      errorMessage: "Failed to update cleaning. Please try again.",
       ...options,
     },
   );

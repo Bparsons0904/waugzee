@@ -1,6 +1,6 @@
 import { USER_ENDPOINTS } from "@constants/api.constants";
 import { useApiQuery } from "@services/apiHooks";
-import { useQueryClient } from "@tanstack/solid-query";
+import { keepPreviousData, useQueryClient } from "@tanstack/solid-query";
 import { createContext, type JSX, useContext } from "solid-js";
 import type {
   Folder,
@@ -34,6 +34,7 @@ export function UserDataProvider(props: { children: JSX.Element }) {
     undefined,
     {
       enabled: () => auth.isAuthenticated() && !!auth.authToken(),
+      placeholderData: keepPreviousData,
     },
   );
 

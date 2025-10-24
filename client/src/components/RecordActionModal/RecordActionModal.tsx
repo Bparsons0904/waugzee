@@ -5,13 +5,15 @@ import {
 } from "@components/common/forms/SearchableSelect/SearchableSelect";
 import { Textarea } from "@components/common/forms/Textarea/Textarea";
 import { Button } from "@components/common/ui/Button/Button";
+import { EditHistoryPanel } from "@components/common/ui/EditHistoryPanel/EditHistoryPanel";
 import { Image } from "@components/common/ui/Image/Image";
+import { RecordHistoryItem } from "@components/RecordHistoryItem/RecordHistoryItem";
 import { useUserData } from "@context/UserDataContext";
 import type { CleaningHistory, PlayHistory } from "@models/Release";
 import type { UserRelease } from "@models/User";
 import { useLogBoth, useLogCleaning, useLogPlay } from "@services/apiHooks";
 import { formatDateTimeForInput } from "@utils/dates";
-import { type Component, createMemo, For, Show } from "solid-js";
+import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import styles from "./RecordActionModal.module.scss";
 
@@ -34,6 +36,11 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
     selectedStylusId: userData.styluses().find((s) => s.isPrimary && s.isActive)?.id,
     notes: "",
   });
+
+  const [isEditPanelOpen, setIsEditPanelOpen] = createSignal(false);
+  const [editItem, setEditItem] = createSignal<
+    ((PlayHistory | CleaningHistory) & { type: "play" | "cleaning" }) | null
+  >(null);
 
   const logPlayMutation = useLogPlay({
     invalidateQueries: [["user"]],
@@ -111,6 +118,11 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
     ];
   };
 
+  const handleEdit = (item: (PlayHistory | CleaningHistory) & { type: "play" | "cleaning" }) => {
+    setEditItem(item);
+    setIsEditPanelOpen(true);
+  };
+
   const releaseHistory = createMemo((): HistoryItem[] => {
     const plays = props.release.playHistory || [];
     const cleanings = props.release.cleaningHistory || [];
@@ -131,27 +143,6 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
   });
-
-  const formatHistoryDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-
-    switch (true) {
-      case diffInDays === 0:
-        return "Today";
-      case diffInDays === 1:
-        return "Yesterday";
-      case diffInDays < 7:
-        return `${diffInDays} days ago`;
-      default:
-        return date.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
-        });
-    }
-  };
 
   return (
     <Show when={props.isOpen}>
@@ -259,37 +250,20 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
                 }
               >
                 <For each={releaseHistory()}>
-                  {(item) => (
-                    <div
-                      class={`${styles.historyItem} ${item.type === "play" ? styles.playItem : styles.cleaningItem}`}
-                    >
-                      <div class={styles.historyItemHeader}>
-                        <span class={styles.historyItemType}>
-                          {item.type === "play" ? "Played" : "Cleaned"}
-                        </span>
-                        <span class={styles.historyDate}>{formatHistoryDate(item.timestamp)}</span>
-                      </div>
-                      <Show when={item.type === "play" && "userStylus" in item && item.userStylus}>
-                        {(userStylusData) => (
-                          <div class={styles.historyStylus}>
-                            Stylus:{" "}
-                            {userStylusData().stylus
-                              ? `${userStylusData().stylus.brand} ${userStylusData().stylus.model}`
-                              : `Stylus ${userStylusData().id.substring(0, 8)}`}
-                          </div>
-                        )}
-                      </Show>
-                      <Show when={item.notes}>
-                        <div class={styles.historyNotes}>{item.notes}</div>
-                      </Show>
-                    </div>
-                  )}
+                  {(item) => <RecordHistoryItem item={item} onEdit={handleEdit} />}
                 </For>
               </Show>
             </div>
           </div>
         </div>
       </div>
+
+      <EditHistoryPanel
+        isOpen={isEditPanelOpen()}
+        onClose={() => setIsEditPanelOpen(false)}
+        editItem={editItem()}
+        styluses={userData.styluses()}
+      />
     </Show>
   );
 };

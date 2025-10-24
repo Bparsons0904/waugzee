@@ -72,6 +72,17 @@ export interface LogPlayResponse {
   playHistory: PlayHistory;
 }
 
+export interface UpdatePlayRequest {
+  releaseId: number;
+  userStylusId?: string;
+  playedAt: string;
+  notes?: string;
+}
+
+export interface UpdatePlayResponse {
+  playHistory: PlayHistory;
+}
+
 export interface PlayHistoryListResponse {
   playHistory: PlayHistory[];
   total: number;
@@ -99,6 +110,17 @@ export interface LogCleaningRequest {
 }
 
 export interface LogCleaningResponse {
+  cleaningHistory: CleaningHistory;
+}
+
+export interface UpdateCleaningRequest {
+  releaseId: number;
+  cleanedAt: string;
+  notes?: string;
+  isDeepClean?: boolean;
+}
+
+export interface UpdateCleaningResponse {
   cleaningHistory: CleaningHistory;
 }
 

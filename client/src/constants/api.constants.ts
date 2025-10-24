@@ -39,12 +39,14 @@ export const STYLUS_ENDPOINTS = {
 // Play History endpoints
 export const PLAY_HISTORY_ENDPOINTS = {
   CREATE: "/plays",
+  UPDATE: (id: string) => `/plays/${id}`,
   DELETE: (id: string) => `/plays/${id}`,
 } as const;
 
 // Cleaning History endpoints
 export const CLEANING_HISTORY_ENDPOINTS = {
   CREATE: "/cleanings",
+  UPDATE: (id: string) => `/cleanings/${id}`,
   DELETE: (id: string) => `/cleanings/${id}`,
 } as const;
 

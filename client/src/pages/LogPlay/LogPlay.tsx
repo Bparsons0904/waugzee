@@ -28,10 +28,16 @@ const LogPlay: Component = () => {
   const userData = useUserData();
   const releases = () => userData.releases();
   const [searchTerm, setSearchTerm] = createSignal("");
-  const [selectedRelease, setSelectedRelease] = createSignal<UserRelease | null>(null);
+  const [selectedReleaseId, setSelectedReleaseId] = createSignal<string | null>(null);
   const [isModalOpen, setIsModalOpen] = createSignal(false);
   const [showStatusDetails, setShowStatusDetails] = createSignal(false);
   const [sortBy, setSortBy] = createSignal("artist");
+
+  const selectedRelease = createMemo(() => {
+    const releaseId = selectedReleaseId();
+    if (!releaseId) return null;
+    return releases().find((r) => r.id === releaseId) || null;
+  });
 
   const logPlayMutation = useLogPlay({
     invalidateQueries: [["user"]],
@@ -145,7 +151,7 @@ const LogPlay: Component = () => {
   });
 
   const handleReleaseClick = (release: UserRelease) => {
-    setSelectedRelease(release);
+    setSelectedReleaseId(release.id);
     setIsModalOpen(true);
   };
 
