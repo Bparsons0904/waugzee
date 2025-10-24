@@ -6,13 +6,8 @@ import RecordActionModal from "@components/RecordActionModal/RecordActionModal";
 import { RecordStatusIndicator } from "@components/StatusIndicators/StatusIndicators";
 import { useUserData } from "@context/UserDataContext";
 import type { UserRelease } from "@models/User";
+import { useLogCleaning, useLogPlay } from "@services/apiHooks";
 import { fuzzySearchUserReleases } from "@utils/fuzzy";
-
-// import {} from // getLastPlayDate,
-// getCleanlinessScore,
-// countPlaysSinceCleaning,
-// getLastCleaningDate,
-("@utils/playStatus");
 
 import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import styles from "./LogPlay.module.scss";
@@ -37,6 +32,16 @@ const LogPlay: Component = () => {
   const [isModalOpen, setIsModalOpen] = createSignal(false);
   const [showStatusDetails, setShowStatusDetails] = createSignal(false);
   const [sortBy, setSortBy] = createSignal("artist");
+
+  const logPlayMutation = useLogPlay({
+    invalidateQueries: [["user"]],
+    successMessage: "Play logged successfully!",
+  });
+
+  const logCleaningMutation = useLogCleaning({
+    invalidateQueries: [["user"]],
+    successMessage: "Cleaning logged successfully!",
+  });
 
   const sortReleases = (releases: UserRelease[], sortOption: string): UserRelease[] => {
     const sorted = [...releases];
@@ -85,16 +90,19 @@ const LogPlay: Component = () => {
   };
 
   const handleQuickPlay = (release: UserRelease) => {
-    console.log("Quick Play:", {
+    const primaryStylus = userData.styluses().find((s) => s.isPrimary && s.isActive);
+    logPlayMutation.mutate({
       releaseId: release.releaseId,
-      releaseTitle: release.release.title,
+      playedAt: new Date().toISOString(),
+      userStylusId: primaryStylus?.id,
     });
   };
 
   const handleQuickCleaning = (release: UserRelease) => {
-    console.log("Quick Cleaning:", {
+    logCleaningMutation.mutate({
       releaseId: release.releaseId,
-      releaseTitle: release.release.title,
+      cleanedAt: new Date().toISOString(),
+      isDeepClean: false,
     });
   };
 
@@ -176,8 +184,8 @@ const LogPlay: Component = () => {
 
                         <div class={styles.statusSection}>
                           <RecordStatusIndicator
-                            playHistory={[]}
-                            cleaningHistory={[]}
+                            playHistory={userRelease.playHistory || []}
+                            cleaningHistory={userRelease.cleaningHistory || []}
                             showDetails={false}
                             onPlayClick={() => handleQuickPlay(userRelease)}
                             onCleanClick={() => handleQuickCleaning(userRelease)}
@@ -189,8 +197,8 @@ const LogPlay: Component = () => {
                     <Show when={showStatusDetails()}>
                       <div class={styles.fullWidthDetails}>
                         <RecordStatusIndicator
-                          playHistory={[]}
-                          cleaningHistory={[]}
+                          playHistory={userRelease.playHistory || []}
+                          cleaningHistory={userRelease.cleaningHistory || []}
                           showDetails={true}
                         />
                       </div>
