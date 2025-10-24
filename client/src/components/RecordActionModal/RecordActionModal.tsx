@@ -1,4 +1,4 @@
-import { DateInput } from "@components/common/forms/DateInput/DateInput";
+import { DateTimeInput } from "@components/common/forms/DateTimeInput/DateTimeInput";
 import {
   SearchableSelect,
   type SearchableSelectOption,
@@ -10,7 +10,7 @@ import { useUserData } from "@context/UserDataContext";
 import type { CleaningHistory, PlayHistory } from "@models/Release";
 import type { UserRelease } from "@models/User";
 import { useLogBoth, useLogCleaning, useLogPlay } from "@services/apiHooks";
-import { formatDateForInput } from "@utils/dates";
+import { formatDateTimeForInput, parseDateTimeInputToISO } from "@utils/dates";
 import { type Component, createMemo, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import styles from "./RecordActionModal.module.scss";
@@ -30,7 +30,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
   const userData = useUserData();
 
   const [formState, setFormState] = createStore({
-    date: formatDateForInput(new Date()),
+    dateTime: formatDateTimeForInput(new Date()),
     selectedStylusId: userData.styluses().find((s) => s.isPrimary && s.isActive)?.id,
     notes: "",
   });
@@ -61,38 +61,35 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
 
   const resetForm = () => {
     setFormState({
-      date: formatDateForInput(new Date()),
+      dateTime: formatDateTimeForInput(new Date()),
       selectedStylusId: null,
       notes: "",
     });
   };
 
   const handleLogPlay = () => {
-    const dateObj = new Date(formState.date);
     logPlayMutation.mutate({
       releaseId: props.release.releaseId,
-      playedAt: dateObj.toISOString(),
+      playedAt: parseDateTimeInputToISO(formState.dateTime),
       userStylusId: formState.selectedStylusId || undefined,
       notes: formState.notes || undefined,
     });
   };
 
   const handleLogCleaning = () => {
-    const dateObj = new Date(formState.date);
     logCleaningMutation.mutate({
       releaseId: props.release.releaseId,
-      cleanedAt: dateObj.toISOString(),
+      cleanedAt: parseDateTimeInputToISO(formState.dateTime),
       notes: formState.notes || undefined,
       isDeepClean: false,
     });
   };
 
   const handleLogBoth = () => {
-    const dateObj = new Date(formState.date);
     logBothMutation.mutate({
       releaseId: props.release.releaseId,
       userStylusId: formState.selectedStylusId || undefined,
-      timestamp: dateObj.toISOString(),
+      timestamp: parseDateTimeInputToISO(formState.dateTime),
       notes: formState.notes || undefined,
       isDeepClean: false,
     });
@@ -188,11 +185,11 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
           <div class={styles.formSection}>
             <div class={styles.formRow}>
               <div class={styles.formGroup}>
-                <DateInput
-                  label="Date"
-                  name="actionDate"
-                  value={formState.date}
-                  onChange={(value) => setFormState("date", value)}
+                <DateTimeInput
+                  label="Date & Time"
+                  name="actionDateTime"
+                  value={formState.dateTime}
+                  onChange={(value) => setFormState("dateTime", value)}
                 />
               </div>
 

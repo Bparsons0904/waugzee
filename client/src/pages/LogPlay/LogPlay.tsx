@@ -45,10 +45,26 @@ const LogPlay: Component = () => {
 
   const sortReleases = (releases: UserRelease[], sortOption: string): UserRelease[] => {
     const sorted = [...releases];
+    const now = Date.now();
+    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
 
     switch (sortOption) {
       case "album":
         return sorted.sort((a, b) => (a.release.title || "").localeCompare(b.release.title || ""));
+
+      case "artist":
+        return sorted.sort((a, b) => {
+          const artistA = a.release.artists?.[0]?.name || "Unknown Artist";
+          const artistB = b.release.artists?.[0]?.name || "Unknown Artist";
+          return artistA.localeCompare(artistB);
+        });
+
+      case "genre":
+        return sorted.sort((a, b) => {
+          const genreA = a.release.genres?.[0]?.name || "";
+          const genreB = b.release.genres?.[0]?.name || "";
+          return genreA.localeCompare(genreB);
+        });
 
       case "year":
         return sorted.sort((a, b) => {
@@ -57,16 +73,64 @@ const LogPlay: Component = () => {
           return yearB - yearA;
         });
 
-      // case "artist":
-      // case "genre":
-      // case "lastPlayed":
-      // case "longestUnplayed":
-      // case "recentlyPlayed":
-      // case "playCount":
-      // case "needsCleaning":
-      default: {
+      case "lastPlayed":
+        return sorted.sort((a, b) => {
+          const lastPlayedA = a.playHistory?.[0]?.playedAt
+            ? new Date(a.playHistory[0].playedAt).getTime()
+            : 0;
+          const lastPlayedB = b.playHistory?.[0]?.playedAt
+            ? new Date(b.playHistory[0].playedAt).getTime()
+            : 0;
+          return lastPlayedB - lastPlayedA;
+        });
+
+      case "longestUnplayed":
+        return sorted.sort((a, b) => {
+          const lastPlayedA = a.playHistory?.[0]?.playedAt
+            ? new Date(a.playHistory[0].playedAt).getTime()
+            : 0;
+          const lastPlayedB = b.playHistory?.[0]?.playedAt
+            ? new Date(b.playHistory[0].playedAt).getTime()
+            : 0;
+          return lastPlayedA - lastPlayedB;
+        });
+
+      case "recentlyPlayed":
+        return sorted
+          .filter((release) => {
+            const lastPlayed = release.playHistory?.[0]?.playedAt
+              ? new Date(release.playHistory[0].playedAt).getTime()
+              : 0;
+            return lastPlayed >= thirtyDaysAgo;
+          })
+          .sort((a, b) => {
+            const lastPlayedA = new Date(a.playHistory?.[0]?.playedAt || 0).getTime();
+            const lastPlayedB = new Date(b.playHistory?.[0]?.playedAt || 0).getTime();
+            return lastPlayedB - lastPlayedA;
+          });
+
+      case "playCount":
+        return sorted.sort((a, b) => {
+          const countA = a.playHistory?.length || 0;
+          const countB = b.playHistory?.length || 0;
+          return countB - countA;
+        });
+
+      case "needsCleaning":
+        return sorted.sort((a, b) => {
+          const playsA = a.playHistory?.length || 0;
+          const cleansA = a.cleaningHistory?.length || 0;
+          const playsB = b.playHistory?.length || 0;
+          const cleansB = b.cleaningHistory?.length || 0;
+
+          const ratioA = cleansA > 0 ? playsA / cleansA : playsA;
+          const ratioB = cleansB > 0 ? playsB / cleansB : playsB;
+
+          return ratioB - ratioA;
+        });
+
+      default:
         return sorted.sort((a, b) => (a.release.title || "").localeCompare(b.release.title || ""));
-      }
     }
   };
 
