@@ -52,6 +52,32 @@ When writing or fixing tests, follow these principles:
 - **Model Changes**: Update GORM models and run migration command - the system handles the rest
 - **No Manual Schema**: SQL migrations are only for data transformations, not schema changes
 
+### Database Access Pattern
+
+**Direct PostgreSQL Access** (for troubleshooting and manual operations):
+
+```bash
+PGPASSWORD=\!{PASSWORD} psql -h 192.168.86.203 -p 5432 -U waugzee_dev_user -d waugzee_dev -c "SQL_QUERY_HERE"
+```
+
+**Key Details**:
+
+- Host: 192.168.86.203 (remote server)
+- Port: 5432
+- User: waugzee_dev_user
+- Database: waugzee_dev
+- Password: !Mustangs0904 (escaped as `\!` in bash)
+
+**Common Commands**:
+
+```bash
+# Check table structure
+PGPASSWORD=\!Mustangs0904 psql -h 192.168.86.203 -p 5432 -U waugzee_dev_user -d waugzee_dev -c "\d table_name"
+
+# Query data
+PGPASSWORD=\!Mustangs0904 psql -h 192.168.86.203 -p 5432 -U waugzee_dev_user -d waugzee_dev -c "SELECT * FROM table_name LIMIT 10;"
+```
+
 ### Repository Pattern
 
 - **No Business Logic in Repositories**: Repositories handle ONLY database operations (CRUD)
@@ -61,10 +87,37 @@ When writing or fixing tests, follow these principles:
 
 ### Cache Operations
 
-- **Use CacheBuilder Pattern**: Always use `database.NewCacheBuilder(cache, key)` - never construct cache keys manually
-- **Hash Pattern**: Provide only the hash name to `WithHashPattern()` - the builder constructs the full hash
-- **Never Manual Keys**: The builder handles all key construction and formatting
-- **Example**: `WithHashPattern("api_request")` not `WithHashPattern("api_request:specific_key")`
+**CRITICAL: Manual cache key construction is ABSOLUTELY FORBIDDEN.**
+
+- **NEVER construct cache keys manually**: Manual concatenation like `constants.SomePrefix + someValue` is FORBIDDEN
+- **ALWAYS use CacheBuilder pattern**: Use `database.NewCacheBuilder(cache, identifier)` with builder methods
+- **Use WithHash() for simple prefixes**: Most common pattern for prefix + identifier
+- **Use WithHashPattern() only for complex patterns**: Reserved for truly complex scenarios
+- **Consistent Set/Get operations**: Ensure identical patterns between cache writes and reads
+
+**Required Patterns:**
+
+```go
+// ✅ CORRECT - Simple prefix (most common case)
+var cachedResponse SomeResponse
+found, err := database.NewCacheBuilder(cache, userID).
+    WithContext(ctx).
+    WithHash(constants.SomeCachePrefix).
+    Get(&cachedResponse)
+
+// ✅ CORRECT - Setting with same pattern
+err := database.NewCacheBuilder(cache, userID).
+    WithContext(ctx).
+    WithHash(constants.SomeCachePrefix).
+    Set(response, time.Hour)
+
+// ❌ FORBIDDEN - Manual key construction
+cacheKey := constants.SomeCachePrefix + userID
+found, err := database.NewCacheBuilder(cache, cacheKey).Get(&cachedResponse)
+
+// ❌ FORBIDDEN - Any form of manual concatenation
+found, err := database.NewCacheBuilder(cache, prefix + ":" + id).Get(&cachedResponse)
+```
 
 ### Service Architecture
 
@@ -73,19 +126,62 @@ When writing or fixing tests, follow these principles:
 - **No Cross-Service Business Logic**: Keep business logic within the appropriate service boundary
 - **Clear Separation**: Services determine WHAT to do, repositories determine HOW to store/retrieve
 
+### Struct Tags and Validation
+
+**CRITICAL: Do not add validation tags to structs - we do not use a validation library.**
+
+- **No `validate` tags**: Never add validation struct tags like `validate:"required"` or `validate:"email"`
+- **Validation in handlers**: Perform validation directly in handler/controller functions using explicit checks
+- **Clear error messages**: Return specific error messages to help users understand what's wrong
+- **Type safety first**: Rely on Go's type system and explicit validation logic
+
+**Anti-patterns:**
+
+```go
+// ❌ FORBIDDEN - Validation tags (we don't use a validator)
+type CreateUserRequest struct {
+    Email    string `json:"email"    validate:"required,email"`
+    Username string `json:"username" validate:"required,min=3,max=20"`
+}
+
+// ✅ CORRECT - Explicit validation in handler
+type CreateUserRequest struct {
+    Email    string `json:"email"`
+    Username string `json:"username"`
+}
+
+func (h *Handler) CreateUser(c *fiber.Ctx) error {
+    var req CreateUserRequest
+    if err := c.BodyParser(&req); err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+    }
+
+    if req.Email == "" {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Email is required"})
+    }
+    if req.Username == "" || len(req.Username) < 3 {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Username must be at least 3 characters"})
+    }
+
+    // ... continue with business logic
+}
+```
+
 ### Common Anti-Patterns to Avoid
 
 ❌ **Manual SQL migrations for schema changes**
 ❌ **Business logic in repository methods**
-❌ **Manually constructed cache keys**
+❌ **MANUALLY CONSTRUCTED CACHE KEYS (ABSOLUTE ZERO TOLERANCE)**
 ❌ **Repository methods with complex business decisions**
 ❌ **Creating repository methods "just in case"**
+❌ **Validation struct tags (we don't use a validation library)**
 
 ✅ **GORM model updates + AutoMigrate**
 ✅ **Business logic in service layer**
-✅ **CacheBuilder for all cache operations**
+✅ **CacheBuilder pattern with WithHash() for ALL cache operations**
 ✅ **Simple, focused repository methods**
 ✅ **Create methods only when needed**
+✅ **Explicit validation in handlers with clear error messages**
 
 ## Technology Stack
 
@@ -103,8 +199,70 @@ When writing or fixing tests, follow these principles:
 - **Framework**: SolidJS with TypeScript
 - **Build Tool**: Vite
 - **Styling**: SCSS with CSS Modules
-- **State Management**: Solid Query + Context API
+- **State Management**: TanStack Query (Solid Query) + Context API
 - **Authentication**: OIDC flow integration
+- **Linting & Formatting**: Biome (fast, unified linter and formatter)
+
+**CRITICAL: Always use TanStack Query for API calls**
+
+- **NEVER use `api.ts` directly in components or services** - it's ONLY for:
+  - Internal use by `apiHooks.ts`
+  - Authentication operations in `AuthContext.tsx`
+- **ALWAYS use hooks from `@services/apiHooks`**:
+  - `useApiQuery` for GET requests
+  - `useApiPut` for PUT requests (with `invalidateQueries` for cache invalidation)
+  - `useApiPost` for POST requests (with `invalidateQueries` for cache invalidation)
+  - `useApiPatch` for PATCH requests (with `invalidateQueries` for cache invalidation)
+  - `useApiDelete` for DELETE requests (with `invalidateQueries` for cache invalidation)
+- **Use `invalidateQueries` option** to automatically refetch data after mutations
+- **No manual cache management** - TanStack Query handles caching, loading states, and error states
+
+**Example Pattern:**
+
+```typescript
+// ✅ CORRECT - Declarative pattern with callbacks (preferred)
+const updateMutation = useApiPut<ResponseType, RequestType>(
+  API_ENDPOINT,
+  undefined,
+  {
+    invalidateQueries: [["queryKey"]], // Automatically refetch after success
+    successMessage: "Update successful!", // Auto toast notification
+    errorMessage: "Update failed. Please try again.", // Auto error toast
+    onSuccess: (data) => {
+      // Additional success logic (optional)
+      console.log("Success:", data);
+      someStateUpdate(data);
+    },
+    onError: (error) => {
+      // Additional error handling (optional)
+      console.error("Error:", error);
+    },
+  },
+);
+
+// Simple mutation call - no try/catch needed
+updateMutation.mutate(data);
+
+// ❌ AVOID - Manual try/catch (unnecessary with onSuccess/onError)
+try {
+  await updateMutation.mutateAsync(data);
+  toast.showSuccess("Update successful!");
+} catch (error) {
+  toast.showError("Update failed");
+}
+
+// ❌ FORBIDDEN - Direct API usage in components
+import { api } from "@services/api";
+const response = await api.put(endpoint, data);
+```
+
+**Key Benefits of Declarative Pattern:**
+
+- Automatic toast notifications via `successMessage` and `errorMessage`
+- No manual try/catch blocks needed
+- Cleaner, more readable code
+- Consistent error handling across the app
+- `onSuccess` and `onError` callbacks for additional logic
 
 ### Infrastructure
 
@@ -126,7 +284,8 @@ When writing or fixing tests, follow these principles:
 - **Server tests**: `tilt trigger server-tests` or `go test -C ./server ./...`
 - **Server test coverage**: `go test -C ./server -coverprofile=coverage.out ./... && go tool cover -html=coverage.out -o coverage.html`
 - **Server linting**: `tilt trigger server-lint` or `\cd server && golangci-lint run`
-- **Client linting**: `tilt trigger client-lint` or `npm run lint:check -C ./client`
+- **Client linting**: `tilt trigger client-lint` or `npm run lint:check -C ./client` (uses Biome)
+- **Client formatting**: `npm run format -C ./client` (Biome auto-fix)
 - **Client tests**: `tilt trigger client-tests` or `npm run test -C ./client`
 - **TypeScript check**: `npm run typecheck -C ./client`
 
@@ -247,12 +406,14 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 **Core Principle**: Build only what the current implementation needs. Keep implementations minimal while allowing forward-thinking in planning.
 
 **Guidelines**:
+
 - ✅ **Implement current requirements**: Focus on play logging and cleaning tracking features
 - ✅ **Forward-thinking planning**: Document future features and architecture decisions
 - ❌ **Avoid over-engineering**: Don't build abstractions for future requirements that may never materialize
 - ❌ **No premature optimization**: Implement simple solutions first, optimize when needed
 
 **Examples**:
+
 - **Good**: Simple play logging with user, release, timestamp, and notes
 - **Good**: Planning for equipment tracking but implementing basic stylus reference first
 - **Avoid**: Complex analytics engines before basic logging is complete
@@ -286,6 +447,104 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 - **Consistent spacing**: Use spacing scale variables (`$spacing-xs` through `$spacing-3xl`)
 - **No magic numbers**: All values should reference design system variables
 
+**CRITICAL: SCSS Design System Reference**
+
+All SCSS files MUST use variables from `client/src/styles/_variables.scss` and `client/src/styles/_colors.scss`. NEVER use hardcoded values.
+
+**Available Variables:**
+
+**Spacing** (use these instead of hardcoded rem/px values):
+
+- `$spacing-xs` (0.25rem / 4px)
+- `$spacing-sm` (0.5rem / 8px)
+- `$spacing-md` (1rem / 16px)
+- `$spacing-lg` (1.5rem / 24px)
+- `$spacing-xl` (2rem / 32px)
+- `$spacing-2xl` (3rem / 48px)
+- `$spacing-3xl` (4rem / 64px)
+
+**Typography** (use these instead of hardcoded font sizes):
+
+- `$font-size-xs` (0.75rem / 12px)
+- `$font-size-sm` (0.875rem / 14px)
+- `$font-size-md` (1rem / 16px) - **BASE font size, use instead of non-existent `$font-size-base`**
+- `$font-size-lg` (1.125rem / 18px)
+- `$font-size-xl` (1.25rem / 20px)
+- `$font-size-2xl` (1.5rem / 24px)
+- `$font-size-3xl` (1.875rem / 30px)
+- `$font-size-4xl` (2.25rem / 36px)
+- `$font-size-5xl` (3rem / 48px)
+
+**Font Weights:**
+
+- `$font-weight-light` (300)
+- `$font-weight-normal` (400)
+- `$font-weight-medium` (500)
+- `$font-weight-semibold` (600)
+- `$font-weight-bold` (700)
+
+**Text Colors** (use these instead of hardcoded hex colors):
+
+- `$text-default` - Default text color (#111827)
+- `$text-muted` - Muted text (#4b5563)
+- `$text-light` - Light text (#6b7280)
+- `$text-disabled` - Disabled text (#9ca3af)
+- `$text-inverse` - White text on dark backgrounds
+- `$text-link` / `$text-link-hover` - Link colors
+- `$text-success` / `$text-warning` / `$text-error` / `$text-info` - Feedback colors
+
+**Background Colors:**
+
+- `$bg-body` / `$bg-surface` / `$bg-elevated` - Surface backgrounds
+- `$bg-subtle` / `$bg-muted` - Subtle backgrounds
+- `$bg-primary` / `$bg-primary-subtle` - Primary colors
+- `$bg-secondary` / `$bg-secondary-subtle` - Secondary colors
+- `$bg-success` / `$bg-warning` / `$bg-error` / `$bg-info` - Feedback backgrounds
+
+**Border Radius:**
+
+- `$border-radius-sm` (0.125rem / 2px)
+- `$border-radius-md` (0.25rem / 4px)
+- `$border-radius-lg` (0.5rem / 8px)
+- `$border-radius-xl` (0.75rem / 12px)
+- `$border-radius-2xl` (1rem / 16px)
+- `$border-radius-full` (9999px for circles)
+
+**Border Colors:**
+
+- `$border-default` / `$border-strong` - Default borders
+- `$border-focus` - Focus state borders
+- `$border-primary` / `$border-secondary` / `$border-accent` - Colored borders
+- `$border-success` / `$border-warning` / `$border-error` - Feedback borders
+
+**Shadows:**
+
+- `$shadow-sm` / `$shadow-md` / `$shadow-lg` / `$shadow-xl` / `$shadow-2xl` - Box shadows
+- `$shadow-inner` - Inset shadow
+- `$focus-ring` - Focus ring effect
+
+**Transitions:**
+
+- `$transition-fast` (150ms)
+- `$transition-normal` (300ms)
+- `$transition-slow` (500ms)
+
+**Common Mistakes to Avoid:**
+
+- ❌ `$font-size-base` - DOES NOT EXIST, use `$font-size-md` instead
+- ❌ `color: #333` - Use `$text-default` or appropriate text color variable
+- ❌ `padding: 1.5rem` - Use `$spacing-lg` instead
+- ❌ `border-radius: 8px` - Use `$border-radius-lg` instead
+- ❌ `font-weight: 600` - Use `$font-weight-semibold` instead
+
+**Correct Examples:**
+
+- ✅ `font-size: $font-size-md;` (not `$font-size-base`)
+- ✅ `color: $text-default;` (not `#111827`)
+- ✅ `padding: $spacing-lg;` (not `1.5rem`)
+- ✅ `border-radius: $border-radius-lg;` (not `8px`)
+- ✅ `font-weight: $font-weight-semibold;` (not `600`)
+
 **Component Development:**
 
 - **Single responsibility**: Each component should have one clear purpose
@@ -294,12 +553,18 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 - **Error boundaries**: Handle error states gracefully with fallbacks
 - **Accessibility**: Proper alt text, ARIA labels, keyboard navigation
 - **Testing**: Comprehensive test coverage for component behavior
+- **SVG Icons**: NEVER use inline SVG elements - always create reusable icon components in `client/src/components/icons/`
+  - ✅ **Good**: `<ChevronDownIcon class={styles.icon} />` or `<CheckIcon size={12} />`
+  - ❌ **Avoid**: Inline `<svg>` elements with hardcoded paths
+  - **Pattern**: Create components with `size` and `class` props for reusability
+  - **Location**: All icon components should live in `client/src/components/icons/`
 
 ### Naming Conventions
 
 **CRITICAL: All naming must follow consistent camelCase/PascalCase standards. NO kebab-case allowed.**
 
 **File Naming:**
+
 - **Services**: camelCase - `userService.ts`, `apiHooks.ts`, `discogsProxy.service.ts`
 - **Components**: PascalCase - `Modal.tsx`, `Button.tsx`, `HomePage.tsx`
 - **Utilities**: camelCase - `dateUtils.ts`, `formatHelpers.ts`
@@ -307,24 +572,28 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 - **CSS/SCSS**: camelCase - `button.module.scss`, `modal.module.scss`
 
 **Route Naming:**
+
 - **API Endpoints**: camelCase - `/syncCollection`, `/rateLimit`, `/getUserProfile`
 - **Frontend Routes**: camelCase - `/silentCallback`, `/userDashboard`
 - **NEVER use kebab-case**: ❌ `/sync-collection`, ❌ `/rate-limit`
 
 **Variable & Function Naming:**
+
 - **Variables**: camelCase - `userName`, `syncStatus`, `isLoading`
 - **Functions**: camelCase - `handleSubmit`, `fetchUserData`, `validateToken`
 - **Constants**: SCREAMING_SNAKE_CASE - `API_BASE_URL`, `MAX_RETRY_ATTEMPTS`
 - **Components**: PascalCase - `UserProfile`, `SyncButton`, `ModalDialog`
 
 **CSS Class Naming:**
+
 - **CSS Classes**: camelCase - `.userProfile`, `.syncButton`, `.errorMessage`
 - **CSS Variables**: kebab-case (exception) - `--primary-color`, `--font-size-large`
 - **SCSS Mixins**: camelCase - `@mixin buttonStyles`, `@mixin cardLayout`
 
 **Enforcement:**
+
 - **Code Reviews**: All PRs must follow these naming conventions
-- **Linting**: ESLint and Go linting rules enforce these standards
+- **Linting**: Biome (frontend) and golangci-lint (backend) enforce these standards
 - **Immediate Fix Required**: Any kebab-case discovered should be fixed immediately
 - **No Exceptions**: Only CSS variables may use kebab-case due to CSS specification requirements
 
@@ -418,12 +687,14 @@ All environment variables in `.env` at project root, shared between services.
 **Key Concept**: Each user makes their own Discogs API calls with their personal token, distributing rate limits across users while the server orchestrates complex sync logic.
 
 **Benefits**:
+
 - **Distributed Rate Limits**: Each user operates within their own Discogs API quota
 - **Server Orchestration**: Backend manages sync workflows, state persistence, and business logic
 - **Real-time Communication**: WebSocket enables immediate progress updates during sync
 - **Scalability**: Performance scales naturally with user count
 
 **Implementation**:
+
 - Users provide their own Discogs tokens
 - Frontend makes actual HTTP requests to Discogs API
 - Backend receives responses via WebSocket and processes data
@@ -462,4 +733,3 @@ This project is currently in **Phase 2: Authentication & User Management**. See 
 ---
 
 **Project Status**: 🚧 **Active Development** - Phase 2: Authentication & User Management
-

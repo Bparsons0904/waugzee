@@ -1,5 +1,28 @@
+/**
+ * DEPRECATION NOTICE: This file provides low-level API access.
+ *
+ * ! DO NOT USE THIS DIRECTLY IN COMPONENTS !
+ *
+ * Instead, use TanStack Query hooks from @services/apiHooks:
+ * - useApiQuery for GET requests
+ * - useApiPut for PUT requests
+ * - useApiPost for POST requests
+ * - useApiPatch for PATCH requests
+ * - useApiDelete for DELETE requests
+ *
+ * TanStack Query provides:
+ * - Automatic caching and cache invalidation
+ * - Loading and error states
+ * - Optimistic updates
+ * - Request deduplication
+ * - Retry logic
+ *
+ * This file should only be used internally by apiHooks.ts or for special cases
+ * that cannot be handled by TanStack Query.
+ */
+
 import { env } from "@services/env.service";
-import axios, { AxiosError, AxiosRequestConfig } from "axios";
+import axios, { type AxiosError, type AxiosRequestConfig } from "axios";
 
 // Types
 export interface ApiError {
@@ -19,23 +42,26 @@ export class ApiClientError extends Error {
     message: string,
     public status?: number,
     public code?: string,
-    public details?: Record<string, unknown>
+    public details?: Record<string, unknown>,
   ) {
     super(message);
-    this.name = 'ApiClientError';
+    this.name = "ApiClientError";
   }
 }
 
 export class NetworkError extends Error {
-  constructor(message: string, public originalError?: Error) {
+  constructor(
+    message: string,
+    public originalError?: Error,
+  ) {
     super(message);
-    this.name = 'NetworkError';
+    this.name = "NetworkError";
   }
 }
 
 // Create axios instance
 const axiosClient = axios.create({
-  baseURL: env.apiUrl + "/api",
+  baseURL: `${env.apiUrl}/api`,
   timeout: 10000,
   headers: {
     Accept: "application/json",
@@ -87,10 +113,7 @@ const handleApiError = (error: AxiosError): ApiClientError | NetworkError => {
     return new NetworkError("Network error: No response received", error);
   } else {
     // Something else happened
-    return new NetworkError(
-      error.message || "An unexpected error occurred",
-      error,
-    );
+    return new NetworkError(error.message || "An unexpected error occurred", error);
   }
 };
 
@@ -116,15 +139,14 @@ const defaultRetryConfig: RetryConfig = {
   },
 };
 
-const sleep = (ms: number): Promise<void> => 
-  new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 const retryRequest = async <T>(
   fn: () => Promise<T>,
-  config: RetryConfig = defaultRetryConfig
+  config: RetryConfig = defaultRetryConfig,
 ): Promise<T> => {
   const { maxAttempts = 3, baseDelayMs = 1000, maxDelayMs = 10000, shouldRetry } = config;
-  
+
   let lastError: Error;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -137,12 +159,12 @@ const retryRequest = async <T>(
         throw lastError;
       }
 
-      const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
+      const delay = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
       await sleep(delay);
     }
   }
 
-  throw lastError!;
+  throw lastError as Error;
 };
 
 // Core request function
@@ -150,7 +172,7 @@ const request = async <T>(
   method: string,
   url: string,
   data?: unknown,
-  config?: AxiosRequestConfig
+  config?: AxiosRequestConfig,
 ): Promise<T> => {
   const makeRequest = async (): Promise<T> => {
     const response = await axiosClient.request({

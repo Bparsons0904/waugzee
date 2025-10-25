@@ -1,7 +1,6 @@
-import { Component, Show } from "solid-js";
 import { useAuth } from "@context/AuthContext";
 import Home from "@pages/Home/Home";
-import Dashboard from "@pages/Dashboard/Dashboard";
+import { type Component, Show } from "solid-js";
 
 const Landing: Component = () => {
   const { isAuthenticated } = useAuth();
@@ -9,7 +8,6 @@ const Landing: Component = () => {
   return (
     <Show when={isAuthenticated()} fallback={<Home />}>
       <Home />
-      <Dashboard />
     </Show>
   );
 };

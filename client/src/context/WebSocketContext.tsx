@@ -1,16 +1,13 @@
+import { env } from "@services/env.service";
+import { createReconnectingWS, createWSState } from "@solid-primitives/websocket";
 import {
   createContext,
-  useContext,
-  createSignal,
   createEffect,
+  createSignal,
+  type JSX,
   onCleanup,
-  JSX,
+  useContext,
 } from "solid-js";
-import {
-  createReconnectingWS,
-  createWSState,
-} from "@solid-primitives/websocket";
-import { env } from "@services/env.service";
 import { useAuth } from "./AuthContext";
 
 // Event constants matching server-side implementation
@@ -65,9 +62,7 @@ interface WebSocketContextValue {
   reconnect: () => void;
 }
 
-const WebSocketContext = createContext<WebSocketContextValue>(
-  {} as WebSocketContextValue,
-);
+const WebSocketContext = createContext<WebSocketContextValue>({} as WebSocketContextValue);
 
 interface WebSocketProviderProps {
   children: JSX.Element;
@@ -79,11 +74,10 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
 
   const [lastError, setLastError] = createSignal<string | null>(null);
   const [lastMessage, setLastMessage] = createSignal<string>("");
-  const [wsInstance, setWsInstance] = createSignal<ReturnType<
-    typeof createReconnectingWS
-  > | null>(null);
+  const [wsInstance, setWsInstance] = createSignal<ReturnType<typeof createReconnectingWS> | null>(
+    null,
+  );
   const [wsAuthenticated, setWsAuthenticated] = createSignal<boolean>(false);
-
 
   const log = (..._args: unknown[]) => {
     // Debug logging disabled for production
@@ -162,7 +156,6 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
         case Events.API_PROGRESS:
         case Events.API_COMPLETE:
         case Events.API_ERROR:
-        default:
           // All other messages are handled by services listening to lastMessage()
           break;
       }
@@ -206,9 +199,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
         setWsAuthenticated(false);
         if (event.code !== 1000) {
           // Not normal closure
-          setLastError(
-            `Connection closed unexpectedly: ${event.reason || "Unknown reason"}`,
-          );
+          setLastError(`Connection closed unexpectedly: ${event.reason || "Unknown reason"}`);
         }
       });
 
@@ -216,9 +207,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
       setLastError(null);
     } catch (error) {
       log("Failed to create WebSocket:", error);
-      setLastError(
-        error instanceof Error ? error.message : "Failed to create connection",
-      );
+      setLastError(error instanceof Error ? error.message : "Failed to create connection");
       setWsInstance(null);
     }
   });
@@ -239,9 +228,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
       case WebSocket.CONNECTING:
         return ConnectionState.Connecting;
       case WebSocket.OPEN:
-        return wsAuthenticated()
-          ? ConnectionState.Authenticated
-          : ConnectionState.Authenticating;
+        return wsAuthenticated() ? ConnectionState.Authenticated : ConnectionState.Authenticating;
       case WebSocket.CLOSING:
         return ConnectionState.Disconnecting;
       case WebSocket.CLOSED:
@@ -295,9 +282,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
       log("Message sent:", message);
     } catch (error) {
       log("Failed to send message:", error);
-      setLastError(
-        error instanceof Error ? error.message : "Failed to send message",
-      );
+      setLastError(error instanceof Error ? error.message : "Failed to send message");
     }
   };
 
@@ -338,7 +323,6 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
     });
   });
 
-
   const contextValue: WebSocketContextValue = {
     connectionState,
     isConnected,
@@ -350,9 +334,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
   };
 
   return (
-    <WebSocketContext.Provider value={contextValue}>
-      {props.children}
-    </WebSocketContext.Provider>
+    <WebSocketContext.Provider value={contextValue}>{props.children}</WebSocketContext.Provider>
   );
 }
 

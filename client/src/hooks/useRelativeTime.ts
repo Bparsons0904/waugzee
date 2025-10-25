@@ -30,10 +30,10 @@ export const useRelativeTime = (date: Date | string) => {
 
   onMount(() => {
     updateTime(); // Initial update
-    
+
     // Set up interval for updates every 30 seconds
     const interval = setInterval(updateTime, 30000);
-    
+
     onCleanup(() => {
       clearInterval(interval);
     });

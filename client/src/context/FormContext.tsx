@@ -1,4 +1,4 @@
-import { Component, createContext, useContext, JSX } from "solid-js";
+import { type Component, createContext, type JSX, useContext } from "solid-js";
 import { createStore } from "solid-js/store";
 
 interface FieldValidation {
@@ -36,8 +36,8 @@ export const FormProvider: Component<FormProviderProps> = (props) => {
   };
 
   const unregisterField = (fieldId: string) => {
-    setFields(fieldId, undefined!);
-    setFormDataStore(fieldId, undefined!);
+    setFields(fieldId, undefined as unknown as never);
+    setFormDataStore(fieldId, undefined as unknown as never);
   };
 
   const updateField = (fieldId: string, validation: FieldValidation) => {
@@ -108,4 +108,3 @@ export const useForm = () => {
   }
   return context;
 };
-

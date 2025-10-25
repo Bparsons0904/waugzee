@@ -5,9 +5,9 @@
 
 // Base API paths
 export const API_PATHS = {
-  AUTH: '/auth',
-  USERS: '/users',
-  HEALTH: '/health',
+  AUTH: "/auth",
+  USERS: "/users",
+  HEALTH: "/health",
 } as const;
 
 // Authentication endpoints
@@ -22,7 +22,37 @@ export const USER_ENDPOINTS = {
   LIST: API_PATHS.USERS,
   ME: `${API_PATHS.USERS}/me`,
   ME_DISCOGS: `${API_PATHS.USERS}/me/discogs`,
+  ME_FOLDER: `${API_PATHS.USERS}/me/folder`,
   PROFILE: (id: string) => `${API_PATHS.USERS}/${id}`,
+} as const;
+
+// Stylus endpoints
+export const STYLUS_ENDPOINTS = {
+  AVAILABLE: "/styluses/available",
+  USER_STYLUSES: "/styluses",
+  CREATE: "/styluses",
+  CUSTOM: "/styluses/custom",
+  UPDATE: (id: string) => `/styluses/${id}`,
+  DELETE: (id: string) => `/styluses/${id}`,
+} as const;
+
+// Play History endpoints
+export const PLAY_HISTORY_ENDPOINTS = {
+  CREATE: "/plays",
+  UPDATE: (id: string) => `/plays/${id}`,
+  DELETE: (id: string) => `/plays/${id}`,
+} as const;
+
+// Cleaning History endpoints
+export const CLEANING_HISTORY_ENDPOINTS = {
+  CREATE: "/cleanings",
+  UPDATE: (id: string) => `/cleanings/${id}`,
+  DELETE: (id: string) => `/cleanings/${id}`,
+} as const;
+
+// Combined History endpoints
+export const HISTORY_ENDPOINTS = {
+  LOG_BOTH: "/logBoth",
 } as const;
 
 // Health endpoints
@@ -30,15 +60,18 @@ export const HEALTH_ENDPOINTS = {
   CHECK: API_PATHS.HEALTH,
 } as const;
 
-
 // Frontend route constants (for consistency with backend auth routes)
-export const FRONTEND_ROUTES = {
-  HOME: '/',
-  LOGIN: '/auth/login',
-  CALLBACK: '/auth/callback',
-  SILENT_CALLBACK: '/auth/silentCallback',
-  DASHBOARD: '/dashboard',
-  PROFILE: '/profile',
+export const ROUTES = {
+  HOME: "/",
+  LOGIN: "/auth/login",
+  CALLBACK: "/auth/callback",
+  SILENT_CALLBACK: "/auth/silentCallback",
+  PROFILE: "/profile",
+  LOG_PLAY: "/log",
+  COLLECTION: "/collection",
+  PLAY_HISTORY: "/playHistory",
+  EQUIPMENT: "/equipment",
+  DASHBOARD: "/dashboard",
 } as const;
 
 // Error retry configuration

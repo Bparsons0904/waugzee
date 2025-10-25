@@ -1,6 +1,6 @@
-import { Component } from "solid-js";
 import { Button } from "@components/common/ui/Button/Button";
 import { useToast } from "@context/ToastContext";
+import type { Component } from "solid-js";
 import styles from "./DiscogsFolderSync.module.scss";
 
 interface DiscogsFolderSyncProps {

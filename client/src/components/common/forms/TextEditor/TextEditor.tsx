@@ -1,31 +1,31 @@
+import { Editor } from "@tiptap/core";
+import { Bold } from "@tiptap/extension-bold";
+import { BulletList } from "@tiptap/extension-bullet-list";
+import { Document } from "@tiptap/extension-document";
+import Emoji from "@tiptap/extension-emoji";
+import { HardBreak } from "@tiptap/extension-hard-break";
+import { History } from "@tiptap/extension-history";
+import { Italic } from "@tiptap/extension-italic";
+import { ListItem } from "@tiptap/extension-list-item";
+import { OrderedList } from "@tiptap/extension-ordered-list";
+import { Paragraph } from "@tiptap/extension-paragraph";
+import { Strike } from "@tiptap/extension-strike";
+import { Text } from "@tiptap/extension-text";
+import { TextAlign } from "@tiptap/extension-text-align";
+import { Underline } from "@tiptap/extension-underline";
 import {
-  Component,
-  createSignal,
-  onMount,
-  onCleanup,
-  Show,
+  type Component,
   createEffect,
+  createSignal,
   For,
   on,
+  onCleanup,
+  onMount,
+  Show,
 } from "solid-js";
 import { createStore } from "solid-js/store";
-import { Editor } from "@tiptap/core";
-import { Document } from "@tiptap/extension-document";
-import { Paragraph } from "@tiptap/extension-paragraph";
-import { Text } from "@tiptap/extension-text";
-import { Bold } from "@tiptap/extension-bold";
-import { Italic } from "@tiptap/extension-italic";
-import { Underline } from "@tiptap/extension-underline";
-import { Strike } from "@tiptap/extension-strike";
-import { BulletList } from "@tiptap/extension-bullet-list";
-import { OrderedList } from "@tiptap/extension-ordered-list";
-import { ListItem } from "@tiptap/extension-list-item";
-import { TextAlign } from "@tiptap/extension-text-align";
-import { History } from "@tiptap/extension-history";
-import { HardBreak } from "@tiptap/extension-hard-break";
-import Emoji from "@tiptap/extension-emoji";
-import styles from "./TextEditor.module.scss";
 import { commonEmojis } from "./emojis";
+import styles from "./TextEditor.module.scss";
 
 // --- PROPS INTERFACE ---
 export interface TextEditorProps {
@@ -59,8 +59,7 @@ export const TextEditor: Component<TextEditorProps> = (props) => {
   const updateActiveStates = (editor: Editor) => {
     const alignments = ["left", "center", "right"];
     const activeAlignment =
-      alignments.find((align) => editor.isActive({ textAlign: align })) ||
-      "left";
+      alignments.find((align) => editor.isActive({ textAlign: align })) || "left";
 
     setActiveStates({
       bold: editor.isActive("bold"),

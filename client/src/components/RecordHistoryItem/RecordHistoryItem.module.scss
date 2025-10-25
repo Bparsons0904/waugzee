@@ -1,0 +1,155 @@
+@import "@styles/variables";
+@import "@styles/colors";
+
+.historyItem {
+  padding: $spacing-md;
+  border-radius: $border-radius-md;
+  margin-bottom: $spacing-sm;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  transition: box-shadow $transition-fast;
+  overflow: visible;
+
+  &:hover {
+    box-shadow: $shadow-sm;
+
+    .actionIcons {
+      opacity: 1;
+      visibility: visible;
+    }
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.playItem {
+  background-color: rgba(50, 115, 220, 0.1);
+  border-left: 3px solid #3273dc;
+}
+
+.cleaningItem {
+  background-color: rgba(16, 185, 129, 0.1);
+  border-left: 3px solid #10b981;
+}
+
+.historyItemContent {
+  flex-grow: 1;
+}
+
+.historyItemHeader {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: $spacing-xs;
+  align-items: center;
+}
+
+.typeAndNotes {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  position: relative;
+}
+
+.dateAndActions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.historyItemType {
+  font-weight: $font-weight-semibold;
+  font-size: $font-size-md;
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.historyItems {
+  display: flex;
+  flex-direction: row;
+  gap: $spacing-sm;
+  min-width: 11ch;
+  align-items: center;
+}
+
+.deepCleanBadge {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #059669;
+  margin-left: $spacing-sm;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $border-radius-lg;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  white-space: nowrap;
+}
+
+.historyItemDate {
+  font-size: $font-size-md;
+  color: $text-muted;
+}
+
+.historyItemStylus {
+  font-size: $font-size-sm;
+  display: flex;
+  align-items: center;
+}
+
+.noteButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: $spacing-xs;
+  border-radius: $border-radius-md;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color $transition-fast;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.8);
+  }
+}
+
+.noteIcon {
+  display: flex;
+  align-items: center;
+  color: $text-muted;
+}
+
+.actionIcons {
+  display: flex;
+  gap: $spacing-sm;
+  opacity: 0;
+  visibility: hidden;
+  transition: all $transition-fast;
+}
+
+.editButton,
+.deleteButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: $spacing-xs;
+  border-radius: $border-radius-md;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color $transition-fast;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.8);
+  }
+}
+
+.editButton {
+  color: #3273dc;
+}
+
+.deleteButton {
+  color: #e74c3c;
+}

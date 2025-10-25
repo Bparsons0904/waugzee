@@ -350,17 +350,22 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 		return log.Err("failed to get or create processing record", err)
 	}
 
+	if processing == nil {
+		log.Info("No processing record available yet", "yearMonth", yearMonth)
+		return nil
+	}
+
 	// Validate processing status
 	if processing.Status != models.ProcessingStatusReadyForProcessing &&
 		processing.Status != models.ProcessingStatusProcessing {
-		return log.Err(
-			"processing not ready",
-			nil,
+		log.Info(
+			"Processing not ready yet",
 			"status",
 			processing.Status,
 			"yearMonth",
 			yearMonth,
 		)
+		return nil
 	}
 
 	// Update status to processing if not already
@@ -376,6 +381,34 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 	if err := ensureDirectory(downloadDir, log); err != nil {
 		return log.Err("failed to create download directory", err, "directory", downloadDir)
 	}
+
+	// Validate all required files exist before starting processing
+	requiredFiles := map[string]string{
+		"labels":   filepath.Join(downloadDir, "labels.xml.gz"),
+		"artists":  filepath.Join(downloadDir, "artists.xml.gz"),
+		"masters":  filepath.Join(downloadDir, "masters.xml.gz"),
+		"releases": filepath.Join(downloadDir, "releases.xml.gz"),
+	}
+
+	for fileType, filePath := range requiredFiles {
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			errorMsg := fmt.Sprintf("required file not found: %s", fileType)
+			processing.Status = models.ProcessingStatusFailed
+			processing.ErrorMessage = &errorMsg
+			if updateErr := s.repos.DiscogsDataProcessing.Update(ctx, processing); updateErr != nil {
+				log.Warn("failed to update processing status to failed", "error", updateErr)
+			}
+			return log.Err(
+				"required XML file does not exist",
+				err,
+				"fileType", fileType,
+				"filePath", filePath,
+				"yearMonth", yearMonth,
+			)
+		}
+	}
+
+	log.Info("All required XML files found, starting processing", "yearMonth", yearMonth)
 
 	// Process labels using the abstracted entity processor
 	labelsFilePath := filepath.Join(downloadDir, "labels.xml.gz")

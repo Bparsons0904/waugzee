@@ -8,19 +8,40 @@ import (
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
+
+	"github.com/google/uuid"
 )
 
 type UserController struct {
-	userRepo       repositories.UserRepository
-	userConfigRepo repositories.UserConfigurationRepository
-	discogsService *services.DiscogsService
-	db             database.DB
-	Config         config.Config
-	log            logger.Logger
+	userRepo        repositories.UserRepository
+	userConfigRepo  repositories.UserConfigurationRepository
+	folderRepo      repositories.FolderRepository
+	userReleaseRepo repositories.UserReleaseRepository
+	userStylusRepo  repositories.StylusRepository
+	discogsService  *services.DiscogsService
+	db              database.DB
+	Config          config.Config
+	log             logger.Logger
+}
+
+type GetUserResponse struct {
+	Folders  []*Folder      `json:"folders"`
+	Releases []*UserRelease `json:"releases"`
+	Styluses []*UserStylus  `json:"styluses"`
 }
 
 type UserControllerInterface interface {
-	UpdateDiscogsToken(ctx context.Context, user *User, req UpdateDiscogsTokenRequest) (*User, error)
+	UpdateDiscogsToken(
+		ctx context.Context,
+		user *User,
+		token string,
+	) (*User, error)
+	GetUser(ctx context.Context, user *User) (*GetUserResponse, error)
+	UpdateSelectedFolder(
+		ctx context.Context,
+		user *User,
+		folderID int,
+	) (*User, error)
 }
 
 func New(
@@ -30,40 +51,38 @@ func New(
 	db database.DB,
 ) UserControllerInterface {
 	return &UserController{
-		userRepo:       repos.User,
-		userConfigRepo: repos.UserConfiguration,
-		discogsService: services.Discogs,
-		db:             db,
-		Config:         config,
-		log:            logger.New("userController"),
+		userRepo:        repos.User,
+		userConfigRepo:  repos.UserConfiguration,
+		folderRepo:      repos.Folder,
+		userReleaseRepo: repos.UserRelease,
+		userStylusRepo:  repos.Stylus,
+		discogsService:  services.Discogs,
+		db:              db,
+		Config:          config,
+		log:             logger.New("userController"),
 	}
-}
-
-type UpdateDiscogsTokenRequest struct {
-	Token string `json:"token"`
 }
 
 func (uc *UserController) UpdateDiscogsToken(
 	ctx context.Context,
 	user *User,
-	req UpdateDiscogsTokenRequest,
+	token string,
 ) (*User, error) {
 	log := uc.log.Function("UpdateDiscogsToken")
 
-	if req.Token == "" {
+	if token == "" {
 		return nil, log.ErrMsg("token is required")
 	}
 
-	identity, err := uc.discogsService.GetUserIdentity(req.Token)
+	identity, err := uc.discogsService.GetUserIdentity(token)
 	if err != nil {
 		log.Warn("Invalid Discogs token provided", "userID", user.ID, "error", err)
 		return nil, log.Err("invalid discogs token", err)
 	}
 
-	// Create or update user configuration
 	config := &UserConfiguration{
 		UserID:          user.ID,
-		DiscogsToken:    &req.Token,
+		DiscogsToken:    &token,
 		DiscogsUsername: &identity.Username,
 	}
 
@@ -71,7 +90,6 @@ func (uc *UserController) UpdateDiscogsToken(
 		return nil, log.Err("failed to update user configuration with discogs credentials", err)
 	}
 
-	// Update user's configuration relationship
 	user.Configuration = config
 
 	log.Info(
@@ -83,4 +101,109 @@ func (uc *UserController) UpdateDiscogsToken(
 	)
 
 	return user, nil
+}
+
+func (uc *UserController) GetUser(
+	ctx context.Context,
+	user *User,
+) (*GetUserResponse, error) {
+	log := uc.log.Function("GetUser")
+
+	// Get user folders
+	folders, err := uc.folderRepo.GetUserFolders(ctx, uc.db.SQL, user.ID)
+	if err != nil {
+		return nil, log.Err("failed to get user folders", err, "userID", user.ID)
+	}
+
+	// Get user releases for selected folder
+	var releases []*UserRelease
+	if user.Configuration != nil && user.Configuration.SelectedFolderID != nil {
+		// Get the folder using the composite key lookup
+		selectedFolder, err := uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, *user.Configuration.SelectedFolderID)
+		if err != nil {
+			log.Warn(
+				"selected folder not found, returning empty releases (likely needs sync)",
+				"userID",
+				user.ID,
+				"folderID",
+				*user.Configuration.SelectedFolderID,
+			)
+			releases = []*UserRelease{}
+		} else {
+			// Use the folder's ID to query user releases
+			releases, err = uc.userReleaseRepo.GetUserReleasesByFolderID(
+				ctx,
+				uc.db.SQL,
+				user.ID,
+				*selectedFolder.ID,
+			)
+			if err != nil {
+				return nil, log.Err(
+					"failed to get user releases",
+					err,
+					"userID",
+					user.ID,
+					"folderID",
+					*user.Configuration.SelectedFolderID,
+					"folderID",
+					*selectedFolder.ID,
+				)
+			}
+		}
+	}
+
+	// Get user styluses
+	styluses, err := uc.userStylusRepo.GetUserStyluses(ctx, uc.db.SQL, user.ID)
+	if err != nil {
+		return nil, log.Err("failed to get user styluses", err, "userID", user.ID)
+	}
+
+	return &GetUserResponse{
+		Folders:  folders,
+		Releases: releases,
+		Styluses: styluses,
+	}, nil
+}
+
+func (uc *UserController) UpdateSelectedFolder(
+	ctx context.Context,
+	user *User,
+	folderID int,
+) (*User, error) {
+	log := uc.log.Function("UpdateSelectedFolder")
+
+	// Validate that the folder exists and belongs to the user
+	_, err := uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, folderID)
+	if err != nil {
+		return nil, log.Err("folder not found or not owned by user", err)
+	}
+
+	if user.Configuration == nil {
+		return nil, log.ErrMsg("user configuration not found, please set up Discogs integration first")
+	}
+
+	user.Configuration.SelectedFolderID = &folderID
+
+	if err := uc.userConfigRepo.Update(ctx, uc.db.SQL, user.Configuration, uc.userRepo); err != nil {
+		return nil, log.Err("failed to update user configuration with selected folder", err)
+	}
+
+	// Clear the user folders cache since the configuration changed
+	if err := uc.clearUserFoldersCache(ctx, user.ID); err != nil {
+		log.Warn("failed to clear user folders cache", "userID", user.ID, "error", err)
+	}
+
+	log.Info(
+		"Selected folder updated successfully",
+		"userID",
+		user.ID,
+		"folderID",
+		folderID,
+	)
+
+	return user, nil
+}
+
+func (uc *UserController) clearUserFoldersCache(ctx context.Context, userID uuid.UUID) error {
+	return uc.folderRepo.ClearUserFoldersCache(ctx, userID)
 }

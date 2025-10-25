@@ -1,0 +1,114 @@
+@use "@styles/variables" as *;
+@use "@styles/colors" as *;
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  width: 100%;
+}
+
+.indicatorRow {
+  display: flex;
+  gap: $spacing-sm;
+  align-items: center;
+}
+
+.indicator {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  position: relative;
+}
+
+.iconContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: $border-radius-full;
+  background-color: $color-gray-300;
+  flex-shrink: 0;
+  opacity: 0.92;
+  transition:
+    transform $transition-fast $transition-timing-default,
+    opacity $transition-fast $transition-timing-default;
+
+  &:hover {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.tooltipText {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: $overlay-dark;
+  color: $text-inverse;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $border-radius-md;
+  font-size: $font-size-sm;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity $transition-fast $transition-timing-default,
+    visibility $transition-fast $transition-timing-default;
+  z-index: $z-index-tooltip;
+
+  &:after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: $overlay-dark transparent transparent transparent;
+  }
+}
+
+.indicator:hover .tooltipText {
+  opacity: 1;
+  visibility: visible;
+}
+
+.indicatorText {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+}
+
+.detailsSection {
+  margin-top: $spacing-sm;
+  padding: $spacing-sm;
+  background-color: $bg-subtle;
+  border-radius: $border-radius-md;
+  font-size: $font-size-sm;
+  width: 100%;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: $spacing-xs;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.detailLabel {
+  color: $text-muted;
+  font-weight: $font-weight-medium;
+}
+
+.detailValue {
+  color: $text-default;
+}

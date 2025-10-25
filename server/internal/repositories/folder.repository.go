@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
@@ -10,30 +11,37 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+const (
+	USER_FOLDERS_CACHE_PREFIX = "user_folders"
+)
+
 type FolderRepository interface {
 	UpsertFolders(ctx context.Context, tx *gorm.DB, userID uuid.UUID, folders []*Folder) error
 	DeleteOrphanFolders(
 		ctx context.Context,
 		tx *gorm.DB,
 		userID uuid.UUID,
-		keepDiscogIDs []int,
+		keepFolderIDs []int,
 	) error
 	GetUserFolders(ctx context.Context, tx *gorm.DB, userID uuid.UUID) ([]*Folder, error)
-	GetFolderByDiscogID(
+	GetFolderByID(
 		ctx context.Context,
 		tx *gorm.DB,
 		userID uuid.UUID,
-		discogID int,
+		folderID int,
 	) (*Folder, error)
+	ClearUserFoldersCache(ctx context.Context, userID uuid.UUID) error
 }
 
 type folderRepository struct {
-	log logger.Logger
+	cache database.DB
+	log   logger.Logger
 }
 
-func NewFolderRepository() FolderRepository {
+func NewFolderRepository(cache database.DB) FolderRepository {
 	return &folderRepository{
-		log: logger.New("folderRepository"),
+		cache: cache,
+		log:   logger.New("folderRepository"),
 	}
 }
 
@@ -59,7 +67,7 @@ func (r *folderRepository) UpsertFolders(
 	if err := tx.WithContext(ctx).
 		Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "discog_id"},
+				{Name: "id"},
 				{Name: "user_id"},
 			},
 			DoUpdates: clause.AssignmentColumns([]string{
@@ -87,11 +95,11 @@ func (r *folderRepository) DeleteOrphanFolders(
 	ctx context.Context,
 	tx *gorm.DB,
 	userID uuid.UUID,
-	keepDiscogIDs []int,
+	keepFolderIDs []int,
 ) error {
 	log := r.log.Function("DeleteOrphanFolders")
 
-	if len(keepDiscogIDs) == 0 {
+	if len(keepFolderIDs) == 0 {
 		// Delete all user folders if no IDs to keep
 		result := tx.WithContext(ctx).
 			Where("user_id = ?", userID).
@@ -105,7 +113,7 @@ func (r *folderRepository) DeleteOrphanFolders(
 	}
 
 	result := tx.WithContext(ctx).
-		Where("user_id = ? AND discog_id NOT IN ?", userID, keepDiscogIDs).
+		Where("user_id = ? AND id NOT IN ?", userID, keepFolderIDs).
 		Delete(&Folder{})
 
 	if result.Error != nil {
@@ -115,7 +123,7 @@ func (r *folderRepository) DeleteOrphanFolders(
 			"userID",
 			userID,
 			"keepCount",
-			len(keepDiscogIDs),
+			len(keepFolderIDs),
 		)
 	}
 
@@ -129,6 +137,16 @@ func (r *folderRepository) GetUserFolders(
 ) ([]*Folder, error) {
 	log := r.log.Function("GetUserFolders")
 
+	var cachedFolders []*Folder
+	found, err := database.NewCacheBuilder(r.cache.Cache.User, userID).
+		WithContext(ctx).
+		WithHash(USER_FOLDERS_CACHE_PREFIX).
+		Get(&cachedFolders)
+	if err == nil && found {
+		log.Info("user folders found in cache", "userID", userID)
+		return cachedFolders, nil
+	}
+
 	var folders []*Folder
 	if err := tx.WithContext(ctx).
 		Where("user_id = ?", userID).
@@ -137,33 +155,59 @@ func (r *folderRepository) GetUserFolders(
 		return nil, log.Err("failed to get user folders", err, "userID", userID)
 	}
 
+	if err := database.NewCacheBuilder(r.cache.Cache.User, userID).
+		WithContext(ctx).
+		WithHash(USER_FOLDERS_CACHE_PREFIX).
+		WithStruct(folders).
+		WithTTL(USER_CACHE_EXPIRY).
+		Set(); err != nil {
+		log.Warn("failed to cache user folders", "userID", userID, "error", err)
+	}
+
+	log.Info("Retrieved user folders", "userID", userID, "folderCount", len(folders))
 	return folders, nil
 }
 
-func (r *folderRepository) GetFolderByDiscogID(
+func (r *folderRepository) GetFolderByID(
 	ctx context.Context,
 	tx *gorm.DB,
 	userID uuid.UUID,
-	discogID int,
+	folderID int,
 ) (*Folder, error) {
-	log := r.log.Function("GetFolderByDiscogID")
+	log := r.log.Function("GetFolderByID")
 
 	var folder Folder
 	if err := tx.WithContext(ctx).
-		Where("user_id = ? AND discog_id = ?", userID, discogID).
+		Where("user_id = ? AND id = ?", userID, folderID).
 		First(&folder).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, log.Err("folder not found", err, "userID", userID, "discogID", discogID)
+			return nil, log.Err("folder not found", err, "userID", userID, "folderID", folderID)
 		}
 		return nil, log.Err(
-			"failed to get folder by discog ID",
+			"failed to get folder by ID",
 			err,
 			"userID",
 			userID,
-			"discogID",
-			discogID,
+			"folderID",
+			folderID,
 		)
 	}
 
 	return &folder, nil
+}
+
+
+func (r *folderRepository) ClearUserFoldersCache(ctx context.Context, userID uuid.UUID) error {
+	log := r.log.Function("ClearUserFoldersCache")
+
+	if err := database.NewCacheBuilder(r.cache.Cache.User, userID.String()).
+		WithContext(ctx).
+		WithHash(USER_FOLDERS_CACHE_PREFIX).
+		Delete(); err != nil {
+		log.Warn("failed to clear user folders cache", "userID", userID, "error", err)
+		return err
+	}
+
+	log.Info("cleared user folders cache", "userID", userID)
+	return nil
 }

@@ -1,5 +1,5 @@
-import { createContext, useContext, ParentComponent } from 'solid-js';
-import { toast, Toaster } from 'solid-toast';
+import { createContext, type ParentComponent, useContext } from "solid-js";
+import { Toaster, toast } from "solid-toast";
 
 interface ToastContextType {
   showSuccess: (message: string) => void;
@@ -25,7 +25,7 @@ export const ToastProvider: ParentComponent = (props) => {
 
   const showWarning = (message: string) => {
     toast(message, {
-      icon: '⚠️',
+      icon: "⚠️",
     });
   };
 
@@ -47,7 +47,7 @@ export const ToastProvider: ParentComponent = (props) => {
 export const useToast = () => {
   const context = useContext(ToastContext);
   if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
+    throw new Error("useToast must be used within a ToastProvider");
   }
   return context;
 };

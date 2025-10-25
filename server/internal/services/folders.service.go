@@ -134,8 +134,10 @@ func (f *FoldersService) ProcessFoldersResponse(
 
 	folders := make([]*Folder, 0, len(discogsFoldersResponse.Data.Folders))
 	for _, discogsFolder := range discogsFoldersResponse.Data.Folders {
+		// Create a copy of the ID to avoid taking address of loop variable
+		folderID := discogsFolder.ID
 		folder := &Folder{
-			DiscogID:    &discogsFolder.ID,
+			ID:          &folderID,
 			UserID:      metadata.UserID,
 			Name:        discogsFolder.Name,
 			Count:       discogsFolder.Count,
@@ -144,7 +146,7 @@ func (f *FoldersService) ProcessFoldersResponse(
 		folders = append(folders, folder)
 	}
 
-	keepDiscogIDs, _ := f.extractFolderSyncData(folders)
+	keepFolderIDs, _ := f.extractFolderSyncData(folders)
 
 	// Execute folder upsert
 	err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
@@ -158,12 +160,17 @@ func (f *FoldersService) ProcessFoldersResponse(
 
 	// Execute orphan cleanup in separate transaction
 	err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
-		return f.repos.Folder.DeleteOrphanFolders(txCtx, tx, metadata.UserID, keepDiscogIDs)
+		return f.repos.Folder.DeleteOrphanFolders(txCtx, tx, metadata.UserID, keepFolderIDs)
 	})
 	if err != nil {
 		return log.Err("failed to delete orphan folders", err,
 			"userID", metadata.UserID,
 			"requestID", metadata.RequestID)
+	}
+
+	// Clear folder cache after upsert and cleanup
+	if err := f.repos.Folder.ClearUserFoldersCache(ctx, metadata.UserID); err != nil {
+		log.Warn("failed to clear folder cache after sync", "error", err)
 	}
 
 	// Update user config in separate transaction
@@ -174,6 +181,20 @@ func (f *FoldersService) ProcessFoldersResponse(
 		return log.Err("failed to update user config with default folder", err,
 			"userID", metadata.UserID,
 			"requestID", metadata.RequestID)
+	}
+
+	// Trigger collection sync now that folders are saved
+	user, err := f.repos.User.GetByID(ctx, f.db.SQLWithContext(ctx), metadata.UserID)
+	if err != nil {
+		log.Warn("Failed to fetch user for collection sync trigger", "error", err)
+		return nil
+	}
+
+	err = f.SyncAllUserFolders(ctx, user)
+	if err != nil {
+		log.Warn("Failed to trigger collection sync after folder discovery",
+			"userID", metadata.UserID,
+			"error", err)
 	}
 
 	return nil
@@ -261,17 +282,17 @@ func (f *FoldersService) processReleasesToSyncState(
 
 func (f *FoldersService) extractFolderSyncData(
 	folders []*Folder,
-) (keepDiscogIDs []int, allFolderDiscogID *int) {
-	keepDiscogIDs = make([]int, 0, len(folders))
+) (keepFolderIDs []int, allFolderID *int) {
+	keepFolderIDs = make([]int, 0, len(folders))
 	for _, folder := range folders {
-		if folder.DiscogID != nil {
-			keepDiscogIDs = append(keepDiscogIDs, *folder.DiscogID)
+		if folder.ID != nil {
+			keepFolderIDs = append(keepFolderIDs, *folder.ID)
 			if folder.Name == "All" {
-				allFolderDiscogID = folder.DiscogID
+				allFolderID = folder.ID
 			}
 		}
 	}
-	return keepDiscogIDs, allFolderDiscogID
+	return keepFolderIDs, allFolderID
 }
 
 func (f *FoldersService) updateUserConfigWithUncategorizedFolderIfNotSet(
@@ -332,6 +353,7 @@ func (f *FoldersService) RequestFolderReleases(
 		RequestType:  "folder_releases",
 		Timestamp:    time.Now(),
 		DiscogsToken: *user.Configuration.DiscogsToken,
+		FolderID:     &folderID,
 	}
 
 	if err := database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
@@ -393,26 +415,25 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 	discogsFolderReleasesResponse, err := processDiscogsAPIResponse[DiscogsFolderReleasesResponse](
 		log, responseData, metadata, "folder_releases")
 	if err != nil {
+		f.clearSyncStateOnError(ctx, metadata.UserID, "failed to process API response")
 		return nil // Don't return error as this is an expected API failure
 	}
 
-	folderID, err := f.folderValidationService.ExtractFolderID(
-		responseData,
-		discogsFolderReleasesResponse,
-	)
-	if err != nil {
-		return log.Err("failed to extract folder ID", err)
+	if metadata.FolderID == nil {
+		f.clearSyncStateOnError(ctx, metadata.UserID, "missing folder ID in request metadata")
+		return log.ErrMsg("missing folder ID in request metadata")
 	}
-
-	missingReleaseIDs := make([]int64, 0)
+	folderID := *metadata.FolderID
 
 	// Get current sync state from cache
 	var syncState CollectionSyncState
+	var missingReleaseIDs []int64
 	found, err := database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).
 		WithHashPattern(COLLECTION_SYNC_HASH).
 		WithContext(ctx).
 		Get(&syncState)
 	if err != nil {
+		f.clearSyncStateOnError(ctx, metadata.UserID, "failed to get sync state from cache")
 		return log.Err("failed to get sync state from cache", err)
 	}
 	if !found {
@@ -457,6 +478,7 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 				RequestType:  "folder_releases",
 				Timestamp:    time.Now(),
 				DiscogsToken: metadata.DiscogsToken,
+				FolderID:     &folderID,
 			}
 
 			if err = database.NewCacheBuilder(f.db.Cache.ClientAPI, requestID).
@@ -503,7 +525,6 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		// Mark this folder as completed - all pages processed
 		syncState.CompletedFolders[folderID] = true
 		syncState.ProcessedFolders = len(syncState.CompletedFolders)
-
 	}
 
 	// Check if all folders are complete
@@ -512,10 +533,17 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 
 		// Perform release validation if not done yet
 		if !syncState.ReleaseValidationDone {
+
 			err = f.performReleaseValidation(ctx, &syncState, metadata.UserID)
 			if err != nil {
+				f.clearSyncStateOnError(ctx, metadata.UserID, "failed to perform release validation")
 				return log.Err("failed to perform release validation", err)
 			}
+
+			log.Info("Release validation complete",
+				"existingReleases", len(syncState.ExistingReleaseIDs),
+				"missingReleases", len(syncState.MissingReleaseIDs),
+				"allReleasesReady", syncState.AllReleasesReady)
 
 			// Update sync state in cache
 			err = database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).
@@ -525,6 +553,7 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 				WithContext(ctx).
 				Set()
 			if err != nil {
+				f.clearSyncStateOnError(ctx, metadata.UserID, "failed to update sync state after validation")
 				log.Warn("Failed to update sync state after validation", "error", err)
 			}
 
@@ -536,7 +565,6 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 
 		// Check if all releases are ready before proceeding
 		if !syncState.AllReleasesReady && len(syncState.PendingReleaseRequests) > 0 {
-			// Still waiting for release API responses
 			return nil
 		}
 
@@ -548,14 +576,17 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 			syncState.MergedReleases,
 		)
 		if err != nil {
+			f.clearSyncStateOnError(ctx, metadata.UserID, "failed to analyze differential sync")
 			return log.Err("failed to analyze differential sync", err)
 		}
+
 
 		// Execute sync operations in focused transaction
 		err = f.transactionService.Execute(ctx, func(txCtx context.Context, tx *gorm.DB) error {
 			return f.executeSyncOperations(txCtx, tx, metadata.UserID, operations)
 		})
 		if err != nil {
+			f.clearSyncStateOnError(ctx, metadata.UserID, "failed to execute differential sync")
 			return log.Err("failed to execute differential sync", err)
 		}
 
@@ -579,9 +610,14 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 			}
 		}
 
-		// Clean up sync state
+		// Clean up sync state and release queue
 		_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).
 			WithHashPattern(COLLECTION_SYNC_HASH).
+			WithContext(ctx).
+			Delete()
+
+		_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).
+			WithHashPattern(RELEASE_QUEUE_HASH).
 			WithContext(ctx).
 			Delete()
 
@@ -602,8 +638,9 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 
 	}
 
-	// Queue missing releases for processing
-	if len(missingReleaseIDs) > 0 {
+	// Queue missing releases for processing only if sync is not complete
+	// If sync is complete, we've already processed everything we can
+	if len(missingReleaseIDs) > 0 && !syncState.SyncComplete {
 		err = f.queueMissingReleases(ctx, metadata.UserID, missingReleaseIDs)
 		if err != nil {
 			log.Warn("Failed to queue missing releases",
@@ -721,29 +758,47 @@ func (f *FoldersService) SyncAllUserFolders(
 	if err != nil {
 		log.Warn("Failed to check for existing sync state", "error", err)
 	} else if found && !existingSyncState.SyncComplete {
-		log.Info("Sync already in progress for user",
-			"userID", user.ID,
-			"syncOperationID", existingSyncState.SyncOperationID,
-			"startedAt", existingSyncState.StartedAt)
-		return nil // Don't start duplicate sync
+		// Check if sync is stale (older than MaxCollectionSyncTTL)
+		syncAge := time.Since(existingSyncState.StartedAt)
+		if syncAge > MaxCollectionSyncTTL {
+			log.Warn("Clearing stale sync state",
+				"userID", user.ID,
+				"syncOperationID", existingSyncState.SyncOperationID,
+				"age", syncAge)
+			// Clear stale sync state
+			_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, user.ID.String()).
+				WithHashPattern(COLLECTION_SYNC_HASH).
+				WithContext(ctx).
+				Delete()
+		} else {
+			log.Info("Sync already in progress for user",
+				"userID", user.ID,
+				"syncOperationID", existingSyncState.SyncOperationID,
+				"startedAt", existingSyncState.StartedAt)
+			return nil // Don't start duplicate sync
+		}
 	}
 
-	// First, get user's folders to determine which ones to sync (skip folder 0)
 	folders, err := f.repos.Folder.GetUserFolders(ctx, f.db.SQLWithContext(ctx), user.ID)
 	if err != nil {
 		return log.Err("failed to get user folders", err)
 	}
 
-	// Filter to folders excluding the "All" folder (read-only)
-	syncFolders := make([]*Folder, 0)
+	if len(folders) == 0 {
+		return log.ErrMsg("no folders to sync")
+	}
+
+	// Count folders with valid IDs (folders with nil ID or ID=0 cannot be synced)
+	// Folder 0 is the "All" folder which is a virtual aggregation of other folders
+	validFolderCount := 0
 	for _, folder := range folders {
-		if folder.DiscogID != nil && *folder.DiscogID > AllFolderID {
-			syncFolders = append(syncFolders, folder)
+		if folder.ID != nil && *folder.ID != 0 {
+			validFolderCount++
 		}
 	}
 
-	if len(syncFolders) == 0 {
-		return log.ErrMsg("no folders to sync (only found folder 0 or no folders)")
+	if validFolderCount == 0 {
+		return log.ErrMsg("no valid folders to sync (all folders have nil ID or are folder 0)")
 	}
 
 	// Generate unique sync operation ID for idempotency
@@ -754,7 +809,7 @@ func (f *FoldersService) SyncAllUserFolders(
 		UserID:                 user.ID,
 		SyncOperationID:        syncOperationID,
 		StartedAt:              time.Now(),
-		TotalFolders:           len(syncFolders),
+		TotalFolders:           validFolderCount,
 		ProcessedFolders:       0,
 		MergedReleases:         make(map[int]*UserRelease),
 		OriginalReleases:       make(map[int]DiscogsFolderReleaseItem),
@@ -779,18 +834,35 @@ func (f *FoldersService) SyncAllUserFolders(
 	}
 
 	// Start sync for each folder (page 1)
-	for _, folder := range syncFolders {
-		if folder.DiscogID == nil {
+	foldersRequested := 0
+	for _, folder := range folders {
+		if folder.ID == nil {
+			log.Warn("Skipping folder with nil ID", "folderName", folder.Name)
 			continue
 		}
 
-		_, err = f.RequestFolderReleases(ctx, user, *folder.DiscogID, 1)
+		// Skip folder 0 (All folder) - it's a virtual folder that aggregates all other folders
+		// and doesn't support the folder releases API endpoint
+		if *folder.ID == 0 {
+			log.Info("Skipping folder 0 (All folder) - virtual aggregation folder",
+				"folderName", folder.Name)
+			continue
+		}
+
+		_, err = f.RequestFolderReleases(ctx, user, *folder.ID, 1)
 		if err != nil {
 			log.Warn("Failed to start sync for folder",
-				"folderID", *folder.DiscogID,
+				"folderID", *folder.ID,
 				"error", err)
+		} else {
+			foldersRequested++
 		}
 	}
+
+	log.Info("Started folder sync requests",
+		"totalFolders", len(folders),
+		"foldersRequested", foldersRequested,
+		"syncOperationID", syncOperationID)
 
 	return nil
 }
@@ -812,14 +884,39 @@ func (f *FoldersService) analyzeDifferentialSync(
 		return nil, log.Err("failed to get existing user releases", err)
 	}
 
+	// Get existing release IDs to validate foreign key constraints
+	releaseIDs := make([]int64, 0, len(mergedReleases))
+	for _, userRelease := range mergedReleases {
+		releaseIDs = append(releaseIDs, userRelease.ReleaseID)
+	}
+
+	existingReleaseIDs, _, err := f.folderValidationService.ValidateReleases(ctx, releaseIDs)
+	if err != nil {
+		return nil, log.Err("failed to validate release IDs", err)
+	}
+
+	// Create a map for fast lookup of existing release IDs
+	existingReleaseMap := make(map[int64]bool, len(existingReleaseIDs))
+	for _, releaseID := range existingReleaseIDs {
+		existingReleaseMap[releaseID] = true
+	}
+
 	operations := &SyncCollectionOperations{
 		Create: make([]UserRelease, 0),
 		Update: make([]UserRelease, 0),
 		Delete: make([]int, 0),
 	}
 
+	skippedCount := 0
+
 	// Find creates and updates
 	for instanceID, mergedRelease := range mergedReleases {
+		// Skip if the release doesn't exist in the database (foreign key constraint)
+		if !existingReleaseMap[mergedRelease.ReleaseID] {
+			skippedCount++
+			continue
+		}
+
 		if currentRelease, exists := currentReleases[instanceID]; exists {
 			// Check if folder, rating, notes, or dateAdded changed (update needed)
 			if currentRelease.FolderID != mergedRelease.FolderID ||
@@ -845,6 +942,12 @@ func (f *FoldersService) analyzeDifferentialSync(
 	// Find deletes (remaining items in current that weren't in merged)
 	for instanceID := range currentReleases {
 		operations.Delete = append(operations.Delete, instanceID)
+	}
+
+	if skippedCount > 0 {
+		log.Warn("Skipped user releases with missing release records",
+			"skippedCount", skippedCount,
+			"totalMerged", len(mergedReleases))
 	}
 
 	return operations, nil
@@ -1016,6 +1119,7 @@ func (f *FoldersService) TriggerSyncCompletion(ctx context.Context, userID uuid.
 		syncState.MergedReleases,
 	)
 	if err != nil {
+		f.clearSyncStateOnError(ctx, userID, "failed to analyze differential sync in completion")
 		return log.Err("failed to analyze differential sync", err)
 	}
 
@@ -1024,6 +1128,7 @@ func (f *FoldersService) TriggerSyncCompletion(ctx context.Context, userID uuid.
 		return f.executeSyncOperations(txCtx, tx, userID, operations)
 	})
 	if err != nil {
+		f.clearSyncStateOnError(ctx, userID, "failed to execute differential sync in completion")
 		return log.Err("failed to execute differential sync", err)
 	}
 
@@ -1043,9 +1148,14 @@ func (f *FoldersService) TriggerSyncCompletion(ctx context.Context, userID uuid.
 		}
 	}
 
-	// Clean up sync state
+	// Clean up sync state and release queue
 	_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, userID.String()).
 		WithHashPattern(COLLECTION_SYNC_HASH).
+		WithContext(ctx).
+		Delete()
+
+	_ = database.NewCacheBuilder(f.db.Cache.ClientAPI, userID.String()).
+		WithHashPattern(RELEASE_QUEUE_HASH).
 		WithContext(ctx).
 		Delete()
 
@@ -1054,4 +1164,41 @@ func (f *FoldersService) TriggerSyncCompletion(ctx context.Context, userID uuid.
 		"totalReleases", len(syncState.MergedReleases))
 
 	return nil
+}
+
+func (f *FoldersService) ClearSyncState(ctx context.Context, userID uuid.UUID) error {
+	log := f.log.Function("ClearSyncState")
+
+	err := database.NewCacheBuilder(f.db.Cache.ClientAPI, userID.String()).
+		WithHashPattern(COLLECTION_SYNC_HASH).
+		WithContext(ctx).
+		Delete()
+
+	if err != nil {
+		return log.Err("failed to clear sync state", err)
+	}
+
+	log.Info("Sync state cleared successfully", "userID", userID)
+	return nil
+}
+
+// clearSyncStateOnError clears the sync state cache when an error occurs during processing
+func (f *FoldersService) clearSyncStateOnError(ctx context.Context, userID uuid.UUID, reason string) {
+	log := f.log.Function("clearSyncStateOnError")
+
+	err := database.NewCacheBuilder(f.db.Cache.ClientAPI, userID.String()).
+		WithHashPattern(COLLECTION_SYNC_HASH).
+		WithContext(ctx).
+		Delete()
+
+	if err != nil {
+		log.Warn("Failed to clear sync state on error",
+			"userID", userID,
+			"reason", reason,
+			"error", err)
+	} else {
+		log.Info("Cleared sync state due to error",
+			"userID", userID,
+			"reason", reason)
+	}
 }

@@ -1,4 +1,4 @@
-import { Component, createSignal, Show } from "solid-js";
+import { type Component, createEffect, createSignal, Show } from "solid-js";
 import styles from "./Image.module.scss";
 
 export interface ImageProps {
@@ -17,9 +17,17 @@ export interface ImageProps {
 }
 
 export const Image: Component<ImageProps> = (props) => {
+  let imgRef: HTMLImageElement | undefined;
   const [loaded, setLoaded] = createSignal(false);
   const [error, setError] = createSignal(false);
   const [imageError, setImageError] = createSignal(false);
+
+  // Check if image is already cached on mount to prevent flash
+  createEffect(() => {
+    if (imgRef?.complete && imgRef.naturalHeight !== 0) {
+      setLoaded(true);
+    }
+  });
 
   const handleLoad = () => {
     setLoaded(true);
@@ -30,7 +38,7 @@ export const Image: Component<ImageProps> = (props) => {
     if (!error() && props.fallback) {
       setError(true);
       if (props.smoothFallback !== false) {
-        setLoaded(false); // Reset loaded state when switching to fallback (default behavior)
+        setLoaded(false);
       }
     } else {
       setImageError(true);
@@ -60,16 +68,17 @@ export const Image: Component<ImageProps> = (props) => {
   };
 
   return (
-    <div 
+    <div
       class={`${styles.imageContainer} ${getAspectRatioClass()} ${props.className || ""}`}
       onClick={props.onClick}
     >
       <Show when={props.showSkeleton && !loaded()}>
         <div class={styles.skeleton} />
       </Show>
-      
+
       <Show when={!imageError()}>
         <img
+          ref={imgRef}
           src={currentSrc()}
           alt={props.alt}
           loading={props.loading || "lazy"}

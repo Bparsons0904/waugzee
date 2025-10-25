@@ -1,7 +1,7 @@
-import { Component, createUniqueId, Show } from "solid-js";
 import { useFormField } from "@hooks/useFormField";
 import { useValidation } from "@hooks/useValidation";
-import { ValidatorFunction } from "../../../../utils/validation";
+import { type Component, createUniqueId, Show } from "solid-js";
+import type { ValidatorFunction } from "../../../../utils/validation";
 import styles from "./Textarea.module.scss";
 
 export interface TextareaProps {
@@ -67,10 +67,8 @@ export const Textarea: Component<TextareaProps> = (props) => {
   };
 
   const currentLength = () => (props.value || validation.value() || "").length;
-  const isNearLimit = () =>
-    props.maxLength && currentLength() > props.maxLength * 0.8;
-  const isOverLimit = () =>
-    props.maxLength && currentLength() > props.maxLength;
+  const isNearLimit = () => props.maxLength && currentLength() > props.maxLength * 0.8;
+  const isOverLimit = () => props.maxLength && currentLength() > props.maxLength;
 
   return (
     <div class={`${styles.textareaContainer} ${props.class || ""}`}>
@@ -115,4 +113,3 @@ export const Textarea: Component<TextareaProps> = (props) => {
     </div>
   );
 };
-

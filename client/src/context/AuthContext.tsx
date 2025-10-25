@@ -1,21 +1,11 @@
-import { useNavigate } from "@solidjs/router";
-import {
-  createContext,
-  useContext,
-  JSX,
-  createEffect,
-  Show,
-  onCleanup,
-} from "solid-js";
-import { createStore } from "solid-js/store";
-import { User, AuthConfig } from "src/types/User";
+import { AUTH_ENDPOINTS, ROUTES } from "@constants/api.constants";
 import { api, setTokenGetter } from "@services/api";
 import { oidcService } from "@services/oidc.service";
-import {
-  AUTH_ENDPOINTS,
-  USER_ENDPOINTS,
-  FRONTEND_ROUTES,
-} from "@constants/api.constants";
+import { useNavigate } from "@solidjs/router";
+import { createContext, createEffect, type JSX, onCleanup, Show, useContext } from "solid-js";
+import { createStore } from "solid-js/store";
+import type { AuthConfig, User } from "src/types/User";
+
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
 type AuthError =
@@ -37,7 +27,6 @@ interface CallbackResponse {
 
 type AuthState = {
   status: AuthStatus;
-  user: User | null;
   token: string | null;
   config: AuthConfig | null;
   configLoading: boolean;
@@ -48,14 +37,11 @@ type AuthState = {
 type AuthContextValue = {
   authState: AuthState;
   isAuthenticated: () => boolean;
-  user: () => User | null;
   authToken: () => string | null;
   authConfig: () => AuthConfig | null;
   loginWithOIDC: () => Promise<void>;
   handleOIDCCallback: () => Promise<void>;
   logout: () => void;
-  refreshUser: () => Promise<void>;
-  updateUser: (user: User) => void;
 };
 
 const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
@@ -65,7 +51,6 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
   const [authState, setAuthState] = createStore<AuthState>({
     status: "loading",
-    user: null,
     token: null,
     config: null,
     configLoading: true,
@@ -84,12 +69,11 @@ export function AuthProvider(props: { children: JSX.Element }) {
     // Clear all local state
     setAuthState({
       status: "unauthenticated",
-      user: null,
       token: null,
       error: null,
     });
 
-    navigate(FRONTEND_ROUTES.LOGIN);
+    navigate(ROUTES.LOGIN);
   };
 
   createEffect(async () => {
@@ -125,10 +109,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
             performLocalLogout();
           },
           onSilentRenewError: (error) => {
-            console.error(
-              "OIDC silent renewal failed - performing logout:",
-              error,
-            );
+            console.error("OIDC silent renewal failed - performing logout:", error);
             performLocalLogout();
           },
           onUserSignedOut: () => {
@@ -159,21 +140,14 @@ export function AuthProvider(props: { children: JSX.Element }) {
         oidcInitialized: false,
         error: {
           type: "config_error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Failed to load auth configuration",
+          message: error instanceof Error ? error.message : "Failed to load auth configuration",
         },
       });
     }
   });
 
   createEffect(() => {
-    if (
-      authState.configLoading ||
-      !authState.config?.configured ||
-      !authState.oidcInitialized
-    ) {
+    if (authState.configLoading || !authState.config?.configured || !authState.oidcInitialized) {
       return;
     }
 
@@ -192,38 +166,20 @@ export function AuthProvider(props: { children: JSX.Element }) {
           console.debug("No valid OIDC session found");
           setAuthState({
             status: "unauthenticated",
-            user: null,
             token: null,
             error: null,
           });
           return;
         }
 
-        // Get user info from backend
-        const response = await api.get<{ user: User }>(USER_ENDPOINTS.ME, {
-          signal: controller.signal,
-        });
-
-        if (!cancelled && response?.user) {
-          console.info("Authentication successful", {
-            userId: response.user.id,
-            email: response.user.email,
-          });
+        // Set authenticated status with token
+        if (!cancelled) {
+          console.info("Authentication successful");
 
           setAuthState({
             status: "authenticated",
-            user: response.user,
             token: oidcUser.access_token,
             error: null,
-          });
-        } else if (!cancelled) {
-          console.warn("Backend user info not found, clearing session");
-          await oidcService.clearUserSession();
-          setAuthState({
-            status: "unauthenticated",
-            user: null,
-            token: null,
-            error: { type: "auth_failed", message: "Failed to get user info" },
           });
         }
       } catch (error) {
@@ -231,14 +187,10 @@ export function AuthProvider(props: { children: JSX.Element }) {
           console.warn("Authentication check failed:", error);
           setAuthState({
             status: "unauthenticated",
-            user: null,
             token: null,
             error: {
               type: "network",
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Authentication check failed",
+              message: error instanceof Error ? error.message : "Authentication check failed",
             },
           });
         }
@@ -284,9 +236,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       const oidcUser = await oidcService.signInRedirectCallback();
 
       if (!oidcUser?.access_token || !oidcUser?.id_token) {
-        throw new Error(
-          "Failed to complete OIDC authentication - missing tokens",
-        );
+        throw new Error("Failed to complete OIDC authentication - missing tokens");
       }
 
       // Temporarily update the token in auth state so the API call can use it
@@ -294,17 +244,12 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
       // Call our backend's callback endpoint with the ID token to create/update the user
       try {
-        const callbackResponse = await api.post<CallbackResponse>(
-          AUTH_ENDPOINTS.CALLBACK,
-          {
-            id_token: oidcUser.id_token,
-            access_token: oidcUser.access_token,
-            state:
-              typeof oidcUser.state === "string"
-                ? oidcUser.state
-                : JSON.stringify(oidcUser.state),
-          },
-        );
+        const callbackResponse = await api.post<CallbackResponse>(AUTH_ENDPOINTS.CALLBACK, {
+          id_token: oidcUser.id_token,
+          access_token: oidcUser.access_token,
+          state:
+            typeof oidcUser.state === "string" ? oidcUser.state : JSON.stringify(oidcUser.state),
+        });
 
         console.info("Backend callback successful:", {
           userId: callbackResponse?.user?.id,
@@ -315,67 +260,27 @@ export function AuthProvider(props: { children: JSX.Element }) {
         throw new Error("Failed to register user with backend");
       }
 
-      // Finally, get the user info from our backend (which should now exist)
-      const response = await api.get<{ user: User }>(USER_ENDPOINTS.ME);
+      // Set authenticated status after successful backend callback
+      setAuthState({
+        status: "authenticated",
+        token: oidcUser.access_token,
+        error: null,
+      });
 
-      if (response?.user) {
-        setAuthState({
-          status: "authenticated",
-          user: response.user,
-          token: oidcUser.access_token,
-          error: null,
-        });
-
-        navigate(FRONTEND_ROUTES.HOME);
-      } else {
-        throw new Error("Failed to get user info from backend after callback");
-      }
+      navigate(ROUTES.HOME);
     } catch (error) {
       console.error("OIDC callback failed:", error);
 
       setAuthState({
         status: "unauthenticated",
-        user: null,
         token: null,
         error: {
           type: "auth_failed",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Authentication callback failed",
+          message: error instanceof Error ? error.message : "Authentication callback failed",
         },
       });
 
       throw error;
-    }
-  };
-
-  const updateUser = (user: User) => {
-    if (!isAuthenticated()) {
-      console.warn("Cannot update user - not authenticated");
-      return;
-    }
-    setAuthState("user", user);
-    console.debug("User state updated directly");
-  };
-
-  const refreshUser = async () => {
-    if (!isAuthenticated()) {
-      console.warn("Cannot refresh user - not authenticated");
-      return;
-    }
-
-    try {
-      const response = await api.get<{ user: User }>(USER_ENDPOINTS.ME);
-
-      if (response?.user) {
-        setAuthState("user", response.user);
-        console.debug("User refreshed successfully");
-      } else {
-        console.warn("Failed to refresh user - no user data returned");
-      }
-    } catch (error) {
-      console.error("Failed to refresh user:", error);
     }
   };
 
@@ -391,16 +296,11 @@ export function AuthProvider(props: { children: JSX.Element }) {
           console.debug("Backend logout completed successfully");
         }
       } catch (backendError) {
-        console.warn(
-          "Backend logout failed, continuing with OIDC logout:",
-          backendError,
-        );
+        console.warn("Backend logout failed, continuing with OIDC logout:", backendError);
       }
 
       if (!authState.oidcInitialized) {
-        console.warn(
-          "OIDC service not initialized, performing local logout only",
-        );
+        console.warn("OIDC service not initialized, performing local logout only");
         performLocalLogout();
         return;
       }
@@ -422,10 +322,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
       performLocalLogout();
     } catch (error) {
-      console.error(
-        "Logout process failed, performing emergency cleanup:",
-        error,
-      );
+      console.error("Logout process failed, performing emergency cleanup:", error);
 
       // Emergency cleanup - ensure we always clear local state
       performLocalLogout();
@@ -437,14 +334,11 @@ export function AuthProvider(props: { children: JSX.Element }) {
       value={{
         authState,
         isAuthenticated,
-        user: () => authState.user,
         authToken: () => authState.token,
         authConfig: () => authState.config,
         loginWithOIDC,
         handleOIDCCallback,
         logout,
-        refreshUser,
-        updateUser,
       }}
     >
       <Show

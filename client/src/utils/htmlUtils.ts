@@ -1,4 +1,4 @@
-import DOMPurify from 'dompurify';
+import DOMPurify from "dompurify";
 
 /**
  * Safely strips HTML tags from a string using DOMPurify
@@ -6,10 +6,10 @@ import DOMPurify from 'dompurify';
  * @returns Plain text string with HTML tags removed
  */
 export const stripHtml = (html: string): string => {
-  if (!html || typeof html !== 'string') {
-    return '';
+  if (!html || typeof html !== "string") {
+    return "";
   }
-  
+
   // Use DOMPurify to sanitize and strip all HTML tags
   // ALLOWED_TAGS: [] removes all tags, leaving only text content
   return DOMPurify.sanitize(html, { ALLOWED_TAGS: [] });
@@ -40,13 +40,13 @@ export const isHtmlEmpty = (html: string): boolean => {
  * @param suffix - Optional suffix to add when truncated (default: '...')
  * @returns Truncated plain text
  */
-export const truncateHtml = (html: string, maxLength: number, suffix = '...'): string => {
+export const truncateHtml = (html: string, maxLength: number, suffix = "..."): string => {
   const plainText = stripHtml(html);
-  
+
   if (plainText.length <= maxLength) {
     return plainText;
   }
-  
+
   return plainText.substring(0, maxLength) + suffix;
 };
 
@@ -57,12 +57,12 @@ export const truncateHtml = (html: string, maxLength: number, suffix = '...'): s
  * @returns Sanitized HTML string
  */
 export const sanitizeHtml = (
-  html: string, 
-  allowedTags: string[] = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'strike']
+  html: string,
+  allowedTags: string[] = ["p", "br", "strong", "b", "em", "i", "u", "strike"],
 ): string => {
-  if (!html || typeof html !== 'string') {
-    return '';
+  if (!html || typeof html !== "string") {
+    return "";
   }
-  
+
   return DOMPurify.sanitize(html, { ALLOWED_TAGS: allowedTags });
 };

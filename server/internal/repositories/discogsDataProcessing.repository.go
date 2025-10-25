@@ -41,13 +41,12 @@ func (r *discogsDataProcessingRepository) Create(ctx context.Context, processing
 func (r *discogsDataProcessingRepository) GetByYearMonth(ctx context.Context, yearMonth string) (*DiscogsDataProcessing, error) {
 	log := r.log.Function("GetByYearMonth")
 
-	var processing DiscogsDataProcessing
-	err := r.db.WithContext(ctx).Where("year_month = ?", yearMonth).First(&processing).Error
+	processing, err := gorm.G[*DiscogsDataProcessing](r.db).Where("year_month = ?", yearMonth).First(ctx)
 	if err != nil {
 		return nil, log.Err("failed to get discogs data processing record by year month", err)
 	}
 
-	return &processing, nil
+	return processing, nil
 }
 
 func (r *discogsDataProcessingRepository) Update(ctx context.Context, processing *DiscogsDataProcessing) error {
@@ -63,8 +62,7 @@ func (r *discogsDataProcessingRepository) Update(ctx context.Context, processing
 func (r *discogsDataProcessingRepository) GetAll(ctx context.Context) ([]*DiscogsDataProcessing, error) {
 	log := r.log.Function("GetAll")
 
-	var processings []*DiscogsDataProcessing
-	err := r.db.WithContext(ctx).Find(&processings).Error
+	processings, err := gorm.G[*DiscogsDataProcessing](r.db).Find(ctx)
 	if err != nil {
 		return nil, log.Err("failed to get all discogs data processing records", err)
 	}
@@ -75,11 +73,10 @@ func (r *discogsDataProcessingRepository) GetAll(ctx context.Context) ([]*Discog
 func (r *discogsDataProcessingRepository) GetLatestProcessing(ctx context.Context) (*DiscogsDataProcessing, error) {
 	log := r.log.Function("GetLatestProcessing")
 
-	var processing DiscogsDataProcessing
-	err := r.db.WithContext(ctx).
+	processing, err := gorm.G[*DiscogsDataProcessing](r.db).
 		Where("status IN (?)", []ProcessingStatus{ProcessingStatusReadyForProcessing, ProcessingStatusProcessing}).
 		Order("created_at DESC").
-		First(&processing).Error
+		First(ctx)
 
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -88,5 +85,5 @@ func (r *discogsDataProcessingRepository) GetLatestProcessing(ctx context.Contex
 		return nil, log.Err("failed to get latest processing record", err)
 	}
 
-	return &processing, nil
+	return processing, nil
 }

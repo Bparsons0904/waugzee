@@ -1,21 +1,50 @@
 import {
-  useQuery,
+  CLEANING_HISTORY_ENDPOINTS,
+  HISTORY_ENDPOINTS,
+  PLAY_HISTORY_ENDPOINTS,
+  STYLUS_ENDPOINTS,
+} from "@constants/api.constants";
+import type {
+  LogBothRequest,
+  LogBothResponse,
+  LogCleaningRequest,
+  LogCleaningResponse,
+  LogPlayRequest,
+  LogPlayResponse,
+  UpdateCleaningRequest,
+  UpdateCleaningResponse,
+  UpdatePlayRequest,
+  UpdatePlayResponse,
+} from "@models/Release";
+import type {
+  AvailableStylusResponse,
+  CreateCustomStylusRequest,
+  CreateCustomStylusResponse,
+  CreateUserStylusRequest,
+  UpdateUserStylusRequest,
+  UserStylusesResponse,
+} from "@models/Stylus";
+import {
+  type UseMutationOptions,
+  type UseMutationResult,
+  type UseQueryOptions,
+  type UseQueryResult,
   useMutation,
+  useQuery,
   useQueryClient,
-  UseQueryOptions,
-  UseMutationOptions,
-  UseQueryResult,
-  UseMutationResult,
 } from "@tanstack/solid-query";
+import type { AxiosRequestConfig } from "axios";
 // import { api, ApiClientError } from "./api";
-import { Accessor } from "solid-js";
+import type { Accessor } from "solid-js";
 import { useToast } from "../context/ToastContext";
-import { AxiosRequestConfig } from "axios";
 import { api } from "./api";
 
 // Enhanced query options
 export interface ApiQueryOptions<T>
-  extends Omit<UseQueryOptions<T>, "queryKey" | "queryFn"> {
+  extends Omit<
+    UseQueryOptions<T, Error, T, readonly unknown[]>,
+    "queryKey" | "queryFn" | "enabled"
+  > {
   enabled?: boolean | Accessor<boolean>;
 }
 
@@ -36,6 +65,8 @@ export function useApiQuery<T>(
   config?: AxiosRequestConfig,
   options?: ApiQueryOptions<T>,
 ): UseQueryResult<T, Error> {
+  const { enabled, ...restOptions } = options || {};
+
   return useQuery(() => ({
     queryKey,
     queryFn: () => api.get<T>(url, config),
@@ -50,7 +81,8 @@ export function useApiQuery<T>(
     //   return failureCount < 3;
     // },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    ...options,
+    enabled: typeof enabled === "function" ? enabled() : enabled,
+    ...restOptions,
   }));
 }
 
@@ -63,6 +95,15 @@ export function useApiMutation<T, V = unknown>(
 ): UseMutationResult<T, Error, V> {
   const queryClient = useQueryClient();
   const toast = useToast();
+
+  const {
+    onSuccess: userOnSuccess,
+    onError: userOnError,
+    invalidateQueries,
+    successMessage,
+    errorMessage,
+    ...restOptions
+  } = options || {};
 
   return useMutation(() => ({
     mutationFn: (variables: V) => {
@@ -83,38 +124,33 @@ export function useApiMutation<T, V = unknown>(
     },
     onSuccess: (data, variables, context) => {
       // Invalidate specified queries
-      if (options?.invalidateQueries) {
-        options.invalidateQueries.forEach((queryKey) => {
+      if (invalidateQueries) {
+        invalidateQueries.forEach((queryKey) => {
           queryClient.invalidateQueries({ queryKey });
         });
       }
 
       // Handle success toast
-      if (options?.successMessage) {
+      if (successMessage) {
         const message =
-          typeof options.successMessage === "function"
-            ? options.successMessage(data, variables)
-            : options.successMessage;
+          typeof successMessage === "function" ? successMessage(data, variables) : successMessage;
         toast.showSuccess(message);
       }
 
-      // Call original onSuccess
-      options?.onSuccess?.(data, variables, context);
+      // Call user's onSuccess callback
+      userOnSuccess?.(data, variables, context);
     },
     onError: (error, variables, context) => {
       // Handle error toast
-      if (options?.errorMessage) {
-        const message =
-          typeof options.errorMessage === "function"
-            ? options.errorMessage(error)
-            : options.errorMessage;
+      if (errorMessage) {
+        const message = typeof errorMessage === "function" ? errorMessage(error) : errorMessage;
         toast.showError(message);
       }
 
-      // Call original onError
-      options?.onError?.(error, variables, context);
+      // Call user's onError callback
+      userOnError?.(error, variables, context);
     },
-    ...options,
+    ...restOptions,
   }));
 }
 
@@ -170,11 +206,7 @@ export function useApiPaginatedQuery<T>(
   additionalParams?: Record<string, unknown>,
   options?: ApiQueryOptions<T>,
 ) {
-  const queryKey = [
-    ...baseQueryKey,
-    "paginated",
-    { page, limit, ...additionalParams },
-  ];
+  const queryKey = [...baseQueryKey, "paginated", { page, limit, ...additionalParams }];
   const params = { page, limit, ...additionalParams };
 
   return useApiGet<T>(queryKey, url, params, options);
@@ -199,4 +231,170 @@ export function useApiSearch<T>(
       ...options,
     },
   );
+}
+
+// Stylus API Hooks
+export function useAvailableStyluses(options?: ApiQueryOptions<AvailableStylusResponse>) {
+  return useApiGet<AvailableStylusResponse>(
+    ["styluses", "available"],
+    STYLUS_ENDPOINTS.AVAILABLE,
+    undefined,
+    options,
+  );
+}
+
+// Claude we should not need this, we already have this is UserDataContext
+export function useUserStyluses(options?: ApiQueryOptions<UserStylusesResponse>) {
+  return useApiGet<UserStylusesResponse>(
+    ["styluses", "user"],
+    STYLUS_ENDPOINTS.USER_STYLUSES,
+    undefined,
+    options,
+  );
+}
+
+export function useCreateUserStylus(
+  options?: ApiMutationOptions<{ success: boolean }, CreateUserStylusRequest>,
+) {
+  return useApiPost<{ success: boolean }, CreateUserStylusRequest>(
+    STYLUS_ENDPOINTS.CREATE,
+    undefined,
+    {
+      invalidateQueries: [["styluses", "user"]],
+      successMessage: "Stylus added to equipment successfully!",
+      errorMessage: "Failed to add stylus to equipment. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useCreateCustomStylus(
+  options?: ApiMutationOptions<CreateCustomStylusResponse, CreateCustomStylusRequest>,
+) {
+  return useApiPost<CreateCustomStylusResponse, CreateCustomStylusRequest>(
+    STYLUS_ENDPOINTS.CUSTOM,
+    undefined,
+    {
+      invalidateQueries: [
+        ["styluses", "user"],
+        ["styluses", "available"],
+      ],
+      successMessage: "Custom stylus created and added to equipment!",
+      errorMessage: "Failed to create custom stylus. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useUpdateUserStylus(
+  options?: ApiMutationOptions<{ success: boolean }, { id: string; data: UpdateUserStylusRequest }>,
+) {
+  return useApiPut<{ success: boolean }, { id: string; data: UpdateUserStylusRequest }>(
+    (variables) => STYLUS_ENDPOINTS.UPDATE(variables.id),
+    undefined,
+    {
+      invalidateQueries: [["styluses", "user"]],
+      successMessage: "Stylus updated successfully!",
+      errorMessage: "Failed to update stylus. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useDeleteUserStylus(options?: ApiMutationOptions<void, string>) {
+  return useApiMutation<void, string>("DELETE", (id) => STYLUS_ENDPOINTS.DELETE(id), undefined, {
+    invalidateQueries: [["styluses", "user"]],
+    successMessage: "Stylus removed from equipment successfully!",
+    errorMessage: "Failed to remove stylus. Please try again.",
+    ...options,
+  });
+}
+
+// Play History API Hooks
+export function useLogPlay(options?: ApiMutationOptions<LogPlayResponse, LogPlayRequest>) {
+  return useApiPost<LogPlayResponse, LogPlayRequest>(PLAY_HISTORY_ENDPOINTS.CREATE, undefined, {
+    successMessage: "Play logged successfully!",
+    errorMessage: "Failed to log play. Please try again.",
+    ...options,
+  });
+}
+
+export function useUpdatePlay(
+  id: string,
+  options?: ApiMutationOptions<UpdatePlayResponse, UpdatePlayRequest>,
+) {
+  return useApiPut<UpdatePlayResponse, UpdatePlayRequest>(
+    PLAY_HISTORY_ENDPOINTS.UPDATE(id),
+    undefined,
+    {
+      successMessage: "Play updated successfully!",
+      errorMessage: "Failed to update play. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useDeletePlay(options?: ApiMutationOptions<void, string>) {
+  return useApiMutation<void, string>(
+    "DELETE",
+    (id) => PLAY_HISTORY_ENDPOINTS.DELETE(id),
+    undefined,
+    {
+      successMessage: "Play deleted successfully!",
+      errorMessage: "Failed to delete play. Please try again.",
+      ...options,
+    },
+  );
+}
+
+// Cleaning History API Hooks
+export function useLogCleaning(
+  options?: ApiMutationOptions<LogCleaningResponse, LogCleaningRequest>,
+) {
+  return useApiPost<LogCleaningResponse, LogCleaningRequest>(
+    CLEANING_HISTORY_ENDPOINTS.CREATE,
+    undefined,
+    {
+      successMessage: "Cleaning logged successfully!",
+      errorMessage: "Failed to log cleaning. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useUpdateCleaning(
+  id: string,
+  options?: ApiMutationOptions<UpdateCleaningResponse, UpdateCleaningRequest>,
+) {
+  return useApiPut<UpdateCleaningResponse, UpdateCleaningRequest>(
+    CLEANING_HISTORY_ENDPOINTS.UPDATE(id),
+    undefined,
+    {
+      successMessage: "Cleaning updated successfully!",
+      errorMessage: "Failed to update cleaning. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useDeleteCleaning(options?: ApiMutationOptions<void, string>) {
+  return useApiMutation<void, string>(
+    "DELETE",
+    (id) => CLEANING_HISTORY_ENDPOINTS.DELETE(id),
+    undefined,
+    {
+      successMessage: "Cleaning deleted successfully!",
+      errorMessage: "Failed to delete cleaning. Please try again.",
+      ...options,
+    },
+  );
+}
+
+// Combined Play & Cleaning History API Hook
+export function useLogBoth(options?: ApiMutationOptions<LogBothResponse, LogBothRequest>) {
+  return useApiPost<LogBothResponse, LogBothRequest>(HISTORY_ENDPOINTS.LOG_BOTH, undefined, {
+    successMessage: "Play and cleaning logged successfully!",
+    errorMessage: "Failed to log play and cleaning. Please try again.",
+    ...options,
+  });
 }

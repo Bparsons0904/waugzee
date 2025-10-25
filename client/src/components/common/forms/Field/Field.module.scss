@@ -1,0 +1,24 @@
+@import "../../../../styles/variables";
+@import "../../../../styles/colors";
+
+.fieldContainer {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.label {
+  display: block;
+  font-weight: $font-weight-medium;
+  cursor: pointer;
+}
+
+.required {
+  color: $color-error-500;
+  margin-left: $spacing-xs;
+}
+
+.fieldContent {
+  display: flex;
+  flex-direction: column;
+}

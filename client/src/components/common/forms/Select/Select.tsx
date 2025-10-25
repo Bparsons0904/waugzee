@@ -1,7 +1,8 @@
-import { Component, createUniqueId, Show } from "solid-js";
+import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import { useFormField } from "@hooks/useFormField";
 import { useValidation } from "@hooks/useValidation";
-import { ValidatorFunction } from "../../../../utils/validation";
+import { type Component, createUniqueId, Show } from "solid-js";
+import type { ValidatorFunction } from "../../../../utils/validation";
 import styles from "./Select.module.scss";
 
 export interface SelectOption {
@@ -27,7 +28,7 @@ export interface SelectProps {
 
 export const Select: Component<SelectProps> = (props) => {
   const id = createUniqueId();
-  
+
   const validation = useValidation({
     initialValue: props.defaultValue,
     required: props.required,
@@ -44,7 +45,7 @@ export const Select: Component<SelectProps> = (props) => {
   const handleChange = (event: Event) => {
     const target = event.target as HTMLSelectElement;
     const newValue = target.value;
-    
+
     validation.setValue(newValue);
     props.onChange?.(newValue);
   };
@@ -52,7 +53,7 @@ export const Select: Component<SelectProps> = (props) => {
   const handleBlur = (event: FocusEvent) => {
     const target = event.target as HTMLSelectElement;
     const value = target.value;
-    
+
     validation.markAsBlurred();
     const validationResult = validation.validate(value, true);
 
@@ -69,6 +70,7 @@ export const Select: Component<SelectProps> = (props) => {
 
   return (
     <div class={`${styles.selectContainer} ${props.class || ""}`}>
+      {/* Claude should this be part of the Field component?  */}
       <Show when={props.label}>
         <label for={id} class={styles.label}>
           {props.label}
@@ -77,7 +79,7 @@ export const Select: Component<SelectProps> = (props) => {
           </Show>
         </label>
       </Show>
-      
+
       <div class={styles.selectWrapper}>
         <select
           id={id}
@@ -94,33 +96,16 @@ export const Select: Component<SelectProps> = (props) => {
               {props.placeholder}
             </option>
           </Show>
-          
+
           {props.options.map((option) => (
-            <option 
-              value={option.value} 
-              disabled={option.disabled}
-            >
+            <option value={option.value} disabled={option.disabled}>
               {option.label}
             </option>
           ))}
         </select>
 
         <div class={styles.selectIcon}>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M4 6L8 10L12 6"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <ChevronDownIcon size={16} />
         </div>
       </div>
 

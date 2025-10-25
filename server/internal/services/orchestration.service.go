@@ -20,6 +20,7 @@ type RequestMetadata struct {
 	RequestType  string    `json:"requestType"`
 	Timestamp    time.Time `json:"timestamp"`
 	DiscogsToken string    `json:"discogsToken,omitempty"`
+	FolderID     *int      `json:"folderId,omitempty"`
 }
 
 type OrchestrationService struct {
@@ -94,10 +95,12 @@ func (o *OrchestrationService) SyncUserFoldersAndCollection(
 	}
 
 	// Step 2: Start collection sync for all user folders
-	// This will process folders 1+ and coordinate with folder responses
+	// Only start if folders already exist - otherwise wait for folder response to trigger sync
 	err = o.foldersService.SyncAllUserFolders(ctx, user)
 	if err != nil {
-		return log.Err("failed to initiate collection sync", err)
+		// If no folders exist yet, that's OK - folder response will trigger sync
+		log.Info("Collection sync will be triggered after folder discovery completes")
+		return nil
 	}
 
 	return nil
@@ -145,7 +148,7 @@ func (o *OrchestrationService) HandleAPIResponse(
 		WithContext(ctx).
 		Delete()
 	if err != nil {
-		log.Err("failed to cleanup cache entry", err, "requestID", requestID)
+		log.Er("failed to cleanup cache entry", err, "requestID", requestID)
 	}
 
 	switch metadata.RequestType {
@@ -317,4 +320,8 @@ func (o *OrchestrationService) handleReleaseResponse(
 	}
 
 	return nil
+}
+
+func (o *OrchestrationService) ClearSyncState(ctx context.Context, userID uuid.UUID) error {
+	return o.foldersService.ClearSyncState(ctx, userID)
 }

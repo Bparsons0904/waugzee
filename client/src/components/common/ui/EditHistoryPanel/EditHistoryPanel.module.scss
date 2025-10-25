@@ -1,0 +1,105 @@
+@import "@styles/variables";
+@import "@styles/colors";
+
+.panelWrapper {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: $z-index-popover;
+  pointer-events: none;
+
+  &.open {
+    pointer-events: all;
+
+    .overlay {
+      opacity: 1;
+    }
+
+    .panel {
+      transform: translateX(0);
+    }
+  }
+}
+
+.overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity $transition-normal;
+}
+
+.panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 500px;
+  max-width: 90vw;
+  background-color: $bg-surface;
+  box-shadow: $shadow-2xl;
+  transform: translateX(100%);
+  transition: transform $transition-normal;
+  display: flex;
+  flex-direction: column;
+}
+
+.panelHeader {
+  padding: $spacing-lg;
+  border-bottom: 1px solid $border-default;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: $spacing-sm;
+  border-radius: $border-radius-md;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-muted;
+  transition: all $transition-fast;
+
+  &:hover {
+    background-color: $bg-muted;
+    color: $text-default;
+  }
+}
+
+.panelBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: $spacing-lg;
+}
+
+.formGroup {
+  margin-bottom: $spacing-lg;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.panelFooter {
+  padding: $spacing-lg;
+  border-top: 1px solid $border-default;
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-md;
+}

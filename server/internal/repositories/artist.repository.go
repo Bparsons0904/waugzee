@@ -2,10 +2,10 @@ package repositories
 
 import (
 	"context"
+	"strconv"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -39,17 +39,17 @@ func NewArtistRepository() ArtistRepository {
 func (r *artistRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (*Artist, error) {
 	log := r.log.Function("GetByID")
 
-	artistID, err := uuid.Parse(id)
+	artistID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		return nil, log.Err("failed to parse artist ID", err, "id", id)
 	}
 
-	var artist Artist
-	if err := tx.WithContext(ctx).First(&artist, "id = ?", artistID).Error; err != nil {
+	artist, err := gorm.G[*Artist](tx).Where(BaseDiscogModel{ID: artistID}).First(ctx)
+	if err != nil {
 		return nil, log.Err("failed to get artist by ID", err, "id", id)
 	}
 
-	return &artist, nil
+	return artist, nil
 }
 
 func (r *artistRepository) GetByDiscogsID(
@@ -59,15 +59,15 @@ func (r *artistRepository) GetByDiscogsID(
 ) (*Artist, error) {
 	log := r.log.Function("GetByDiscogsID")
 
-	var artist Artist
-	if err := tx.WithContext(ctx).First(&artist, "id = ?", discogsID).Error; err != nil {
+	artist, err := gorm.G[*Artist](tx).Where(BaseDiscogModel{ID: discogsID}).First(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
 		return nil, log.Err("failed to get artist by Discogs ID", err, "discogsID", discogsID)
 	}
 
-	return &artist, nil
+	return artist, nil
 }
 
 func (r *artistRepository) Create(
@@ -97,13 +97,18 @@ func (r *artistRepository) Update(ctx context.Context, tx *gorm.DB, artist *Arti
 func (r *artistRepository) Delete(ctx context.Context, tx *gorm.DB, id string) error {
 	log := r.log.Function("Delete")
 
-	artistID, err := uuid.Parse(id)
+	artistID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		return log.Err("failed to parse artist ID", err, "id", id)
 	}
 
-	if err := tx.WithContext(ctx).Delete(&Artist{}, "id = ?", artistID).Error; err != nil {
+	rowsAffected, err := gorm.G[*Artist](tx).Where(BaseDiscogModel{ID: artistID}).Delete(ctx)
+	if err != nil {
 		return log.Err("failed to delete artist", err, "id", id)
+	}
+
+	if rowsAffected == 0 {
+		return gorm.ErrRecordNotFound
 	}
 
 	return nil
@@ -140,8 +145,8 @@ func (r *artistRepository) GetBatchByDiscogsIDs(
 		return make(map[int64]*Artist), nil
 	}
 
-	var artists []*Artist
-	if err := tx.WithContext(ctx).Where("id IN ?", discogsIDs).Find(&artists).Error; err != nil {
+	artists, err := gorm.G[*Artist](tx).Where("id IN ?", discogsIDs).Find(ctx)
+	if err != nil {
 		return nil, log.Err("failed to get artists by Discogs IDs", err, "count", len(discogsIDs))
 	}
 

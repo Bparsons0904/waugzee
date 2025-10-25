@@ -1,0 +1,270 @@
+@import "../../styles/variables";
+@import "../../styles/colors";
+
+.folderSelector {
+  position: relative;
+}
+
+.compactWrapper {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  font-size: $font-size-sm;
+}
+
+.dropdownLabel {
+  color: $text-muted;
+  font-weight: $font-weight-medium;
+  white-space: nowrap;
+}
+
+.currentViewing {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  color: $text-muted;
+  font-size: $font-size-sm;
+  white-space: nowrap;
+
+  strong {
+    color: $text-default;
+    font-weight: $font-weight-medium;
+  }
+}
+
+.placeholder {
+  color: $text-light;
+  font-style: italic;
+}
+
+.itemCount {
+  color: $text-light;
+  font-weight: $font-weight-normal;
+}
+
+
+.compactSelector {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 200px;
+}
+
+.folderSelect {
+  width: 100%;
+  padding: $spacing-xs $spacing-lg $spacing-xs $spacing-sm;
+  background-color: $bg-surface;
+  border: $border-width-thin solid $border-default;
+  border-radius: $border-radius-sm;
+  font-size: $font-size-sm;
+  color: $text-default;
+  cursor: pointer;
+  appearance: none;
+  transition: border-color $transition-fast $transition-timing-default,
+    box-shadow $transition-fast $transition-timing-default;
+
+  &:hover {
+    border-color: $border-strong;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $color-primary-500;
+    box-shadow: 0 0 0 2px rgba($color-primary-500, 0.15);
+  }
+
+  &:disabled {
+    background-color: $bg-disabled;
+    color: $text-disabled;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  // Hide default arrow in IE
+  &::-ms-expand {
+    display: none;
+  }
+}
+
+.selectIcon {
+  position: absolute;
+  right: $spacing-sm;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: $text-muted;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color $transition-fast;
+
+  .folderSelect:focus + & {
+    color: $text-default;
+  }
+
+  .folderSelect:disabled + & {
+    color: $text-disabled;
+  }
+}
+
+.loadingSpinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid $border-default;
+  border-top-color: $color-primary-500;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.noFolders {
+  display: flex;
+  align-items: center;
+  padding: $spacing-sm;
+  color: $text-muted;
+  font-size: $font-size-sm;
+}
+
+.noFoldersText {
+  margin: 0;
+  font-style: italic;
+}
+
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ====================
+// Navbar Mode Styles
+// ====================
+
+.navbarMode {
+  position: relative;
+}
+
+.navbarSelector {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 160px;
+}
+
+.navbarSelect {
+  width: 100%;
+  padding: $spacing-xs $spacing-lg $spacing-xs $spacing-sm;
+  background-color: rgba($bg-surface, 0.8);
+  backdrop-filter: blur(8px);
+  border: $border-width-thin solid rgba($border-default, 0.6);
+  border-radius: $border-radius-md;
+  font-size: $font-size-sm;
+  color: $text-default;
+  cursor: pointer;
+  appearance: none;
+  transition: all $transition-fast $transition-timing-default;
+  font-weight: $font-weight-medium;
+
+  &:hover {
+    background-color: rgba($bg-surface, 0.95);
+    border-color: rgba($border-strong, 0.8);
+    box-shadow: $shadow-sm;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $color-primary-500;
+    box-shadow: 0 0 0 2px rgba($color-primary-500, 0.15);
+    background-color: $bg-surface;
+  }
+
+  &:disabled {
+    background-color: rgba($bg-disabled, 0.6);
+    color: $text-disabled;
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  // Hide default arrow in IE
+  &::-ms-expand {
+    display: none;
+  }
+
+  // Modern option styling
+  option {
+    background-color: $bg-surface;
+    color: $text-default;
+    padding: $spacing-xs;
+  }
+}
+
+.navbarSelectIcon {
+  position: absolute;
+  right: $spacing-sm;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: $text-muted;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-fast;
+
+  .navbarSelect:focus + & {
+    color: $color-primary-500;
+  }
+
+  .navbarSelect:disabled + & {
+    color: $text-disabled;
+  }
+
+  svg {
+    transition: transform $transition-fast;
+  }
+
+  .navbarSelect:focus + & svg {
+    transform: rotate(180deg);
+  }
+}
+
+.navbarLoadingSpinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba($border-default, 0.3);
+  border-top-color: $color-primary-500;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+// Responsive adjustments
+@media (max-width: $breakpoint-sm) {
+  .compactWrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: $spacing-sm;
+  }
+
+  .currentViewing {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .compactSelector {
+    min-width: auto;
+    width: 100%;
+  }
+
+  .dropdownLabel {
+    text-align: center;
+  }
+
+  // Navbar responsive adjustments
+  .navbarSelector {
+    min-width: 120px;
+  }
+
+  .navbarSelect {
+    font-size: $font-size-xs;
+    padding: $spacing-xs $spacing-md $spacing-xs $spacing-xs;
+  }
+}

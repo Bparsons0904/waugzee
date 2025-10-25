@@ -1,6 +1,6 @@
+import path from "node:path";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
-import path from "path";
 
 export default defineConfig({
   envDir: "../",
@@ -39,7 +39,7 @@ export default defineConfig({
       "@hooks": path.resolve(__dirname, "./src/hooks/"),
       "@services": path.resolve(__dirname, "./src/services/"),
       "@context": path.resolve(__dirname, "./src/context/"),
-      "@types": path.resolve(__dirname, "./src/types/"),
+      "@models": path.resolve(__dirname, "./src/types/"),
       "@constants": path.resolve(__dirname, "./src/constants/"),
       "@utils": path.resolve(__dirname, "./src/utils/"),
     },

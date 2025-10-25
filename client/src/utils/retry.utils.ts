@@ -1,5 +1,6 @@
-import { RETRY_CONFIG } from '@constants/api.constants';
-import { ApiClientError, NetworkError } from '@services/api';
+// Claude why do we need this? I don't think we are using it and we should let tanStack handle retrys
+import { RETRY_CONFIG } from "@constants/api.constants";
+import { ApiClientError, NetworkError } from "@services/api";
 
 /**
  * Exponential backoff retry utility for handling network errors
@@ -35,18 +36,18 @@ const defaultShouldRetry = (error: Error): boolean => {
  * Calculate exponential backoff delay with jitter
  */
 const calculateDelay = (
-  attempt: number, 
-  baseDelay: number, 
-  maxDelay: number, 
-  exponentialBase: number
+  attempt: number,
+  baseDelay: number,
+  maxDelay: number,
+  exponentialBase: number,
 ): number => {
-  const exponentialDelay = baseDelay * Math.pow(exponentialBase, attempt - 1);
+  const exponentialDelay = baseDelay * exponentialBase ** (attempt - 1);
   const delayWithCap = Math.min(exponentialDelay, maxDelay);
-  
+
   // Add jitter (±25% randomness)
   const jitterFactor = 0.25;
   const jitter = 1 + (Math.random() * 2 - 1) * jitterFactor;
-  
+
   return Math.floor(delayWithCap * jitter);
 };
 
@@ -54,7 +55,7 @@ const calculateDelay = (
  * Sleep utility for delays
  */
 const sleep = (ms: number): Promise<void> => {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
 /**
@@ -62,7 +63,7 @@ const sleep = (ms: number): Promise<void> => {
  */
 export async function retryWithExponentialBackoff<T>(
   fn: () => Promise<T>,
-  config: RetryConfig = {}
+  config: RetryConfig = {},
 ): Promise<T> {
   const {
     maxAttempts = RETRY_CONFIG.MAX_ATTEMPTS,
@@ -87,7 +88,7 @@ export async function retryWithExponentialBackoff<T>(
 
       // Calculate and apply delay
       const delay = calculateDelay(attempt, baseDelayMs, maxDelayMs, exponentialBase);
-      
+
       console.debug(`Retry attempt ${attempt}/${maxAttempts} failed, retrying in ${delay}ms:`, {
         error: lastError.message,
         attempt,
@@ -98,7 +99,7 @@ export async function retryWithExponentialBackoff<T>(
     }
   }
 
-  throw lastError!;
+  throw lastError as Error;
 }
 
 /**

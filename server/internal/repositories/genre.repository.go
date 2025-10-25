@@ -37,8 +37,8 @@ func NewGenreRepository() GenreRepository {
 func (r *genreRepository) GetAll(ctx context.Context, tx *gorm.DB) ([]*Genre, error) {
 	log := r.log.Function("GetAll")
 
-	var genres []*Genre
-	if err := tx.WithContext(ctx).Find(&genres).Error; err != nil {
+	genres, err := gorm.G[*Genre](tx).Find(ctx)
+	if err != nil {
 		return nil, log.Err("failed to get all genres", err)
 	}
 
@@ -53,23 +53,23 @@ func (r *genreRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (
 		return nil, log.Err("failed to parse genre ID", err, "id", id)
 	}
 
-	var genre Genre
-	if err := tx.WithContext(ctx).First(&genre, "id = ?", genreID).Error; err != nil {
+	genre, err := gorm.G[*Genre](tx).Where("id = ?", genreID).First(ctx)
+	if err != nil {
 		return nil, log.Err("failed to get genre by ID", err, "id", id)
 	}
 
-	return &genre, nil
+	return genre, nil
 }
 
 func (r *genreRepository) GetByName(ctx context.Context, tx *gorm.DB, name string) (*Genre, error) {
 	log := r.log.Function("GetByName")
 
-	var genre Genre
-	if err := tx.WithContext(ctx).First(&genre, "name = ?", name).Error; err != nil {
+	genre, err := gorm.G[*Genre](tx).Where("name = ?", name).First(ctx)
+	if err != nil {
 		return nil, log.Err("failed to get genre by name", err, "name", name)
 	}
 
-	return &genre, nil
+	return genre, nil
 }
 
 func (r *genreRepository) Create(ctx context.Context, tx *gorm.DB, genre *Genre) (*Genre, error) {
@@ -100,8 +100,13 @@ func (r *genreRepository) Delete(ctx context.Context, tx *gorm.DB, id string) er
 		return log.Err("failed to parse genre ID", err, "id", id)
 	}
 
-	if err := tx.WithContext(ctx).Delete(&Genre{}, "id = ?", genreID).Error; err != nil {
+	rowsAffected, err := gorm.G[*Genre](tx).Where("id = ?", genreID).Delete(ctx)
+	if err != nil {
 		return log.Err("failed to delete genre", err, "id", id)
+	}
+
+	if rowsAffected == 0 {
+		return gorm.ErrRecordNotFound
 	}
 
 	return nil
@@ -196,8 +201,8 @@ func (r *genreRepository) GetBatchByNames(
 		return make(map[string]*Genre), nil
 	}
 
-	var genres []*Genre
-	if err := tx.WithContext(ctx).Where("name IN ?", names).Find(&genres).Error; err != nil {
+	genres, err := gorm.G[*Genre](tx).Where("name IN ?", names).Find(ctx)
+	if err != nil {
 		return nil, log.Err("failed to get genres by names", err, "count", len(names))
 	}
 
@@ -209,8 +214,6 @@ func (r *genreRepository) GetBatchByNames(
 
 	return result, nil
 }
-
-
 
 func (r *genreRepository) InsertBatch(ctx context.Context, tx *gorm.DB, genres []*Genre) error {
 	log := r.log.Function("InsertBatch")

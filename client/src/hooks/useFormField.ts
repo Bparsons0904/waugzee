@@ -1,5 +1,5 @@
-import { onMount, onCleanup } from "solid-js";
 import { useForm } from "@context/FormContext";
+import { onCleanup, onMount } from "solid-js";
 
 interface FieldValidation {
   isValid: boolean;
@@ -30,7 +30,7 @@ export const useFormField = (options: UseFormFieldOptions = {}) => {
   // Register with form context on mount
   onMount(() => {
     if (isConnectedToForm) {
-      formContext!.registerField(fieldId, {
+      formContext?.registerField(fieldId, {
         isValid: true,
         errorMessage: undefined,
         isRequired: options.required || false,
@@ -42,13 +42,13 @@ export const useFormField = (options: UseFormFieldOptions = {}) => {
   // Unregister from form context on cleanup
   onCleanup(() => {
     if (isConnectedToForm) {
-      formContext!.unregisterField(fieldId);
+      formContext?.unregisterField(fieldId);
     }
   });
 
-  const updateFormField = (validation: Omit<FieldValidation, 'isRequired'>) => {
+  const updateFormField = (validation: Omit<FieldValidation, "isRequired">) => {
     if (isConnectedToForm) {
-      formContext!.updateField(fieldId, {
+      formContext?.updateField(fieldId, {
         ...validation,
         isRequired: options.required || false,
       });

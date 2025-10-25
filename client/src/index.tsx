@@ -1,7 +1,7 @@
+import { Router } from "@solidjs/router";
 import { render } from "solid-js/web";
 import App from "./App";
 import { Routes } from "./Routes";
-import { Router } from "@solidjs/router";
 
 const root = document.getElementById("root");
 
@@ -17,5 +17,5 @@ render(
       <Routes />
     </Router>
   ),
-  root!,
+  root as HTMLElement,
 );

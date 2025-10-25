@@ -1,5 +1,5 @@
-import { Component, createEffect, createSignal } from "solid-js";
 import { useAuth } from "@context/AuthContext";
+import { type Component, createEffect, createSignal } from "solid-js";
 import styles from "./Auth.module.scss";
 
 const OidcCallback: Component = () => {
@@ -27,25 +27,30 @@ const OidcCallback: Component = () => {
         <div class={styles.authHeader}>
           <h1>Completing Sign In...</h1>
         </div>
-        
+
         <div class={styles.authContent}>
-          {loading() ? (
+          {loading() && (
             <div class={styles.loadingContainer}>
               <div class={styles.spinner} />
               <p>Processing authentication...</p>
             </div>
-          ) : error() ? (
+          )}
+          {error() && (
             <div class={styles.errorContainer}>
               <h3>Authentication Error</h3>
               <p class={styles.errorMessage}>{error()}</p>
-              <button 
+              <button
+                type="button"
                 class={styles.retryButton}
-                onClick={() => window.location.href = '/login'}
+                onClick={() => {
+                  window.location.href = "/login";
+                }}
               >
                 Try Again
               </button>
             </div>
-          ) : (
+          )}
+          {!loading() && !error() && (
             <div class={styles.successContainer}>
               <p>Authentication successful! Redirecting...</p>
             </div>

@@ -1,0 +1,65 @@
+@import "../../../../styles/variables";
+@import "../../../../styles/colors";
+
+.dateTimeInputContainer {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  width: 100%;
+}
+
+.label {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $text-default;
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+}
+
+.required {
+  color: $text-error;
+}
+
+.dateTimeInput {
+  width: 100%;
+  padding: $spacing-sm $spacing-md;
+  font-size: $font-size-md;
+  font-family: inherit;
+  color: $text-default;
+  background-color: $bg-surface;
+  border: 1px solid $border-default;
+  border-radius: $border-radius-md;
+  transition: $transition-fast;
+
+  &:hover:not(:disabled) {
+    border-color: $border-strong;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $border-focus;
+    box-shadow: $focus-ring;
+  }
+
+  &:disabled {
+    background-color: $bg-muted;
+    color: $text-disabled;
+    cursor: not-allowed;
+  }
+}
+
+.dateTimeInputError {
+  border-color: $border-error;
+
+  &:focus {
+    border-color: $border-error;
+    box-shadow: 0 0 0 3px rgba($border-error, 0.1);
+  }
+}
+
+.errorMessage {
+  font-size: $font-size-sm;
+  color: $text-error;
+  margin-top: $spacing-xs;
+}

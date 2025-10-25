@@ -10,6 +10,14 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+type UpdateDiscogsTokenRequest struct {
+	Token string `json:"token"`
+}
+
+type UpdateSelectedFolderRequest struct {
+	FolderID int `json:"folderId"`
+}
+
 type UserHandler struct {
 	Handler
 	zitadelService *services.ZitadelService
@@ -34,6 +42,7 @@ func (h *UserHandler) Register() {
 
 	users.Get("/me", h.getCurrentUser)
 	users.Put("/me/discogs", h.updateDiscogsToken)
+	users.Put("/me/folder", h.updateSelectedFolder)
 }
 
 func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
@@ -44,20 +53,32 @@ func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(fiber.Map{"user": user})
+	userData, err := h.userController.GetUser(c.Context(), user)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve user data",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"user":     user,
+		"folders":  userData.Folders,
+		"releases": userData.Releases,
+		"styluses": userData.Styluses,
+	})
 }
 
 func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
 	user := middleware.GetUser(c)
 
-	var req userController.UpdateDiscogsTokenRequest
+	var req UpdateDiscogsTokenRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
 
-	user, err := h.userController.UpdateDiscogsToken(c.Context(), user, req)
+	user, err := h.userController.UpdateDiscogsToken(c.Context(), user, req.Token)
 	if err != nil {
 		if err.Error() == "token is required" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -75,4 +96,34 @@ func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"user": user})
+}
+
+func (h *UserHandler) updateSelectedFolder(c *fiber.Ctx) error {
+	user := middleware.GetUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authentication required",
+		})
+	}
+
+	var req UpdateSelectedFolderRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	updatedUser, err := h.userController.UpdateSelectedFolder(c.Context(), user, req.FolderID)
+	if err != nil {
+		if err.Error() == "folder not found or not owned by user" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Folder not found or not owned by user",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update selected folder",
+		})
+	}
+
+	return c.JSON(fiber.Map{"user": updatedUser})
 }

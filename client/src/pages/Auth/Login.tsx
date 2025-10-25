@@ -1,7 +1,7 @@
-import { Component, createSignal, Show } from "solid-js";
-import styles from "./Auth.module.scss";
 import { Button } from "@components/common/ui/Button/Button";
 import { useAuth } from "@context/AuthContext";
+import { type Component, createSignal, Show } from "solid-js";
+import styles from "./Auth.module.scss";
 
 const Login: Component = () => {
   const { loginWithOIDC, authConfig } = useAuth();
@@ -28,17 +28,18 @@ const Login: Component = () => {
         <div class={styles.authCard}>
           <div class={styles.authHeader}>
             <h1 class={styles.authTitle}>Welcome Back</h1>
-            <p class={styles.authSubtitle}>
-              Sign in to continue your vinyl journey
-            </p>
+            <p class={styles.authSubtitle}>Sign in to continue your vinyl journey</p>
           </div>
 
           <div class={styles.authContent}>
-            <Show when={authConfig()?.configured} fallback={
-              <div class={styles.errorContainer}>
-                <p class={styles.errorMessage}>Authentication is not configured</p>
-              </div>
-            }>
+            <Show
+              when={authConfig()?.configured}
+              fallback={
+                <div class={styles.errorContainer}>
+                  <p class={styles.errorMessage}>Authentication is not configured</p>
+                </div>
+              }
+            >
               <Show when={error()}>
                 <div class={styles.errorContainer}>
                   <p class={styles.errorMessage}>{error()}</p>
@@ -46,12 +47,7 @@ const Login: Component = () => {
               </Show>
 
               <div class={styles.authActions}>
-                <Button 
-                  variant="gradient" 
-                  size="lg"
-                  onClick={handleOIDCLogin}
-                  disabled={loading()}
-                >
+                <Button variant="gradient" size="lg" onClick={handleOIDCLogin} disabled={loading()}>
                   {loading() ? "Signing In..." : "Sign In with Zitadel"}
                 </Button>
               </div>

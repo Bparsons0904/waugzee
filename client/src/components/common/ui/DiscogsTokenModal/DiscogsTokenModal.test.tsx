@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor } from "@solidjs/testing-library";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DiscogsTokenModal } from "./DiscogsTokenModal";
 
 describe("DiscogsTokenModal", () => {
@@ -10,11 +10,7 @@ describe("DiscogsTokenModal", () => {
   });
 
   it("renders modal content", () => {
-    render(() => (
-      <DiscogsTokenModal
-        onClose={mockOnClose}
-      />
-    ));
+    render(() => <DiscogsTokenModal onClose={mockOnClose} />);
 
     expect(screen.getByText("What is a Discogs Token?")).toBeInTheDocument();
     expect(screen.getByText("How to Get Your Token")).toBeInTheDocument();
@@ -22,13 +18,8 @@ describe("DiscogsTokenModal", () => {
     expect(screen.getByText("Save Token")).toBeInTheDocument();
   });
 
-
   it("handles token input", async () => {
-    render(() => (
-      <DiscogsTokenModal
-        onClose={mockOnClose}
-      />
-    ));
+    render(() => <DiscogsTokenModal onClose={mockOnClose} />);
 
     const input = screen.getByLabelText("Your Discogs API Token *") as HTMLInputElement;
     fireEvent.input(input, { target: { value: "test-token-123" } });
@@ -36,13 +27,8 @@ describe("DiscogsTokenModal", () => {
     expect(input.value).toBe("test-token-123");
   });
 
-
   it("calls onClose after successful token submission", async () => {
-    render(() => (
-      <DiscogsTokenModal
-        onClose={mockOnClose}
-      />
-    ));
+    render(() => <DiscogsTokenModal onClose={mockOnClose} />);
 
     const input = screen.getByLabelText("Your Discogs API Token *");
     fireEvent.input(input, { target: { value: "test-token-123" } });
@@ -55,15 +41,8 @@ describe("DiscogsTokenModal", () => {
     });
   });
 
-
-
-
   it("contains link to Discogs developer settings", () => {
-    render(() => (
-      <DiscogsTokenModal
-        onClose={mockOnClose}
-      />
-    ));
+    render(() => <DiscogsTokenModal onClose={mockOnClose} />);
 
     const link = screen.getByText("Discogs Developer Settings");
     expect(link).toBeInTheDocument();

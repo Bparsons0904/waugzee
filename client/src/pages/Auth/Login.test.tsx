@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
 import { MemoryRouter, Route } from "@solidjs/router";
+import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import { createSignal, type JSX } from "solid-js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Login from "./Login";
-import { createSignal, JSX } from "solid-js";
 
 // Mock the auth context
 const mockLogin = vi.fn();
@@ -41,7 +41,7 @@ describe("Login", () => {
         <Login />
       </MockRouter>
     ));
-    
+
     expect(screen.getByText("Welcome Back")).toBeInTheDocument();
     expect(screen.getByText("Sign in to continue your creative journey")).toBeInTheDocument();
     expect(screen.getByLabelText(/Username or Email/)).toBeInTheDocument();
@@ -55,10 +55,10 @@ describe("Login", () => {
         <Login />
       </MockRouter>
     ));
-    
+
     expect(screen.getByText("Don't have an account?")).toBeInTheDocument();
     expect(screen.getByText("Create one here")).toBeInTheDocument();
-    
+
     const registerLink = screen.getByRole("link", { name: /create one here/i });
     expect(registerLink).toHaveAttribute("href", "/register");
   });
@@ -69,10 +69,10 @@ describe("Login", () => {
         <Login />
       </MockRouter>
     ));
-    
+
     const usernameInput = screen.getByLabelText(/Username or Email/) as HTMLInputElement;
     const passwordInput = screen.getByLabelText(/Password/) as HTMLInputElement;
-    
+
     expect(usernameInput.value).toBe("admin");
     expect(passwordInput.value).toBe("password");
   });
@@ -83,19 +83,19 @@ describe("Login", () => {
         <Login />
       </MockRouter>
     ));
-    
+
     const usernameInput = screen.getByLabelText(/Username or Email/);
     const passwordInput = screen.getByLabelText(/Password/);
-    
+
     // Clear the default values
     fireEvent.input(usernameInput, { target: { value: "" } });
     fireEvent.blur(usernameInput);
-    
+
     expect(screen.getByText("Username or Email is required")).toBeInTheDocument();
-    
+
     fireEvent.input(passwordInput, { target: { value: "" } });
     fireEvent.blur(passwordInput);
-    
+
     expect(screen.getByText("Password is required")).toBeInTheDocument();
   });
 
@@ -105,19 +105,19 @@ describe("Login", () => {
         <Login />
       </MockRouter>
     ));
-    
+
     const usernameInput = screen.getByLabelText(/Username or Email/);
     const passwordInput = screen.getByLabelText(/Password/);
-    
+
     // Enter values that are too short
     fireEvent.input(usernameInput, { target: { value: "ab" } });
     fireEvent.blur(usernameInput);
-    
+
     expect(screen.getByText("Username or Email must be at least 3 characters")).toBeInTheDocument();
-    
+
     fireEvent.input(passwordInput, { target: { value: "12345" } });
     fireEvent.blur(passwordInput);
-    
+
     expect(screen.getByText("Password must be at least 6 characters")).toBeInTheDocument();
   });
 
@@ -127,14 +127,14 @@ describe("Login", () => {
         <Login />
       </MockRouter>
     ));
-    
+
     const submitButton = screen.getByRole("button", { name: /sign in/i });
     const usernameInput = screen.getByLabelText(/Username or Email/);
-    
+
     // Clear username to make form invalid
     fireEvent.input(usernameInput, { target: { value: "" } });
     fireEvent.blur(usernameInput);
-    
+
     expect(submitButton).toBeDisabled();
   });
 
@@ -144,9 +144,9 @@ describe("Login", () => {
         <Login />
       </MockRouter>
     ));
-    
+
     const submitButton = screen.getByRole("button", { name: /sign in/i });
-    
+
     // With default values, form should be valid
     expect(submitButton).not.toBeDisabled();
   });
@@ -157,20 +157,20 @@ describe("Login", () => {
         <Login />
       </MockRouter>
     ));
-    
+
     const form = document.querySelector("form");
     const usernameInput = screen.getByLabelText(/Username or Email/);
     const passwordInput = screen.getByLabelText(/Password/);
-    
+
     // Enter custom values and blur to update form context
     fireEvent.input(usernameInput, { target: { value: "testuser" } });
     fireEvent.blur(usernameInput);
     fireEvent.input(passwordInput, { target: { value: "testpass123" } });
     fireEvent.blur(passwordInput);
-    
+
     // Submit the form
     fireEvent.submit(form);
-    
+
     expect(mockLogin).toHaveBeenCalledWith({
       login: "testuser",
       password: "testpass123",
@@ -183,12 +183,12 @@ describe("Login", () => {
         <Login />
       </MockRouter>
     ));
-    
+
     const form = document.querySelector("form");
-    
+
     // Submit without changing values
     fireEvent.submit(form);
-    
+
     expect(mockLogin).toHaveBeenCalledWith({
       login: "admin",
       password: "password",
@@ -201,13 +201,13 @@ describe("Login", () => {
         <Login />
       </MockRouter>
     ));
-    
+
     const usernameInput = screen.getByLabelText(/Username or Email/);
     const passwordInput = screen.getByLabelText(/Password/);
-    
+
     expect(usernameInput).toHaveAttribute("name", "login");
     expect(usernameInput).toHaveAttribute("autocomplete", "username");
-    
+
     expect(passwordInput).toHaveAttribute("name", "password");
     expect(passwordInput).toHaveAttribute("type", "password");
     expect(passwordInput).toHaveAttribute("autocomplete", "current-password");
@@ -219,11 +219,11 @@ describe("Login", () => {
         <Login />
       </MockRouter>
     ));
-    
+
     // Check that asterisks are present in the DOM
     const pageContainer = document.body;
     expect(pageContainer.textContent).toContain("*");
-    
+
     // Check specifically for username and password fields
     const usernameInput = screen.getByLabelText(/Username or Email/);
     const passwordInput = screen.getByLabelText(/Password/);

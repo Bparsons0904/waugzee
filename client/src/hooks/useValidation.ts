@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { ValidationResult, ValidatorFunction, runValidators } from "../utils/validation";
+import { runValidators, type ValidationResult, type ValidatorFunction } from "../utils/validation";
 
 interface UseValidationOptions {
   initialValue?: string;
@@ -19,7 +19,7 @@ export const useValidation = (options: UseValidationOptions = {}) => {
 
   const buildValidators = (): ValidatorFunction[] => {
     const validators: ValidatorFunction[] = [];
-    const fieldName = options.fieldName || 'Field';
+    const fieldName = options.fieldName || "Field";
 
     // Required validation
     if (options.required) {
@@ -36,11 +36,12 @@ export const useValidation = (options: UseValidationOptions = {}) => {
 
     // Min length validation
     if (options.minLength !== undefined) {
+      const minLength = options.minLength;
       nonEmptyValidators.push((val: string) => {
-        if (val.length < options.minLength!) {
-          return { 
-            isValid: false, 
-            errorMessage: `${fieldName} must be at least ${options.minLength} characters` 
+        if (val.length < minLength) {
+          return {
+            isValid: false,
+            errorMessage: `${fieldName} must be at least ${options.minLength} characters`,
           };
         }
         return { isValid: true };
@@ -49,11 +50,12 @@ export const useValidation = (options: UseValidationOptions = {}) => {
 
     // Max length validation
     if (options.maxLength !== undefined) {
+      const maxLength = options.maxLength;
       nonEmptyValidators.push((val: string) => {
-        if (val.length > options.maxLength!) {
-          return { 
-            isValid: false, 
-            errorMessage: `${fieldName} must be no more than ${options.maxLength} characters` 
+        if (val.length > maxLength) {
+          return {
+            isValid: false,
+            errorMessage: `${fieldName} must be no more than ${options.maxLength} characters`,
           };
         }
         return { isValid: true };
@@ -62,12 +64,13 @@ export const useValidation = (options: UseValidationOptions = {}) => {
 
     // Pattern validation
     if (options.pattern) {
+      const pattern = options.pattern;
       nonEmptyValidators.push((val: string) => {
-        const regex = new RegExp(options.pattern!);
+        const regex = new RegExp(pattern);
         if (!regex.test(val)) {
-          return { 
-            isValid: false, 
-            errorMessage: `${fieldName} format is invalid` 
+          return {
+            isValid: false,
+            errorMessage: `${fieldName} format is invalid`,
           };
         }
         return { isValid: true };
@@ -86,7 +89,7 @@ export const useValidation = (options: UseValidationOptions = {}) => {
         if ((!val || val.trim().length === 0) && !options.required) {
           return { isValid: true };
         }
-        
+
         return runValidators(val, nonEmptyValidators);
       });
     }
@@ -96,19 +99,19 @@ export const useValidation = (options: UseValidationOptions = {}) => {
 
   const validate = (newValue: string, forceValidation = false): ValidationResult => {
     const validators = buildValidators();
-    
+
     // Only show validation errors after blur or if forced
     if (!hasBlurred() && !forceValidation) {
       // Still run validation for form validity checks, but don't show errors
       const result = runValidators(newValue, validators);
       return result;
     }
-    
+
     const result = runValidators(newValue, validators);
-    
+
     setIsValid(result.isValid);
     setErrorMessage(result.errorMessage || "");
-    
+
     return result;
   };
 

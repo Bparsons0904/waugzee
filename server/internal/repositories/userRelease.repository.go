@@ -13,7 +13,17 @@ type UserReleaseRepository interface {
 	CreateBatch(ctx context.Context, tx *gorm.DB, userReleases []*UserRelease) error
 	UpdateBatch(ctx context.Context, tx *gorm.DB, userReleases []*UserRelease) error
 	DeleteBatch(ctx context.Context, tx *gorm.DB, userID uuid.UUID, instanceIDs []int) error
-	GetExistingByUser(ctx context.Context, tx *gorm.DB, userID uuid.UUID) (map[int]*UserRelease, error)
+	GetExistingByUser(
+		ctx context.Context,
+		tx *gorm.DB,
+		userID uuid.UUID,
+	) (map[int]*UserRelease, error)
+	GetUserReleasesByFolderID(
+		ctx context.Context,
+		tx *gorm.DB,
+		userID uuid.UUID,
+		folderID int,
+	) ([]*UserRelease, error)
 }
 
 type userReleaseRepository struct {
@@ -145,3 +155,40 @@ func (r *userReleaseRepository) GetExistingByUser(
 	return result, nil
 }
 
+func (r *userReleaseRepository) GetUserReleasesByFolderID(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+	folderID int,
+) ([]*UserRelease, error) {
+	log := r.log.Function("GetUserReleasesByFolderID")
+
+	var userReleases []*UserRelease
+	if err := tx.WithContext(ctx).
+		Preload("Release.Artists").
+		Preload("Release.Genres").
+		Preload("Release.Labels").
+		Preload("Release").
+		Preload("PlayHistory", "user_id = ?", userID).
+		Preload("PlayHistory.UserStylus").
+		Preload("PlayHistory.UserStylus.Stylus").
+		Preload("CleaningHistory", "user_id = ?", userID).
+		Where("user_id = ? AND folder_id = ? AND active = ?", userID, folderID, true).
+		Order("date_added DESC").
+		Find(&userReleases).Error; err != nil {
+		return nil, log.Err(
+			"failed to get user releases by folder",
+			err,
+			"userID", userID,
+			"folderID", folderID,
+		)
+	}
+
+	log.Info(
+		"Retrieved user releases by folder",
+		"userID", userID,
+		"folderID", folderID,
+		"count", len(userReleases),
+	)
+	return userReleases, nil
+}

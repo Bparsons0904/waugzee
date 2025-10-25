@@ -7,57 +7,71 @@ export type ValidatorFunction = (value: string) => ValidationResult;
 
 // Built-in validators
 export const validators = {
-  required: (fieldName: string = 'Field'): ValidatorFunction => (value: string) => {
-    if (!value || value.trim().length === 0) {
-      return { isValid: false, errorMessage: `${fieldName} is required` };
-    }
-    return { isValid: true };
-  },
+  required:
+    (fieldName: string = "Field"): ValidatorFunction =>
+    (value: string) => {
+      if (!value || value.trim().length === 0) {
+        return { isValid: false, errorMessage: `${fieldName} is required` };
+      }
+      return { isValid: true };
+    },
 
-  minLength: (min: number, fieldName: string = 'Field'): ValidatorFunction => (value: string) => {
-    if (value.length < min) {
-      return { 
-        isValid: false, 
-        errorMessage: `${fieldName} must be at least ${min} characters` 
-      };
-    }
-    return { isValid: true };
-  },
+  minLength:
+    (min: number, fieldName: string = "Field"): ValidatorFunction =>
+    (value: string) => {
+      if (value.length < min) {
+        return {
+          isValid: false,
+          errorMessage: `${fieldName} must be at least ${min} characters`,
+        };
+      }
+      return { isValid: true };
+    },
 
-  maxLength: (max: number, fieldName: string = 'Field'): ValidatorFunction => (value: string) => {
-    if (value.length > max) {
-      return { 
-        isValid: false, 
-        errorMessage: `${fieldName} must be no more than ${max} characters` 
-      };
-    }
-    return { isValid: true };
-  },
+  maxLength:
+    (max: number, fieldName: string = "Field"): ValidatorFunction =>
+    (value: string) => {
+      if (value.length > max) {
+        return {
+          isValid: false,
+          errorMessage: `${fieldName} must be no more than ${max} characters`,
+        };
+      }
+      return { isValid: true };
+    },
 
   email: (): ValidatorFunction => (value: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(value)) {
-      return { isValid: false, errorMessage: 'Please enter a valid email address' };
+      return { isValid: false, errorMessage: "Please enter a valid email address" };
     }
     return { isValid: true };
   },
 
-  pattern: (regex: RegExp, errorMessage: string): ValidatorFunction => (value: string) => {
-    if (!regex.test(value)) {
-      return { isValid: false, errorMessage };
-    }
-    return { isValid: true };
-  },
+  pattern:
+    (regex: RegExp, errorMessage: string): ValidatorFunction =>
+    (value: string) => {
+      if (!regex.test(value)) {
+        return { isValid: false, errorMessage };
+      }
+      return { isValid: true };
+    },
 
   passwordStrength: (): ValidatorFunction => (value: string) => {
     if (value.length < 8) {
       return { isValid: false, errorMessage: "Password must be at least 8 characters long" };
     }
     if (!/(?=.*[a-z])/.test(value)) {
-      return { isValid: false, errorMessage: "Password must contain at least one lowercase letter" };
+      return {
+        isValid: false,
+        errorMessage: "Password must contain at least one lowercase letter",
+      };
     }
     if (!/(?=.*[A-Z])/.test(value)) {
-      return { isValid: false, errorMessage: "Password must contain at least one uppercase letter" };
+      return {
+        isValid: false,
+        errorMessage: "Password must contain at least one uppercase letter",
+      };
     }
     if (!/(?=.*\d)/.test(value)) {
       return { isValid: false, errorMessage: "Password must contain at least one number" };
@@ -68,8 +82,8 @@ export const validators = {
 
 // Validation runner that combines multiple validators
 export const runValidators = (
-  value: string, 
-  validatorList: ValidatorFunction[]
+  value: string,
+  validatorList: ValidatorFunction[],
 ): ValidationResult => {
   for (const validator of validatorList) {
     const result = validator(value);

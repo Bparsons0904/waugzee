@@ -1,0 +1,229 @@
+@use "../../styles/variables" as *;
+@use "../../styles/colors" as *;
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: $spacing-xl;
+  background: $bg-surface;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-sm;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-lg;
+}
+
+.title {
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+  margin: 0;
+}
+
+.headerButtons {
+  display: flex;
+  gap: $spacing-md;
+}
+
+.loading {
+  text-align: center;
+  padding: $spacing-xl;
+  color: $text-muted;
+  font-style: italic;
+}
+
+.section {
+  margin-bottom: $spacing-2xl;
+}
+
+.sectionTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+  margin-bottom: $spacing-md;
+}
+
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-md;
+
+  &.full {
+    grid-template-columns: 1fr;
+  }
+}
+
+.statusSection {
+  background-color: $bg-subtle;
+  border: $border-width-thin solid $border-default;
+  border-radius: $border-radius-md;
+  padding: $spacing-md;
+  margin-bottom: $spacing-lg;
+
+  h3 {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: $text-default;
+    margin: 0 0 $spacing-md 0;
+  }
+}
+
+.toggleGroup {
+  display: flex;
+  gap: $spacing-lg;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-md;
+  margin-top: $spacing-md;
+}
+
+.stylusList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: $spacing-lg;
+}
+
+.stylusCard {
+  background-color: $bg-surface;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-md;
+  padding: $spacing-lg;
+  display: flex;
+  flex-direction: column;
+  transition:
+    transform $transition-fast $transition-timing-default,
+    box-shadow $transition-fast $transition-timing-default;
+  position: relative;
+  border-left: $border-width-thicker solid transparent;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: $shadow-lg;
+  }
+}
+
+.stylusInfo {
+  flex-grow: 1;
+  margin-bottom: $spacing-md;
+}
+
+.stylusName {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+  margin-top: 0;
+  margin-bottom: $spacing-md;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+}
+
+.tagsContainer {
+  display: flex;
+  gap: $spacing-sm;
+  margin-left: auto;
+}
+
+.activeTag,
+.primaryTag,
+.archivedTag {
+  display: inline-block;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $border-radius-md;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  text-transform: uppercase;
+  letter-spacing: $letter-spacing-wide;
+}
+
+.activeTag {
+  background-color: $bg-success-subtle;
+  color: $text-success;
+}
+
+.primaryTag {
+  background-color: $bg-info-subtle;
+  color: $text-info;
+}
+
+.archivedTag {
+  background-color: $bg-muted;
+  color: $text-muted;
+}
+
+.stylusDetail {
+  margin: $spacing-sm 0;
+  font-size: $font-size-sm;
+  color: $text-muted;
+
+  strong {
+    color: $text-default;
+    font-weight: $font-weight-semibold;
+  }
+}
+
+.stylusActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-md;
+  margin-top: auto;
+}
+
+.noStyluses {
+  text-align: center;
+  padding: $spacing-xl;
+  color: $text-muted;
+  font-style: italic;
+  background-color: $bg-subtle;
+  border-radius: $border-radius-lg;
+}
+
+@media (max-width: $breakpoint-md) {
+  .container {
+    padding: $spacing-lg;
+  }
+
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+
+  .toggleGroup {
+    flex-direction: column;
+    gap: $spacing-md;
+  }
+}
+
+@media (max-width: $breakpoint-sm) {
+  .container {
+    padding: $spacing-md;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $spacing-md;
+  }
+
+  .headerButtons {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .stylusList {
+    grid-template-columns: 1fr;
+  }
+}

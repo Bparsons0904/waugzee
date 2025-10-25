@@ -27,6 +27,7 @@ var MODELS_TO_MIGRATE = []any{
 	&User{},
 	&Folder{},
 	&Stylus{},
+	&UserStylus{},
 	&Genre{},
 	&Label{},
 	&Artist{},
@@ -75,7 +76,7 @@ func main() {
 		}
 		err = migrateDown(steps, config, log)
 	case "seed":
-		err = migrateSeed(db, config, log)
+		err = migrateSeed(db.SQL, config, log)
 	}
 
 	if err != nil {
@@ -122,30 +123,12 @@ func migrateDown(steps int, config config.Config, log logger.Logger) error {
 	return nil
 }
 
-func migrateSeed(db database.DB, config config.Config, log logger.Logger) error {
+func migrateSeed(db *gorm.DB, config config.Config, log logger.Logger) error {
 	log = log.Function("migrateSeed")
 	log.Info("Running seed")
 
-	// Clean DB to get to a fresh state before seeding
-	if err := cleanDatabase(db.SQL, log); err != nil {
-		return log.Err("failed to clean database", err)
-	}
-
-	// Flush all cache databases
-	if err := db.FlushAllCaches(); err != nil {
-		return log.Err("failed to flush cache databases", err)
-	}
-
-	if err := migrateUp(db.SQL, config, log); err != nil {
-		return log.Err("failed to auto migrate", err)
-	}
-
-	if err := autoMigrate(db.SQL, log); err != nil {
-		return log.Err("failed to auto migrate", err)
-	}
-
 	log.Info("Seeding database")
-	if err := seed.Seed(db.SQL, config, log); err != nil {
+	if err := seed.Seed(db, config, log); err != nil {
 		return log.Err("failed to seed database", err)
 	}
 
@@ -236,20 +219,5 @@ func runMigrations(
 		log.Info("Applied migrations", "migrationCount", n)
 	}
 
-	return nil
-}
-
-func cleanDatabase(db *gorm.DB, log logger.Logger) error {
-	log = log.Function("cleanDatabase")
-	log.Info("Cleaning database before seeding")
-
-	// Drop all tables to get a completely fresh start
-	// This is simpler and more thorough than selective deletion
-	if err := db.Migrator().DropTable(MODELS_TO_MIGRATE...); err != nil {
-		return log.Err("failed to drop tables", err)
-	}
-	log.Info("Dropped all tables successfully")
-
-	log.Info("Database cleaned successfully")
 	return nil
 }

@@ -1,5 +1,5 @@
-import { Component, JSX } from "solid-js";
 import { FormProvider } from "@context/FormContext";
+import type { Component, JSX } from "solid-js";
 
 interface FormProps {
   children: JSX.Element;
@@ -14,4 +14,3 @@ export const Form: Component<FormProps> = (props) => {
     </FormProvider>
   );
 };
-

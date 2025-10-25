@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
@@ -186,7 +187,24 @@ func (j *DiscogsDownloadJob) Execute(ctx context.Context) error {
 
 	// Perform the actual download
 	if err := j.performDownload(ctx, processingRecord, yearMonth); err != nil {
-		// Update record with error information
+		// Check if it's a 404 error (data not available yet)
+		if strings.Contains(err.Error(), "status code: 404") {
+			log.Info(
+				"Data not available yet for this month, will try again next day",
+				"yearMonth",
+				yearMonth,
+			)
+			// Reset status back to not_started so it will be retried next day
+			if statusErr := processingRecord.UpdateStatus(models.ProcessingStatusNotStarted); statusErr != nil {
+				log.Warn("failed to reset processing record status", "error", statusErr)
+			}
+			if updateErr := j.repo.Update(ctx, processingRecord); updateErr != nil {
+				log.Warn("failed to update processing record", "error", updateErr)
+			}
+			return nil // Success - just not available yet
+		}
+
+		// For other errors, mark as failed
 		errorMsg := err.Error()
 		processingRecord.ErrorMessage = &errorMsg
 		if statusErr := processingRecord.UpdateStatus(models.ProcessingStatusFailed); statusErr != nil {
@@ -226,8 +244,25 @@ func (j *DiscogsDownloadJob) performDownload(
 		return log.Err("failed to parse checksum file", err, "checksumFile", checksumFile)
 	}
 
-	// Update processing record with checksums and transition to ready_for_processing
+	// Update processing record with checksums
 	processingRecord.FileChecksums = checksums
+	if err := j.repo.Update(ctx, processingRecord); err != nil {
+		return log.Err("failed to update processing record with checksums", err, "yearMonth", yearMonth)
+	}
+
+	// Download all XML data files
+	log.Info("Starting XML file downloads", "yearMonth", yearMonth)
+
+	fileTypes := []string{"artists", "labels", "masters", "releases"}
+	for _, fileType := range fileTypes {
+		log.Info("Downloading XML file", "fileType", fileType, "yearMonth", yearMonth)
+		if err := j.download.DownloadXMLFile(ctx, yearMonth, fileType); err != nil {
+			return log.Err("failed to download XML file", err, "fileType", fileType, "yearMonth", yearMonth)
+		}
+		log.Info("Downloaded XML file successfully", "fileType", fileType, "yearMonth", yearMonth)
+	}
+
+	// Transition to ready_for_processing after all downloads complete
 	if err := processingRecord.UpdateStatus(models.ProcessingStatusReadyForProcessing); err != nil {
 		return log.Err("failed to transition to ready_for_processing status", err, "yearMonth", yearMonth)
 	}
@@ -240,7 +275,7 @@ func (j *DiscogsDownloadJob) performDownload(
 		return log.Err("failed to update processing record after download", err, "yearMonth", yearMonth)
 	}
 
-	// Clean up downloaded file to save space (we only need the parsed checksums)
+	// Clean up downloaded checksum file to save space (we only need the parsed checksums)
 	if err := os.Remove(checksumFile); err != nil {
 		log.Warn("failed to clean up checksum file", "error", err, "file", checksumFile)
 	}

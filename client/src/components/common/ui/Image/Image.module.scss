@@ -5,7 +5,7 @@
   overflow: hidden;
   background-color: $bg-subtle;
   border-radius: $border-radius-md;
-  
+
   &:hover {
     cursor: pointer;
   }
@@ -26,7 +26,7 @@
 
 .aspectHero {
   aspect-ratio: 21 / 9; // Wide hero image
-  
+
   @media (max-width: $breakpoint-md) {
     aspect-ratio: 16 / 9;
   }
@@ -40,7 +40,7 @@
   opacity: 0;
   transition: opacity $transition-normal $transition-timing-smooth;
   display: block;
-  
+
   &.loaded {
     opacity: 1;
   }
@@ -107,8 +107,10 @@
 .vinylAlbum {
   border-radius: $border-radius-lg;
   box-shadow: $shadow-md;
-  transition: transform $transition-fast, box-shadow $transition-fast;
-  
+  transition:
+    transform $transition-fast,
+    box-shadow $transition-fast;
+
   &:hover {
     transform: translateY(-2px);
     box-shadow: $shadow-lg;
@@ -146,7 +148,7 @@
     $color-gray-200 50%,
     $color-gray-100 100%
   );
-  
+
   &::before {
     content: "♪";
     position: absolute;
@@ -166,7 +168,7 @@
     $color-gray-200 50%,
     $color-gray-100 100%
   );
-  
+
   &::before {
     content: "🎧";
     position: absolute;
@@ -177,3 +179,4 @@
     opacity: 0.5;
   }
 }
+

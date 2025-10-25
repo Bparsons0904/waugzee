@@ -1,0 +1,257 @@
+@import "../../../../styles/variables";
+@import "../../../../styles/colors";
+@import "../../../../styles/mixins";
+
+.searchableSelectContainer {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  position: relative;
+}
+
+.label {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $text-default;
+  margin-bottom: $spacing-xs;
+}
+
+.required {
+  color: $color-error-500;
+  margin-left: $spacing-xs;
+}
+
+.searchableSelectWrapper {
+  position: relative;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-sm $spacing-md;
+  background-color: $bg-surface;
+  border: $border-width-thin solid $border-default;
+  border-radius: $border-radius-md;
+  cursor: pointer;
+  transition: all $transition-fast $transition-timing-default;
+  min-height: 2.75rem;
+
+  &:hover:not(.disabled) {
+    border-color: $input-border-hover;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $border-focus;
+    box-shadow: $focus-ring;
+  }
+
+  &.disabled {
+    background-color: $bg-disabled;
+    color: $text-disabled;
+    cursor: not-allowed;
+  }
+
+  &.open {
+    border-color: $border-focus;
+  }
+}
+
+.selectError {
+  border-color: $border-error !important;
+  background-color: $bg-error-subtle;
+
+  &:focus {
+    border-color: $border-error !important;
+    box-shadow: 0 0 0 3px rgba($color-error-500, 0.3) !important;
+  }
+}
+
+.placeholder {
+  color: $input-placeholder;
+}
+
+.selectedText {
+  color: $text-default;
+}
+
+.selectIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-muted;
+  transition: transform $transition-fast $transition-timing-default,
+    color $transition-normal;
+
+  .trigger:focus & {
+    color: $text-default;
+  }
+
+  .disabled & {
+    color: $text-disabled;
+  }
+}
+
+.iconRotated {
+  transform: rotate(180deg);
+}
+
+.dropdownContainer {
+  position: absolute;
+  top: calc(100% + $spacing-xs);
+  left: 0;
+  right: 0;
+  z-index: $z-index-dropdown;
+  background-color: $bg-surface;
+  border: $border-width-thin solid $border-default;
+  border-radius: $border-radius-md;
+  box-shadow: $shadow-md;
+  overflow: hidden;
+  animation: slideDown 0.15s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.searchContainer {
+  position: relative;
+  padding: $spacing-sm;
+  border-bottom: $border-width-thin solid $border-default;
+}
+
+.searchIcon {
+  position: absolute;
+  left: calc($spacing-sm + $spacing-xs);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-muted;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: $spacing-sm $spacing-md $spacing-sm $spacing-xl;
+  border: $border-width-thin solid $border-default;
+  border-radius: $border-radius-sm;
+  background-color: $bg-surface;
+  font-size: $font-size-sm;
+  transition: border-color $transition-fast $transition-timing-default;
+
+  &:focus {
+    outline: none;
+    border-color: $border-focus;
+  }
+
+  &::placeholder {
+    color: $input-placeholder;
+  }
+}
+
+.optionsContainer {
+  max-height: 16rem;
+  overflow-y: auto;
+  padding: $spacing-xs 0;
+
+  &::-webkit-scrollbar {
+    width: 0.5rem;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: $bg-subtle;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: $border-strong;
+    border-radius: $border-radius-sm;
+
+    &:hover {
+      background: $text-muted;
+    }
+  }
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  padding: $spacing-sm $spacing-md;
+  cursor: pointer;
+  transition: background-color $transition-fast $transition-timing-default;
+
+  &:hover:not(.disabled) {
+    background-color: $bg-subtle;
+  }
+
+  &.focused:not(.disabled) {
+    background-color: $bg-primary-subtle;
+    outline: 2px solid $border-focus;
+    outline-offset: -2px;
+  }
+
+  &.selected {
+    background-color: $bg-primary-subtle;
+    color: $text-link;
+    font-weight: $font-weight-medium;
+
+    &:hover {
+      background-color: $bg-primary-subtle;
+    }
+  }
+
+  &.disabled {
+    color: $text-disabled;
+    cursor: not-allowed;
+    opacity: 0.5;
+
+    &:hover {
+      background-color: $bg-surface;
+    }
+  }
+}
+
+.optionLabel {
+  font-size: $font-size-sm;
+}
+
+.optionMetadata {
+  font-size: $font-size-xs;
+  color: $text-muted;
+  margin-top: $spacing-xs;
+}
+
+.emptyMessage {
+  padding: $spacing-md;
+  text-align: center;
+  color: $text-muted;
+  font-size: $font-size-sm;
+}
+
+.errorMessage {
+  color: $text-error;
+  font-size: $font-size-xs;
+  margin-top: $spacing-xs;
+  display: block;
+  animation: slideInError 0.2s ease-out;
+}
+
+@keyframes slideInError {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

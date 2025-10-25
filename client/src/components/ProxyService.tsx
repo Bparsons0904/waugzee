@@ -1,16 +1,12 @@
+import { Events, useWebSocket, type WebSocketMessage } from "@context/WebSocketContext";
+import axios, { type AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
 import { createEffect } from "solid-js";
-import {
-  useWebSocket,
-  WebSocketMessage,
-  Events,
-} from "@context/WebSocketContext";
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import type {
+  ApiError,
   ApiRequestPayload,
   ApiResponsePayload,
   ExternalHttpRequest,
   ExternalHttpResponse,
-  ApiError,
 } from "src/types/ApiProxy";
 
 // Error classes for external API handling
@@ -37,40 +33,26 @@ class ExternalNetworkError extends Error {
 }
 
 // Handle external API errors consistently
-const handleExternalApiError = (
-  error: AxiosError,
-): ExternalApiError | ExternalNetworkError => {
+const handleExternalApiError = (error: AxiosError): ExternalApiError | ExternalNetworkError => {
   // Claude should this be a switch statement?
   if (error.response) {
     const response = error.response as AxiosResponse<{ message?: string }>;
-    const errorMessage =
-      response.data?.message || error.message || "External API error";
+    const errorMessage = response.data?.message || error.message || "External API error";
 
-    return new ExternalApiError(
-      errorMessage,
-      error.response.status,
-      error.code,
-      {
-        url: error.config?.url,
-        method: error.config?.method,
-        responseData: response.data,
-      },
-    );
+    return new ExternalApiError(errorMessage, error.response.status, error.code, {
+      url: error.config?.url,
+      method: error.config?.method,
+      responseData: response.data,
+    });
   } else if (error.request) {
-    return new ExternalNetworkError(
-      "Network error: No response from external API",
-      error,
-    );
+    return new ExternalNetworkError("Network error: No response from external API", error);
   } else {
-    return new ExternalNetworkError(
-      error.message || "An unexpected error occurred",
-      error,
-    );
+    return new ExternalNetworkError(error.message || "An unexpected error occurred", error);
   }
 };
 
 // Core external API request function
-const makeExternalRequest = async <T = unknown,>(
+const makeExternalRequest = async <T = unknown>(
   request: ExternalHttpRequest,
 ): Promise<ExternalHttpResponse<T>> => {
   try {
@@ -155,9 +137,7 @@ const validateRequest = (request: ExternalHttpRequest): void => {
 };
 
 // Validate WebSocket API request payload
-const validateApiRequestPayload = (
-  payload: unknown,
-): payload is ApiRequestPayload => {
+const validateApiRequestPayload = (payload: unknown): payload is ApiRequestPayload => {
   if (!payload || typeof payload !== "object") {
     throw new Error("API request payload is required and must be an object");
   }
@@ -268,15 +248,11 @@ export function ProxyService() {
       const response = await makeExternalRequest(httpRequest);
 
       // Create success response payload
-      const responsePayload = createResponsePayload(
-        payload.requestId,
-        payload.requestType,
-        {
-          status: response.status,
-          statusText: response.statusText,
-          data: response.data,
-        },
-      );
+      const responsePayload = createResponsePayload(payload.requestId, payload.requestType, {
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data,
+      });
 
       // Send response back to server
       const responseMessage: WebSocketMessage = {
@@ -303,8 +279,7 @@ export function ProxyService() {
 
       try {
         // Try to get the payload even if validation failed
-        const payload =
-          message.payload as unknown as Partial<ApiRequestPayload>;
+        const payload = message.payload as unknown as Partial<ApiRequestPayload>;
         errorPayload = createResponsePayload(
           payload.requestId || "unknown",
           payload.requestType || "unknown",
@@ -315,12 +290,7 @@ export function ProxyService() {
         callbackEvent = payload.callbackEvent || "api_response";
       } catch {
         // If we can't parse payload at all, create a generic error
-        errorPayload = createResponsePayload(
-          "unknown",
-          "unknown",
-          undefined,
-          formatError(error),
-        );
+        errorPayload = createResponsePayload("unknown", "unknown", undefined, formatError(error));
       }
 
       // Send error response back to server

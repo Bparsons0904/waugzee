@@ -51,14 +51,32 @@
 }
 .navbarMenu {
   display: flex;
+  flex-direction: column;
   width: 100%;
   margin-top: $spacing-md;
+  gap: $spacing-md;
   @include breakpoint(md) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
     width: auto;
     margin-top: 0;
+    gap: $spacing-lg;
   }
 }
 .navbarItems {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  @include breakpoint(md) {
+    flex-direction: row;
+    width: auto;
+  }
+}
+
+.navbarActions {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -113,5 +131,23 @@
       background: $color-primary-500;
       border-radius: $border-radius-full;
     }
+  }
+}
+
+// ====================
+// Navbar Folder Selector
+// ====================
+
+.navbarFolderSelector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+
+  @include breakpoint(md) {
+    width: auto;
+    justify-content: flex-start;
+    flex: 1;
+    max-width: 240px;
   }
 }
