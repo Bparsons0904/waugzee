@@ -27,6 +27,12 @@ type HistoryRepository interface {
 		userID uuid.UUID,
 		limit int,
 	) ([]*PlayHistory, error)
+	UpdatePlayHistory(
+		ctx context.Context,
+		tx *gorm.DB,
+		playHistoryID uuid.UUID,
+		updates map[string]interface{},
+	) (*PlayHistory, error)
 	DeletePlayHistory(
 		ctx context.Context,
 		tx *gorm.DB,
@@ -42,6 +48,12 @@ type HistoryRepository interface {
 		userID uuid.UUID,
 		limit int,
 	) ([]*CleaningHistory, error)
+	UpdateCleaningHistory(
+		ctx context.Context,
+		tx *gorm.DB,
+		cleaningHistoryID uuid.UUID,
+		updates map[string]interface{},
+	) (*CleaningHistory, error)
 	DeleteCleaningHistory(
 		ctx context.Context,
 		tx *gorm.DB,
@@ -76,8 +88,8 @@ func (r *historyRepository) CreatePlayHistory(
 			err,
 			"userID",
 			playHistory.UserID,
-			"releaseID",
-			playHistory.ReleaseID,
+			"userReleaseID",
+			playHistory.UserReleaseID,
 		)
 	}
 
@@ -109,7 +121,7 @@ func (r *historyRepository) GetUserPlayHistory(
 	}
 
 	playHistory, err := gorm.G[*PlayHistory](tx).
-		Preload("Release", nil).
+		Preload("UserRelease.Release", nil).
 		Preload("UserStylus", nil).
 		Preload("UserStylus.Stylus", nil).
 		Where(PlayHistory{UserID: userID}).
@@ -137,6 +149,39 @@ func (r *historyRepository) GetUserPlayHistory(
 		"count",
 		len(playHistory),
 	)
+
+	return playHistory, nil
+}
+
+func (r *historyRepository) UpdatePlayHistory(
+	ctx context.Context,
+	tx *gorm.DB,
+	playHistoryID uuid.UUID,
+	updates map[string]interface{},
+) (*PlayHistory, error) {
+	log := r.log.Function("UpdatePlayHistory")
+
+	result := tx.Model(&PlayHistory{}).Where("id = ?", playHistoryID).Updates(updates)
+	if result.Error != nil {
+		return nil, log.Err(
+			"failed to update play history",
+			result.Error,
+			"playHistoryID",
+			playHistoryID,
+		)
+	}
+
+	playHistory, err := gorm.G[*PlayHistory](tx).
+		Preload("UserRelease.Release", nil).
+		Preload("UserStylus", nil).
+		Preload("UserStylus.Stylus", nil).
+		Where(PlayHistory{BaseUUIDModel: BaseUUIDModel{ID: playHistoryID}}).
+		First(ctx)
+	if err != nil {
+		return nil, log.Err("failed to retrieve updated play history", err, "playHistoryID", playHistoryID)
+	}
+
+	r.clearUserPlayHistoryCache(ctx, playHistory.UserID)
 
 	return playHistory, nil
 }
@@ -186,8 +231,8 @@ func (r *historyRepository) CreateCleaningHistory(
 			err,
 			"userID",
 			cleaningHistory.UserID,
-			"releaseID",
-			cleaningHistory.ReleaseID,
+			"userReleaseID",
+			cleaningHistory.UserReleaseID,
 		)
 	}
 
@@ -219,7 +264,7 @@ func (r *historyRepository) GetUserCleaningHistory(
 	}
 
 	cleaningHistory, err := gorm.G[*CleaningHistory](tx).
-		Preload("Release", nil).
+		Preload("UserRelease.Release", nil).
 		Where(CleaningHistory{UserID: userID}).
 		Order("cleaned_at DESC").
 		Limit(limit).
@@ -245,6 +290,42 @@ func (r *historyRepository) GetUserCleaningHistory(
 		"count",
 		len(cleaningHistory),
 	)
+
+	return cleaningHistory, nil
+}
+
+func (r *historyRepository) UpdateCleaningHistory(
+	ctx context.Context,
+	tx *gorm.DB,
+	cleaningHistoryID uuid.UUID,
+	updates map[string]interface{},
+) (*CleaningHistory, error) {
+	log := r.log.Function("UpdateCleaningHistory")
+
+	result := tx.Model(&CleaningHistory{}).Where("id = ?", cleaningHistoryID).Updates(updates)
+	if result.Error != nil {
+		return nil, log.Err(
+			"failed to update cleaning history",
+			result.Error,
+			"cleaningHistoryID",
+			cleaningHistoryID,
+		)
+	}
+
+	cleaningHistory, err := gorm.G[*CleaningHistory](tx).
+		Preload("UserRelease.Release", nil).
+		Where(CleaningHistory{BaseUUIDModel: BaseUUIDModel{ID: cleaningHistoryID}}).
+		First(ctx)
+	if err != nil {
+		return nil, log.Err(
+			"failed to retrieve updated cleaning history",
+			err,
+			"cleaningHistoryID",
+			cleaningHistoryID,
+		)
+	}
+
+	r.clearUserCleaningHistoryCache(ctx, cleaningHistory.UserID)
 
 	return cleaningHistory, nil
 }

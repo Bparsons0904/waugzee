@@ -60,14 +60,12 @@ export const EditHistoryPanel: Component<EditHistoryPanelProps> = (props) => {
 
     if (props.editItem.type === "play") {
       updatePlayMutation.mutate({
-        releaseId: props.editItem.releaseId,
         playedAt: new Date(dateTime()).toISOString(),
         userStylusId: stylusId() || undefined,
         notes: notes() || undefined,
       });
     } else {
       updateCleaningMutation.mutate({
-        releaseId: props.editItem.releaseId,
         cleanedAt: new Date(dateTime()).toISOString(),
         notes: notes() || undefined,
         isDeepClean: (props.editItem as CleaningHistory).isDeepClean || false,

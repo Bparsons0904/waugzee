@@ -1,4 +1,5 @@
 import type { UserStylus } from "./Stylus";
+import type { UserRelease } from "./User";
 
 export interface Artist {
   id: number;
@@ -51,8 +52,8 @@ export interface Style {
 export interface PlayHistory {
   id: string;
   userId: string;
-  releaseId: number;
-  release?: Release;
+  userReleaseId: string;
+  userRelease?: UserRelease;
   userStylusId?: string;
   userStylus?: UserStylus;
   playedAt: string;
@@ -62,7 +63,7 @@ export interface PlayHistory {
 }
 
 export interface LogPlayRequest {
-  releaseId: number;
+  userReleaseId: string;
   userStylusId?: string;
   playedAt: string;
   notes?: string;
@@ -73,7 +74,6 @@ export interface LogPlayResponse {
 }
 
 export interface UpdatePlayRequest {
-  releaseId: number;
   userStylusId?: string;
   playedAt: string;
   notes?: string;
@@ -93,8 +93,8 @@ export interface PlayHistoryListResponse {
 export interface CleaningHistory {
   id: string;
   userId: string;
-  releaseId: number;
-  release?: Release;
+  userReleaseId: string;
+  userRelease?: UserRelease;
   cleanedAt: string;
   notes: string;
   isDeepClean: boolean;
@@ -103,7 +103,7 @@ export interface CleaningHistory {
 }
 
 export interface LogCleaningRequest {
-  releaseId: number;
+  userReleaseId: string;
   cleanedAt: string;
   notes?: string;
   isDeepClean?: boolean;
@@ -114,7 +114,6 @@ export interface LogCleaningResponse {
 }
 
 export interface UpdateCleaningRequest {
-  releaseId: number;
   cleanedAt: string;
   notes?: string;
   isDeepClean?: boolean;
@@ -132,7 +131,7 @@ export interface CleaningHistoryListResponse {
 }
 
 export interface LogBothRequest {
-  releaseId: number;
+  userReleaseId: string;
   userStylusId?: string;
   timestamp: string;
   notes?: string;

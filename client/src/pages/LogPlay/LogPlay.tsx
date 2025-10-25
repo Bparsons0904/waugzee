@@ -162,7 +162,7 @@ const LogPlay: Component = () => {
   const handleQuickPlay = (release: UserRelease) => {
     const primaryStylus = userData.styluses().find((s) => s.isPrimary && s.isActive);
     logPlayMutation.mutate({
-      releaseId: release.releaseId,
+      userReleaseId: release.id,
       playedAt: new Date().toISOString(),
       userStylusId: primaryStylus?.id,
     });
@@ -170,7 +170,7 @@ const LogPlay: Component = () => {
 
   const handleQuickCleaning = (release: UserRelease) => {
     logCleaningMutation.mutate({
-      releaseId: release.releaseId,
+      userReleaseId: release.id,
       cleanedAt: new Date().toISOString(),
       isDeepClean: false,
     });

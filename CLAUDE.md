@@ -52,6 +52,32 @@ When writing or fixing tests, follow these principles:
 - **Model Changes**: Update GORM models and run migration command - the system handles the rest
 - **No Manual Schema**: SQL migrations are only for data transformations, not schema changes
 
+### Database Access Pattern
+
+**Direct PostgreSQL Access** (for troubleshooting and manual operations):
+
+```bash
+PGPASSWORD=\!{PASSWORD} psql -h 192.168.86.203 -p 5432 -U waugzee_dev_user -d waugzee_dev -c "SQL_QUERY_HERE"
+```
+
+**Key Details**:
+
+- Host: 192.168.86.203 (remote server)
+- Port: 5432
+- User: waugzee_dev_user
+- Database: waugzee_dev
+- Password: !Mustangs0904 (escaped as `\!` in bash)
+
+**Common Commands**:
+
+```bash
+# Check table structure
+PGPASSWORD=\!Mustangs0904 psql -h 192.168.86.203 -p 5432 -U waugzee_dev_user -d waugzee_dev -c "\d table_name"
+
+# Query data
+PGPASSWORD=\!Mustangs0904 psql -h 192.168.86.203 -p 5432 -U waugzee_dev_user -d waugzee_dev -c "SELECT * FROM table_name LIMIT 10;"
+```
+
 ### Repository Pattern
 
 - **No Business Logic in Repositories**: Repositories handle ONLY database operations (CRUD)
@@ -200,8 +226,8 @@ const updateMutation = useApiPut<ResponseType, RequestType>(
   undefined,
   {
     invalidateQueries: [["queryKey"]], // Automatically refetch after success
-    successMessage: "Update successful!",  // Auto toast notification
-    errorMessage: "Update failed. Please try again.",  // Auto error toast
+    successMessage: "Update successful!", // Auto toast notification
+    errorMessage: "Update failed. Please try again.", // Auto error toast
     onSuccess: (data) => {
       // Additional success logic (optional)
       console.log("Success:", data);
@@ -211,7 +237,7 @@ const updateMutation = useApiPut<ResponseType, RequestType>(
       // Additional error handling (optional)
       console.error("Error:", error);
     },
-  }
+  },
 );
 
 // Simple mutation call - no try/catch needed
@@ -231,6 +257,7 @@ const response = await api.put(endpoint, data);
 ```
 
 **Key Benefits of Declarative Pattern:**
+
 - Automatic toast notifications via `successMessage` and `errorMessage`
 - No manual try/catch blocks needed
 - Cleaner, more readable code
@@ -379,12 +406,14 @@ controllerAuthInfo := &userController.AuthInfo{...} // Manual conversion
 **Core Principle**: Build only what the current implementation needs. Keep implementations minimal while allowing forward-thinking in planning.
 
 **Guidelines**:
+
 - ✅ **Implement current requirements**: Focus on play logging and cleaning tracking features
 - ✅ **Forward-thinking planning**: Document future features and architecture decisions
 - ❌ **Avoid over-engineering**: Don't build abstractions for future requirements that may never materialize
 - ❌ **No premature optimization**: Implement simple solutions first, optimize when needed
 
 **Examples**:
+
 - **Good**: Simple play logging with user, release, timestamp, and notes
 - **Good**: Planning for equipment tracking but implementing basic stylus reference first
 - **Avoid**: Complex analytics engines before basic logging is complete
@@ -425,6 +454,7 @@ All SCSS files MUST use variables from `client/src/styles/_variables.scss` and `
 **Available Variables:**
 
 **Spacing** (use these instead of hardcoded rem/px values):
+
 - `$spacing-xs` (0.25rem / 4px)
 - `$spacing-sm` (0.5rem / 8px)
 - `$spacing-md` (1rem / 16px)
@@ -434,6 +464,7 @@ All SCSS files MUST use variables from `client/src/styles/_variables.scss` and `
 - `$spacing-3xl` (4rem / 64px)
 
 **Typography** (use these instead of hardcoded font sizes):
+
 - `$font-size-xs` (0.75rem / 12px)
 - `$font-size-sm` (0.875rem / 14px)
 - `$font-size-md` (1rem / 16px) - **BASE font size, use instead of non-existent `$font-size-base`**
@@ -445,6 +476,7 @@ All SCSS files MUST use variables from `client/src/styles/_variables.scss` and `
 - `$font-size-5xl` (3rem / 48px)
 
 **Font Weights:**
+
 - `$font-weight-light` (300)
 - `$font-weight-normal` (400)
 - `$font-weight-medium` (500)
@@ -452,6 +484,7 @@ All SCSS files MUST use variables from `client/src/styles/_variables.scss` and `
 - `$font-weight-bold` (700)
 
 **Text Colors** (use these instead of hardcoded hex colors):
+
 - `$text-default` - Default text color (#111827)
 - `$text-muted` - Muted text (#4b5563)
 - `$text-light` - Light text (#6b7280)
@@ -461,6 +494,7 @@ All SCSS files MUST use variables from `client/src/styles/_variables.scss` and `
 - `$text-success` / `$text-warning` / `$text-error` / `$text-info` - Feedback colors
 
 **Background Colors:**
+
 - `$bg-body` / `$bg-surface` / `$bg-elevated` - Surface backgrounds
 - `$bg-subtle` / `$bg-muted` - Subtle backgrounds
 - `$bg-primary` / `$bg-primary-subtle` - Primary colors
@@ -468,6 +502,7 @@ All SCSS files MUST use variables from `client/src/styles/_variables.scss` and `
 - `$bg-success` / `$bg-warning` / `$bg-error` / `$bg-info` - Feedback backgrounds
 
 **Border Radius:**
+
 - `$border-radius-sm` (0.125rem / 2px)
 - `$border-radius-md` (0.25rem / 4px)
 - `$border-radius-lg` (0.5rem / 8px)
@@ -476,22 +511,26 @@ All SCSS files MUST use variables from `client/src/styles/_variables.scss` and `
 - `$border-radius-full` (9999px for circles)
 
 **Border Colors:**
+
 - `$border-default` / `$border-strong` - Default borders
 - `$border-focus` - Focus state borders
 - `$border-primary` / `$border-secondary` / `$border-accent` - Colored borders
 - `$border-success` / `$border-warning` / `$border-error` - Feedback borders
 
 **Shadows:**
+
 - `$shadow-sm` / `$shadow-md` / `$shadow-lg` / `$shadow-xl` / `$shadow-2xl` - Box shadows
 - `$shadow-inner` - Inset shadow
 - `$focus-ring` - Focus ring effect
 
 **Transitions:**
+
 - `$transition-fast` (150ms)
 - `$transition-normal` (300ms)
 - `$transition-slow` (500ms)
 
 **Common Mistakes to Avoid:**
+
 - ❌ `$font-size-base` - DOES NOT EXIST, use `$font-size-md` instead
 - ❌ `color: #333` - Use `$text-default` or appropriate text color variable
 - ❌ `padding: 1.5rem` - Use `$spacing-lg` instead
@@ -499,6 +538,7 @@ All SCSS files MUST use variables from `client/src/styles/_variables.scss` and `
 - ❌ `font-weight: 600` - Use `$font-weight-semibold` instead
 
 **Correct Examples:**
+
 - ✅ `font-size: $font-size-md;` (not `$font-size-base`)
 - ✅ `color: $text-default;` (not `#111827`)
 - ✅ `padding: $spacing-lg;` (not `1.5rem`)
@@ -524,6 +564,7 @@ All SCSS files MUST use variables from `client/src/styles/_variables.scss` and `
 **CRITICAL: All naming must follow consistent camelCase/PascalCase standards. NO kebab-case allowed.**
 
 **File Naming:**
+
 - **Services**: camelCase - `userService.ts`, `apiHooks.ts`, `discogsProxy.service.ts`
 - **Components**: PascalCase - `Modal.tsx`, `Button.tsx`, `HomePage.tsx`
 - **Utilities**: camelCase - `dateUtils.ts`, `formatHelpers.ts`
@@ -531,22 +572,26 @@ All SCSS files MUST use variables from `client/src/styles/_variables.scss` and `
 - **CSS/SCSS**: camelCase - `button.module.scss`, `modal.module.scss`
 
 **Route Naming:**
+
 - **API Endpoints**: camelCase - `/syncCollection`, `/rateLimit`, `/getUserProfile`
 - **Frontend Routes**: camelCase - `/silentCallback`, `/userDashboard`
 - **NEVER use kebab-case**: ❌ `/sync-collection`, ❌ `/rate-limit`
 
 **Variable & Function Naming:**
+
 - **Variables**: camelCase - `userName`, `syncStatus`, `isLoading`
 - **Functions**: camelCase - `handleSubmit`, `fetchUserData`, `validateToken`
 - **Constants**: SCREAMING_SNAKE_CASE - `API_BASE_URL`, `MAX_RETRY_ATTEMPTS`
 - **Components**: PascalCase - `UserProfile`, `SyncButton`, `ModalDialog`
 
 **CSS Class Naming:**
+
 - **CSS Classes**: camelCase - `.userProfile`, `.syncButton`, `.errorMessage`
 - **CSS Variables**: kebab-case (exception) - `--primary-color`, `--font-size-large`
 - **SCSS Mixins**: camelCase - `@mixin buttonStyles`, `@mixin cardLayout`
 
 **Enforcement:**
+
 - **Code Reviews**: All PRs must follow these naming conventions
 - **Linting**: Biome (frontend) and golangci-lint (backend) enforce these standards
 - **Immediate Fix Required**: Any kebab-case discovered should be fixed immediately
@@ -642,12 +687,14 @@ All environment variables in `.env` at project root, shared between services.
 **Key Concept**: Each user makes their own Discogs API calls with their personal token, distributing rate limits across users while the server orchestrates complex sync logic.
 
 **Benefits**:
+
 - **Distributed Rate Limits**: Each user operates within their own Discogs API quota
 - **Server Orchestration**: Backend manages sync workflows, state persistence, and business logic
 - **Real-time Communication**: WebSocket enables immediate progress updates during sync
 - **Scalability**: Performance scales naturally with user count
 
 **Implementation**:
+
 - Users provide their own Discogs tokens
 - Frontend makes actual HTTP requests to Discogs API
 - Backend receives responses via WebSocket and processes data
@@ -686,4 +733,3 @@ This project is currently in **Phase 2: Authentication & User Management**. See 
 ---
 
 **Project Status**: 🚧 **Active Development** - Phase 2: Authentication & User Management
-

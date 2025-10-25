@@ -163,7 +163,7 @@ func (h *StylusHandler) updateUserStylus(c *fiber.Ctx) error {
 
 	var req stylusController.UpdateUserStylusRequest
 	if err = c.BodyParser(&req); err != nil {
-		log.Err("Invalid request body", err, "stylusID", stylusID, "req", req)
+		log.Er("Invalid request body", err, "stylusID", stylusID, "req", req)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})

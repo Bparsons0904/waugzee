@@ -76,7 +76,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
 
   const handleLogPlay = () => {
     logPlayMutation.mutate({
-      releaseId: props.release.releaseId,
+      userReleaseId: props.release.id,
       playedAt: new Date(formState.dateTime).toISOString(),
       userStylusId: formState.selectedStylusId || undefined,
       notes: formState.notes || undefined,
@@ -85,7 +85,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
 
   const handleLogCleaning = () => {
     logCleaningMutation.mutate({
-      releaseId: props.release.releaseId,
+      userReleaseId: props.release.id,
       cleanedAt: new Date(formState.dateTime).toISOString(),
       notes: formState.notes || undefined,
       isDeepClean: false,
@@ -94,7 +94,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
 
   const handleLogBoth = () => {
     logBothMutation.mutate({
-      releaseId: props.release.releaseId,
+      userReleaseId: props.release.id,
       userStylusId: formState.selectedStylusId || undefined,
       timestamp: new Date(formState.dateTime).toISOString(),
       notes: formState.notes || undefined,
