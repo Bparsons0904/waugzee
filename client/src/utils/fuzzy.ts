@@ -15,6 +15,9 @@ const defaultOptions = {
   threshold: 0.4,
   distance: 100,
   minMatchCharLength: 2,
+  ignoreLocation: true,
+  useExtendedSearch: false,
+  findAllMatches: true,
 };
 
 export const createFuseInstance = (releases: Release[], options = {}) => {
@@ -52,12 +55,9 @@ export const customSearchReleases = (
 
 const userReleaseOptions = {
   keys: [
-    { name: "release.title", weight: 2 },
-    { name: "release.artists.name", weight: 1.5 },
-    { name: "release.genres.name", weight: 1 },
-    { name: "release.labels.name", weight: 0.8 },
-    { name: "release.format", weight: 0.5 },
-    { name: "release.country", weight: 0.3 },
+    { name: "release.artists.name", weight: 3.0 },
+    { name: "release.title", weight: 2.0 },
+    { name: "release.genres.name", weight: 1.0 },
   ],
   isCaseSensitive: false,
   includeScore: true,
@@ -65,6 +65,9 @@ const userReleaseOptions = {
   threshold: 0.4,
   distance: 100,
   minMatchCharLength: 2,
+  ignoreLocation: true,
+  useExtendedSearch: false,
+  findAllMatches: true,
 };
 
 export const createUserReleaseFuseInstance = (userReleases: UserRelease[], options = {}) => {
