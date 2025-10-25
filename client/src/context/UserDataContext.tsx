@@ -1,4 +1,5 @@
 import { USER_ENDPOINTS } from "@constants/api.constants";
+import type { PlayHistory } from "@models/Release";
 import { useApiQuery } from "@services/apiHooks";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createContext, type JSX, useContext } from "solid-js";
@@ -16,6 +17,7 @@ type UserDataContextValue = {
   folders: () => Folder[];
   releases: () => UserRelease[];
   styluses: () => UserStylus[];
+  playHistory: () => PlayHistory[];
   isLoading: () => boolean;
   error: () => string | null;
   updateUser: (user: User) => void;
@@ -71,6 +73,7 @@ export function UserDataProvider(props: { children: JSX.Element }) {
         folders: () => userQuery.data?.folders || [],
         releases: () => userQuery.data?.releases || [],
         styluses: () => userQuery.data?.styluses || [],
+        playHistory: () => userQuery.data?.playHistory || [],
         isLoading: () => userQuery.isLoading,
         error: () => userQuery.error?.message || null,
         updateUser,

@@ -61,10 +61,11 @@ func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"user":     user,
-		"folders":  userData.Folders,
-		"releases": userData.Releases,
-		"styluses": userData.Styluses,
+		"user":        user,
+		"folders":     userData.Folders,
+		"releases":    userData.Releases,
+		"styluses":    userData.Styluses,
+		"playHistory": userData.PlayHistory,
 	})
 }
 

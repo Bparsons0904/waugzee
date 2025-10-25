@@ -18,6 +18,7 @@ type UserController struct {
 	folderRepo      repositories.FolderRepository
 	userReleaseRepo repositories.UserReleaseRepository
 	userStylusRepo  repositories.StylusRepository
+	historyRepo     repositories.HistoryRepository
 	discogsService  *services.DiscogsService
 	db              database.DB
 	Config          config.Config
@@ -25,9 +26,10 @@ type UserController struct {
 }
 
 type GetUserResponse struct {
-	Folders  []*Folder      `json:"folders"`
-	Releases []*UserRelease `json:"releases"`
-	Styluses []*UserStylus  `json:"styluses"`
+	Folders     []*Folder       `json:"folders"`
+	Releases    []*UserRelease  `json:"releases"`
+	Styluses    []*UserStylus   `json:"styluses"`
+	PlayHistory []*PlayHistory  `json:"playHistory"`
 }
 
 type UserControllerInterface interface {
@@ -56,6 +58,7 @@ func New(
 		folderRepo:      repos.Folder,
 		userReleaseRepo: repos.UserRelease,
 		userStylusRepo:  repos.Stylus,
+		historyRepo:     repos.History,
 		discogsService:  services.Discogs,
 		db:              db,
 		Config:          config,
@@ -158,10 +161,17 @@ func (uc *UserController) GetUser(
 		return nil, log.Err("failed to get user styluses", err, "userID", user.ID)
 	}
 
+	// Get user play history (limit to 1000 most recent)
+	playHistory, err := uc.historyRepo.GetUserPlayHistory(ctx, uc.db.SQL, user.ID, 1000)
+	if err != nil {
+		return nil, log.Err("failed to get user play history", err, "userID", user.ID)
+	}
+
 	return &GetUserResponse{
-		Folders:  folders,
-		Releases: releases,
-		Styluses: styluses,
+		Folders:     folders,
+		Releases:    releases,
+		Styluses:    styluses,
+		PlayHistory: playHistory,
 	}, nil
 }
 

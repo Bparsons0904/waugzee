@@ -173,4 +173,5 @@ export interface UserWithFoldersAndReleasesResponse {
   folders: Folder[];
   releases: UserRelease[];
   styluses: UserStylus[];
+  playHistory: PlayHistory[];
 }

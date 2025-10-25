@@ -1,4 +1,4 @@
-import type { Release } from "@models/Release";
+import type { PlayHistory, Release } from "@models/Release";
 import type { UserRelease } from "@models/User";
 import Fuse from "fuse.js";
 
@@ -84,6 +84,44 @@ export const fuzzySearchUserReleases = (
   }
 
   const fuse = createUserReleaseFuseInstance(userReleases, options);
+  const results = fuse.search(searchTerm);
+
+  return results.map((result) => result.item);
+};
+
+const playHistoryOptions = {
+  keys: [
+    { name: "userRelease.release.title", weight: 2.0 },
+    { name: "userRelease.release.artists.name", weight: 1.5 },
+    { name: "userStylus.stylus.brand", weight: 1.0 },
+    { name: "userStylus.stylus.model", weight: 1.0 },
+    { name: "notes", weight: 0.5 },
+  ],
+  isCaseSensitive: false,
+  includeScore: true,
+  shouldSort: true,
+  threshold: 0.4,
+  distance: 100,
+  minMatchCharLength: 2,
+  ignoreLocation: true,
+  useExtendedSearch: false,
+  findAllMatches: true,
+};
+
+export const createPlayHistoryFuseInstance = (playHistory: PlayHistory[], options = {}) => {
+  return new Fuse(playHistory, { ...playHistoryOptions, ...options });
+};
+
+export const fuzzySearchPlayHistory = (
+  playHistory: PlayHistory[],
+  searchTerm: string,
+  options = {},
+): PlayHistory[] => {
+  if (!searchTerm.trim()) {
+    return playHistory;
+  }
+
+  const fuse = createPlayHistoryFuseInstance(playHistory, options);
   const results = fuse.search(searchTerm);
 
   return results.map((result) => result.item);
