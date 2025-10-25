@@ -1,12 +1,13 @@
+import { Select } from "@components/common/forms/Select/Select";
+import { TextInput } from "@components/common/forms/TextInput/TextInput";
 import { EditHistoryPanel } from "@components/common/ui/EditHistoryPanel/EditHistoryPanel";
-import type { PlayHistory } from "@models/Release";
 import { useUserData } from "@context/UserDataContext";
+import type { PlayHistory } from "@models/Release";
 import { getLocalDateGroupKey, isSameLocalDay, useFormattedShortDate } from "@utils/dates";
 import { fuzzySearchPlayHistory } from "@utils/fuzzy";
-import { TbWashTemperature5 } from "solid-icons/tb";
-import { VsNote } from "solid-icons/vs";
 import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import styles from "./PlayHistory.module.scss";
+import { PlayItemCard } from "./PlayItemCard";
 
 const PlayHistoryPage: Component = () => {
   const { playHistory, releases, styluses } = useUserData();
@@ -71,16 +72,22 @@ const PlayHistoryPage: Component = () => {
     const grouped = history.reduce(
       (acc, play) => {
         let key: string;
-        if (groupBy() === "date") {
-          key = getLocalDateGroupKey(play.playedAt);
-        } else if (groupBy() === "artist") {
-          const release = releases().find((r) => r.id === play.userReleaseId);
-          key = release?.release?.artists?.[0]?.name || "Unknown Artist";
-        } else if (groupBy() === "album") {
-          const release = releases().find((r) => r.id === play.userReleaseId);
-          key = release?.release?.title || "Unknown Album";
-        } else {
-          key = "";
+        switch (groupBy()) {
+          case "date":
+            key = getLocalDateGroupKey(play.playedAt);
+            break;
+          case "artist": {
+            const release = releases().find((r) => r.id === play.userReleaseId);
+            key = release?.release?.artists?.[0]?.name || "Unknown Artist";
+            break;
+          }
+          case "album": {
+            const release = releases().find((r) => r.id === play.userReleaseId);
+            key = release?.release?.title || "Unknown Album";
+            break;
+          }
+          default:
+            key = "";
         }
 
         if (!acc[key]) acc[key] = [];
@@ -114,46 +121,39 @@ const PlayHistoryPage: Component = () => {
 
       <div class={styles.filters}>
         <div class={styles.filterGroup}>
-          <label class={styles.label} for="time-filter">
-            Time Period:
-          </label>
-          <select
-            id="time-filter"
-            class={styles.select}
+          <Select
+            label="Time Period"
             value={timeFilter()}
-            onInput={(e) => setTimeFilter(e.currentTarget.value)}
-          >
-            <option value="all">All Time</option>
-            <option value="week">Last Week</option>
-            <option value="month">Last Month</option>
-            <option value="year">Last Year</option>
-          </select>
+            options={[
+              { value: "all", label: "All Time" },
+              { value: "week", label: "Last Week" },
+              { value: "month", label: "Last Month" },
+              { value: "year", label: "Last Year" },
+            ]}
+            onChange={(value) => setTimeFilter(value)}
+          />
         </div>
 
         <div class={styles.filterGroup}>
-          <label class={styles.label} for="group-by-filter">
-            Group By:
-          </label>
-          <select
-            id="group-by-filter"
-            class={styles.select}
+          <Select
+            label="Group By"
             value={groupBy()}
-            onInput={(e) => setGroupBy(e.currentTarget.value)}
-          >
-            <option value="none">None</option>
-            <option value="date">Date</option>
-            <option value="artist">Artist</option>
-            <option value="album">Album</option>
-          </select>
+            options={[
+              { value: "none", label: "None" },
+              { value: "date", label: "Date" },
+              { value: "artist", label: "Artist" },
+              { value: "album", label: "Album" },
+            ]}
+            onChange={(value) => setGroupBy(value)}
+          />
         </div>
 
         <div class={styles.searchBox}>
-          <input
-            type="text"
-            class={styles.searchInput}
+          <TextInput
+            label="Search"
             placeholder="Search by artist, album, stylus or notes..."
             value={searchTerm()}
-            onInput={(e) => setSearchTerm(e.currentTarget.value)}
+            onInput={(value) => setSearchTerm(value)}
           />
         </div>
       </div>
@@ -178,43 +178,13 @@ const PlayHistoryPage: Component = () => {
                 <For each={plays}>
                   {(play) => {
                     const release = releases().find((r) => r.id === play.userReleaseId);
-                    const thumb = release?.release?.thumb;
-                    const title = release?.release?.title || "Unknown Album";
-                    const artists = release?.release?.artists || [];
-
                     return (
-                      <div class={styles.playItem} onClick={() => handleItemClick(play)}>
-                        <div class={styles.albumArt}>
-                          {thumb ? (
-                            <img src={thumb} alt={title} class={styles.albumImage} />
-                          ) : (
-                            <div class={styles.noImage}>No Image</div>
-                          )}
-                        </div>
-
-                        <div class={styles.playDetails}>
-                          <h3 class={styles.albumTitle}>{title}</h3>
-                          <p class={styles.artistName}>
-                            {artists.map((artist) => artist.name).join(", ") || "Unknown Artist"}
-                          </p>
-                        </div>
-
-                        <div class={styles.indicators}>
-                          <Show when={play.notes && play.notes.trim() !== ""}>
-                            <span class={`${styles.indicator} ${styles.hasNotes}`}>
-                              <VsNote size={14} />
-                              <span>Notes</span>
-                            </span>
-                          </Show>
-
-                          <Show when={hasCleaning(play.userReleaseId, play.playedAt)}>
-                            <span class={`${styles.indicator} ${styles.hasCleaning}`}>
-                              <TbWashTemperature5 size={14} />
-                              <span>Cleaned</span>
-                            </span>
-                          </Show>
-                        </div>
-                      </div>
+                      <PlayItemCard
+                        play={play}
+                        release={release}
+                        hasCleaning={hasCleaning(play.userReleaseId, play.playedAt)}
+                        onClick={() => handleItemClick(play)}
+                      />
                     );
                   }}
                 </For>
