@@ -4,6 +4,7 @@ import {
   type SearchableSelectOption,
 } from "@components/common/forms/SearchableSelect/SearchableSelect";
 import { Textarea } from "@components/common/forms/Textarea/Textarea";
+import { Toggle } from "@components/common/forms/Toggle/Toggle";
 import { Button } from "@components/common/ui/Button/Button";
 import { EditHistoryPanel } from "@components/common/ui/EditHistoryPanel/EditHistoryPanel";
 import { Image } from "@components/common/ui/Image/Image";
@@ -35,6 +36,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
     dateTime: formatDateTimeForInput(new Date()),
     selectedStylusId: userData.styluses().find((s) => s.isPrimary && s.isActive)?.id,
     notes: "",
+    isDeepClean: false,
   });
 
   const [isEditPanelOpen, setIsEditPanelOpen] = createSignal(false);
@@ -71,6 +73,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
       dateTime: formatDateTimeForInput(new Date()),
       selectedStylusId: null,
       notes: "",
+      isDeepClean: false,
     });
   };
 
@@ -88,7 +91,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
       userReleaseId: props.release.id,
       cleanedAt: new Date(formState.dateTime).toISOString(),
       notes: formState.notes || undefined,
-      isDeepClean: false,
+      isDeepClean: formState.isDeepClean,
     });
   };
 
@@ -98,7 +101,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
       userStylusId: formState.selectedStylusId || undefined,
       timestamp: new Date(formState.dateTime).toISOString(),
       notes: formState.notes || undefined,
-      isDeepClean: false,
+      isDeepClean: formState.isDeepClean,
     });
   };
 
@@ -206,6 +209,15 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
                 placeholder="Enter any notes about this play or cleaning..."
                 rows={3}
                 onChange={(value) => setFormState("notes", value)}
+              />
+            </div>
+
+            <div class={styles.formGroup}>
+              <Toggle
+                label="Deep Clean"
+                name="isDeepClean"
+                checked={formState.isDeepClean}
+                onChange={(checked) => setFormState("isDeepClean", checked)}
               />
             </div>
           </div>

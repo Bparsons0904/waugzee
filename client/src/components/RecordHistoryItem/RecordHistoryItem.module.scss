@@ -74,6 +74,18 @@
   flex-direction: row;
   gap: $spacing-sm;
   min-width: 11ch;
+  align-items: center;
+}
+
+.deepCleanBadge {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #059669;
+  margin-left: $spacing-sm;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $border-radius-lg;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  white-space: nowrap;
 }
 
 .historyItemDate {

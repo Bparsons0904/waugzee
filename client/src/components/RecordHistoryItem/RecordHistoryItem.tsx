@@ -88,6 +88,9 @@ export const RecordHistoryItem: Component<RecordHistoryItemProps> = (props) => {
                   <Match when={props.item.type === "cleaning"}>
                     <span class={styles.historyItems}>
                       <TbWashTemperature5 size={20} /> Cleaned
+                      <Show when={(props.item as CleaningHistory).isDeepClean}>
+                        <span class={styles.deepCleanBadge}>Deep Clean</span>
+                      </Show>
                     </span>
                   </Match>
                 </Switch>

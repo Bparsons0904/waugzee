@@ -263,14 +263,20 @@
 .bothButton {
   background-color: #8c6dff;
   color: $text-inverse;
+  box-shadow: none;
 
   &:hover:not(:disabled) {
     background-color: #7159d9;
+    box-shadow: none;
+  }
+
+  &:active:not(:disabled) {
+    box-shadow: none;
   }
 
   &:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(140, 109, 255, 0.4);
+    box-shadow: none;
   }
 }
 

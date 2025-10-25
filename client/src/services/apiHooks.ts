@@ -41,9 +41,11 @@ import { api } from "./api";
 
 // Enhanced query options
 export interface ApiQueryOptions<T>
-  extends Omit<UseQueryOptions<T, Error, T, readonly unknown[]>, "queryKey" | "queryFn"> {
+  extends Omit<
+    UseQueryOptions<T, Error, T, readonly unknown[]>,
+    "queryKey" | "queryFn" | "enabled"
+  > {
   enabled?: boolean | Accessor<boolean>;
-  placeholderData?: unknown;
 }
 
 // Enhanced mutation options with common patterns
