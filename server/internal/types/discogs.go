@@ -48,10 +48,8 @@ type Release struct {
 	Formats     Format          `xml:"formats>format"`
 	Genres      []string        `xml:"genres>genre"`
 	Styles      []string        `xml:"styles>style"`
-	Tracklist   Track           `xml:"tracklist>track"`
-	Images      Image           `xml:"images>image"`
-	// IdentifiersIdentifier  `xml:"identifiers>identifier"`
-	Companies Company `xml:"companies>company"`
+	Tracklist   []Track         `xml:"tracklist>track"`
+	Images      []Image         `xml:"images>image"`
 }
 
 type Master struct {

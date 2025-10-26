@@ -35,6 +35,15 @@
 .searchBox {
   flex: 2;
   min-width: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  display: block;
+  font-weight: $font-weight-medium;
+  margin-bottom: $spacing-sm;
+  color: $text-default;
 }
 
 .historyList {

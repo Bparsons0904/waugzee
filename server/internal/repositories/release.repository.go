@@ -130,8 +130,15 @@ func (r *releaseRepository) UpsertBatch(
 	log.Info("Upserting releases", "count", len(releases))
 
 	if err := tx.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"title", "updated_at"}),
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"title",
+			"tracks_json",
+			"images_json",
+			"videos_json",
+			"total_duration",
+			"updated_at",
+		}),
 	}).Create(&releases).Error; err != nil {
 		return log.Err("failed to upsert release batch", err, "count", len(releases))
 	}

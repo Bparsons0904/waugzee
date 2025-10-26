@@ -2,14 +2,12 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -88,17 +86,6 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 			// Set Master ID if available
 			if basicInfo.MasterID > 0 {
 				release.MasterID = &basicInfo.MasterID
-			}
-
-			// Store genres and styles in Data column using the new Data struct
-			if len(basicInfo.Genres) > 0 || len(basicInfo.Styles) > 0 {
-				dataStruct := Data{
-					Genres: basicInfo.Genres,
-					Styles: basicInfo.Styles,
-				}
-				if dataJSON, err := json.Marshal(dataStruct); err == nil {
-					release.Data = datatypes.JSON(dataJSON)
-				}
 			}
 
 			releases = append(releases, release)

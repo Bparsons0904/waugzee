@@ -1,4 +1,5 @@
 import { Field } from "@components/common/forms/Field/Field";
+import { SearchInput } from "@components/common/forms/SearchInput/SearchInput";
 import { Select, type SelectOption } from "@components/common/forms/Select/Select";
 import { Toggle } from "@components/common/forms/Toggle/Toggle";
 import { Image } from "@components/common/ui/Image/Image";
@@ -184,16 +185,15 @@ const LogPlay: Component = () => {
       <div class={styles.logForm}>
         <div class={styles.controlsRow}>
           <div class={styles.searchSection}>
-            <Field label="Search Your Collection" htmlFor="releaseSearch">
-              <input
-                type="text"
-                id="releaseSearch"
-                class={styles.searchInput}
-                value={searchTerm()}
-                onInput={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by title or artist..."
-              />
-            </Field>
+            <label class={styles.label} for="releaseSearch">
+              Search Your Collection
+            </label>
+            <SearchInput
+              id="releaseSearch"
+              value={searchTerm()}
+              onInput={setSearchTerm}
+              placeholder="Search by title or artist..."
+            />
           </div>
 
           <div class={styles.sortSection}>

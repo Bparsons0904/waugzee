@@ -1,0 +1,437 @@
+@use "../../styles/variables" as *;
+@use "../../styles/colors" as *;
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: $spacing-xl;
+}
+
+.title {
+  font-size: $font-size-4xl;
+  font-weight: $font-weight-bold;
+  color: $text-default;
+  margin-bottom: $spacing-lg;
+  text-align: center;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+  margin-bottom: $spacing-lg;
+}
+
+.searchBar {
+  width: 100%;
+}
+
+.controlButtons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: $spacing-md;
+}
+
+.filterButton {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  background-color: $bg-surface;
+  border: 1px solid $border-default;
+  border-radius: $border-radius-md;
+  font-size: $font-size-sm;
+  cursor: pointer;
+  transition: $transition-fast;
+
+  &:hover {
+    background-color: $bg-subtle;
+  }
+
+  &.active {
+    background-color: $bg-primary-subtle;
+    border-color: $border-primary;
+    color: $color-primary-600;
+  }
+}
+
+.sortContainer {
+  position: relative;
+
+  .sortSelect {
+    appearance: none;
+    padding: $spacing-sm $spacing-2xl $spacing-sm $spacing-md;
+    font-size: $font-size-sm;
+    border: 1px solid $border-default;
+    border-radius: $border-radius-md;
+    background-color: $bg-surface;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23333%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right $spacing-sm center;
+    background-size: 0.65rem auto;
+
+    &:focus {
+      outline: none;
+      border-color: $border-focus;
+      box-shadow: $focus-ring;
+    }
+  }
+}
+
+.gridSizeToggle {
+  display: flex;
+  gap: $spacing-xs;
+  border: 1px solid $border-default;
+  border-radius: $border-radius-md;
+  overflow: hidden;
+
+  button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-sm;
+    background: $bg-surface;
+    border: none;
+    cursor: pointer;
+    transition: $transition-fast;
+
+    &:hover {
+      background-color: $bg-subtle;
+    }
+
+    &.active {
+      background-color: $bg-primary-subtle;
+      color: $color-primary-600;
+    }
+  }
+}
+
+.filterPanel {
+  background-color: $bg-surface;
+  border-radius: $border-radius-lg;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-lg;
+  box-shadow: $shadow-sm;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.filterSection {
+  margin-bottom: $spacing-lg;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.filterTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+  margin-bottom: $spacing-sm;
+}
+
+.filterOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+}
+
+.filterOption {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  cursor: pointer;
+
+  input[type="checkbox"] {
+    margin: 0;
+  }
+
+  span {
+    font-size: $font-size-sm;
+    color: $text-default;
+  }
+}
+
+.filterActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: $spacing-md;
+}
+
+.clearButton {
+  padding: $spacing-sm $spacing-md;
+  background-color: transparent;
+  color: $color-primary-600;
+  border: 1px solid $border-primary;
+  border-radius: $border-radius-sm;
+  font-size: $font-size-sm;
+  cursor: pointer;
+  transition: $transition-fast;
+
+  &:hover {
+    background-color: $bg-primary-subtle;
+  }
+}
+
+.noResults {
+  padding: $spacing-xl;
+  text-align: center;
+  background-color: $bg-subtle;
+  border-radius: $border-radius-lg;
+  margin-bottom: $spacing-lg;
+
+  p {
+    color: $text-muted;
+    margin-bottom: $spacing-md;
+  }
+}
+
+.albumGrid {
+  display: grid;
+  gap: $spacing-lg;
+  width: 100%;
+
+  &.small {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+
+    .albumTitle {
+      font-size: $font-size-sm;
+    }
+
+    .albumArtist {
+      font-size: $font-size-xs;
+    }
+  }
+
+  &.medium {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+
+  &.large {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+
+    .albumTitle {
+      font-size: $font-size-lg;
+    }
+  }
+}
+
+.albumCard {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: $border-radius-lg;
+  background-color: $bg-surface;
+  box-shadow: $shadow-sm;
+  transition: $transition-normal;
+  cursor: pointer;
+  height: 100%;
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: $shadow-lg;
+  }
+}
+
+.albumArtwork {
+  position: relative;
+  padding-bottom: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.albumImage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: $transition-normal;
+
+  .albumCard:hover & {
+    transform: scale(1.05);
+  }
+}
+
+.noImage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: $bg-muted;
+  color: $text-muted;
+  padding: $spacing-md;
+  text-align: center;
+  font-style: italic;
+  font-size: $font-size-sm;
+}
+
+.albumHover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: $spacing-md;
+  opacity: 0;
+  transition: opacity $transition-normal;
+  overflow: auto;
+  color: $text-inverse;
+  pointer-events: none;
+  z-index: 10;
+
+  .albumCard:hover & {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.trackList {
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.trackListTitle {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  margin-bottom: $spacing-sm;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.tracks {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  font-size: $font-size-xs;
+
+  li {
+    margin-bottom: $spacing-xs;
+    display: flex;
+    gap: $spacing-sm;
+    line-height: 1.3;
+    flex-wrap: wrap;
+  }
+}
+
+.trackPosition {
+  opacity: 0.7;
+  flex-shrink: 0;
+  min-width: 2ch;
+}
+
+.trackDuration {
+  opacity: 0.7;
+  margin-left: auto;
+  padding-left: $spacing-sm;
+  font-size: $font-size-xs;
+}
+
+.noTracks {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.albumInfo {
+  padding: $spacing-sm;
+}
+
+.albumTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.albumArtist {
+  font-size: $font-size-sm;
+  color: $text-muted;
+  margin: 0 0 $spacing-xs;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: $spacing-lg;
+  }
+
+  .controlButtons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sortContainer,
+  .filterButton,
+  .gridSizeToggle {
+    width: 100%;
+  }
+
+  .sortContainer .sortSelect {
+    width: 100%;
+  }
+
+  .gridSizeToggle {
+    justify-content: center;
+  }
+
+  .albumGrid {
+    &.small,
+    &.medium,
+    &.large {
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: $spacing-md;
+  }
+
+  .title {
+    font-size: $font-size-3xl;
+  }
+
+  .albumGrid {
+    &.small,
+    &.medium,
+    &.large {
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+  }
+
+  .filterPanel {
+    padding: $spacing-md;
+  }
+}

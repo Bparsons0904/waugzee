@@ -1,5 +1,5 @@
+import { SearchInput } from "@components/common/forms/SearchInput/SearchInput";
 import { Select } from "@components/common/forms/Select/Select";
-import { TextInput } from "@components/common/forms/TextInput/TextInput";
 import { EditHistoryPanel } from "@components/common/ui/EditHistoryPanel/EditHistoryPanel";
 import { useUserData } from "@context/UserDataContext";
 import type { PlayHistory } from "@models/Release";
@@ -149,11 +149,14 @@ const PlayHistoryPage: Component = () => {
         </div>
 
         <div class={styles.searchBox}>
-          <TextInput
-            label="Search"
+          <label class={styles.label} for="playHistorySearch">
+            Search
+          </label>
+          <SearchInput
+            id="playHistorySearch"
             placeholder="Search by artist, album, stylus or notes..."
             value={searchTerm()}
-            onInput={(value) => setSearchTerm(value)}
+            onInput={setSearchTerm}
           />
         </div>
       </div>

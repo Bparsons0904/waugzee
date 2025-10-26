@@ -102,6 +102,12 @@ export interface Label {
   entityType?: string;
 }
 
+export interface Track {
+  position: string;
+  title: string;
+  duration?: string;
+}
+
 export interface Release {
   id: number;
   title: string;
@@ -119,7 +125,7 @@ export interface Release {
   lastSynced?: string;
   thumb?: string;
   coverImage?: string;
-  data?: Record<string, unknown>; // JSON data
+  tracksJson?: Track[];
   artists?: Artist[];
   genres?: Genre[];
   labels?: Label[];

@@ -30,15 +30,30 @@ export const NavBar: Component = () => {
                     Profile
                   </A>
                 </li>
-                {/* <li class={styles.navbarItem}> */}
-                {/*   <A */}
-                {/*     href="/story/1" */}
-                {/*     class={styles.navbarLink} */}
-                {/*     activeClass={styles.active} */}
-                {/*   > */}
-                {/*     Story */}
-                {/*   </A> */}
-                {/* </li> */}
+                <li class={styles.navbarItem}>
+                  <A href={ROUTES.COLLECTION} class={styles.navbarLink} activeClass={styles.active}>
+                    Collection
+                  </A>
+                </li>
+                <li class={styles.navbarItem}>
+                  <A href={ROUTES.LOG_PLAY} class={styles.navbarLink} activeClass={styles.active}>
+                    Log Play
+                  </A>
+                </li>
+                <li class={styles.navbarItem}>
+                  <A
+                    href={ROUTES.PLAY_HISTORY}
+                    class={styles.navbarLink}
+                    activeClass={styles.active}
+                  >
+                    Play History
+                  </A>
+                </li>
+                <li class={styles.navbarItem}>
+                  <A href={ROUTES.EQUIPMENT} class={styles.navbarLink} activeClass={styles.active}>
+                    Equipment
+                  </A>
+                </li>
               </Match>
             </Switch>
           </ul>

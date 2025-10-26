@@ -16,9 +16,10 @@ const (
 	FormatOther    ReleaseFormat = "other"
 )
 
-type Data struct {
-	Styles []string `json:"styles"`
-	Genres []string `json:"genres"`
+type Track struct {
+	Position string `json:"position"`
+	Title    string `json:"title"`
+	Duration string `json:"duration"`
 }
 
 type Release struct {
@@ -39,11 +40,15 @@ type Release struct {
 	Thumb       *string       `gorm:"type:text"        json:"thumb,omitempty"`
 	CoverImage  *string       `gorm:"type:text"        json:"coverImage,omitempty"`
 
-	// JSONB column containing embedded display data: tracks, styles, images, videos
-	// Claude we eventually need to properly define these with a struct
-	Data datatypes.JSON `gorm:"type:jsonb" json:"data,omitempty"`
+	// JSONB columns for display data
+	TracksJSON []Track           `gorm:"type:jsonb;serializer:json" json:"tracksJson,omitempty"`
+	ImagesJSON datatypes.JSON    `gorm:"type:jsonb"                 json:"imagesJson,omitempty"`
+	VideosJSON datatypes.JSON    `gorm:"type:jsonb"                 json:"videosJson,omitempty"`
 
-	Master  *Master  `gorm:"-:migration" json:"master,omitempty"`
+	// Calculated total duration in seconds
+	TotalDuration *int `gorm:"type:int" json:"totalDuration,omitempty"`
+
+	Master  *Master  `gorm:"-:migration"                                                            json:"master,omitempty"`
 	Artists []Artist `gorm:"many2many:release_artists;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"artists,omitempty"`
 	Labels  []Label  `gorm:"many2many:release_labels;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"  json:"labels,omitempty"`
 	Genres  []Genre  `gorm:"many2many:release_genres;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"  json:"genres,omitempty"`

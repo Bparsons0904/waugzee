@@ -3,12 +3,14 @@ package services
 import (
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
@@ -193,6 +195,65 @@ func (s *DiscogsXMLParserService) convertXMLMasterToModel(xmlMaster types.Master
 	}
 }
 
+// calculateTotalDuration calculates total duration from track list in seconds
+// Handles formats: "3:45" (MM:SS) or "1:23:45" (HH:MM:SS)
+// Returns nil if unable to calculate (missing/malformed durations)
+func calculateTotalDuration(tracks []types.Track) *int {
+	if len(tracks) == 0 {
+		return nil
+	}
+
+	totalSeconds := 0
+	hasValidDuration := false
+
+	for _, track := range tracks {
+		if track.Duration == "" {
+			continue
+		}
+
+		// Parse duration string (format: "MM:SS" or "HH:MM:SS")
+		var hours, minutes, seconds int
+		var err error
+
+		parts := strings.Split(track.Duration, ":")
+		switch len(parts) {
+		case 2: // MM:SS format
+			minutes, err = strconv.Atoi(parts[0])
+			if err != nil {
+				continue
+			}
+			seconds, err = strconv.Atoi(parts[1])
+			if err != nil {
+				continue
+			}
+		case 3: // HH:MM:SS format
+			hours, err = strconv.Atoi(parts[0])
+			if err != nil {
+				continue
+			}
+			minutes, err = strconv.Atoi(parts[1])
+			if err != nil {
+				continue
+			}
+			seconds, err = strconv.Atoi(parts[2])
+			if err != nil {
+				continue
+			}
+		default:
+			continue
+		}
+
+		totalSeconds += (hours * 3600) + (minutes * 60) + seconds
+		hasValidDuration = true
+	}
+
+	if !hasValidDuration {
+		return nil
+	}
+
+	return &totalSeconds
+}
+
 // convertXMLReleaseToModel converts XML Release to database Release model
 func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
 	xmlRelease types.Release,
@@ -229,8 +290,7 @@ func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
 		BaseDiscogModel: models.BaseDiscogModel{
 			ID: xmlRelease.ID,
 		},
-		Title: xmlRelease.Title,
-		// MasterID:    masterID,
+		Title:       xmlRelease.Title,
 		Year:        year,
 		Country:     country,
 		Format:      format,
@@ -241,6 +301,37 @@ func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
 
 	if xmlRelease.MasterID > 0 {
 		release.MasterID = &xmlRelease.MasterID
+	}
+
+	// Populate JSONB fields
+	if len(xmlRelease.Tracklist) > 0 {
+		// Convert types.Track to models.Track
+		tracks := make([]models.Track, len(xmlRelease.Tracklist))
+		for i, xmlTrack := range xmlRelease.Tracklist {
+			tracks[i] = models.Track{
+				Position: xmlTrack.Position,
+				Title:    xmlTrack.Title,
+				Duration: xmlTrack.Duration,
+			}
+		}
+		release.TracksJSON = tracks
+
+		// Calculate total duration
+		release.TotalDuration = calculateTotalDuration(xmlRelease.Tracklist)
+	}
+
+	if len(xmlRelease.Images) > 0 {
+		if imagesJSON, err := json.Marshal(xmlRelease.Images); err == nil {
+			release.ImagesJSON = imagesJSON
+		} else {
+			s.log.Warn("Failed to marshal images to JSON", "releaseID", xmlRelease.ID, "error", err)
+		}
+	}
+
+	// VideosJSON: Empty array as videos are not in monthly XML dumps (only in API)
+	emptyArray := []interface{}{}
+	if videosJSON, err := json.Marshal(emptyArray); err == nil {
+		release.VideosJSON = videosJSON
 	}
 
 	return release
