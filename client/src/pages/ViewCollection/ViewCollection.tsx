@@ -2,9 +2,10 @@ import { SearchInput } from "@components/common/forms/SearchInput/SearchInput";
 import { Button } from "@components/common/ui/Button/Button";
 import FilterIcon from "@components/icons/FilterIcon";
 import GridIcon from "@components/icons/GridIcon";
+import RecordActionModal from "@components/RecordActionModal/RecordActionModal";
 import { useUserData } from "@context/UserDataContext";
 import { fuzzySearchUserReleases } from "@utils/fuzzy";
-import { type Component, createEffect, createSignal, For, Show } from "solid-js";
+import { type Component, createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import type { UserRelease } from "src/types/User";
 import styles from "./ViewCollection.module.scss";
 
@@ -120,11 +121,12 @@ const CollectionControls: Component<CollectionControlsProps> = (props) => {
 
 interface AlbumCardProps {
   userRelease: UserRelease;
+  onClick: (userRelease: UserRelease) => void;
 }
 
 const AlbumCard: Component<AlbumCardProps> = (props) => {
   return (
-    <div class={styles.albumCard}>
+    <div class={styles.albumCard} onClick={() => props.onClick(props.userRelease)}>
       <div class={styles.albumArtwork}>
         <Show
           when={props.userRelease.release.coverImage}
@@ -189,11 +191,20 @@ const ViewCollection: Component = () => {
   const [gridSize, setGridSize] = createSignal<"small" | "medium" | "large">("medium");
   const [showFilters, setShowFilters] = createSignal(false);
   const [genreFilter, setGenreFilter] = createSignal<string[]>([]);
+  const [selectedReleaseId, setSelectedReleaseId] = createSignal<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = createSignal(false);
+
+  const selectedRelease = createMemo(() => {
+    const releaseId = selectedReleaseId();
+    if (!releaseId) return null;
+    return releases().find((r) => r.id === releaseId) || null;
+  });
 
   const availableGenres = () => {
     const genreSet = new Set<string>();
     releases().forEach((userRelease) => {
       userRelease.release.genres?.forEach((genre) => {
+        if (genre.type !== "genre") return;
         genreSet.add(genre.name);
       });
     });
@@ -267,6 +278,15 @@ const ViewCollection: Component = () => {
     setSearchTerm("");
   };
 
+  const handleReleaseClick = (release: UserRelease) => {
+    setSelectedReleaseId(release.id);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
   return (
     <div class={styles.container}>
       <h1 class={styles.title}>Your Collection</h1>
@@ -297,9 +317,17 @@ const ViewCollection: Component = () => {
 
       <div class={`${styles.albumGrid} ${styles[gridSize()]}`}>
         <For each={filteredReleases()}>
-          {(userRelease) => <AlbumCard userRelease={userRelease} />}
+          {(userRelease) => <AlbumCard userRelease={userRelease} onClick={handleReleaseClick} />}
         </For>
       </div>
+
+      <Show when={selectedRelease()}>
+        <RecordActionModal
+          isOpen={isModalOpen()}
+          onClose={handleCloseModal}
+          release={selectedRelease() as never}
+        />
+      </Show>
     </div>
   );
 };

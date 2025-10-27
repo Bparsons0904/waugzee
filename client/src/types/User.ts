@@ -93,6 +93,10 @@ export interface Artist {
 export interface Genre {
   id: number;
   name: string;
+  nameLower: string;
+  type: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Label {
