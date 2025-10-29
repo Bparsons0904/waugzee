@@ -22,7 +22,6 @@ import type {
   CreateCustomStylusResponse,
   CreateUserStylusRequest,
   UpdateUserStylusRequest,
-  UserStylusesResponse,
 } from "@models/Stylus";
 import {
   type UseMutationOptions,
@@ -238,16 +237,6 @@ export function useAvailableStyluses(options?: ApiQueryOptions<AvailableStylusRe
   return useApiGet<AvailableStylusResponse>(
     ["styluses", "available"],
     STYLUS_ENDPOINTS.AVAILABLE,
-    undefined,
-    options,
-  );
-}
-
-// Claude we should not need this, we already have this is UserDataContext
-export function useUserStyluses(options?: ApiQueryOptions<UserStylusesResponse>) {
-  return useApiGet<UserStylusesResponse>(
-    ["styluses", "user"],
-    STYLUS_ENDPOINTS.USER_STYLUSES,
     undefined,
     options,
   );

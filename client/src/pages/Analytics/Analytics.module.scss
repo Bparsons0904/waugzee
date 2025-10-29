@@ -1,0 +1,70 @@
+@import "@styles/variables";
+@import "@styles/colors";
+
+.analyticsPage {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: $spacing-xl $spacing-lg;
+
+  @media (max-width: 768px) {
+    padding: $spacing-lg $spacing-md;
+  }
+}
+
+.pageHeader {
+  margin-bottom: $spacing-2xl;
+  text-align: center;
+}
+
+.pageTitle {
+  font-size: $font-size-4xl;
+  font-weight: $font-weight-bold;
+  color: $text-default;
+  margin: 0 0 $spacing-sm 0;
+
+  @media (max-width: 768px) {
+    font-size: $font-size-3xl;
+  }
+}
+
+.pageDescription {
+  font-size: $font-size-lg;
+  color: $text-muted;
+  margin: 0;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+
+  @media (max-width: 768px) {
+    font-size: $font-size-md;
+  }
+}
+
+.loading {
+  text-align: center;
+  padding: $spacing-3xl;
+  font-size: $font-size-lg;
+  color: $text-muted;
+  font-style: italic;
+}
+
+.emptyState {
+  text-align: center;
+  padding: $spacing-3xl;
+  background-color: $bg-surface;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-md;
+
+  h2 {
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-bold;
+    color: $text-default;
+    margin: 0 0 $spacing-md 0;
+  }
+
+  p {
+    font-size: $font-size-lg;
+    color: $text-muted;
+    margin: 0;
+  }
+}

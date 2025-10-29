@@ -72,6 +72,7 @@ export const ROUTES = {
   PLAY_HISTORY: "/playHistory",
   EQUIPMENT: "/equipment",
   DASHBOARD: "/dashboard",
+  ANALYTICS: "/analytics",
 } as const;
 
 // Error retry configuration

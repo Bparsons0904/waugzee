@@ -1,0 +1,26 @@
+@import "@styles/variables";
+@import "@styles/colors";
+
+.controlsContainer {
+  background-color: $bg-surface;
+  border-radius: $border-radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-md;
+  margin-bottom: $spacing-xl;
+}
+
+.controlsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: $spacing-md;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.controlGroup {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}

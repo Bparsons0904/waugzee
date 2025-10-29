@@ -3,7 +3,7 @@ import { Select } from "@components/common/forms/Select/Select";
 import { EditHistoryPanel } from "@components/common/ui/EditHistoryPanel/EditHistoryPanel";
 import { useUserData } from "@context/UserDataContext";
 import type { PlayHistory } from "@models/Release";
-import { getLocalDateGroupKey, isSameLocalDay, useFormattedShortDate } from "@utils/dates";
+import { formatDateForInput, isSameLocalDay, useFormattedShortDate } from "@utils/dates";
 import { fuzzySearchPlayHistory } from "@utils/fuzzy";
 import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import styles from "./PlayHistory.module.scss";
@@ -74,7 +74,7 @@ const PlayHistoryPage: Component = () => {
         let key: string;
         switch (groupBy()) {
           case "date":
-            key = getLocalDateGroupKey(play.playedAt);
+            key = formatDateForInput(play.playedAt);
             break;
           case "artist": {
             const release = releases().find((r) => r.id === play.userReleaseId);

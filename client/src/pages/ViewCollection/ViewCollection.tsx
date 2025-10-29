@@ -213,22 +213,6 @@ const ViewCollection: Component = () => {
     return Array.from(genreSet).sort();
   });
 
-  const filteredReleases = createMemo(() => {
-    let filtered = releases();
-
-    if (viewState.genreFilter.length > 0) {
-      filtered = filtered.filter((userRelease) =>
-        userRelease.release.genres?.some((genre) => viewState.genreFilter.includes(genre.name)),
-      );
-    }
-
-    if (viewState.searchTerm) {
-      filtered = fuzzySearchUserReleases(filtered, viewState.searchTerm);
-    }
-
-    return sortReleases(filtered, viewState.sortBy);
-  });
-
   const sortReleases = (releasesToSort: UserRelease[], sortOption: string): UserRelease[] => {
     switch (sortOption) {
       case "artist": {
@@ -264,6 +248,22 @@ const ViewCollection: Component = () => {
       }
     }
   };
+
+  const filteredReleases = createMemo(() => {
+    let filtered = releases();
+
+    if (viewState.genreFilter.length > 0) {
+      filtered = filtered.filter((userRelease) =>
+        userRelease.release.genres?.some((genre) => viewState.genreFilter.includes(genre.name)),
+      );
+    }
+
+    if (viewState.searchTerm) {
+      filtered = fuzzySearchUserReleases(filtered, viewState.searchTerm);
+    }
+
+    return sortReleases(filtered, viewState.sortBy);
+  });
 
   const toggleGenre = (genre: string) => {
     if (viewState.genreFilter.includes(genre)) {

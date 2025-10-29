@@ -54,6 +54,11 @@ export const NavBar: Component = () => {
                     Equipment
                   </A>
                 </li>
+                <li class={styles.navbarItem}>
+                  <A href={ROUTES.ANALYTICS} class={styles.navbarLink} activeClass={styles.active}>
+                    Analytics
+                  </A>
+                </li>
               </Match>
             </Switch>
           </ul>

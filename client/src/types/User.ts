@@ -158,7 +158,7 @@ export interface Stylus {
   cartridgeType?: string;
   recommendedReplaceHours?: number;
   userGeneratedId?: string;
-  isVerified?: boolean;
+  isVerified: boolean;
   createdAt: string;
   updatedAt: string;
 }
