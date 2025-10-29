@@ -1,5 +1,5 @@
 import { USER_ENDPOINTS } from "@constants/api.constants";
-import type { PlayHistory } from "@models/Release";
+import type { CleaningHistory, PlayHistory } from "@models/Release";
 import { useApiQuery } from "@services/apiHooks";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createContext, type JSX, useContext } from "solid-js";
@@ -18,6 +18,7 @@ type UserDataContextValue = {
   releases: () => UserRelease[];
   styluses: () => UserStylus[];
   playHistory: () => PlayHistory[];
+  cleaningHistory: () => CleaningHistory[];
   isLoading: () => boolean;
   error: () => string | null;
   updateUser: (user: User) => void;
@@ -66,6 +67,11 @@ export function UserDataProvider(props: { children: JSX.Element }) {
     await queryClient.invalidateQueries({ queryKey: ["user"] });
   };
 
+  const cleaningHistory = () => {
+    const releases = userQuery.data?.releases || [];
+    return releases.flatMap((release) => release.cleaningHistory || []);
+  };
+
   return (
     <UserDataContext.Provider
       value={{
@@ -74,6 +80,7 @@ export function UserDataProvider(props: { children: JSX.Element }) {
         releases: () => userQuery.data?.releases || [],
         styluses: () => userQuery.data?.styluses || [],
         playHistory: () => userQuery.data?.playHistory || [],
+        cleaningHistory,
         isLoading: () => userQuery.isLoading,
         error: () => userQuery.error?.message || null,
         updateUser,

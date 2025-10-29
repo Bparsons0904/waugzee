@@ -2,20 +2,32 @@ import { Select } from "@components/common/forms/Select/Select";
 import { Button } from "@components/common/ui/Button/Button";
 import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import type { NeglectedRecord } from "src/types/Analytics";
-import type { PlayHistory } from "src/types/Release";
+import type { CleaningHistory, PlayHistory } from "src/types/Release";
 import type { UserRelease } from "src/types/User";
-import { findNeglectedRecords, formatDaysSincePlay } from "../../utils/neglectedUtils";
+import {
+  findNeglectedRecords,
+  formatDaysSinceActivity,
+  type NeglectMode,
+} from "../../utils/neglectedUtils";
 import styles from "./NeglectedRecords.module.scss";
 
 interface NeglectedRecordsProps {
   releases: UserRelease[];
   playHistory: PlayHistory[];
+  cleaningHistory: CleaningHistory[];
   onPlayRecord?: (userReleaseId: string) => void;
+  onCleanRecord?: (userReleaseId: string) => void;
 }
 
 export const NeglectedRecords: Component<NeglectedRecordsProps> = (props) => {
+  const [mode, setMode] = createSignal<NeglectMode>("play");
   const [daysThreshold, setDaysThreshold] = createSignal(90);
   const [displayLimit, setDisplayLimit] = createSignal(10);
+
+  const modeOptions = [
+    { value: "play", label: "Not Played" },
+    { value: "cleaning", label: "Not Cleaned" },
+  ];
 
   const thresholdOptions = [
     { value: "30", label: "30 Days" },
@@ -33,26 +45,64 @@ export const NeglectedRecords: Component<NeglectedRecordsProps> = (props) => {
   ];
 
   const neglectedRecords = createMemo((): NeglectedRecord[] => {
-    const all = findNeglectedRecords(props.releases, props.playHistory, daysThreshold());
+    const all = findNeglectedRecords(
+      props.releases,
+      props.playHistory,
+      props.cleaningHistory,
+      daysThreshold(),
+      mode(),
+    );
     return all.slice(0, displayLimit());
   });
 
   const totalNeglected = createMemo(() => {
-    return findNeglectedRecords(props.releases, props.playHistory, daysThreshold()).length;
+    return findNeglectedRecords(
+      props.releases,
+      props.playHistory,
+      props.cleaningHistory,
+      daysThreshold(),
+      mode(),
+    ).length;
+  });
+
+  const modeConfig = createMemo(() => {
+    if (mode() === "play") {
+      return {
+        title: "Neglected Records - Not Played",
+        subtitle: "Records that haven't been played recently - time to give them some love!",
+        thresholdLabel: "Not Played In",
+        emptyMessage:
+          "Great! All your records have been played recently. Keep spinning those vinyls!",
+        actionButton: "Log a Play",
+        onAction: props.onPlayRecord,
+      };
+    }
+    return {
+      title: "Neglected Records - Not Cleaned",
+      subtitle: "Records that need cleaning - time to show them some care!",
+      thresholdLabel: "Not Cleaned In",
+      emptyMessage: "Great! All your records have been cleaned recently. Keep them in shape!",
+      actionButton: "Log Cleaning",
+      onAction: props.onCleanRecord,
+    };
   });
 
   return (
     <div class={styles.container}>
       <div class={styles.header}>
-        <h2 class={styles.sectionTitle}>Neglected Records</h2>
-        <p class={styles.subtitle}>
-          Records that haven't been played recently - time to give them some love!
-        </p>
+        <h2 class={styles.sectionTitle}>{modeConfig().title}</h2>
+        <p class={styles.subtitle}>{modeConfig().subtitle}</p>
       </div>
 
       <div class={styles.controlsRow}>
         <Select
-          label="Not Played In"
+          label="Show"
+          options={modeOptions}
+          value={mode()}
+          onChange={(value) => setMode(value as NeglectMode)}
+        />
+        <Select
+          label={modeConfig().thresholdLabel}
           options={thresholdOptions}
           value={daysThreshold().toString()}
           onChange={(value) => setDaysThreshold(Number.parseInt(value, 10))}
@@ -71,11 +121,7 @@ export const NeglectedRecords: Component<NeglectedRecordsProps> = (props) => {
 
       <Show
         when={neglectedRecords().length > 0}
-        fallback={
-          <div class={styles.noData}>
-            Great! All your records have been played recently. Keep spinning those vinyls!
-          </div>
-        }
+        fallback={<div class={styles.noData}>{modeConfig().emptyMessage}</div>}
       >
         <div class={styles.recordsGrid}>
           <For each={neglectedRecords()}>
@@ -98,26 +144,40 @@ export const NeglectedRecords: Component<NeglectedRecordsProps> = (props) => {
 
                   <div class={styles.metaInfo}>
                     <span class={styles.daysSince}>
-                      {formatDaysSincePlay(record.daysSinceLastPlay)}
+                      {formatDaysSinceActivity(record.daysSinceLastActivity)}
                     </span>
-                    <Show when={record.totalPlays > 0}>
-                      <span class={styles.playCount}>
-                        {record.totalPlays} play{record.totalPlays !== 1 ? "s" : ""} total
-                      </span>
+
+                    <Show when={mode() === "play"}>
+                      <Show when={record.totalPlays > 0}>
+                        <span class={styles.activityCount}>
+                          {record.totalPlays} play{record.totalPlays !== 1 ? "s" : ""} total
+                        </span>
+                      </Show>
+                      <Show when={record.totalPlays === 0}>
+                        <span class={styles.neverActivity}>Never played</span>
+                      </Show>
                     </Show>
-                    <Show when={record.totalPlays === 0}>
-                      <span class={styles.neverPlayed}>Never played</span>
+
+                    <Show when={mode() === "cleaning"}>
+                      <Show when={record.totalCleans && record.totalCleans > 0}>
+                        <span class={styles.activityCount}>
+                          {record.totalCleans} clean{record.totalCleans !== 1 ? "s" : ""} total
+                        </span>
+                      </Show>
+                      <Show when={!record.totalCleans || record.totalCleans === 0}>
+                        <span class={styles.neverActivity}>Never cleaned</span>
+                      </Show>
                     </Show>
                   </div>
 
-                  <Show when={props.onPlayRecord}>
+                  <Show when={modeConfig().onAction}>
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => props.onPlayRecord?.(record.userReleaseId)}
-                      class={styles.playButton}
+                      onClick={() => modeConfig().onAction?.(record.userReleaseId)}
+                      class={styles.actionButton}
                     >
-                      Log a Play
+                      {modeConfig().actionButton}
                     </Button>
                   </Show>
                 </div>

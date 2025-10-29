@@ -52,9 +52,12 @@ export interface NeglectedRecord {
   title: string;
   artistNames: string[];
   coverImage?: string;
-  daysSinceLastPlay: number;
-  lastPlayedAt?: Date;
+  daysSinceLastActivity: number;
+  lastActivityAt?: Date;
   totalPlays: number;
+  totalCleans?: number;
+  lastPlayedAt?: Date;
+  lastCleanedAt?: Date;
 }
 
 export interface DropdownOption {

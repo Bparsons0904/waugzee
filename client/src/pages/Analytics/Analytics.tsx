@@ -102,7 +102,11 @@ const Analytics: Component = () => {
             dateRange={state.dateRange}
           />
 
-          <NeglectedRecords releases={userData.releases()} playHistory={userData.playHistory()} />
+          <NeglectedRecords
+            releases={userData.releases()}
+            playHistory={userData.playHistory()}
+            cleaningHistory={userData.cleaningHistory()}
+          />
         </Show>
       </Show>
     </div>
