@@ -5,7 +5,8 @@ import GridIcon from "@components/icons/GridIcon";
 import RecordActionModal from "@components/RecordActionModal/RecordActionModal";
 import { useUserData } from "@context/UserDataContext";
 import { fuzzySearchUserReleases } from "@utils/fuzzy";
-import { type Component, createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { type Component, createMemo, For, Show } from "solid-js";
+import { createStore } from "solid-js/store";
 import type { UserRelease } from "src/types/User";
 import styles from "./ViewCollection.module.scss";
 
@@ -46,6 +47,7 @@ const CollectionControls: Component<CollectionControlsProps> = (props) => {
             <span>Filter</span>
           </button>
 
+          {/* Claude should we use the existing select here? */}
           <div class={styles.sortContainer}>
             <select
               value={props.sortBy}
@@ -185,22 +187,22 @@ const AlbumCard: Component<AlbumCardProps> = (props) => {
 const ViewCollection: Component = () => {
   const { releases } = useUserData();
 
-  const [filteredReleases, setFilteredReleases] = createSignal<UserRelease[]>([]);
-  const [searchTerm, setSearchTerm] = createSignal("");
-  const [sortBy, setSortBy] = createSignal("artist");
-  const [gridSize, setGridSize] = createSignal<"small" | "medium" | "large">("medium");
-  const [showFilters, setShowFilters] = createSignal(false);
-  const [genreFilter, setGenreFilter] = createSignal<string[]>([]);
-  const [selectedReleaseId, setSelectedReleaseId] = createSignal<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = createSignal(false);
-
-  const selectedRelease = createMemo(() => {
-    const releaseId = selectedReleaseId();
-    if (!releaseId) return null;
-    return releases().find((r) => r.id === releaseId) || null;
+  const [viewState, setViewState] = createStore({
+    searchTerm: "",
+    sortBy: "artist",
+    gridSize: "medium" as "small" | "medium" | "large",
+    showFilters: false,
+    genreFilter: [] as string[],
+    selectedReleaseId: null as string | null,
+    isModalOpen: false,
   });
 
-  const availableGenres = () => {
+  const selectedRelease = createMemo(() => {
+    if (!viewState.selectedReleaseId) return null;
+    return releases().find((r) => r.id === viewState.selectedReleaseId) || null;
+  });
+
+  const availableGenres = createMemo(() => {
     const genreSet = new Set<string>();
     releases().forEach((userRelease) => {
       userRelease.release.genres?.forEach((genre) => {
@@ -209,24 +211,22 @@ const ViewCollection: Component = () => {
       });
     });
     return Array.from(genreSet).sort();
-  };
+  });
 
-  createEffect(() => {
+  const filteredReleases = createMemo(() => {
     let filtered = releases();
 
-    if (genreFilter().length > 0) {
+    if (viewState.genreFilter.length > 0) {
       filtered = filtered.filter((userRelease) =>
-        userRelease.release.genres?.some((genre) => genreFilter().includes(genre.name)),
+        userRelease.release.genres?.some((genre) => viewState.genreFilter.includes(genre.name)),
       );
     }
 
-    if (searchTerm()) {
-      filtered = fuzzySearchUserReleases(filtered, searchTerm());
+    if (viewState.searchTerm) {
+      filtered = fuzzySearchUserReleases(filtered, viewState.searchTerm);
     }
 
-    filtered = sortReleases(filtered, sortBy());
-
-    setFilteredReleases(filtered);
+    return sortReleases(filtered, viewState.sortBy);
   });
 
   const sortReleases = (releasesToSort: UserRelease[], sortOption: string): UserRelease[] => {
@@ -266,25 +266,29 @@ const ViewCollection: Component = () => {
   };
 
   const toggleGenre = (genre: string) => {
-    if (genreFilter().includes(genre)) {
-      setGenreFilter((prev) => prev.filter((g) => g !== genre));
+    if (viewState.genreFilter.includes(genre)) {
+      setViewState("genreFilter", (prev) => prev.filter((g) => g !== genre));
     } else {
-      setGenreFilter((prev) => [...prev, genre]);
+      setViewState("genreFilter", (prev) => [...prev, genre]);
     }
   };
 
   const clearFilters = () => {
-    setGenreFilter([]);
-    setSearchTerm("");
+    setViewState({
+      genreFilter: [],
+      searchTerm: "",
+    });
   };
 
   const handleReleaseClick = (release: UserRelease) => {
-    setSelectedReleaseId(release.id);
-    setIsModalOpen(true);
+    setViewState({
+      selectedReleaseId: release.id,
+      isModalOpen: true,
+    });
   };
 
   const handleCloseModal = () => {
-    setIsModalOpen(false);
+    setViewState("isModalOpen", false);
   };
 
   return (
@@ -292,16 +296,16 @@ const ViewCollection: Component = () => {
       <h1 class={styles.title}>Your Collection</h1>
 
       <CollectionControls
-        searchTerm={searchTerm()}
-        onSearchChange={setSearchTerm}
-        sortBy={sortBy()}
-        onSortChange={setSortBy}
-        gridSize={gridSize()}
-        onGridSizeChange={setGridSize}
-        showFilters={showFilters()}
-        onToggleFilters={() => setShowFilters(!showFilters())}
+        searchTerm={viewState.searchTerm}
+        onSearchChange={(value) => setViewState("searchTerm", value)}
+        sortBy={viewState.sortBy}
+        onSortChange={(value) => setViewState("sortBy", value)}
+        gridSize={viewState.gridSize}
+        onGridSizeChange={(size) => setViewState("gridSize", size)}
+        showFilters={viewState.showFilters}
+        onToggleFilters={() => setViewState("showFilters", !viewState.showFilters)}
         availableGenres={availableGenres()}
-        selectedGenres={genreFilter()}
+        selectedGenres={viewState.genreFilter}
         onGenreToggle={toggleGenre}
         onClearFilters={clearFilters}
       />
@@ -315,7 +319,7 @@ const ViewCollection: Component = () => {
         </div>
       </Show>
 
-      <div class={`${styles.albumGrid} ${styles[gridSize()]}`}>
+      <div class={`${styles.albumGrid} ${styles[viewState.gridSize]}`}>
         <For each={filteredReleases()}>
           {(userRelease) => <AlbumCard userRelease={userRelease} onClick={handleReleaseClick} />}
         </For>
@@ -323,7 +327,7 @@ const ViewCollection: Component = () => {
 
       <Show when={selectedRelease()}>
         <RecordActionModal
-          isOpen={isModalOpen()}
+          isOpen={viewState.isModalOpen}
           onClose={handleCloseModal}
           release={selectedRelease() as never}
         />
