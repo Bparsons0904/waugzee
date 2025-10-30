@@ -4,7 +4,7 @@ import {
   type ActionItem,
   ActionsSection,
 } from "@components/dashboard/ActionsSection/ActionsSection";
-import { type StatItem, StatsSection } from "@components/dashboard/StatsSection/StatsSection";
+import { StatsSection } from "@components/dashboard/StatsSection/StatsSection";
 import { ROUTES } from "@constants/api.constants";
 import { useUserData } from "@context/UserDataContext";
 import { useApiPost } from "@services/apiHooks";
@@ -12,7 +12,6 @@ import { useNavigate } from "@solidjs/router";
 import { type Component, createMemo, createSignal, onMount } from "solid-js";
 import styles from "./Home.module.scss";
 
-// Preload LogPlay page for instant navigation
 const preloadLogPlay = () => import("@pages/LogPlay/LogPlay");
 
 interface SyncResponse {
@@ -20,24 +19,10 @@ interface SyncResponse {
   message: string;
 }
 
-interface DashboardStats {
-  totalRecords: number;
-  totalPlays: number;
-  listeningHours: number;
-  favoriteGenre: string;
-}
-
 const Home: Component = () => {
   const navigate = useNavigate();
   const { user } = useUserData();
 
-  const [stats, setStats] = createSignal<DashboardStats>({
-    totalRecords: 0,
-    totalPlays: 0,
-    listeningHours: 0,
-    favoriteGenre: "Loading...",
-  });
-  const [isLoading, setIsLoading] = createSignal(true);
   const [showTokenModal, setShowTokenModal] = createSignal(false);
   const [syncStatus, setSyncStatus] = createSignal<string>("");
 
@@ -75,33 +60,6 @@ const Home: Component = () => {
   const handleViewAnalytics = () => {
     navigate("/analytics");
   };
-
-  const statsItems = createMemo((): StatItem[] => [
-    {
-      icon: "💽",
-      value: isLoading() ? "--" : stats().totalRecords.toLocaleString(),
-      label: "Records",
-      isLoading: isLoading(),
-    },
-    {
-      icon: "▶️",
-      value: isLoading() ? "--" : stats().totalPlays.toLocaleString(),
-      label: "Plays",
-      isLoading: isLoading(),
-    },
-    {
-      icon: "⏱️",
-      value: isLoading() ? "--h" : `${stats().listeningHours}h`,
-      label: "Hours",
-      isLoading: isLoading(),
-    },
-    {
-      icon: "🎯",
-      value: isLoading() ? "--" : stats().favoriteGenre,
-      label: "Top Genre",
-      isLoading: isLoading(),
-    },
-  ]);
 
   const getButtonText = () => {
     if (!user()?.configuration?.discogsToken) {
@@ -153,23 +111,7 @@ const Home: Component = () => {
   ]);
 
   onMount(async () => {
-    // Preload LogPlay page immediately for instant navigation
     preloadLogPlay();
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      setStats({
-        totalRecords: 247,
-        totalPlays: 1430,
-        listeningHours: 89,
-        favoriteGenre: "Jazz",
-      });
-    } catch (error) {
-      console.error("Failed to load dashboard data:", error);
-    } finally {
-      setIsLoading(false);
-    }
   });
 
   return (
@@ -184,7 +126,7 @@ const Home: Component = () => {
         </button>
       </div>
 
-      <StatsSection stats={statsItems()} />
+      <StatsSection />
 
       <ActionsSection actions={actionItems()} />
 
