@@ -31,35 +31,30 @@ type FormatDetails struct {
 
 type Release struct {
 	BaseDiscogModel
-	Title       string        `gorm:"type:text;"       json:"title"`
-	LabelID     *int64        `gorm:"type:bigint;"     json:"labelId,omitempty"`
-	MasterID    *int64        `gorm:"type:bigint"      json:"masterId,omitempty"`
-	Year        *int          `gorm:"type:int"         json:"year,omitempty"`
-	Country     *string       `gorm:"type:text"        json:"country,omitempty"`
-	Format      ReleaseFormat `gorm:"type:text"        json:"format"`
-	TrackCount  *int          `gorm:"type:int"         json:"trackCount,omitempty"`
-	Notes       *string       `gorm:"type:text"        json:"notes,omitempty"`
-	ResourceURL *string       `gorm:"type:text"        json:"resourceUrl,omitempty"`
-	URI         *string       `gorm:"type:text"        json:"uri,omitempty"`
-	DateAdded   *time.Time    `gorm:"type:timestamptz" json:"dateAdded,omitempty"`
-	DateChanged *time.Time    `gorm:"type:timestamptz" json:"dateChanged,omitempty"`
-	LastSynced  *time.Time    `gorm:"type:timestamptz" json:"lastSynced,omitempty"`
-	Thumb       *string       `gorm:"type:text"        json:"thumb,omitempty"`
-	CoverImage  *string       `gorm:"type:text"        json:"coverImage,omitempty"`
-
-	// JSONB columns for display data
-	TracksJSON        []Track           `gorm:"type:jsonb;serializer:json" json:"tracksJson,omitempty"`
-	ImagesJSON        datatypes.JSON    `gorm:"type:jsonb"                 json:"imagesJson,omitempty"`
-	VideosJSON        datatypes.JSON    `gorm:"type:jsonb"                 json:"videosJson,omitempty"`
-	FormatDetailsJSON datatypes.JSON    `gorm:"type:jsonb"                 json:"formatDetailsJson,omitempty"`
-
-	// Calculated total duration in seconds
-	TotalDuration *int `gorm:"type:int" json:"totalDuration,omitempty"`
-
-	Master  *Master  `gorm:"-:migration"                                                            json:"master,omitempty"`
-	Artists []Artist `gorm:"many2many:release_artists;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"artists,omitempty"`
-	Labels  []Label  `gorm:"many2many:release_labels;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"  json:"labels,omitempty"`
-	Genres  []Genre  `gorm:"many2many:release_genres;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"  json:"genres,omitempty"`
+	Title             string         `gorm:"type:text;"                                                             json:"title"`
+	LabelID           *int64         `gorm:"type:bigint;"                                                           json:"labelId,omitempty"`
+	MasterID          *int64         `gorm:"type:bigint"                                                            json:"masterId,omitempty"`
+	Year              *int           `gorm:"type:int"                                                               json:"year,omitempty"`
+	Country           *string        `gorm:"type:text"                                                              json:"country,omitempty"`
+	Format            ReleaseFormat  `gorm:"type:text"                                                              json:"format"`
+	TrackCount        *int           `gorm:"type:int"                                                               json:"trackCount,omitempty"`
+	Notes             *string        `gorm:"type:text"                                                              json:"notes,omitempty"`
+	ResourceURL       *string        `gorm:"type:text"                                                              json:"resourceUrl,omitempty"`
+	URI               *string        `gorm:"type:text"                                                              json:"uri,omitempty"`
+	DateAdded         *time.Time     `gorm:"type:timestamptz"                                                       json:"dateAdded,omitempty"`
+	DateChanged       *time.Time     `gorm:"type:timestamptz"                                                       json:"dateChanged,omitempty"`
+	LastSynced        *time.Time     `gorm:"type:timestamptz"                                                       json:"lastSynced,omitempty"`
+	Thumb             *string        `gorm:"type:text"                                                              json:"thumb,omitempty"`
+	CoverImage        *string        `gorm:"type:text"                                                              json:"coverImage,omitempty"`
+	TotalDuration     *int           `gorm:"type:int"                                                               json:"totalDuration,omitempty"`
+	TracksJSON        []Track        `gorm:"type:jsonb;serializer:json"                                             json:"tracksJson,omitempty"`
+	ImagesJSON        datatypes.JSON `gorm:"type:jsonb"                                                             json:"imagesJson,omitempty"`
+	VideosJSON        datatypes.JSON `gorm:"type:jsonb"                                                             json:"videosJson,omitempty"`
+	FormatDetailsJSON datatypes.JSON `gorm:"type:jsonb"                                                             json:"formatDetailsJson,omitempty"`
+	Master            *Master        `gorm:"-:migration"                                                            json:"master,omitempty"`
+	Artists           []Artist       `gorm:"many2many:release_artists;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"artists,omitempty"`
+	Labels            []Label        `gorm:"many2many:release_labels;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"  json:"labels,omitempty"`
+	Genres            []Genre        `gorm:"many2many:release_genres;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"  json:"genres,omitempty"`
 }
 
 // For Reference per docs release payload https://www.discogs.com/developers?gad_source=1&gad_campaignid=823995355&gbraid=0AAAAADmy1_qz72zU5htXZz3lK6Y3ullFL&gclid=CjwKCAjwobnGBhBNEiwAu2mpFHcf8cHDn0K2FJBEyUUOfD427IsCWbYaAxZJC0XueuPQU7VwnLvGtBoCGIsQAvD_BwE#page:database,header:database-release

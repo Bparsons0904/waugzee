@@ -197,7 +197,13 @@ func (s *DiscogsXMLParserService) convertXMLMasterToModel(xmlMaster types.Master
 
 // calculateTotalDuration calculates total duration from track list in seconds
 // Handles formats: "3:45" (MM:SS) or "1:23:45" (HH:MM:SS)
-// Falls back to disc count estimation (20 min per side = 40 min per disc) if track durations unavailable
+// Validation rules:
+//   - Skips tracks with zero duration ("0:00") to trigger fallback
+//   - Rejects tracks with unreasonable values (hours > 99, minutes > 999, seconds > 59)
+//   - Rejects tracks longer than 2 hours (7200 seconds)
+//   - Silently skips malformed or overflowing duration strings
+//
+// Falls back to disc count estimation (40 min per disc) if no valid track durations found
 func calculateTotalDuration(tracks []types.Track, format types.Format) *int {
 	if len(tracks) == 0 {
 		return estimateDurationFromDiscCount(format)
@@ -216,34 +222,41 @@ func calculateTotalDuration(tracks []types.Track, format types.Format) *int {
 		var err error
 
 		parts := strings.Split(track.Duration, ":")
-		switch len(parts) {
-		case 2: // MM:SS format
-			minutes, err = strconv.Atoi(parts[0])
-			if err != nil {
-				continue
-			}
-			seconds, err = strconv.Atoi(parts[1])
-			if err != nil {
-				continue
-			}
-		case 3: // HH:MM:SS format
-			hours, err = strconv.Atoi(parts[0])
-			if err != nil {
-				continue
-			}
-			minutes, err = strconv.Atoi(parts[1])
-			if err != nil {
-				continue
-			}
-			seconds, err = strconv.Atoi(parts[2])
-			if err != nil {
-				continue
-			}
-		default:
+
+		// Validate we have reasonable number of parts before proceeding
+		if len(parts) < 2 || len(parts) > 3 {
 			continue
 		}
 
-		totalSeconds += (hours * 3600) + (minutes * 60) + seconds
+		switch len(parts) {
+		case 2: // MM:SS format
+			if minutes, err = strconv.Atoi(parts[0]); err != nil || minutes < 0 || minutes > 999 {
+				continue
+			}
+			if seconds, err = strconv.Atoi(parts[1]); err != nil || seconds < 0 || seconds > 59 {
+				continue
+			}
+		case 3: // HH:MM:SS format
+			if hours, err = strconv.Atoi(parts[0]); err != nil || hours < 0 || hours > 99 {
+				continue
+			}
+			if minutes, err = strconv.Atoi(parts[1]); err != nil || minutes < 0 || minutes > 59 {
+				continue
+			}
+			if seconds, err = strconv.Atoi(parts[2]); err != nil || seconds < 0 || seconds > 59 {
+				continue
+			}
+		}
+
+		trackDuration := (hours * 3600) + (minutes * 60) + seconds
+
+		// Skip tracks with zero or unreasonably long durations
+		// Max reasonable track duration: 2 hours (7200 seconds)
+		if trackDuration <= 0 || trackDuration > 7200 {
+			continue
+		}
+
+		totalSeconds += trackDuration
 		hasValidDuration = true
 	}
 
@@ -300,7 +313,6 @@ func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
 
 	// Determine format based on format information
 	format := models.FormatVinyl // Default to vinyl
-	// TODO: Parse actual format from xmlRelease.Formats when needed
 
 	release := &models.Release{
 		BaseDiscogModel: models.BaseDiscogModel{
@@ -361,7 +373,7 @@ func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
 	}
 
 	// VideosJSON: Empty array as videos are not in monthly XML dumps (only in API)
-	emptyArray := []interface{}{}
+	emptyArray := []any{}
 	if videosJSON, err := json.Marshal(emptyArray); err == nil {
 		release.VideosJSON = videosJSON
 	}
@@ -495,13 +507,13 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 	if processing.Status != models.ProcessingStatusProcessing {
 		processing.Status = models.ProcessingStatusProcessing
 		processing.StartedAt = &now
-		if err := s.repos.DiscogsDataProcessing.Update(ctx, processing); err != nil {
+		if err = s.repos.DiscogsDataProcessing.Update(ctx, processing); err != nil {
 			return log.Err("failed to update processing status", err)
 		}
 	}
 
 	downloadDir := fmt.Sprintf("%s/%s", DiscogsDataDir, yearMonth)
-	if err := ensureDirectory(downloadDir, log); err != nil {
+	if err = ensureDirectory(downloadDir, log); err != nil {
 		return log.Err("failed to create download directory", err, "directory", downloadDir)
 	}
 
@@ -514,7 +526,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 	}
 
 	for fileType, filePath := range requiredFiles {
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		if _, err = os.Stat(filePath); os.IsNotExist(err) {
 			errorMsg := fmt.Sprintf("required file not found: %s", fileType)
 			processing.Status = models.ProcessingStatusFailed
 			processing.ErrorMessage = &errorMsg
