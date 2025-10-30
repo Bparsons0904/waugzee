@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 	"waugzee/internal/logger"
@@ -86,6 +87,29 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 			// Set Master ID if available
 			if basicInfo.MasterID > 0 {
 				release.MasterID = &basicInfo.MasterID
+			}
+
+			// Extract format details (duration calculation happens during full data sync)
+			if len(basicInfo.Formats) > 0 {
+				format := basicInfo.Formats[0]
+
+				// Store format details as JSONB
+				formatDetails := FormatDetails{
+					Name:         format.Name,
+					Qty:          format.Qty,
+					Text:         format.Text,
+					Descriptions: format.Descriptions,
+				}
+
+				formatJSON, err := json.Marshal(formatDetails)
+				if err == nil {
+					release.FormatDetailsJSON = formatJSON
+				} else {
+					log.Warn("Failed to marshal format details", "releaseID", basicInfo.ID, "error", err)
+				}
+
+				// Note: Duration calculation (track-based with disc count fallback) happens
+				// during XML processing or individual release requests where we have full data
 			}
 
 			releases = append(releases, release)

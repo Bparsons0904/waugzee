@@ -136,6 +136,7 @@ func (r *releaseRepository) UpsertBatch(
 			"tracks_json",
 			"images_json",
 			"videos_json",
+			"format_details_json",
 			"total_duration",
 			"updated_at",
 		}),

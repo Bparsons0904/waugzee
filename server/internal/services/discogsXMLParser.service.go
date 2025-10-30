@@ -197,10 +197,10 @@ func (s *DiscogsXMLParserService) convertXMLMasterToModel(xmlMaster types.Master
 
 // calculateTotalDuration calculates total duration from track list in seconds
 // Handles formats: "3:45" (MM:SS) or "1:23:45" (HH:MM:SS)
-// Returns nil if unable to calculate (missing/malformed durations)
-func calculateTotalDuration(tracks []types.Track) *int {
+// Falls back to disc count estimation (20 min per side = 40 min per disc) if track durations unavailable
+func calculateTotalDuration(tracks []types.Track, format types.Format) *int {
 	if len(tracks) == 0 {
-		return nil
+		return estimateDurationFromDiscCount(format)
 	}
 
 	totalSeconds := 0
@@ -248,10 +248,26 @@ func calculateTotalDuration(tracks []types.Track) *int {
 	}
 
 	if !hasValidDuration {
-		return nil
+		return estimateDurationFromDiscCount(format)
 	}
 
 	return &totalSeconds
+}
+
+// estimateDurationFromDiscCount estimates duration based on disc count
+// Uses 20 minutes per side (40 minutes per disc) as the standard
+func estimateDurationFromDiscCount(format types.Format) *int {
+	if format.Qty == "" {
+		return nil
+	}
+
+	qty, err := strconv.Atoi(format.Qty)
+	if err != nil || qty <= 0 {
+		return nil
+	}
+
+	estimatedSeconds := qty * 2400 // qty * 40 minutes * 60 seconds
+	return &estimatedSeconds
 }
 
 // convertXMLReleaseToModel converts XML Release to database Release model
@@ -303,6 +319,22 @@ func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
 		release.MasterID = &xmlRelease.MasterID
 	}
 
+	// Extract and store format details as JSONB
+	if xmlRelease.Formats.Name != "" || xmlRelease.Formats.Qty != "" {
+		formatDetails := models.FormatDetails{
+			Name:         xmlRelease.Formats.Name,
+			Qty:          xmlRelease.Formats.Qty,
+			Text:         xmlRelease.Formats.Text,
+			Descriptions: []string{}, // XML format doesn't have descriptions array parsed yet
+		}
+
+		if formatJSON, err := json.Marshal(formatDetails); err == nil {
+			release.FormatDetailsJSON = formatJSON
+		} else {
+			s.log.Warn("Failed to marshal format details", "releaseID", xmlRelease.ID, "error", err)
+		}
+	}
+
 	// Populate JSONB fields
 	if len(xmlRelease.Tracklist) > 0 {
 		// Convert types.Track to models.Track
@@ -315,10 +347,10 @@ func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
 			}
 		}
 		release.TracksJSON = tracks
-
-		// Calculate total duration
-		release.TotalDuration = calculateTotalDuration(xmlRelease.Tracklist)
 	}
+
+	// Calculate total duration (with fallback to disc count estimation)
+	release.TotalDuration = calculateTotalDuration(xmlRelease.Tracklist, xmlRelease.Formats)
 
 	if len(xmlRelease.Images) > 0 {
 		if imagesJSON, err := json.Marshal(xmlRelease.Images); err == nil {

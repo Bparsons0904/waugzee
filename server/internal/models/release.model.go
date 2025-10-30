@@ -22,6 +22,13 @@ type Track struct {
 	Duration string `json:"duration"`
 }
 
+type FormatDetails struct {
+	Name         string   `json:"name"`
+	Qty          string   `json:"qty"`
+	Descriptions []string `json:"descriptions"`
+	Text         string   `json:"text"`
+}
+
 type Release struct {
 	BaseDiscogModel
 	Title       string        `gorm:"type:text;"       json:"title"`
@@ -41,9 +48,10 @@ type Release struct {
 	CoverImage  *string       `gorm:"type:text"        json:"coverImage,omitempty"`
 
 	// JSONB columns for display data
-	TracksJSON []Track           `gorm:"type:jsonb;serializer:json" json:"tracksJson,omitempty"`
-	ImagesJSON datatypes.JSON    `gorm:"type:jsonb"                 json:"imagesJson,omitempty"`
-	VideosJSON datatypes.JSON    `gorm:"type:jsonb"                 json:"videosJson,omitempty"`
+	TracksJSON        []Track           `gorm:"type:jsonb;serializer:json" json:"tracksJson,omitempty"`
+	ImagesJSON        datatypes.JSON    `gorm:"type:jsonb"                 json:"imagesJson,omitempty"`
+	VideosJSON        datatypes.JSON    `gorm:"type:jsonb"                 json:"videosJson,omitempty"`
+	FormatDetailsJSON datatypes.JSON    `gorm:"type:jsonb"                 json:"formatDetailsJson,omitempty"`
 
 	// Calculated total duration in seconds
 	TotalDuration *int `gorm:"type:int" json:"totalDuration,omitempty"`

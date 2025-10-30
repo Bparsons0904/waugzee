@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type GenreRepository interface {
@@ -182,8 +183,13 @@ func (r *genreRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, genres [
 	}
 
 	if len(toUpdate) > 0 {
-		if err := r.UpdateBatch(ctx, tx, toUpdate); err != nil {
-			return log.Err("failed to update genre batch", err, "count", len(toUpdate))
+		// Use ON CONFLICT DO NOTHING to handle race conditions gracefully
+		// This prevents transaction aborts when genres are inserted concurrently
+		if err := tx.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "name"}, {Name: "type"}},
+			DoNothing: true,
+		}).Create(&toUpdate).Error; err != nil {
+			return log.Err("failed to upsert genre batch", err, "count", len(toUpdate))
 		}
 	}
 
@@ -222,7 +228,11 @@ func (r *genreRepository) InsertBatch(ctx context.Context, tx *gorm.DB, genres [
 		return nil
 	}
 
-	if err := tx.WithContext(ctx).Create(&genres).Error; err != nil {
+	// Use ON CONFLICT DO NOTHING to handle race conditions gracefully
+	if err := tx.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "name"}, {Name: "type"}},
+		DoNothing: true,
+	}).Create(&genres).Error; err != nil {
 		return log.Err("failed to insert genre batch", err, "count", len(genres))
 	}
 
