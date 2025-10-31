@@ -129,6 +129,7 @@ export interface Release {
   lastSynced?: string;
   thumb?: string;
   coverImage?: string;
+  totalDuration?: number;
   tracksJson?: Track[];
   artists?: Artist[];
   genres?: Genre[];

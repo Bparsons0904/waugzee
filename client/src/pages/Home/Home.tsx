@@ -71,40 +71,40 @@ const Home: Component = () => {
   const actionItems = createMemo((): ActionItem[] => [
     {
       title: "Log Play",
-      description: "Record when you play a record from your collection.",
+      description: "Track your listening sessions with notes and equipment details.",
       buttonText: "Log Now",
       onClick: () => handleNavigation(ROUTES.LOG_PLAY),
     },
     {
-      title: "View Play History",
-      description: "View your play history and listening statistics.",
-      buttonText: "View Stats",
+      title: "Play History",
+      description: "Review your listening sessions and track record plays.",
+      buttonText: "View History",
       onClick: () => handleNavigation(ROUTES.PLAY_HISTORY),
     },
     {
       title: "View Collection",
       description: "Browse and search through your vinyl collection.",
-      buttonText: "View Collection",
+      buttonText: "Browse Collection",
       onClick: () => handleNavigation(ROUTES.COLLECTION),
     },
     {
-      title: "View Styluses",
-      description: "View, edit and add styluses to track wear.",
-      buttonText: "View Styluses",
+      title: "My Styluses",
+      description: "Manage your styluses and track needle wear.",
+      buttonText: "Manage Styluses",
       onClick: () => handleNavigation(ROUTES.EQUIPMENT),
     },
     {
       title: "Sync Collection",
       description: user()?.configuration?.discogsToken
-        ? syncStatus() || "Sync your Waugzee collection with your Discogs library."
+        ? syncStatus() || "Import your vinyl collection from Discogs."
         : "Connect your Discogs account to sync your collection.",
       buttonText: getButtonText(),
       onClick: handleSyncCollection,
       disabled: syncMutation.isPending,
     },
     {
-      title: "View Analytics",
-      description: "Explore insights about your collection and listening habits.",
+      title: "Listening Insights",
+      description: "Discover patterns in your listening habits.",
       buttonText: "View Insights",
       onClick: handleViewAnalytics,
     },

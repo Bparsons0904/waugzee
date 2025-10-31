@@ -121,7 +121,7 @@ func (r *historyRepository) GetUserPlayHistory(
 	}
 
 	playHistory, err := gorm.G[*PlayHistory](tx).
-		Preload("UserRelease.Release", nil).
+		Preload("UserRelease.Release.Genres", nil).
 		Preload("UserStylus", nil).
 		Preload("UserStylus.Stylus", nil).
 		Where(PlayHistory{UserID: userID}).
@@ -178,7 +178,12 @@ func (r *historyRepository) UpdatePlayHistory(
 		Where(PlayHistory{BaseUUIDModel: BaseUUIDModel{ID: playHistoryID}}).
 		First(ctx)
 	if err != nil {
-		return nil, log.Err("failed to retrieve updated play history", err, "playHistoryID", playHistoryID)
+		return nil, log.Err(
+			"failed to retrieve updated play history",
+			err,
+			"playHistoryID",
+			playHistoryID,
+		)
 	}
 
 	r.clearUserPlayHistoryCache(ctx, playHistory.UserID)

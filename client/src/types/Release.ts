@@ -153,6 +153,7 @@ export interface Release {
   resourceUrl: string;
   thumb: string;
   coverImage: string;
+  totalDuration?: number;
   createdAt: string;
   updatedAt: string;
   lastSynced: string;

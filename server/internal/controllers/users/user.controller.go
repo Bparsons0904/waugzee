@@ -26,10 +26,10 @@ type UserController struct {
 }
 
 type GetUserResponse struct {
-	Folders     []*Folder       `json:"folders"`
-	Releases    []*UserRelease  `json:"releases"`
-	Styluses    []*UserStylus   `json:"styluses"`
-	PlayHistory []*PlayHistory  `json:"playHistory"`
+	Folders     []*Folder      `json:"folders"`
+	Releases    []*UserRelease `json:"releases"`
+	Styluses    []*UserStylus  `json:"styluses"`
+	PlayHistory []*PlayHistory `json:"playHistory"`
 }
 
 type UserControllerInterface interface {
@@ -122,7 +122,13 @@ func (uc *UserController) GetUser(
 	var releases []*UserRelease
 	if user.Configuration != nil && user.Configuration.SelectedFolderID != nil {
 		// Get the folder using the composite key lookup
-		selectedFolder, err := uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, *user.Configuration.SelectedFolderID)
+		var selectedFolder *Folder
+		selectedFolder, err = uc.folderRepo.GetFolderByID(
+			ctx,
+			uc.db.SQL,
+			user.ID,
+			*user.Configuration.SelectedFolderID,
+		)
 		if err != nil {
 			log.Warn(
 				"selected folder not found, returning empty releases (likely needs sync)",
@@ -189,7 +195,9 @@ func (uc *UserController) UpdateSelectedFolder(
 	}
 
 	if user.Configuration == nil {
-		return nil, log.ErrMsg("user configuration not found, please set up Discogs integration first")
+		return nil, log.ErrMsg(
+			"user configuration not found, please set up Discogs integration first",
+		)
 	}
 
 	user.Configuration.SelectedFolderID = &folderID

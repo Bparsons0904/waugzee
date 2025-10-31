@@ -67,10 +67,7 @@ func (rs *ReleaseSyncService) RequestMissingReleases(
 
 	// Limit concurrent API requests to prevent overwhelming the system
 	processedCount := 0
-	maxRequests := MaxPendingAPIRequests
-	if len(missingReleaseIDs) < maxRequests {
-		maxRequests = len(missingReleaseIDs)
-	}
+	maxRequests := min(len(missingReleaseIDs), MaxPendingAPIRequests)
 
 	// Request each missing release up to the limit
 	for _, releaseID := range missingReleaseIDs {
@@ -117,14 +114,17 @@ func (rs *ReleaseSyncService) RequestMissingReleases(
 			Event:   "api_request",
 			UserID:  user.ID.String(),
 			Payload: map[string]any{
-				"requestId":    requestID,
-				"requestType":  "release",
-				"releaseId":    releaseID,
-				"syncStateId":  syncStateID,
-				"url":          fullURL,
-				"method":       "GET",
+				"requestId":   requestID,
+				"requestType": "release",
+				"releaseId":   releaseID,
+				"syncStateId": syncStateID,
+				"url":         fullURL,
+				"method":      "GET",
 				"headers": map[string]string{
-					"Authorization": fmt.Sprintf("Discogs token=%s", *user.Configuration.DiscogsToken),
+					"Authorization": fmt.Sprintf(
+						"Discogs token=%s",
+						*user.Configuration.DiscogsToken,
+					),
 				},
 				"callbackService": "orchestration",
 				"callbackEvent":   "api_response",
@@ -239,7 +239,8 @@ func (rs *ReleaseSyncService) ProcessReleaseResponse(
 			Text:         firstFormat.Text,
 			Descriptions: firstFormat.Descriptions,
 		}
-		formatJSON, err := json.Marshal(formatDetails)
+		var formatJSON []byte
+		formatJSON, err = json.Marshal(formatDetails)
 		if err != nil {
 			log.Warn("Failed to marshal format details", "error", err)
 		} else {
@@ -338,7 +339,6 @@ func (rs *ReleaseSyncService) updateSyncStateWithPendingRequests(
 ) error {
 	log := rs.log.Function("updateSyncStateWithPendingRequests")
 
-
 	// Get current sync state as raw data to avoid import cycles
 	var syncStateData map[string]any
 	found, err := database.NewCacheBuilder(rs.db.Cache.ClientAPI, syncStateID).
@@ -391,3 +391,4 @@ func (rs *ReleaseSyncService) updateSyncStateWithPendingRequests(
 
 	return nil
 }
+
