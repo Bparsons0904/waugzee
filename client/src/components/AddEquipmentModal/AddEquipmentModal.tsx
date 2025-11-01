@@ -9,6 +9,7 @@ import { Button } from "@components/common/ui/Button/Button";
 import type { CreateUserStylusRequest } from "@models/Stylus";
 import { useAvailableStyluses, useCreateUserStylus } from "@services/apiHooks";
 import { formatDateForInput } from "@utils/dates";
+import clsx from "clsx";
 import type { Component } from "solid-js";
 import { createStore } from "solid-js/store";
 import styles from "./AddEquipmentModal.module.scss";
@@ -128,7 +129,7 @@ const AddEquipmentModal: Component<AddEquipmentModalProps> = (props) => {
         />
       </div>
 
-      <div class={`${styles.formRow} ${styles.full}`}>
+      <div class={clsx(styles.formRow, styles.full)}>
         <Textarea
           name="notes"
           label="Notes"

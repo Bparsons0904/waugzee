@@ -10,6 +10,7 @@ import type { UserStylus } from "@models/User";
 import { useUpdateCleaning, useUpdatePlay } from "@services/apiHooks";
 import { formatDateTimeForInput } from "@utils/dates";
 import { AiOutlineClose } from "solid-icons/ai";
+import clsx from "clsx";
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import styles from "./EditHistoryPanel.module.scss";
 
@@ -91,7 +92,7 @@ export const EditHistoryPanel: Component<EditHistoryPanelProps> = (props) => {
   const isSubmitting = () => updatePlayMutation.isPending || updateCleaningMutation.isPending;
 
   return (
-    <div class={`${styles.panelWrapper} ${props.isOpen ? styles.open : ""}`}>
+    <div class={clsx(styles.panelWrapper, { [styles.open]: props.isOpen })}>
       <div class={styles.overlay} onClick={props.onClose} />
 
       <div class={styles.panel}>

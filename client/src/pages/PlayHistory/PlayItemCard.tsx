@@ -2,6 +2,7 @@ import type { PlayHistory } from "@models/Release";
 import type { UserRelease } from "@models/User";
 import { TbWashTemperature5 } from "solid-icons/tb";
 import { VsNote } from "solid-icons/vs";
+import clsx from "clsx";
 import { type Component, Show } from "solid-js";
 import styles from "./PlayHistory.module.scss";
 
@@ -38,14 +39,14 @@ export const PlayItemCard: Component<PlayItemCardProps> = (props) => {
 
       <div class={styles.indicators}>
         <Show when={props.play.notes && props.play.notes.trim() !== ""}>
-          <span class={`${styles.indicator} ${styles.hasNotes}`}>
+          <span class={clsx(styles.indicator, styles.hasNotes)}>
             <VsNote size={14} />
             <span>Notes</span>
           </span>
         </Show>
 
         <Show when={props.hasCleaning}>
-          <span class={`${styles.indicator} ${styles.hasCleaning}`}>
+          <span class={clsx(styles.indicator, styles.hasCleaning)}>
             <TbWashTemperature5 size={14} />
             <span>Cleaned</span>
           </span>

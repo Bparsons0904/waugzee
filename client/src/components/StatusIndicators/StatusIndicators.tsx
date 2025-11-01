@@ -12,6 +12,7 @@ import {
 } from "@utils/playStatus";
 import { ImHeadphones } from "solid-icons/im";
 import { TbWashTemperature5 } from "solid-icons/tb";
+import clsx from "clsx";
 import { type Component, Show } from "solid-js";
 import styles from "./StatusIndicators.module.scss";
 
@@ -98,7 +99,9 @@ const PlayStatusIndicator: Component<PlayStatusProps> = (props) => {
   return (
     <div class={styles.indicator}>
       <div
-        class={`${styles.iconContainer} ${props.onClick ? styles.clickable : ""}`}
+        class={clsx(styles.iconContainer, {
+          [styles.clickable]: props.onClick,
+        })}
         style={{ "background-color": color() }}
         onClick={handleClick}
         title="Click to log a play"
@@ -136,7 +139,9 @@ const CleaningStatusIndicator: Component<CleaningStatusProps> = (props) => {
   return (
     <div class={styles.indicator}>
       <div
-        class={`${styles.iconContainer} ${props.onClick ? styles.clickable : ""}`}
+        class={clsx(styles.iconContainer, {
+          [styles.clickable]: props.onClick,
+        })}
         style={{ "background-color": color() }}
         onClick={handleClick}
         title="Click to log a cleaning"

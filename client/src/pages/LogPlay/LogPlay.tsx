@@ -9,6 +9,7 @@ import { useUserData } from "@context/UserDataContext";
 import type { UserRelease } from "@models/User";
 import { useLogCleaning, useLogPlay } from "@services/apiHooks";
 import { fuzzySearchUserReleases } from "@utils/fuzzy";
+import clsx from "clsx";
 
 import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import styles from "./LogPlay.module.scss";
@@ -233,7 +234,9 @@ const LogPlay: Component = () => {
               <For each={filteredReleases()}>
                 {(userRelease) => (
                   <div
-                    class={`${styles.releaseCard} ${selectedRelease()?.id === userRelease.id ? styles.selected : ""}`}
+                    class={clsx(styles.releaseCard, {
+                      [styles.selected]: selectedRelease()?.id === userRelease.id,
+                    })}
                     onClick={() => handleReleaseClick(userRelease)}
                   >
                     <div class={styles.releaseCardContainer}>

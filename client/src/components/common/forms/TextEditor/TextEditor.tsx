@@ -13,6 +13,7 @@ import { Strike } from "@tiptap/extension-strike";
 import { Text } from "@tiptap/extension-text";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { Underline } from "@tiptap/extension-underline";
+import clsx from "clsx";
 import {
   type Component,
   createEffect,
@@ -166,14 +167,14 @@ export const TextEditor: Component<TextEditorProps> = (props) => {
 
   // --- JSX ---
   return (
-    <div class={`${styles.textEditor} ${props.class || ""}`}>
+    <div class={clsx(styles.textEditor, props.class)}>
       {/* Toolbar */}
       <div class={styles.toolbar}>
         {/* Text Formatting */}
         <div class={styles.toolbarGroup}>
           <button
             type="button"
-            class={`${styles.toolbarButton} ${activeStates.bold ? styles.active : ""}`}
+            class={clsx(styles.toolbarButton, { [styles.active]: activeStates.bold })}
             onClick={() => editor()?.chain().focus().toggleBold().run()}
             aria-label="Bold"
             title="Bold"
@@ -184,7 +185,7 @@ export const TextEditor: Component<TextEditorProps> = (props) => {
 
           <button
             type="button"
-            class={`${styles.toolbarButton} ${activeStates.italic ? styles.active : ""}`}
+            class={clsx(styles.toolbarButton, { [styles.active]: activeStates.italic })}
             onClick={() => editor()?.chain().focus().toggleItalic().run()}
             aria-label="Italic"
             title="Italic"
@@ -194,7 +195,7 @@ export const TextEditor: Component<TextEditorProps> = (props) => {
 
           <button
             type="button"
-            class={`${styles.toolbarButton} ${activeStates.underline ? styles.active : ""}`}
+            class={clsx(styles.toolbarButton, { [styles.active]: activeStates.underline })}
             onClick={() => editor()?.chain().focus().toggleUnderline().run()}
             aria-label="Underline"
             title="Underline"
@@ -204,7 +205,7 @@ export const TextEditor: Component<TextEditorProps> = (props) => {
 
           <button
             type="button"
-            class={`${styles.toolbarButton} ${activeStates.strike ? styles.active : ""}`}
+            class={clsx(styles.toolbarButton, { [styles.active]: activeStates.strike })}
             onClick={() => editor()?.chain().focus().toggleStrike().run()}
             aria-label="Strikethrough"
             title="Strikethrough"
@@ -219,7 +220,7 @@ export const TextEditor: Component<TextEditorProps> = (props) => {
         <div class={styles.toolbarGroup}>
           <button
             type="button"
-            class={`${styles.toolbarButton} ${activeStates.bulletList ? styles.active : ""}`}
+            class={clsx(styles.toolbarButton, { [styles.active]: activeStates.bulletList })}
             onClick={() => editor()?.chain().focus().toggleBulletList().run()}
             aria-label="Bullet List"
             title="Bullet List"
@@ -229,7 +230,7 @@ export const TextEditor: Component<TextEditorProps> = (props) => {
 
           <button
             type="button"
-            class={`${styles.toolbarButton} ${activeStates.orderedList ? styles.active : ""}`}
+            class={clsx(styles.toolbarButton, { [styles.active]: activeStates.orderedList })}
             onClick={() => editor()?.chain().focus().toggleOrderedList().run()}
             aria-label="Numbered List"
             title="Numbered List"
@@ -244,7 +245,9 @@ export const TextEditor: Component<TextEditorProps> = (props) => {
         <div class={styles.toolbarGroup}>
           <button
             type="button"
-            class={`${styles.toolbarButton} ${activeStates.textAlign === "left" ? styles.active : ""}`}
+            class={clsx(styles.toolbarButton, {
+              [styles.active]: activeStates.textAlign === "left",
+            })}
             onClick={() => setAlignment("left")}
             aria-label="Align Left"
             title="Align Left"
@@ -254,7 +257,9 @@ export const TextEditor: Component<TextEditorProps> = (props) => {
 
           <button
             type="button"
-            class={`${styles.toolbarButton} ${activeStates.textAlign === "center" ? styles.active : ""}`}
+            class={clsx(styles.toolbarButton, {
+              [styles.active]: activeStates.textAlign === "center",
+            })}
             onClick={() => setAlignment("center")}
             aria-label="Align Center"
             title="Align Center"
@@ -264,7 +269,9 @@ export const TextEditor: Component<TextEditorProps> = (props) => {
 
           <button
             type="button"
-            class={`${styles.toolbarButton} ${activeStates.textAlign === "right" ? styles.active : ""}`}
+            class={clsx(styles.toolbarButton, {
+              [styles.active]: activeStates.textAlign === "right",
+            })}
             onClick={() => setAlignment("right")}
             aria-label="Align Right"
             title="Align Right"
@@ -279,7 +286,7 @@ export const TextEditor: Component<TextEditorProps> = (props) => {
         <div class={styles.toolbarGroup}>
           <button
             type="button"
-            class={`${styles.toolbarButton} ${showEmojiPicker() ? styles.active : ""}`}
+            class={clsx(styles.toolbarButton, { [styles.active]: showEmojiPicker() })}
             onClick={() => setShowEmojiPicker(!showEmojiPicker())}
             aria-label="Insert Emoji"
             title="Insert Emoji"

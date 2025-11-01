@@ -5,6 +5,7 @@ import GridIcon from "@components/icons/GridIcon";
 import RecordActionModal from "@components/RecordActionModal/RecordActionModal";
 import { useUserData } from "@context/UserDataContext";
 import { fuzzySearchUserReleases } from "@utils/fuzzy";
+import clsx from "clsx";
 import { type Component, createMemo, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import type { UserRelease } from "src/types/User";
@@ -319,7 +320,7 @@ const ViewCollection: Component = () => {
         </div>
       </Show>
 
-      <div class={`${styles.albumGrid} ${styles[viewState.gridSize]}`}>
+      <div class={clsx(styles.albumGrid, styles[viewState.gridSize])}>
         <For each={filteredReleases()}>
           {(userRelease) => <AlbumCard userRelease={userRelease} onClick={handleReleaseClick} />}
         </For>

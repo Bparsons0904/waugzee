@@ -1,6 +1,7 @@
 import { formatHistoryDate } from "@utils/dates";
 import { AiOutlineClose, AiTwotoneCalendar } from "solid-icons/ai";
 import { ImHeadphones } from "solid-icons/im";
+import clsx from "clsx";
 import { type Component, Show } from "solid-js";
 import styles from "./NotesViewPanel.module.scss";
 
@@ -15,7 +16,7 @@ export interface NotesViewPanelProps {
 
 export const NotesViewPanel: Component<NotesViewPanelProps> = (props) => {
   return (
-    <div class={`${styles.panelWrapper} ${props.isOpen ? styles.open : ""}`}>
+    <div class={clsx(styles.panelWrapper, { [styles.open]: props.isOpen })}>
       <div class={styles.overlay} onClick={props.onClose} />
 
       <div class={styles.panel}>

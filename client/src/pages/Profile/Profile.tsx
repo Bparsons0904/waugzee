@@ -5,6 +5,7 @@ import { USER_ENDPOINTS } from "@constants/api.constants";
 import { useAuth } from "@context/AuthContext";
 import { useUserData } from "@context/UserDataContext";
 import { useApiPut } from "@services/apiHooks";
+import clsx from "clsx";
 import { type Component, createSignal, Show } from "solid-js";
 import type { UpdateUserPreferencesRequest, UpdateUserPreferencesResponse } from "src/types/User";
 import styles from "./Profile.module.scss";
@@ -99,11 +100,10 @@ const Profile: Component = () => {
             <div class={styles.statusInfo}>
               <span class={styles.infoLabel}>Connection Status</span>
               <span
-                class={`${styles.statusBadge} ${
-                  user()?.configuration?.discogsToken
-                    ? styles.statusConnected
-                    : styles.statusDisconnected
-                }`}
+                class={clsx(styles.statusBadge, {
+                  [styles.statusConnected]: user()?.configuration?.discogsToken,
+                  [styles.statusDisconnected]: !user()?.configuration?.discogsToken,
+                })}
               >
                 {user()?.configuration?.discogsToken
                   ? `✓ Connected as ${user()?.configuration?.discogsUsername}`

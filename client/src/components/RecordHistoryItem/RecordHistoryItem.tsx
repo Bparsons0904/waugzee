@@ -8,6 +8,7 @@ import { BsVinylFill } from "solid-icons/bs";
 import { FaSolidTrash } from "solid-icons/fa";
 import { TbWashTemperature5 } from "solid-icons/tb";
 import { VsNote } from "solid-icons/vs";
+import clsx from "clsx";
 import { type Component, createSignal, Match, Show, Switch } from "solid-js";
 import styles from "./RecordHistoryItem.module.scss";
 
@@ -73,7 +74,10 @@ export const RecordHistoryItem: Component<RecordHistoryItemProps> = (props) => {
   return (
     <>
       <div
-        class={`${styles.historyItem} ${props.item.type === "play" ? styles.playItem : styles.cleaningItem}`}
+        class={clsx(styles.historyItem, {
+          [styles.playItem]: props.item.type === "play",
+          [styles.cleaningItem]: props.item.type === "cleaning",
+        })}
       >
         <div class={styles.historyItemContent}>
           <div class={styles.historyItemHeader}>
