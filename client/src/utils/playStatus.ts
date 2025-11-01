@@ -1,12 +1,13 @@
 export function getCleanlinessScore(
   lastCleanedDate: Date | null,
   playsSinceCleaning: number,
+  cleaningFrequencyPlays = 5,
 ): number {
   if (!lastCleanedDate) {
     return 100;
   }
 
-  const playScore = Math.min(100, (playsSinceCleaning / 5.01) * 100);
+  const playScore = Math.min(100, (playsSinceCleaning / (cleaningFrequencyPlays + 0.01)) * 100);
 
   return playScore;
 }
@@ -19,16 +20,19 @@ export function getCleanlinessColor(score: number): string {
   return "#e9493e";
 }
 
-export function getPlayRecencyScore(lastPlayedDate: Date | null): number {
+export function getPlayRecencyScore(
+  lastPlayedDate: Date | null,
+  recentlyPlayedThresholdDays = 90,
+): number {
   if (!lastPlayedDate) return 0;
 
   const now = new Date();
   const daysElapsed = (now.getTime() - lastPlayedDate.getTime()) / (24 * 60 * 60 * 1000);
 
   if (daysElapsed <= 7) return 100;
-  if (daysElapsed <= 30) return 80;
-  if (daysElapsed <= 90) return 60;
-  if (daysElapsed <= 180) return 40;
+  if (daysElapsed <= recentlyPlayedThresholdDays / 3) return 80;
+  if (daysElapsed <= recentlyPlayedThresholdDays) return 60;
+  if (daysElapsed <= recentlyPlayedThresholdDays * 2) return 40;
   if (daysElapsed <= 365) return 20;
   return 0;
 }
@@ -41,7 +45,10 @@ export function getPlayRecencyColor(score: number): string {
   return "#e9493e";
 }
 
-export function getPlayRecencyText(lastPlayedDate: Date | null): string {
+export function getPlayRecencyText(
+  lastPlayedDate: Date | null,
+  recentlyPlayedThresholdDays = 90,
+): string {
   if (!lastPlayedDate) return "Never played";
 
   const now = new Date();
@@ -49,10 +56,10 @@ export function getPlayRecencyText(lastPlayedDate: Date | null): string {
 
   if (daysElapsed <= 7) return "Played this week";
   if (daysElapsed <= 30) return "Played this month";
-  // Claude could the months be Played in the last ${}months?
-  if (daysElapsed <= 90) return "Played in the last 3 months";
-  if (daysElapsed <= 180) return "Played in the last 6 months";
-  // Maybe just return Played over a year and that is the default
+  if (daysElapsed <= recentlyPlayedThresholdDays)
+    return `Played in the last ${Math.ceil(daysElapsed / 30)} months`;
+  if (daysElapsed <= recentlyPlayedThresholdDays * 2)
+    return `Played in the last ${Math.ceil(daysElapsed / 30)} months`;
   if (daysElapsed <= 365) return "Played in the last year";
   return "Not played recently";
 }

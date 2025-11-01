@@ -17,11 +17,12 @@ interface NeglectedRecordsProps {
   cleaningHistory: CleaningHistory[];
   onPlayRecord?: (userReleaseId: string) => void;
   onCleanRecord?: (userReleaseId: string) => void;
+  defaultDaysThreshold?: number;
 }
 
 export const NeglectedRecords: Component<NeglectedRecordsProps> = (props) => {
   const [mode, setMode] = createSignal<NeglectMode>("play");
-  const [daysThreshold, setDaysThreshold] = createSignal(90);
+  const [daysThreshold, setDaysThreshold] = createSignal(props.defaultDaysThreshold ?? 180);
   const [displayLimit, setDisplayLimit] = createSignal(10);
 
   const modeOptions = [

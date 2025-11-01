@@ -1,4 +1,3 @@
-import { FolderSelector } from "@components/folders/FolderSelector";
 import { ROUTES } from "@constants/api.constants";
 import { useAuth } from "@context/AuthContext";
 import { A } from "@solidjs/router";
@@ -62,15 +61,6 @@ export const NavBar: Component = () => {
               </Match>
             </Switch>
           </ul>
-
-          {/* Folder Selector for authenticated users */}
-          <Switch>
-            <Match when={isAuthenticated()}>
-              <div class={styles.navbarFolderSelector}>
-                <FolderSelector navbar />
-              </div>
-            </Match>
-          </Switch>
 
           <ul class={styles.navbarActions}>
             <li class={styles.navbarItem}>

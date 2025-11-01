@@ -6,6 +6,9 @@ export interface UserConfiguration {
   discogsToken?: string;
   discogsUsername?: string;
   selectedFolderId?: number;
+  recentlyPlayedThresholdDays?: number;
+  cleaningFrequencyPlays?: number;
+  neglectedRecordsThresholdDays?: number;
 }
 
 export interface Folder {
@@ -80,6 +83,16 @@ export interface UpdateSelectedFolderRequest {
 }
 
 export interface UpdateSelectedFolderResponse {
+  user: User;
+}
+
+export interface UpdateUserPreferencesRequest {
+  recentlyPlayedThresholdDays?: number;
+  cleaningFrequencyPlays?: number;
+  neglectedRecordsThresholdDays?: number;
+}
+
+export interface UpdateUserPreferencesResponse {
   user: User;
 }
 

@@ -43,6 +43,7 @@ func (h *UserHandler) Register() {
 	users.Get("/me", h.getCurrentUser)
 	users.Put("/me/discogs", h.updateDiscogsToken)
 	users.Put("/me/folder", h.updateSelectedFolder)
+	users.Put("/me/preferences", h.updateUserPreferences)
 }
 
 func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
@@ -123,6 +124,40 @@ func (h *UserHandler) updateSelectedFolder(c *fiber.Ctx) error {
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to update selected folder",
+		})
+	}
+
+	return c.JSON(fiber.Map{"user": updatedUser})
+}
+
+func (h *UserHandler) updateUserPreferences(c *fiber.Ctx) error {
+	user := middleware.GetUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authentication required",
+		})
+	}
+
+	var req userController.UpdateUserPreferencesRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	updatedUser, err := h.userController.UpdateUserPreferences(c.Context(), user, &req)
+	if err != nil {
+		errMsg := err.Error()
+		if errMsg == "user configuration not found, please set up Discogs integration first" ||
+			errMsg == "recentlyPlayedThresholdDays must be between 1 and 365" ||
+			errMsg == "cleaningFrequencyPlays must be between 1 and 50" ||
+			errMsg == "neglectedRecordsThresholdDays must be between 1 and 730" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": errMsg,
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update user preferences",
 		})
 	}
 

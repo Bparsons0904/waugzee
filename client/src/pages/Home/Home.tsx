@@ -1,5 +1,3 @@
-import { DiscogsTokenModal } from "@components/common/ui/DiscogsTokenModal";
-import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import {
   type ActionItem,
   ActionsSection,
@@ -23,7 +21,6 @@ const Home: Component = () => {
   const navigate = useNavigate();
   const { user } = useUserData();
 
-  const [showTokenModal, setShowTokenModal] = createSignal(false);
   const [syncStatus, setSyncStatus] = createSignal<string>("");
 
   const syncMutation = useApiPost<SyncResponse, void>("/sync/syncCollection", undefined, {
@@ -45,16 +42,12 @@ const Home: Component = () => {
 
   const handleSyncCollection = () => {
     if (!user()?.configuration?.discogsToken) {
-      setShowTokenModal(true);
+      navigate(ROUTES.PROFILE);
       return;
     }
 
     setSyncStatus("Initiating collection sync...");
     syncMutation.mutate();
-  };
-
-  const handleTokenModalClose = () => {
-    setShowTokenModal(false);
   };
 
   const handleViewAnalytics = () => {
@@ -121,23 +114,11 @@ const Home: Component = () => {
           <h1 class={styles.title}>Welcome back, {user()?.firstName || "User"}!</h1>
           <p class={styles.subtitle}>Your personal vinyl collection tracker</p>
         </div>
-        <button type="button" class={styles.primaryButton} onClick={() => setShowTokenModal(true)}>
-          {user()?.configuration?.discogsToken ? "Update Discogs Token" : "Connect Discogs"}
-        </button>
       </div>
 
       <StatsSection />
 
       <ActionsSection actions={actionItems()} />
-
-      <Modal
-        isOpen={showTokenModal()}
-        onClose={handleTokenModalClose}
-        size={ModalSize.Large}
-        title="Discogs API Configuration"
-      >
-        <DiscogsTokenModal onClose={handleTokenModalClose} />
-      </Modal>
     </div>
   );
 };

@@ -32,6 +32,12 @@ type GetUserResponse struct {
 	PlayHistory []*PlayHistory `json:"playHistory"`
 }
 
+type UpdateUserPreferencesRequest struct {
+	RecentlyPlayedThresholdDays   *int `json:"recentlyPlayedThresholdDays"`
+	CleaningFrequencyPlays        *int `json:"cleaningFrequencyPlays"`
+	NeglectedRecordsThresholdDays *int `json:"neglectedRecordsThresholdDays"`
+}
+
 type UserControllerInterface interface {
 	UpdateDiscogsToken(
 		ctx context.Context,
@@ -43,6 +49,11 @@ type UserControllerInterface interface {
 		ctx context.Context,
 		user *User,
 		folderID int,
+	) (*User, error)
+	UpdateUserPreferences(
+		ctx context.Context,
+		user *User,
+		preferences *UpdateUserPreferencesRequest,
 	) (*User, error)
 }
 
@@ -224,4 +235,57 @@ func (uc *UserController) UpdateSelectedFolder(
 
 func (uc *UserController) clearUserFoldersCache(ctx context.Context, userID uuid.UUID) error {
 	return uc.folderRepo.ClearUserFoldersCache(ctx, userID)
+}
+
+func (uc *UserController) UpdateUserPreferences(
+	ctx context.Context,
+	user *User,
+	preferences *UpdateUserPreferencesRequest,
+) (*User, error) {
+	log := uc.log.Function("UpdateUserPreferences")
+
+	if user.Configuration == nil {
+		return nil, log.ErrMsg(
+			"user configuration not found, please set up Discogs integration first",
+		)
+	}
+
+	if preferences.RecentlyPlayedThresholdDays != nil {
+		if *preferences.RecentlyPlayedThresholdDays < 1 || *preferences.RecentlyPlayedThresholdDays > 365 {
+			return nil, log.ErrMsg("recentlyPlayedThresholdDays must be between 1 and 365")
+		}
+		user.Configuration.RecentlyPlayedThresholdDays = preferences.RecentlyPlayedThresholdDays
+	}
+
+	if preferences.CleaningFrequencyPlays != nil {
+		if *preferences.CleaningFrequencyPlays < 1 || *preferences.CleaningFrequencyPlays > 50 {
+			return nil, log.ErrMsg("cleaningFrequencyPlays must be between 1 and 50")
+		}
+		user.Configuration.CleaningFrequencyPlays = preferences.CleaningFrequencyPlays
+	}
+
+	if preferences.NeglectedRecordsThresholdDays != nil {
+		if *preferences.NeglectedRecordsThresholdDays < 1 || *preferences.NeglectedRecordsThresholdDays > 730 {
+			return nil, log.ErrMsg("neglectedRecordsThresholdDays must be between 1 and 730")
+		}
+		user.Configuration.NeglectedRecordsThresholdDays = preferences.NeglectedRecordsThresholdDays
+	}
+
+	if err := uc.userConfigRepo.Update(ctx, uc.db.SQL, user.Configuration, uc.userRepo); err != nil {
+		return nil, log.Err("failed to update user preferences", err)
+	}
+
+	log.Info(
+		"User preferences updated successfully",
+		"userID",
+		user.ID,
+		"recentlyPlayedThresholdDays",
+		user.Configuration.RecentlyPlayedThresholdDays,
+		"cleaningFrequencyPlays",
+		user.Configuration.CleaningFrequencyPlays,
+		"neglectedRecordsThresholdDays",
+		user.Configuration.NeglectedRecordsThresholdDays,
+	)
+
+	return user, nil
 }

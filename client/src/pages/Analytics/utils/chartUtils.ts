@@ -11,8 +11,6 @@ import type {
 import type { PlayHistory } from "src/types/Release";
 import type { UserRelease } from "src/types/User";
 
-const ESTIMATED_VINYL_DURATION_MINUTES = 40;
-
 export function calculatePlayFrequency(
   playHistory: PlayHistory[],
   releases: UserRelease[],
@@ -77,8 +75,9 @@ export function calculatePlayDuration(
     const playDate = new Date(play.playedAt);
     const key = getDateGroupKey(playDate, frequency);
 
-    const duration = ESTIMATED_VINYL_DURATION_MINUTES;
-    durationsByDate.set(key, (durationsByDate.get(key) || 0) + duration);
+    const durationSeconds = play.userRelease?.release?.totalDuration || 0;
+    const durationMinutes = Math.round(durationSeconds / 60);
+    durationsByDate.set(key, (durationsByDate.get(key) || 0) + durationMinutes);
   });
 
   return Array.from(durationsByDate.entries())
@@ -114,12 +113,14 @@ export function calculateDistribution(
     if (!userRelease) return;
 
     const keys = getDistributionKeys(userRelease, distributionType);
+    const durationSeconds = userRelease.release?.totalDuration || 0;
+    const durationMinutes = Math.round(durationSeconds / 60);
 
     keys.forEach((key) => {
       const existing = distributionMap.get(key) || { count: 0, duration: 0 };
       distributionMap.set(key, {
         count: existing.count + 1,
-        duration: existing.duration + ESTIMATED_VINYL_DURATION_MINUTES,
+        duration: existing.duration + durationMinutes,
       });
     });
   });

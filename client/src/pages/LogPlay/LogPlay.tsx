@@ -13,21 +13,24 @@ import { fuzzySearchUserReleases } from "@utils/fuzzy";
 import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import styles from "./LogPlay.module.scss";
 
-const sortOptions: SelectOption[] = [
-  { value: "album", label: "Album (A-Z)" },
-  { value: "artist", label: "Artist (A-Z)" },
-  { value: "genre", label: "Genre (A-Z)" },
-  { value: "lastPlayed", label: "Last Played (newest first)" },
-  { value: "longestUnplayed", label: "Longest Unplayed (oldest first)" },
-  { value: "needsCleaning", label: "Needs Cleaning (most dirty first)" },
-  { value: "recentlyPlayed", label: "Recently Played (30 days)" },
-  { value: "year", label: "Release Year (newest first)" },
-  { value: "playCount", label: "Most Played" },
-];
-
 const LogPlay: Component = () => {
   const userData = useUserData();
   const releases = () => userData.releases();
+
+  const recentlyPlayedThreshold = () =>
+    userData.user()?.configuration?.recentlyPlayedThresholdDays ?? 90;
+
+  const sortOptions = createMemo((): SelectOption[] => [
+    { value: "album", label: "Album (A-Z)" },
+    { value: "artist", label: "Artist (A-Z)" },
+    { value: "genre", label: "Genre (A-Z)" },
+    { value: "lastPlayed", label: "Last Played (newest first)" },
+    { value: "longestUnplayed", label: "Longest Unplayed (oldest first)" },
+    { value: "needsCleaning", label: "Needs Cleaning (most dirty first)" },
+    { value: "recentlyPlayed", label: `Recently Played (${recentlyPlayedThreshold()} days)` },
+    { value: "year", label: "Release Year (newest first)" },
+    { value: "playCount", label: "Most Played" },
+  ]);
   const [searchTerm, setSearchTerm] = createSignal("");
   const [selectedReleaseId, setSelectedReleaseId] = createSignal<string | null>(null);
   const [isModalOpen, setIsModalOpen] = createSignal(false);
@@ -53,7 +56,8 @@ const LogPlay: Component = () => {
   const sortReleases = (releases: UserRelease[], sortOption: string): UserRelease[] => {
     const sorted = [...releases];
     const now = Date.now();
-    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+    const threshold = recentlyPlayedThreshold();
+    const thresholdAgo = now - threshold * 24 * 60 * 60 * 1000;
 
     switch (sortOption) {
       case "album":
@@ -108,7 +112,7 @@ const LogPlay: Component = () => {
             const lastPlayed = release.playHistory?.[0]?.playedAt
               ? new Date(release.playHistory[0].playedAt).getTime()
               : 0;
-            return lastPlayed >= thirtyDaysAgo;
+            return lastPlayed >= thresholdAgo;
           })
           .sort((a, b) => {
             const lastPlayedA = new Date(a.playHistory?.[0]?.playedAt || 0).getTime();
