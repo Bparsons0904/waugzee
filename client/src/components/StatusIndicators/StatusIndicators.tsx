@@ -10,9 +10,9 @@ import {
   getPlayRecencyScore,
   getPlayRecencyText,
 } from "@utils/playStatus";
+import clsx from "clsx";
 import { ImHeadphones } from "solid-icons/im";
 import { TbWashTemperature5 } from "solid-icons/tb";
-import clsx from "clsx";
 import { type Component, Show } from "solid-js";
 import styles from "./StatusIndicators.module.scss";
 

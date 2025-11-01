@@ -28,10 +28,8 @@ const Home: Component = () => {
     errorMessage: "Failed to start collection sync. Please try again.",
     onSuccess: (data) => {
       setSyncStatus(data.message);
-      console.log("Sync response:", data);
     },
-    onError: (error) => {
-      console.error("Sync failed:", error);
+    onError: () => {
       setSyncStatus("Sync failed. Please try again.");
     },
   });

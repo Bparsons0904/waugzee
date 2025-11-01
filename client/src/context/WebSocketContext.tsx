@@ -82,6 +82,7 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
   const log = (..._args: unknown[]) => {
     // Debug logging disabled for production
     // if (debug) {
+    // biome-ignore lint/suspicious/noConsole: Debug logging for WebSocket connection
     console.log(`[WebSocket] ${_args[0]}`, ..._args.slice(1));
     // }
   };

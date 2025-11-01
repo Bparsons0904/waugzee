@@ -60,7 +60,6 @@ export function UserDataProvider(props: { children: JSX.Element }) {
 
   const refreshUser = async () => {
     if (!auth.isAuthenticated()) {
-      console.warn("Cannot refresh user - not authenticated");
       return;
     }
 

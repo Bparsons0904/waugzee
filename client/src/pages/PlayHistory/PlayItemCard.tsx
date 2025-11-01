@@ -1,8 +1,8 @@
 import type { PlayHistory } from "@models/Release";
 import type { UserRelease } from "@models/User";
+import clsx from "clsx";
 import { TbWashTemperature5 } from "solid-icons/tb";
 import { VsNote } from "solid-icons/vs";
-import clsx from "clsx";
 import { type Component, Show } from "solid-js";
 import styles from "./PlayHistory.module.scss";
 

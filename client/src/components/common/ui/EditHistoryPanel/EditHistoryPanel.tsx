@@ -9,8 +9,8 @@ import type { CleaningHistory, PlayHistory } from "@models/Release";
 import type { UserStylus } from "@models/User";
 import { useUpdateCleaning, useUpdatePlay } from "@services/apiHooks";
 import { formatDateTimeForInput } from "@utils/dates";
-import { AiOutlineClose } from "solid-icons/ai";
 import clsx from "clsx";
+import { AiOutlineClose } from "solid-icons/ai";
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import styles from "./EditHistoryPanel.module.scss";
 

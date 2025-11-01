@@ -9,8 +9,7 @@ function parseLocalDate(date: string | Date | null | undefined): Date | null {
       return null;
     }
     return dateObj;
-  } catch (error) {
-    console.error("Error parsing date:", error);
+  } catch {
     return null;
   }
 }

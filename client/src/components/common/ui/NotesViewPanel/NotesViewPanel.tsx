@@ -1,7 +1,7 @@
 import { formatHistoryDate } from "@utils/dates";
+import clsx from "clsx";
 import { AiOutlineClose, AiTwotoneCalendar } from "solid-icons/ai";
 import { ImHeadphones } from "solid-icons/im";
-import clsx from "clsx";
 import { type Component, Show } from "solid-js";
 import styles from "./NotesViewPanel.module.scss";
 

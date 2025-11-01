@@ -140,7 +140,7 @@ const Profile: Component = () => {
                   min="1"
                   max="365"
                   value={recentlyPlayedThreshold()}
-                  onInput={(e) => setRecentlyPlayedThreshold(Number.parseInt(e.target.value))}
+                  onInput={(e) => setRecentlyPlayedThreshold(Number.parseInt(e.target.value, 10))}
                 />
                 <p class={styles.helpText}>
                   Records played within this many days are considered "recently played"
@@ -158,7 +158,7 @@ const Profile: Component = () => {
                   min="1"
                   max="50"
                   value={cleaningFrequency()}
-                  onInput={(e) => setCleaningFrequency(Number.parseInt(e.target.value))}
+                  onInput={(e) => setCleaningFrequency(Number.parseInt(e.target.value, 10))}
                 />
                 <p class={styles.helpText}>
                   Number of plays before a record needs cleaning (affects play status indicators)
@@ -176,7 +176,7 @@ const Profile: Component = () => {
                   min="1"
                   max="730"
                   value={neglectedThreshold()}
-                  onInput={(e) => setNeglectedThreshold(Number.parseInt(e.target.value))}
+                  onInput={(e) => setNeglectedThreshold(Number.parseInt(e.target.value, 10))}
                 />
                 <p class={styles.helpText}>
                   Records not played within this many days are considered "neglected" in analytics
