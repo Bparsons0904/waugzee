@@ -58,7 +58,7 @@ export const StatsSection: Component = () => {
 
   const statsItems = createMemo((): StatItem[] => [
     {
-      icon: "💽",
+      icon: "🎶",
       value: isLoading() ? "--" : stats().totalRecords.toLocaleString(),
       label: "Records",
       isLoading: isLoading(),
@@ -79,7 +79,7 @@ export const StatsSection: Component = () => {
       onClick: () => navigate(ROUTES.ANALYTICS),
     },
     {
-      icon: "🎯",
+      icon: "☆",
       value: isLoading() ? "--" : stats().favoriteGenre,
       label: "Top Genre",
       isLoading: isLoading(),

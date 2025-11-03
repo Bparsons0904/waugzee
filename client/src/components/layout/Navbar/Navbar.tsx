@@ -1,3 +1,4 @@
+import VinylIcon from "@components/icons/VinylIcon";
 import { ROUTES } from "@constants/api.constants";
 import { useAuth } from "@context/AuthContext";
 import { A } from "@solidjs/router";
@@ -12,6 +13,7 @@ export const NavBar: Component = () => {
       <div class={styles.navbarContainer}>
         <div class={styles.navbarLogo}>
           <A href={ROUTES.HOME} class={styles.navbarTitle}>
+            <VinylIcon size={42} class={styles.vinylIcon} />
             Waugzee
           </A>
         </div>
@@ -45,7 +47,11 @@ export const NavBar: Component = () => {
             <Switch>
               <Match when={!isAuthenticated()}>
                 <li class={styles.navbarItem}>
-                  <A href={ROUTES.LOGIN} class={styles.navbarLink} activeClass={styles.active}>
+                  <A
+                    href={ROUTES.LOGIN}
+                    class={`${styles.navbarLink} ${styles.authButton}`}
+                    activeClass={styles.active}
+                  >
                     Login
                   </A>
                 </li>
@@ -57,7 +63,11 @@ export const NavBar: Component = () => {
                   </A>
                 </li>
                 <li class={styles.navbarItem}>
-                  <A href={ROUTES.HOME} class={styles.navbarLink} onClick={logout}>
+                  <A
+                    href={ROUTES.HOME}
+                    class={`${styles.navbarLink} ${styles.authButton}`}
+                    onClick={logout}
+                  >
                     Logout
                   </A>
                 </li>
