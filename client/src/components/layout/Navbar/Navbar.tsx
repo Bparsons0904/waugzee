@@ -1,7 +1,7 @@
 import { ROUTES } from "@constants/api.constants";
 import { useAuth } from "@context/AuthContext";
 import { A } from "@solidjs/router";
-import { type Component, Match, Switch } from "solid-js";
+import { type Component, Match, Show, Switch } from "solid-js";
 import styles from "./NavBar.module.scss";
 
 export const NavBar: Component = () => {
@@ -22,7 +22,34 @@ export const NavBar: Component = () => {
                 Home
               </A>
             </li>
+            <Show when={isAuthenticated()}>
+              <li class={styles.navbarItem}>
+                <A href={ROUTES.LOG_PLAY} class={styles.navbarLink} activeClass={styles.active}>
+                  Log Play
+                </A>
+              </li>
+              <li class={styles.navbarItem}>
+                <A href={ROUTES.COLLECTION} class={styles.navbarLink} activeClass={styles.active}>
+                  Collection
+                </A>
+              </li>
+              <li class={styles.navbarItem}>
+                <A href={ROUTES.PLAY_HISTORY} class={styles.navbarLink} activeClass={styles.active}>
+                  Play History
+                </A>
+              </li>
+            </Show>
+          </ul>
+
+          <ul class={styles.navbarActions}>
             <Switch>
+              <Match when={!isAuthenticated()}>
+                <li class={styles.navbarItem}>
+                  <A href={ROUTES.LOGIN} class={styles.navbarLink} activeClass={styles.active}>
+                    Login
+                  </A>
+                </li>
+              </Match>
               <Match when={isAuthenticated()}>
                 <li class={styles.navbarItem}>
                   <A href={ROUTES.PROFILE} class={styles.navbarLink} activeClass={styles.active}>
@@ -30,53 +57,12 @@ export const NavBar: Component = () => {
                   </A>
                 </li>
                 <li class={styles.navbarItem}>
-                  <A href={ROUTES.COLLECTION} class={styles.navbarLink} activeClass={styles.active}>
-                    Collection
-                  </A>
-                </li>
-                <li class={styles.navbarItem}>
-                  <A href={ROUTES.LOG_PLAY} class={styles.navbarLink} activeClass={styles.active}>
-                    Log Play
-                  </A>
-                </li>
-                <li class={styles.navbarItem}>
-                  <A
-                    href={ROUTES.PLAY_HISTORY}
-                    class={styles.navbarLink}
-                    activeClass={styles.active}
-                  >
-                    Play History
-                  </A>
-                </li>
-                <li class={styles.navbarItem}>
-                  <A href={ROUTES.EQUIPMENT} class={styles.navbarLink} activeClass={styles.active}>
-                    Equipment
-                  </A>
-                </li>
-                <li class={styles.navbarItem}>
-                  <A href={ROUTES.ANALYTICS} class={styles.navbarLink} activeClass={styles.active}>
-                    Analytics
+                  <A href={ROUTES.HOME} class={styles.navbarLink} onClick={logout}>
+                    Logout
                   </A>
                 </li>
               </Match>
             </Switch>
-          </ul>
-
-          <ul class={styles.navbarActions}>
-            <li class={styles.navbarItem}>
-              <Switch>
-                <Match when={!isAuthenticated()}>
-                  <A href={ROUTES.LOGIN} class={styles.navbarLink} activeClass={styles.active}>
-                    Login
-                  </A>
-                </Match>
-                <Match when={isAuthenticated()}>
-                  <A href={ROUTES.HOME} class={styles.navbarLink} onClick={logout}>
-                    Logout
-                  </A>
-                </Match>
-              </Switch>
-            </li>
           </ul>
         </div>
       </div>
