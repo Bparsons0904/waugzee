@@ -11,7 +11,7 @@ type UserConfiguration struct {
 	DiscogsToken                  *string   `gorm:"type:text"                                                   json:"discogsToken"`
 	DiscogsUsername               *string   `gorm:"type:text"                                                   json:"discogsUsername"`
 	SelectedFolderID              *int      `gorm:"type:bigint;default:0"                                       json:"selectedFolderId"`
-	RecentlyPlayedThresholdDays   *int      `gorm:"type:int;default:90"                                         json:"recentlyPlayedThresholdDays"`
+	RecentlyPlayedThresholdDays   *int      `gorm:"type:int;default:180"                                        json:"recentlyPlayedThresholdDays"`
 	CleaningFrequencyPlays        *int      `gorm:"type:int;default:5"                                          json:"cleaningFrequencyPlays"`
-	NeglectedRecordsThresholdDays *int      `gorm:"type:int;default:180"                                        json:"neglectedRecordsThresholdDays"`
+	NeglectedRecordsThresholdDays *int      `gorm:"type:int;default:365"                                        json:"neglectedRecordsThresholdDays"`
 }

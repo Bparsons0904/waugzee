@@ -21,6 +21,8 @@ const LogPlay: Component = () => {
   const recentlyPlayedThreshold = () =>
     userData.user()?.configuration?.recentlyPlayedThresholdDays ?? 90;
 
+  const cleaningFrequency = () => userData.user()?.configuration?.cleaningFrequencyPlays ?? 5;
+
   const sortOptions = createMemo((): SelectOption[] => [
     { value: "album", label: "Album (A-Z)" },
     { value: "artist", label: "Artist (A-Z)" },
@@ -205,7 +207,7 @@ const LogPlay: Component = () => {
             <Field label="Sort By" htmlFor="sortOptions">
               <Select
                 name="sortOptions"
-                options={sortOptions}
+                options={sortOptions()}
                 value={sortBy()}
                 onChange={setSortBy}
               />
@@ -263,6 +265,8 @@ const LogPlay: Component = () => {
                           <RecordStatusIndicator
                             playHistory={userRelease.playHistory || []}
                             cleaningHistory={userRelease.cleaningHistory || []}
+                            recentlyPlayedThresholdDays={recentlyPlayedThreshold()}
+                            cleaningFrequencyPlays={cleaningFrequency()}
                             showDetails={false}
                             onPlayClick={() => handleQuickPlay(userRelease)}
                             onCleanClick={() => handleQuickCleaning(userRelease)}
@@ -276,6 +280,8 @@ const LogPlay: Component = () => {
                         <RecordStatusIndicator
                           playHistory={userRelease.playHistory || []}
                           cleaningHistory={userRelease.cleaningHistory || []}
+                          recentlyPlayedThresholdDays={recentlyPlayedThreshold()}
+                          cleaningFrequencyPlays={cleaningFrequency()}
                           showDetails={true}
                         />
                       </div>

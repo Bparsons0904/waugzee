@@ -1,5 +1,6 @@
 import { Select } from "@components/common/forms/Select/Select";
 import { Button } from "@components/common/ui/Button/Button";
+import { useUserData } from "@context/UserDataContext";
 import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import type { NeglectedRecord } from "src/types/Analytics";
 import type { CleaningHistory, PlayHistory } from "src/types/Release";
@@ -17,12 +18,14 @@ interface NeglectedRecordsProps {
   cleaningHistory: CleaningHistory[];
   onPlayRecord?: (userReleaseId: string) => void;
   onCleanRecord?: (userReleaseId: string) => void;
-  defaultDaysThreshold?: number;
 }
 
 export const NeglectedRecords: Component<NeglectedRecordsProps> = (props) => {
+  const { user } = useUserData();
   const [mode, setMode] = createSignal<NeglectMode>("play");
-  const [daysThreshold, setDaysThreshold] = createSignal(props.defaultDaysThreshold ?? 180);
+  const [daysThreshold, setDaysThreshold] = createSignal(
+    user()?.configuration?.neglectedRecordsThresholdDays ?? 365,
+  );
   const [displayLimit, setDisplayLimit] = createSignal(10);
 
   const modeOptions = [

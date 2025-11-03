@@ -106,7 +106,6 @@ const Analytics: Component = () => {
             releases={userData.releases()}
             playHistory={userData.playHistory()}
             cleaningHistory={userData.cleaningHistory()}
-            defaultDaysThreshold={userData.user()?.configuration?.neglectedRecordsThresholdDays}
           />
         </Show>
       </Show>

@@ -22,6 +22,8 @@ export interface StatusIndicatorProps {
   showDetails?: boolean;
   onPlayClick?: () => void;
   onCleanClick?: () => void;
+  recentlyPlayedThresholdDays?: number;
+  cleaningFrequencyPlays?: number;
 }
 
 export const RecordStatusIndicator: Component<StatusIndicatorProps> = (props) => {
@@ -31,9 +33,11 @@ export const RecordStatusIndicator: Component<StatusIndicatorProps> = (props) =>
   const playsSinceCleaning = () =>
     countPlaysSinceCleaning(props.playHistory || [], lastCleanDate());
 
-  const cleanlinessScore = () => getCleanlinessScore(lastCleanDate(), playsSinceCleaning());
+  const cleanlinessScore = () =>
+    getCleanlinessScore(lastCleanDate(), playsSinceCleaning(), props.cleaningFrequencyPlays ?? 5);
 
-  const playRecencyScore = () => getPlayRecencyScore(lastPlayDate());
+  const playRecencyScore = () =>
+    getPlayRecencyScore(lastPlayDate(), props.recentlyPlayedThresholdDays ?? 90);
 
   return (
     <div class={styles.container}>
@@ -42,6 +46,7 @@ export const RecordStatusIndicator: Component<StatusIndicatorProps> = (props) =>
           <PlayStatusIndicator
             score={playRecencyScore()}
             lastPlayed={lastPlayDate()}
+            recentlyPlayedThresholdDays={props.recentlyPlayedThresholdDays}
             onClick={props.onPlayClick}
           />
           <CleaningStatusIndicator
@@ -76,18 +81,18 @@ export const RecordStatusIndicator: Component<StatusIndicatorProps> = (props) =>
 interface PlayStatusProps {
   score: number;
   lastPlayed: Date | null;
+  recentlyPlayedThresholdDays?: number;
   showDetails?: boolean;
   onClick?: () => void;
 }
 
-// Claude are both of the indicators needed?  Seems like there is a lot of shared logic between the 2 of them
 const PlayStatusIndicator: Component<PlayStatusProps> = (props) => {
   const getColorWithOpacity = (colorHex: string): string => {
     return `${colorHex}CC`;
   };
 
   const color = () => getColorWithOpacity(getPlayRecencyColor(props.score));
-  const text = () => getPlayRecencyText(props.lastPlayed);
+  const text = () => getPlayRecencyText(props.lastPlayed, props.recentlyPlayedThresholdDays ?? 90);
 
   const handleClick = (e: MouseEvent) => {
     if (props.onClick) {
