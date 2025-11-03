@@ -3,12 +3,14 @@ package services
 import (
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
@@ -193,6 +195,94 @@ func (s *DiscogsXMLParserService) convertXMLMasterToModel(xmlMaster types.Master
 	}
 }
 
+// calculateTotalDuration calculates total duration from track list in seconds
+// Handles formats: "3:45" (MM:SS) or "1:23:45" (HH:MM:SS)
+// Validation rules:
+//   - Skips tracks with zero duration ("0:00") to trigger fallback
+//   - Rejects tracks with unreasonable values (hours > 99, minutes > 999, seconds > 59)
+//   - Rejects tracks longer than 2 hours (7200 seconds)
+//   - Silently skips malformed or overflowing duration strings
+//
+// Falls back to disc count estimation (40 min per disc) if no valid track durations found
+func calculateTotalDuration(tracks []types.Track, format types.Format) *int {
+	if len(tracks) == 0 {
+		return estimateDurationFromDiscCount(format)
+	}
+
+	totalSeconds := 0
+	hasValidDuration := false
+
+	for _, track := range tracks {
+		if track.Duration == "" {
+			continue
+		}
+
+		// Parse duration string (format: "MM:SS" or "HH:MM:SS")
+		var hours, minutes, seconds int
+		var err error
+
+		parts := strings.Split(track.Duration, ":")
+
+		// Validate we have reasonable number of parts before proceeding
+		if len(parts) < 2 || len(parts) > 3 {
+			continue
+		}
+
+		switch len(parts) {
+		case 2: // MM:SS format
+			if minutes, err = strconv.Atoi(parts[0]); err != nil || minutes < 0 || minutes > 999 {
+				continue
+			}
+			if seconds, err = strconv.Atoi(parts[1]); err != nil || seconds < 0 || seconds > 59 {
+				continue
+			}
+		case 3: // HH:MM:SS format
+			if hours, err = strconv.Atoi(parts[0]); err != nil || hours < 0 || hours > 99 {
+				continue
+			}
+			if minutes, err = strconv.Atoi(parts[1]); err != nil || minutes < 0 || minutes > 59 {
+				continue
+			}
+			if seconds, err = strconv.Atoi(parts[2]); err != nil || seconds < 0 || seconds > 59 {
+				continue
+			}
+		}
+
+		trackDuration := (hours * 3600) + (minutes * 60) + seconds
+
+		// Skip tracks with zero or unreasonably long durations
+		// Max reasonable track duration: 2 hours (7200 seconds)
+		if trackDuration <= 0 || trackDuration > 7200 {
+			continue
+		}
+
+		totalSeconds += trackDuration
+		hasValidDuration = true
+	}
+
+	if !hasValidDuration {
+		return estimateDurationFromDiscCount(format)
+	}
+
+	return &totalSeconds
+}
+
+// estimateDurationFromDiscCount estimates duration based on disc count
+// Uses 20 minutes per side (40 minutes per disc) as the standard
+func estimateDurationFromDiscCount(format types.Format) *int {
+	if format.Qty == "" {
+		return nil
+	}
+
+	qty, err := strconv.Atoi(format.Qty)
+	if err != nil || qty <= 0 {
+		return nil
+	}
+
+	estimatedSeconds := qty * 2400 // qty * 40 minutes * 60 seconds
+	return &estimatedSeconds
+}
+
 // convertXMLReleaseToModel converts XML Release to database Release model
 func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
 	xmlRelease types.Release,
@@ -223,14 +313,12 @@ func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
 
 	// Determine format based on format information
 	format := models.FormatVinyl // Default to vinyl
-	// TODO: Parse actual format from xmlRelease.Formats when needed
 
 	release := &models.Release{
 		BaseDiscogModel: models.BaseDiscogModel{
 			ID: xmlRelease.ID,
 		},
-		Title: xmlRelease.Title,
-		// MasterID:    masterID,
+		Title:       xmlRelease.Title,
 		Year:        year,
 		Country:     country,
 		Format:      format,
@@ -241,6 +329,53 @@ func (s *DiscogsXMLParserService) convertXMLReleaseToModel(
 
 	if xmlRelease.MasterID > 0 {
 		release.MasterID = &xmlRelease.MasterID
+	}
+
+	// Extract and store format details as JSONB
+	if xmlRelease.Formats.Name != "" || xmlRelease.Formats.Qty != "" {
+		formatDetails := models.FormatDetails{
+			Name:         xmlRelease.Formats.Name,
+			Qty:          xmlRelease.Formats.Qty,
+			Text:         xmlRelease.Formats.Text,
+			Descriptions: []string{}, // XML format doesn't have descriptions array parsed yet
+		}
+
+		if formatJSON, err := json.Marshal(formatDetails); err == nil {
+			release.FormatDetailsJSON = formatJSON
+		} else {
+			s.log.Warn("Failed to marshal format details", "releaseID", xmlRelease.ID, "error", err)
+		}
+	}
+
+	// Populate JSONB fields
+	if len(xmlRelease.Tracklist) > 0 {
+		// Convert types.Track to models.Track
+		tracks := make([]models.Track, len(xmlRelease.Tracklist))
+		for i, xmlTrack := range xmlRelease.Tracklist {
+			tracks[i] = models.Track{
+				Position: xmlTrack.Position,
+				Title:    xmlTrack.Title,
+				Duration: xmlTrack.Duration,
+			}
+		}
+		release.TracksJSON = tracks
+	}
+
+	// Calculate total duration (with fallback to disc count estimation)
+	release.TotalDuration = calculateTotalDuration(xmlRelease.Tracklist, xmlRelease.Formats)
+
+	if len(xmlRelease.Images) > 0 {
+		if imagesJSON, err := json.Marshal(xmlRelease.Images); err == nil {
+			release.ImagesJSON = imagesJSON
+		} else {
+			s.log.Warn("Failed to marshal images to JSON", "releaseID", xmlRelease.ID, "error", err)
+		}
+	}
+
+	// VideosJSON: Empty array as videos are not in monthly XML dumps (only in API)
+	emptyArray := []any{}
+	if videosJSON, err := json.Marshal(emptyArray); err == nil {
+		release.VideosJSON = videosJSON
 	}
 
 	return release
@@ -372,13 +507,13 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 	if processing.Status != models.ProcessingStatusProcessing {
 		processing.Status = models.ProcessingStatusProcessing
 		processing.StartedAt = &now
-		if err := s.repos.DiscogsDataProcessing.Update(ctx, processing); err != nil {
+		if err = s.repos.DiscogsDataProcessing.Update(ctx, processing); err != nil {
 			return log.Err("failed to update processing status", err)
 		}
 	}
 
 	downloadDir := fmt.Sprintf("%s/%s", DiscogsDataDir, yearMonth)
-	if err := ensureDirectory(downloadDir, log); err != nil {
+	if err = ensureDirectory(downloadDir, log); err != nil {
 		return log.Err("failed to create download directory", err, "directory", downloadDir)
 	}
 
@@ -391,7 +526,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 	}
 
 	for fileType, filePath := range requiredFiles {
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		if _, err = os.Stat(filePath); os.IsNotExist(err) {
 			errorMsg := fmt.Sprintf("required file not found: %s", fileType)
 			processing.Status = models.ProcessingStatusFailed
 			processing.ErrorMessage = &errorMsg

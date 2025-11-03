@@ -209,8 +209,8 @@ export function ProxyService() {
       if (message.event === Events.API_REQUEST) {
         handleApiRequest(message);
       }
-    } catch (error) {
-      console.error("[ProxyService] Failed to parse WebSocket message:", error);
+    } catch {
+      // Silently ignore malformed messages
     }
   });
 
@@ -219,7 +219,6 @@ export function ProxyService() {
    */
   const handleApiRequest = async (message: WebSocketMessage) => {
     if (!message.payload) {
-      console.error("[ProxyService] API request missing payload");
       return;
     }
 
@@ -227,13 +226,6 @@ export function ProxyService() {
       // Validate the API request payload
       validateApiRequestPayload(message.payload);
       const payload = message.payload as unknown as ApiRequestPayload;
-
-      console.log("[ProxyService] Processing API request:", {
-        requestId: payload.requestId,
-        requestType: payload.requestType,
-        url: payload.url,
-        method: payload.method,
-      });
 
       // Extract HTTP request configuration
       const httpRequest: ExternalHttpRequest = {
@@ -264,14 +256,7 @@ export function ProxyService() {
       };
 
       sendMessage(responseMessage);
-
-      console.log("[ProxyService] API request completed successfully:", {
-        requestId: payload.requestId,
-        status: response.status,
-      });
     } catch (error) {
-      console.error("[ProxyService] API request failed:", error);
-
       // We need payload for error handling, so we'll try to extract it if validation failed
       let errorPayload: ApiResponsePayload;
       let callbackService = "orchestration";

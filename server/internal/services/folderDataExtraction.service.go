@@ -9,7 +9,6 @@ import (
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -90,15 +89,27 @@ func (f *FolderDataExtractionService) ExtractBasicInformation(
 				release.MasterID = &basicInfo.MasterID
 			}
 
-			// Store genres and styles in Data column using the new Data struct
-			if len(basicInfo.Genres) > 0 || len(basicInfo.Styles) > 0 {
-				dataStruct := Data{
-					Genres: basicInfo.Genres,
-					Styles: basicInfo.Styles,
+			// Extract format details (duration calculation happens during full data sync)
+			if len(basicInfo.Formats) > 0 {
+				format := basicInfo.Formats[0]
+
+				// Store format details as JSONB
+				formatDetails := FormatDetails{
+					Name:         format.Name,
+					Qty:          format.Qty,
+					Text:         format.Text,
+					Descriptions: format.Descriptions,
 				}
-				if dataJSON, err := json.Marshal(dataStruct); err == nil {
-					release.Data = datatypes.JSON(dataJSON)
+
+				formatJSON, err := json.Marshal(formatDetails)
+				if err == nil {
+					release.FormatDetailsJSON = formatJSON
+				} else {
+					log.Warn("Failed to marshal format details", "releaseID", basicInfo.ID, "error", err)
 				}
+
+				// Note: Duration calculation (track-based with disc count fallback) happens
+				// during XML processing or individual release requests where we have full data
 			}
 
 			releases = append(releases, release)

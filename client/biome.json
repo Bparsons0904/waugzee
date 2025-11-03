@@ -7,7 +7,8 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!**/*.test.ts", "!**/dist"]
+    "includes": ["src/**", "*.ts", "*.tsx", "*.js", "*.jsx", "*.json"],
+    "experimentalScannerIgnores": ["dist", "node_modules", "coverage", "build"]
   },
   "formatter": {
     "enabled": true,
@@ -26,7 +27,8 @@
       "complexity": {
         "noExtraBooleanCast": "error",
         "noUselessCatch": "error",
-        "noUselessTypeConstraint": "error"
+        "noUselessTypeConstraint": "error",
+        "useArrowFunction": "warn"
       },
       "correctness": {
         "noConstAssign": "error",
@@ -49,6 +51,7 @@
         "noUnusedLabels": "error",
         "noUnusedVariables": "error",
         "useIsNan": "error",
+        "useJsxKeyInIterable": "off",
         "useValidForDirection": "error"
       },
       "suspicious": {
@@ -56,8 +59,10 @@
         "noCatchAssign": "error",
         "noClassAssign": "error",
         "noCompareNegZero": "error",
+        "noConsole": "warn",
         "noControlCharactersInRegex": "error",
         "noDebugger": "error",
+        "noDoubleEquals": "warn",
         "noDuplicateCase": "error",
         "noDuplicateClassMembers": "error",
         "noDuplicateObjectKeys": "error",
@@ -73,14 +78,22 @@
         "noRedeclare": "error",
         "noShadowRestrictedNames": "error",
         "noUnsafeNegation": "error",
+        "noVar": "error",
         "noWith": "error",
         "useGetterReturn": "error"
       },
       "style": {
+        "noNestedTernary": "error",
+        "noParameterAssign": "warn",
         "noUnusedTemplateLiteral": "warn",
         "useConst": "error",
-        "useTemplate": "warn",
-        "noNestedTernary": "error"
+        "useExportType": "warn",
+        "useImportType": "warn",
+        "useSelfClosingElements": "warn",
+        "useTemplate": "warn"
+      },
+      "performance": {
+        "noAccumulatingSpread": "warn"
       }
     }
   },
@@ -131,6 +144,20 @@
         "rules": {
           "suspicious": {
             "noExplicitAny": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/context/AuthContext.tsx",
+        "src/services/oidc.service.ts",
+        "src/pages/Auth/**/*.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
           }
         }
       }

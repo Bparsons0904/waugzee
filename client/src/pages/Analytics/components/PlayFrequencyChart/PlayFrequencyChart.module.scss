@@ -1,0 +1,27 @@
+@import "@styles/variables";
+@import "@styles/colors";
+
+.chartContainer {
+  background-color: $bg-surface;
+  border-radius: $border-radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-md;
+  margin-bottom: $spacing-xl;
+}
+
+.chartWrapper {
+  height: 400px;
+  width: 100%;
+
+  @media (max-width: 768px) {
+    height: 300px;
+  }
+}
+
+.noData {
+  padding: $spacing-2xl;
+  text-align: center;
+  color: $text-muted;
+  font-style: italic;
+  font-size: $font-size-md;
+}

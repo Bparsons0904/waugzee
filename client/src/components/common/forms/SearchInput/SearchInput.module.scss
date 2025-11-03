@@ -1,0 +1,36 @@
+@use "../../../../styles/variables" as *;
+@use "../../../../styles/colors" as *;
+
+.searchInputWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.searchIcon {
+  position: absolute;
+  left: $spacing-md;
+  top: 50%;
+  transform: translateY(-50%);
+  color: $text-muted;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: $spacing-sm $spacing-md $spacing-sm $spacing-2xl;
+  font-size: $font-size-md;
+  border: 1px solid $border-default;
+  border-radius: $border-radius-lg;
+  background-color: $bg-surface;
+  transition: border-color $transition-fast, box-shadow $transition-fast;
+
+  &:focus {
+    outline: none;
+    border-color: $border-focus;
+    box-shadow: $focus-ring;
+  }
+
+  &:hover:not(:focus) {
+    border-color: $border-strong;
+  }
+}

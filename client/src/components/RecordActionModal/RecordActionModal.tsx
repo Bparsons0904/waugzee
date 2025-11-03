@@ -8,6 +8,7 @@ import { Toggle } from "@components/common/forms/Toggle/Toggle";
 import { Button } from "@components/common/ui/Button/Button";
 import { EditHistoryPanel } from "@components/common/ui/EditHistoryPanel/EditHistoryPanel";
 import { Image } from "@components/common/ui/Image/Image";
+import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import { RecordHistoryItem } from "@components/RecordHistoryItem/RecordHistoryItem";
 import { useUserData } from "@context/UserDataContext";
 import type { CleaningHistory, PlayHistory } from "@models/Release";
@@ -148,16 +149,14 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
   });
 
   return (
-    <Show when={props.isOpen}>
-      <div class={styles.modalOverlay} onClick={props.onClose}>
-        <div class={styles.modal} onClick={(e) => e.stopPropagation()}>
-          <div class={styles.modalHeader}>
-            <button type="button" class={styles.closeButton} onClick={props.onClose}>
-              ×
-            </button>
-            <h2 class={styles.modalTitle}>Record Actions</h2>
-          </div>
-
+    <>
+      <Modal
+        isOpen={props.isOpen}
+        onClose={props.onClose}
+        title="Record Actions"
+        size={ModalSize.Large}
+      >
+        <div class={styles.modalContent}>
           <div class={styles.recordDetails}>
             <div class={styles.recordImage}>
               <Image
@@ -268,7 +267,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
             </div>
           </div>
         </div>
-      </div>
+      </Modal>
 
       <EditHistoryPanel
         isOpen={isEditPanelOpen()}
@@ -276,7 +275,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
         editItem={editItem()}
         styluses={userData.styluses()}
       />
-    </Show>
+    </>
   );
 };
 

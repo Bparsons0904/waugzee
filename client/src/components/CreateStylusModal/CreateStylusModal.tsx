@@ -3,6 +3,7 @@ import { TextInput } from "@components/common/forms/TextInput/TextInput";
 import { Button } from "@components/common/ui/Button/Button";
 import type { CreateCustomStylusRequest } from "@models/Stylus";
 import { useCreateCustomStylus } from "@services/apiHooks";
+import clsx from "clsx";
 import type { Component } from "solid-js";
 import { createStore } from "solid-js/store";
 import styles from "./CreateStylusModal.module.scss";
@@ -116,7 +117,7 @@ const CreateStylusModal: Component<CreateStylusModalProps> = (props) => {
         />
       </div>
 
-      <div class={`${styles.formRow} ${styles.full}`}>
+      <div class={clsx(styles.formRow, styles.full)}>
         <TextInput
           name="recommendedHours"
           label="Recommended Replace Hours"

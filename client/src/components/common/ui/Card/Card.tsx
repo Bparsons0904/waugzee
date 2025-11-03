@@ -17,7 +17,8 @@ export const Card: Component<CardProps> = (props) => {
     const baseClass = styles.card;
     const variantClass = styles[variant];
     const customClass = props.class || "";
-    return `${baseClass} ${variantClass} ${customClass}`.trim();
+    const clickableClass = props.onClick ? styles.clickable : "";
+    return `${baseClass} ${variantClass} ${customClass} ${clickableClass}`.trim();
   };
 
   return (

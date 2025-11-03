@@ -254,7 +254,7 @@ export class OIDCService {
   /**
    * Start the authentication flow
    */
-  async signInRedirect(): Promise<void> {
+  async signInRedirect(additionalState?: Record<string, unknown>): Promise<void> {
     if (!this.userManager) {
       throw new Error("OIDC service not initialized");
     }
@@ -262,7 +262,7 @@ export class OIDCService {
     try {
       await this.userManager.signinRedirect({
         // Additional state can be passed here
-        state: { timestamp: Date.now() },
+        state: { timestamp: Date.now(), ...additionalState },
       });
     } catch (error) {
       console.error("Failed to start sign-in redirect:", error);

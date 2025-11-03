@@ -3,6 +3,7 @@ import { NotesViewPanel } from "@components/common/ui/NotesViewPanel/NotesViewPa
 import type { CleaningHistory, PlayHistory } from "@models/Release";
 import { useDeleteCleaning, useDeletePlay } from "@services/apiHooks";
 import { formatHistoryDate } from "@utils/dates";
+import clsx from "clsx";
 import { BiSolidEdit } from "solid-icons/bi";
 import { BsVinylFill } from "solid-icons/bs";
 import { FaSolidTrash } from "solid-icons/fa";
@@ -73,7 +74,10 @@ export const RecordHistoryItem: Component<RecordHistoryItemProps> = (props) => {
   return (
     <>
       <div
-        class={`${styles.historyItem} ${props.item.type === "play" ? styles.playItem : styles.cleaningItem}`}
+        class={clsx(styles.historyItem, {
+          [styles.playItem]: props.item.type === "play",
+          [styles.cleaningItem]: props.item.type === "cleaning",
+        })}
       >
         <div class={styles.historyItemContent}>
           <div class={styles.historyItemHeader}>

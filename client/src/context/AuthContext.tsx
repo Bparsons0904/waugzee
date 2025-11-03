@@ -39,7 +39,7 @@ type AuthContextValue = {
   isAuthenticated: () => boolean;
   authToken: () => string | null;
   authConfig: () => AuthConfig | null;
-  loginWithOIDC: () => Promise<void>;
+  loginWithOIDC: (returnTo?: string) => Promise<void>;
   handleOIDCCallback: () => Promise<void>;
   logout: () => void;
 };
@@ -181,6 +181,15 @@ export function AuthProvider(props: { children: JSX.Element }) {
             token: oidcUser.access_token,
             error: null,
           });
+
+          // Check if we're on a valid protected route after refresh
+          const currentPath = window.location.pathname;
+          const authPaths = [ROUTES.LOGIN, ROUTES.CALLBACK, ROUTES.SILENT_CALLBACK] as const;
+          const isAuthPath = (authPaths as readonly string[]).includes(currentPath);
+
+          // If user is authenticated and on an auth-related page, redirect home
+          // Otherwise, stay on current page (handles refresh scenario)
+          if (isAuthPath) navigate(ROUTES.HOME);
         }
       } catch (error) {
         if (!cancelled) {
@@ -205,7 +214,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
     });
   });
 
-  const loginWithOIDC = async () => {
+  const loginWithOIDC = async (returnTo?: string) => {
     try {
       if (!authState.config?.configured) {
         throw new Error("OIDC is not configured");
@@ -215,7 +224,15 @@ export function AuthProvider(props: { children: JSX.Element }) {
         throw new Error("OIDC service is not initialized yet");
       }
 
-      await oidcService.signInRedirect();
+      const currentPath = returnTo || window.location.pathname;
+      const authPaths = [ROUTES.LOGIN, ROUTES.CALLBACK, ROUTES.SILENT_CALLBACK];
+      const shouldStoreReturn = !authPaths.includes(currentPath as (typeof authPaths)[number]);
+
+      const returnPath = shouldStoreReturn ? currentPath : ROUTES.HOME;
+
+      await oidcService.signInRedirect({
+        returnTo: returnPath,
+      });
     } catch (error) {
       console.error("OIDC login failed:", error);
       setAuthState("error", {
@@ -267,7 +284,21 @@ export function AuthProvider(props: { children: JSX.Element }) {
         error: null,
       });
 
-      navigate(ROUTES.HOME);
+      // Extract returnTo from OIDC state
+      let state: Record<string, unknown> = {};
+      try {
+        state =
+          typeof oidcUser.state === "object"
+            ? oidcUser.state
+            : JSON.parse(typeof oidcUser.state === "string" ? oidcUser.state : "{}");
+      } catch (error) {
+        console.warn("Failed to parse OIDC state, using default:", error);
+      }
+
+      const returnTo = typeof state.returnTo === "string" ? state.returnTo : ROUTES.HOME;
+
+      // Navigate to original destination
+      navigate(returnTo);
     } catch (error) {
       console.error("OIDC callback failed:", error);
 

@@ -1,3 +1,4 @@
+import clsx from "clsx";
 import type { Component, JSX } from "solid-js";
 import styles from "./Card.module.scss";
 
@@ -48,9 +49,7 @@ export const Card: Component<CardProps> = (props) => {
 
   return (
     <div
-      class={`${styles.card} ${sizeClass()} ${paddingClass()} ${variantClass()} ${
-        props.class || ""
-      }`}
+      class={clsx(styles.card, sizeClass(), paddingClass(), variantClass(), props.class)}
       onClick={props.onClick}
     >
       {props.children}

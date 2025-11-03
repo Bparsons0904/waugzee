@@ -23,6 +23,7 @@ export const USER_ENDPOINTS = {
   ME: `${API_PATHS.USERS}/me`,
   ME_DISCOGS: `${API_PATHS.USERS}/me/discogs`,
   ME_FOLDER: `${API_PATHS.USERS}/me/folder`,
+  ME_PREFERENCES: `${API_PATHS.USERS}/me/preferences`,
   PROFILE: (id: string) => `${API_PATHS.USERS}/${id}`,
 } as const;
 
@@ -72,6 +73,7 @@ export const ROUTES = {
   PLAY_HISTORY: "/playHistory",
   EQUIPMENT: "/equipment",
   DASHBOARD: "/dashboard",
+  ANALYTICS: "/analytics",
 } as const;
 
 // Error retry configuration

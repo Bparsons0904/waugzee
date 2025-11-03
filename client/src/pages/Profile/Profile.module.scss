@@ -1,0 +1,278 @@
+@use "../../styles/variables" as *;
+@use "../../styles/colors" as *;
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: $spacing-xl;
+}
+
+.header {
+  margin-bottom: $spacing-2xl;
+}
+
+.title {
+  font-size: $font-size-3xl;
+  font-weight: $font-weight-bold;
+  color: $text-default;
+  margin: 0 0 $spacing-sm 0;
+}
+
+.subtitle {
+  font-size: $font-size-md;
+  color: $text-muted;
+  margin: 0;
+}
+
+.section {
+  background: $bg-surface;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-sm;
+  padding: $spacing-xl;
+  margin-bottom: $spacing-xl;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-lg;
+  padding-bottom: $spacing-md;
+  border-bottom: $border-width-thin solid $border-default;
+}
+
+.sectionTitle {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+  margin: 0;
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-lg;
+}
+
+.infoItem {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.infoLabel {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $text-muted;
+  text-transform: uppercase;
+  letter-spacing: $letter-spacing-wide;
+}
+
+.infoValue {
+  font-size: $font-size-md;
+  color: $text-default;
+  word-break: break-word;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $border-radius-md;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+}
+
+.statusConnected {
+  background-color: $bg-success-subtle;
+  color: $text-success;
+}
+
+.statusDisconnected {
+  background-color: $bg-error-subtle;
+  color: $text-error;
+}
+
+.preferencesForm {
+  display: flex;
+  flex-direction: column;
+}
+
+.preferencesGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-lg;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  padding: $spacing-lg;
+  background-color: $bg-subtle;
+  border-radius: $border-radius-lg;
+  border: $border-width-thin solid $border-default;
+}
+
+.label {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $text-default;
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+}
+
+.helpText {
+  font-size: $font-size-xs;
+  color: $text-muted;
+  margin-top: $spacing-xs;
+}
+
+.input {
+  padding: $spacing-sm $spacing-md;
+  border: $border-width-thin solid $border-default;
+  border-radius: $border-radius-md;
+  font-size: $font-size-md;
+  color: $text-default;
+  background-color: $bg-body;
+  transition: border-color $transition-fast;
+
+  &:focus {
+    outline: none;
+    border-color: $border-focus;
+    box-shadow: $focus-ring;
+  }
+
+  &:disabled {
+    background-color: $bg-subtle;
+    color: $text-disabled;
+    cursor: not-allowed;
+  }
+}
+
+.formActions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: $spacing-md;
+  padding: $spacing-lg;
+  background-color: $bg-subtle;
+  border-radius: $border-radius-lg;
+  border: $border-width-thin solid $border-default;
+}
+
+.discogsInfo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-lg;
+}
+
+.statusInfo {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+}
+
+.dataManagementActions {
+  display: flex;
+  gap: $spacing-xl;
+}
+
+.dataAction {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  flex: 1;
+}
+
+.buttonWrapper {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+}
+
+.comingSoon {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+  padding: $spacing-xs $spacing-sm;
+  background-color: $bg-warning-subtle;
+  color: $text-warning;
+  border-radius: $border-radius-md;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  text-transform: uppercase;
+  letter-spacing: $letter-spacing-wide;
+}
+
+.signOutButton {
+  width: 100%;
+  margin-top: $spacing-md;
+}
+
+.loading {
+  text-align: center;
+  padding: $spacing-xl;
+  color: $text-muted;
+  font-style: italic;
+}
+
+.error {
+  text-align: center;
+  padding: $spacing-xl;
+  color: $text-error;
+}
+
+@media (max-width: $breakpoint-md) {
+  .container {
+    padding: $spacing-lg;
+  }
+
+  .infoGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .section {
+    padding: $spacing-lg;
+  }
+}
+
+@media (max-width: $breakpoint-sm) {
+  .container {
+    padding: $spacing-md;
+  }
+
+  .section {
+    padding: $spacing-md;
+  }
+
+  .title {
+    font-size: $font-size-2xl;
+  }
+
+  .sectionTitle {
+    font-size: $font-size-lg;
+  }
+
+  .discogsInfo {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .statusInfo {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $spacing-xs;
+  }
+
+  .dataManagementActions {
+    flex-direction: column;
+  }
+
+  .preferencesGrid {
+    grid-template-columns: 1fr;
+  }
+}

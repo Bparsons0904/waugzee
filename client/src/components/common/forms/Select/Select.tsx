@@ -1,6 +1,7 @@
 import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import { useFormField } from "@hooks/useFormField";
 import { useValidation } from "@hooks/useValidation";
+import clsx from "clsx";
 import { type Component, createUniqueId, Show } from "solid-js";
 import type { ValidatorFunction } from "../../../../utils/validation";
 import styles from "./Select.module.scss";
@@ -69,7 +70,7 @@ export const Select: Component<SelectProps> = (props) => {
   };
 
   return (
-    <div class={`${styles.selectContainer} ${props.class || ""}`}>
+    <div class={clsx(styles.selectContainer, props.class)}>
       {/* Claude should this be part of the Field component?  */}
       <Show when={props.label}>
         <label for={id} class={styles.label}>
@@ -84,7 +85,9 @@ export const Select: Component<SelectProps> = (props) => {
         <select
           id={id}
           name={props.name}
-          class={`${styles.select} ${!validation.isValid() ? styles.selectError : ""}`}
+          class={clsx(styles.select, {
+            [styles.selectError]: !validation.isValid(),
+          })}
           value={props.value || validation.value()}
           disabled={props.disabled}
           required={props.required}

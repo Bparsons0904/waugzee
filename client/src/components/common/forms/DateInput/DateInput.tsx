@@ -1,5 +1,6 @@
 import { useFormField } from "@hooks/useFormField";
 import { useValidation } from "@hooks/useValidation";
+import clsx from "clsx";
 import { type Component, createUniqueId, Show } from "solid-js";
 import type { ValidatorFunction } from "../../../../utils/validation";
 import styles from "./DateInput.module.scss";
@@ -62,7 +63,7 @@ export const DateInput: Component<DateInputProps> = (props) => {
   };
 
   return (
-    <div class={`${styles.dateInputContainer} ${props.class || ""}`}>
+    <div class={clsx(styles.dateInputContainer, props.class)}>
       <Show when={props.label}>
         <label for={id} class={styles.label}>
           {props.label}
@@ -76,7 +77,9 @@ export const DateInput: Component<DateInputProps> = (props) => {
         id={id}
         type="date"
         name={props.name}
-        class={`${styles.dateInput} ${!validation.isValid() ? styles.dateInputError : ""}`}
+        class={clsx(styles.dateInput, {
+          [styles.dateInputError]: !validation.isValid(),
+        })}
         value={props.value || validation.value()}
         min={props.min}
         max={props.max}

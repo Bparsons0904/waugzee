@@ -6,6 +6,9 @@ export interface UserConfiguration {
   discogsToken?: string;
   discogsUsername?: string;
   selectedFolderId?: number;
+  recentlyPlayedThresholdDays?: number;
+  cleaningFrequencyPlays?: number;
+  neglectedRecordsThresholdDays?: number;
 }
 
 export interface Folder {
@@ -83,6 +86,16 @@ export interface UpdateSelectedFolderResponse {
   user: User;
 }
 
+export interface UpdateUserPreferencesRequest {
+  recentlyPlayedThresholdDays?: number;
+  cleaningFrequencyPlays?: number;
+  neglectedRecordsThresholdDays?: number;
+}
+
+export interface UpdateUserPreferencesResponse {
+  user: User;
+}
+
 // Release and UserRelease Types
 export interface Artist {
   id: number;
@@ -93,6 +106,10 @@ export interface Artist {
 export interface Genre {
   id: number;
   name: string;
+  nameLower: string;
+  type: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Label {
@@ -100,6 +117,12 @@ export interface Label {
   name: string;
   resourceUrl?: string;
   entityType?: string;
+}
+
+export interface Track {
+  position: string;
+  title: string;
+  duration?: string;
 }
 
 export interface Release {
@@ -119,7 +142,8 @@ export interface Release {
   lastSynced?: string;
   thumb?: string;
   coverImage?: string;
-  data?: Record<string, unknown>; // JSON data
+  totalDuration?: number;
+  tracksJson?: Track[];
   artists?: Artist[];
   genres?: Genre[];
   labels?: Label[];
@@ -148,7 +172,7 @@ export interface Stylus {
   cartridgeType?: string;
   recommendedReplaceHours?: number;
   userGeneratedId?: string;
-  isVerified?: boolean;
+  isVerified: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -173,4 +197,5 @@ export interface UserWithFoldersAndReleasesResponse {
   folders: Folder[];
   releases: UserRelease[];
   styluses: UserStylus[];
+  playHistory: PlayHistory[];
 }

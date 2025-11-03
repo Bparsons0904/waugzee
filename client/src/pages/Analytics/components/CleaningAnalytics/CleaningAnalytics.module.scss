@@ -1,0 +1,70 @@
+@import "@styles/variables";
+@import "@styles/colors";
+
+.container {
+  background-color: $bg-surface;
+  border-radius: $border-radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-md;
+  margin-bottom: $spacing-xl;
+}
+
+.sectionTitle {
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  color: $text-default;
+  margin: 0 0 $spacing-lg 0;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: $spacing-md;
+  margin-bottom: $spacing-xl;
+
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.statCard {
+  background-color: $bg-elevated;
+  border-radius: $border-radius-md;
+  padding: $spacing-md;
+  text-align: center;
+  border: 1px solid $border-default;
+}
+
+.statValue {
+  font-size: $font-size-3xl;
+  font-weight: $font-weight-bold;
+  color: $text-link;
+  margin-bottom: $spacing-xs;
+}
+
+.statLabel {
+  font-size: $font-size-sm;
+  color: $text-muted;
+  font-weight: $font-weight-medium;
+}
+
+.chartContainer {
+  margin-top: $spacing-xl;
+}
+
+.chartWrapper {
+  height: 400px;
+  width: 100%;
+
+  @media (max-width: 768px) {
+    height: 300px;
+  }
+}
+
+.noData {
+  padding: $spacing-2xl;
+  text-align: center;
+  color: $text-muted;
+  font-style: italic;
+  font-size: $font-size-md;
+}

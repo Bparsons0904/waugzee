@@ -18,6 +18,7 @@ type UserController struct {
 	folderRepo      repositories.FolderRepository
 	userReleaseRepo repositories.UserReleaseRepository
 	userStylusRepo  repositories.StylusRepository
+	historyRepo     repositories.HistoryRepository
 	discogsService  *services.DiscogsService
 	db              database.DB
 	Config          config.Config
@@ -25,9 +26,16 @@ type UserController struct {
 }
 
 type GetUserResponse struct {
-	Folders  []*Folder      `json:"folders"`
-	Releases []*UserRelease `json:"releases"`
-	Styluses []*UserStylus  `json:"styluses"`
+	Folders     []*Folder      `json:"folders"`
+	Releases    []*UserRelease `json:"releases"`
+	Styluses    []*UserStylus  `json:"styluses"`
+	PlayHistory []*PlayHistory `json:"playHistory"`
+}
+
+type UpdateUserPreferencesRequest struct {
+	RecentlyPlayedThresholdDays   *int `json:"recentlyPlayedThresholdDays"`
+	CleaningFrequencyPlays        *int `json:"cleaningFrequencyPlays"`
+	NeglectedRecordsThresholdDays *int `json:"neglectedRecordsThresholdDays"`
 }
 
 type UserControllerInterface interface {
@@ -41,6 +49,11 @@ type UserControllerInterface interface {
 		ctx context.Context,
 		user *User,
 		folderID int,
+	) (*User, error)
+	UpdateUserPreferences(
+		ctx context.Context,
+		user *User,
+		preferences *UpdateUserPreferencesRequest,
 	) (*User, error)
 }
 
@@ -56,6 +69,7 @@ func New(
 		folderRepo:      repos.Folder,
 		userReleaseRepo: repos.UserRelease,
 		userStylusRepo:  repos.Stylus,
+		historyRepo:     repos.History,
 		discogsService:  services.Discogs,
 		db:              db,
 		Config:          config,
@@ -119,7 +133,13 @@ func (uc *UserController) GetUser(
 	var releases []*UserRelease
 	if user.Configuration != nil && user.Configuration.SelectedFolderID != nil {
 		// Get the folder using the composite key lookup
-		selectedFolder, err := uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, *user.Configuration.SelectedFolderID)
+		var selectedFolder *Folder
+		selectedFolder, err = uc.folderRepo.GetFolderByID(
+			ctx,
+			uc.db.SQL,
+			user.ID,
+			*user.Configuration.SelectedFolderID,
+		)
 		if err != nil {
 			log.Warn(
 				"selected folder not found, returning empty releases (likely needs sync)",
@@ -158,10 +178,17 @@ func (uc *UserController) GetUser(
 		return nil, log.Err("failed to get user styluses", err, "userID", user.ID)
 	}
 
+	// Get user play history (limit to 1000 most recent)
+	playHistory, err := uc.historyRepo.GetUserPlayHistory(ctx, uc.db.SQL, user.ID, 1000)
+	if err != nil {
+		return nil, log.Err("failed to get user play history", err, "userID", user.ID)
+	}
+
 	return &GetUserResponse{
-		Folders:  folders,
-		Releases: releases,
-		Styluses: styluses,
+		Folders:     folders,
+		Releases:    releases,
+		Styluses:    styluses,
+		PlayHistory: playHistory,
 	}, nil
 }
 
@@ -179,7 +206,9 @@ func (uc *UserController) UpdateSelectedFolder(
 	}
 
 	if user.Configuration == nil {
-		return nil, log.ErrMsg("user configuration not found, please set up Discogs integration first")
+		return nil, log.ErrMsg(
+			"user configuration not found, please set up Discogs integration first",
+		)
 	}
 
 	user.Configuration.SelectedFolderID = &folderID
@@ -206,4 +235,57 @@ func (uc *UserController) UpdateSelectedFolder(
 
 func (uc *UserController) clearUserFoldersCache(ctx context.Context, userID uuid.UUID) error {
 	return uc.folderRepo.ClearUserFoldersCache(ctx, userID)
+}
+
+func (uc *UserController) UpdateUserPreferences(
+	ctx context.Context,
+	user *User,
+	preferences *UpdateUserPreferencesRequest,
+) (*User, error) {
+	log := uc.log.Function("UpdateUserPreferences")
+
+	if user.Configuration == nil {
+		return nil, log.ErrMsg(
+			"user configuration not found, please set up Discogs integration first",
+		)
+	}
+
+	if preferences.RecentlyPlayedThresholdDays != nil {
+		if *preferences.RecentlyPlayedThresholdDays < 1 || *preferences.RecentlyPlayedThresholdDays > 365 {
+			return nil, log.ErrMsg("recentlyPlayedThresholdDays must be between 1 and 365")
+		}
+		user.Configuration.RecentlyPlayedThresholdDays = preferences.RecentlyPlayedThresholdDays
+	}
+
+	if preferences.CleaningFrequencyPlays != nil {
+		if *preferences.CleaningFrequencyPlays < 1 || *preferences.CleaningFrequencyPlays > 50 {
+			return nil, log.ErrMsg("cleaningFrequencyPlays must be between 1 and 50")
+		}
+		user.Configuration.CleaningFrequencyPlays = preferences.CleaningFrequencyPlays
+	}
+
+	if preferences.NeglectedRecordsThresholdDays != nil {
+		if *preferences.NeglectedRecordsThresholdDays < 1 || *preferences.NeglectedRecordsThresholdDays > 730 {
+			return nil, log.ErrMsg("neglectedRecordsThresholdDays must be between 1 and 730")
+		}
+		user.Configuration.NeglectedRecordsThresholdDays = preferences.NeglectedRecordsThresholdDays
+	}
+
+	if err := uc.userConfigRepo.Update(ctx, uc.db.SQL, user.Configuration, uc.userRepo); err != nil {
+		return nil, log.Err("failed to update user preferences", err)
+	}
+
+	log.Info(
+		"User preferences updated successfully",
+		"userID",
+		user.ID,
+		"recentlyPlayedThresholdDays",
+		user.Configuration.RecentlyPlayedThresholdDays,
+		"cleaningFrequencyPlays",
+		user.Configuration.CleaningFrequencyPlays,
+		"neglectedRecordsThresholdDays",
+		user.Configuration.NeglectedRecordsThresholdDays,
+	)
+
+	return user, nil
 }

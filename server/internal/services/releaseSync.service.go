@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 	"waugzee/internal/database"
@@ -9,6 +10,7 @@ import (
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
+	"waugzee/internal/types"
 
 	"github.com/google/uuid"
 )
@@ -65,10 +67,7 @@ func (rs *ReleaseSyncService) RequestMissingReleases(
 
 	// Limit concurrent API requests to prevent overwhelming the system
 	processedCount := 0
-	maxRequests := MaxPendingAPIRequests
-	if len(missingReleaseIDs) < maxRequests {
-		maxRequests = len(missingReleaseIDs)
-	}
+	maxRequests := min(len(missingReleaseIDs), MaxPendingAPIRequests)
 
 	// Request each missing release up to the limit
 	for _, releaseID := range missingReleaseIDs {
@@ -115,14 +114,17 @@ func (rs *ReleaseSyncService) RequestMissingReleases(
 			Event:   "api_request",
 			UserID:  user.ID.String(),
 			Payload: map[string]any{
-				"requestId":    requestID,
-				"requestType":  "release",
-				"releaseId":    releaseID,
-				"syncStateId":  syncStateID,
-				"url":          fullURL,
-				"method":       "GET",
+				"requestId":   requestID,
+				"requestType": "release",
+				"releaseId":   releaseID,
+				"syncStateId": syncStateID,
+				"url":         fullURL,
+				"method":      "GET",
 				"headers": map[string]string{
-					"Authorization": fmt.Sprintf("Discogs token=%s", *user.Configuration.DiscogsToken),
+					"Authorization": fmt.Sprintf(
+						"Discogs token=%s",
+						*user.Configuration.DiscogsToken,
+					),
 				},
 				"callbackService": "orchestration",
 				"callbackEvent":   "api_response",
@@ -215,8 +217,71 @@ func (rs *ReleaseSyncService) ProcessReleaseResponse(
 	// Set format (default to vinyl)
 	release.Format = FormatVinyl
 
-	// TODO: Store additional data like tracks, images, videos in Data JSONB field
-	// This would require defining the proper struct for the JSONB data
+	// Process tracks from API response
+	if len(releaseData.Tracklist) > 0 {
+		tracks := make([]Track, 0, len(releaseData.Tracklist))
+		for _, apiTrack := range releaseData.Tracklist {
+			tracks = append(tracks, Track{
+				Position: apiTrack.Position,
+				Title:    apiTrack.Title,
+				Duration: apiTrack.Duration,
+			})
+		}
+		release.TracksJSON = tracks
+	}
+
+	// Process format details from API response
+	if len(releaseData.Formats) > 0 {
+		firstFormat := releaseData.Formats[0]
+		formatDetails := FormatDetails{
+			Name:         firstFormat.Name,
+			Qty:          firstFormat.Qty,
+			Text:         firstFormat.Text,
+			Descriptions: firstFormat.Descriptions,
+		}
+		var formatJSON []byte
+		formatJSON, err = json.Marshal(formatDetails)
+		if err != nil {
+			log.Warn("Failed to marshal format details", "error", err)
+		} else {
+			release.FormatDetailsJSON = formatJSON
+		}
+	}
+
+	// Calculate total duration from tracks
+	if len(release.TracksJSON) > 0 || len(releaseData.Formats) > 0 {
+		// Convert model tracks to types.Track for duration calculation
+		typeTracks := make([]types.Track, 0, len(release.TracksJSON))
+		for _, track := range release.TracksJSON {
+			typeTracks = append(typeTracks, types.Track{
+				Position: track.Position,
+				Title:    track.Title,
+				Duration: track.Duration,
+			})
+		}
+
+		// Convert format for duration calculation
+		var format types.Format
+		if len(releaseData.Formats) > 0 {
+			format = types.Format{
+				Name: releaseData.Formats[0].Name,
+				Qty:  releaseData.Formats[0].Qty,
+				Text: releaseData.Formats[0].Text,
+			}
+		}
+
+		// Calculate duration using the same function as XML processing
+		duration := calculateTotalDuration(typeTracks, format)
+		if duration != nil {
+			release.TotalDuration = duration
+			if len(typeTracks) == 0 && format.Qty != "" {
+				log.Debug("Duration estimated from disc count",
+					"releaseID", releaseData.ID,
+					"qty", format.Qty,
+					"duration", *duration)
+			}
+		}
+	}
 
 	// Save release to database
 	err = rs.repos.Release.UpsertBatch(ctx, rs.db.SQLWithContext(ctx), []*Release{release})
@@ -239,15 +304,31 @@ type DiscogsReleaseResponse struct {
 
 // DiscogsReleaseData represents the release data from Discogs API
 type DiscogsReleaseData struct {
-	ID          int64  `json:"id"`
-	Title       string `json:"title"`
-	Year        int    `json:"year"`
-	Country     string `json:"country"`
-	Thumb       string `json:"thumb"`
-	ResourceURL string `json:"resource_url"`
-	URI         string `json:"uri"`
-	MasterID    int64  `json:"master_id"`
-	// Add other fields as needed based on Discogs API response
+	ID          int64                  `json:"id"`
+	Title       string                 `json:"title"`
+	Year        int                    `json:"year"`
+	Country     string                 `json:"country"`
+	Thumb       string                 `json:"thumb"`
+	ResourceURL string                 `json:"resource_url"`
+	URI         string                 `json:"uri"`
+	MasterID    int64                  `json:"master_id"`
+	Tracklist   []DiscogsTracklistItem `json:"tracklist"`
+	Formats     []DiscogsFormat        `json:"formats"`
+}
+
+// DiscogsTracklistItem represents a track from Discogs API response
+type DiscogsTracklistItem struct {
+	Position string `json:"position"`
+	Title    string `json:"title"`
+	Duration string `json:"duration"`
+}
+
+// DiscogsFormat represents format data from Discogs API response
+type DiscogsFormat struct {
+	Name         string   `json:"name"`
+	Qty          string   `json:"qty"`
+	Text         string   `json:"text"`
+	Descriptions []string `json:"descriptions"`
 }
 
 // updateSyncStateWithPendingRequests adds pending request IDs to the collection sync state
@@ -257,7 +338,6 @@ func (rs *ReleaseSyncService) updateSyncStateWithPendingRequests(
 	requestIDs []string,
 ) error {
 	log := rs.log.Function("updateSyncStateWithPendingRequests")
-
 
 	// Get current sync state as raw data to avoid import cycles
 	var syncStateData map[string]any
@@ -311,3 +391,4 @@ func (rs *ReleaseSyncService) updateSyncStateWithPendingRequests(
 
 	return nil
 }
+

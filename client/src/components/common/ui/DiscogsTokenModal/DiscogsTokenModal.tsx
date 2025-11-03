@@ -31,13 +31,11 @@ export const DiscogsTokenModal: Component<DiscogsTokenModalProps> = (props) => {
       successMessage: "Discogs token saved! Starting collection sync...",
       errorMessage: "Failed to save token. Please try again.",
       onSuccess: () => {
-        console.log("Discogs token saved successfully, triggering sync");
         setToken("");
         props.onClose();
         syncMutation.mutate();
       },
       onError: (error) => {
-        console.error("Token submission failed:", error);
         setLocalError(
           error instanceof Error ? error.message : "Failed to save token. Please try again.",
         );

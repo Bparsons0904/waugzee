@@ -51,20 +51,6 @@
   color: $text-default;
 }
 
-.searchInput {
-  width: 100%;
-  padding: $spacing-sm $spacing-md;
-  border: $border-width-thin solid $input-border;
-  border-radius: $border-radius-md;
-  font-size: $font-size-md;
-
-  &:focus {
-    outline: none;
-    border-color: $input-border-focus;
-    box-shadow: $focus-ring;
-  }
-}
-
 .select {
   width: 100%;
   padding: $spacing-sm $spacing-md;

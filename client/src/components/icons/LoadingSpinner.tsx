@@ -6,5 +6,5 @@ interface LoadingSpinnerProps {
 }
 
 export const LoadingSpinner: Component<LoadingSpinnerProps> = (props) => {
-  return <div class={props.class || styles.loadingSpinner}></div>;
+  return <div class={props.class || styles.loadingSpinner} />;
 };

@@ -1,3 +1,4 @@
+import clsx from "clsx";
 import { type Component, Show } from "solid-js";
 import styles from "./ConfirmationModal.module.scss";
 
@@ -36,7 +37,7 @@ export const ConfirmationModal: Component<ConfirmationModalProps> = (props) => {
             </button>
             <button
               type="button"
-              class={`${styles.confirmButton} ${styles.destructive}`}
+              class={clsx(styles.confirmButton, styles.destructive)}
               onClick={props.onConfirm}
             >
               {confirmText()}

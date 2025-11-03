@@ -1,4 +1,5 @@
 import { Field } from "@components/common/forms/Field/Field";
+import { SearchInput } from "@components/common/forms/SearchInput/SearchInput";
 import { Select, type SelectOption } from "@components/common/forms/Select/Select";
 import { Toggle } from "@components/common/forms/Toggle/Toggle";
 import { Image } from "@components/common/ui/Image/Image";
@@ -8,25 +9,31 @@ import { useUserData } from "@context/UserDataContext";
 import type { UserRelease } from "@models/User";
 import { useLogCleaning, useLogPlay } from "@services/apiHooks";
 import { fuzzySearchUserReleases } from "@utils/fuzzy";
+import clsx from "clsx";
 
 import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import styles from "./LogPlay.module.scss";
 
-const sortOptions: SelectOption[] = [
-  { value: "album", label: "Album (A-Z)" },
-  { value: "artist", label: "Artist (A-Z)" },
-  { value: "genre", label: "Genre (A-Z)" },
-  { value: "lastPlayed", label: "Last Played (newest first)" },
-  { value: "longestUnplayed", label: "Longest Unplayed (oldest first)" },
-  { value: "needsCleaning", label: "Needs Cleaning (most dirty first)" },
-  { value: "recentlyPlayed", label: "Recently Played (30 days)" },
-  { value: "year", label: "Release Year (newest first)" },
-  { value: "playCount", label: "Most Played" },
-];
-
 const LogPlay: Component = () => {
   const userData = useUserData();
   const releases = () => userData.releases();
+
+  const recentlyPlayedThreshold = () =>
+    userData.user()?.configuration?.recentlyPlayedThresholdDays ?? 90;
+
+  const cleaningFrequency = () => userData.user()?.configuration?.cleaningFrequencyPlays ?? 5;
+
+  const sortOptions = createMemo((): SelectOption[] => [
+    { value: "album", label: "Album (A-Z)" },
+    { value: "artist", label: "Artist (A-Z)" },
+    { value: "genre", label: "Genre (A-Z)" },
+    { value: "lastPlayed", label: "Last Played (newest first)" },
+    { value: "longestUnplayed", label: "Longest Unplayed (oldest first)" },
+    { value: "needsCleaning", label: "Needs Cleaning (most dirty first)" },
+    { value: "recentlyPlayed", label: `Recently Played (${recentlyPlayedThreshold()} days)` },
+    { value: "year", label: "Release Year (newest first)" },
+    { value: "playCount", label: "Most Played" },
+  ]);
   const [searchTerm, setSearchTerm] = createSignal("");
   const [selectedReleaseId, setSelectedReleaseId] = createSignal<string | null>(null);
   const [isModalOpen, setIsModalOpen] = createSignal(false);
@@ -52,7 +59,8 @@ const LogPlay: Component = () => {
   const sortReleases = (releases: UserRelease[], sortOption: string): UserRelease[] => {
     const sorted = [...releases];
     const now = Date.now();
-    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+    const threshold = recentlyPlayedThreshold();
+    const thresholdAgo = now - threshold * 24 * 60 * 60 * 1000;
 
     switch (sortOption) {
       case "album":
@@ -107,7 +115,7 @@ const LogPlay: Component = () => {
             const lastPlayed = release.playHistory?.[0]?.playedAt
               ? new Date(release.playHistory[0].playedAt).getTime()
               : 0;
-            return lastPlayed >= thirtyDaysAgo;
+            return lastPlayed >= thresholdAgo;
           })
           .sort((a, b) => {
             const lastPlayedA = new Date(a.playHistory?.[0]?.playedAt || 0).getTime();
@@ -184,23 +192,22 @@ const LogPlay: Component = () => {
       <div class={styles.logForm}>
         <div class={styles.controlsRow}>
           <div class={styles.searchSection}>
-            <Field label="Search Your Collection" htmlFor="releaseSearch">
-              <input
-                type="text"
-                id="releaseSearch"
-                class={styles.searchInput}
-                value={searchTerm()}
-                onInput={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by title or artist..."
-              />
-            </Field>
+            <label class={styles.label} for="releaseSearch">
+              Search Your Collection
+            </label>
+            <SearchInput
+              id="releaseSearch"
+              value={searchTerm()}
+              onInput={setSearchTerm}
+              placeholder="Search by title or artist..."
+            />
           </div>
 
           <div class={styles.sortSection}>
             <Field label="Sort By" htmlFor="sortOptions">
               <Select
                 name="sortOptions"
-                options={sortOptions}
+                options={sortOptions()}
                 value={sortBy()}
                 onChange={setSortBy}
               />
@@ -229,7 +236,9 @@ const LogPlay: Component = () => {
               <For each={filteredReleases()}>
                 {(userRelease) => (
                   <div
-                    class={`${styles.releaseCard} ${selectedRelease()?.id === userRelease.id ? styles.selected : ""}`}
+                    class={clsx(styles.releaseCard, {
+                      [styles.selected]: selectedRelease()?.id === userRelease.id,
+                    })}
                     onClick={() => handleReleaseClick(userRelease)}
                   >
                     <div class={styles.releaseCardContainer}>
@@ -256,6 +265,8 @@ const LogPlay: Component = () => {
                           <RecordStatusIndicator
                             playHistory={userRelease.playHistory || []}
                             cleaningHistory={userRelease.cleaningHistory || []}
+                            recentlyPlayedThresholdDays={recentlyPlayedThreshold()}
+                            cleaningFrequencyPlays={cleaningFrequency()}
                             showDetails={false}
                             onPlayClick={() => handleQuickPlay(userRelease)}
                             onCleanClick={() => handleQuickCleaning(userRelease)}
@@ -269,6 +280,8 @@ const LogPlay: Component = () => {
                         <RecordStatusIndicator
                           playHistory={userRelease.playHistory || []}
                           cleaningHistory={userRelease.cleaningHistory || []}
+                          recentlyPlayedThresholdDays={recentlyPlayedThreshold()}
+                          cleaningFrequencyPlays={cleaningFrequency()}
                           showDetails={true}
                         />
                       </div>
