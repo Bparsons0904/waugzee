@@ -80,7 +80,7 @@ export function UserDataProvider(props: { children: JSX.Element }) {
         styluses: () => userQuery.data?.styluses || [],
         playHistory: () => userQuery.data?.playHistory || [],
         cleaningHistory,
-        isLoading: () => userQuery.isLoading,
+        isLoading: () => userQuery.isPending,
         error: () => userQuery.error?.message || null,
         updateUser,
         refreshUser,

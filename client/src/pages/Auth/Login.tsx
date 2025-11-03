@@ -12,7 +12,12 @@ const Login: Component = () => {
     try {
       setLoading(true);
       setError(null);
-      await loginWithOIDC();
+
+      // Retrieve stored return location from sessionStorage
+      const returnTo = sessionStorage.getItem("returnTo");
+      if (returnTo) sessionStorage.removeItem("returnTo");
+
+      await loginWithOIDC(returnTo || undefined);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Login failed";
       setError(errorMessage);
