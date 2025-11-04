@@ -101,8 +101,6 @@ steps:
         from_secret: CORS_ALLOW_ORIGINS
       ZITADEL_CLIENT_ID:
         from_secret: ZITADEL_CLIENT_ID
-      ZITADEL_CLIENT_SECRET:
-        from_secret: ZITADEL_CLIENT_SECRET
       ZITADEL_INSTANCE_URL:
         from_secret: ZITADEL_INSTANCE_URL
       ZITADEL_PRIVATE_KEY:
@@ -156,8 +154,6 @@ steps:
         from_secret: CORS_ALLOW_ORIGINS
       ZITADEL_CLIENT_ID:
         from_secret: ZITADEL_CLIENT_ID
-      ZITADEL_CLIENT_SECRET:
-        from_secret: ZITADEL_CLIENT_SECRET
       ZITADEL_INSTANCE_URL:
         from_secret: ZITADEL_INSTANCE_URL
       ZITADEL_PRIVATE_KEY:

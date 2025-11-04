@@ -52,10 +52,9 @@ type ZitadelService struct {
 	config       config.Config
 	log          logger.Logger
 	httpClient   *http.Client
-	issuer       string
-	clientID     string
-	clientSecret string
-	privateKey   *rsa.PrivateKey
+	issuer     string
+	clientID   string
+	privateKey *rsa.PrivateKey
 	keyID        string
 	clientIDM2M  string
 
@@ -105,16 +104,15 @@ func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 	}
 
 	service := &ZitadelService{
-		config:       cfg,
-		log:          log,
-		httpClient:   httpClient,
-		issuer:       cfg.ZitadelInstanceURL,
-		clientID:     cfg.ZitadelClientID,
-		clientSecret: cfg.ZitadelClientSecret,
-		privateKey:   privateKey,
-		keyID:        cfg.ZitadelKeyID,
-		clientIDM2M:  cfg.ZitadelClientIDM2M,
-		cacheTTL:     15 * time.Minute, // Cache OIDC discovery and JWKS for 15 minutes
+		config:      cfg,
+		log:         log,
+		httpClient:  httpClient,
+		issuer:      cfg.ZitadelInstanceURL,
+		clientID:    cfg.ZitadelClientID,
+		privateKey:  privateKey,
+		keyID:       cfg.ZitadelKeyID,
+		clientIDM2M: cfg.ZitadelClientIDM2M,
+		cacheTTL:    15 * time.Minute, // Cache OIDC discovery and JWKS for 15 minutes
 	}
 
 	log.Info("Zitadel service initialized successfully",
@@ -284,11 +282,8 @@ func (zs *ZitadelService) ValidateToken(
 		data.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
 		data.Set("client_assertion", jwtAssertion)
 	} else {
-		// Fallback to client_id/client_secret for web client
+		// Fallback to client_id only (PKCE flow doesn't require client_secret)
 		data.Set("client_id", zs.clientID)
-		if zs.clientSecret != "" {
-			data.Set("client_secret", zs.clientSecret)
-		}
 	}
 
 	req, err := http.NewRequestWithContext(
@@ -586,11 +581,8 @@ func (zs *ZitadelService) RevokeToken(ctx context.Context, token string, tokenTy
 		data.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
 		data.Set("client_assertion", jwtAssertion)
 	} else {
-		// Fallback to client_id/client_secret for web client
+		// Fallback to client_id only (PKCE flow doesn't require client_secret)
 		data.Set("client_id", zs.clientID)
-		if zs.clientSecret != "" {
-			data.Set("client_secret", zs.clientSecret)
-		}
 	}
 
 	req, err := http.NewRequestWithContext(
