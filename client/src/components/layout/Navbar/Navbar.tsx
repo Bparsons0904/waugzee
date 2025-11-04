@@ -1,12 +1,19 @@
 import VinylIcon from "@components/icons/VinylIcon";
 import { ROUTES } from "@constants/api.constants";
 import { useAuth } from "@context/AuthContext";
+import { useSyncStatus } from "@context/SyncStatusContext";
+import { useUserData } from "@context/UserDataContext";
 import { A } from "@solidjs/router";
 import { type Component, Match, Show, Switch } from "solid-js";
 import styles from "./NavBar.module.scss";
+import { SyncStatusIndicator } from "./SyncStatusIndicator";
 
 export const NavBar: Component = () => {
   const { isAuthenticated, logout } = useAuth();
+  const { user } = useUserData();
+  const { isSyncing } = useSyncStatus();
+
+  const needsDiscogsKey = () => !user()?.configuration?.discogsToken;
 
   return (
     <nav class={styles.navbar}>
@@ -44,6 +51,11 @@ export const NavBar: Component = () => {
           </ul>
 
           <ul class={styles.navbarActions}>
+            <Show when={isAuthenticated()}>
+              <li class={styles.navbarItem}>
+                <SyncStatusIndicator isSyncing={isSyncing()} />
+              </li>
+            </Show>
             <Switch>
               <Match when={!isAuthenticated()}>
                 <li class={styles.navbarItem}>
@@ -58,7 +70,11 @@ export const NavBar: Component = () => {
               </Match>
               <Match when={isAuthenticated()}>
                 <li class={styles.navbarItem}>
-                  <A href={ROUTES.PROFILE} class={styles.navbarLink} activeClass={styles.active}>
+                  <A
+                    href={ROUTES.PROFILE}
+                    class={`${styles.navbarLink} ${needsDiscogsKey() ? styles.needsAttention : ""}`}
+                    activeClass={styles.active}
+                  >
                     Profile
                   </A>
                 </li>

@@ -88,9 +88,39 @@ func (o *OrchestrationService) SyncUserFoldersAndCollection(
 		return log.ErrMsg("user does not have a Discogs token configured")
 	}
 
+	// Send sync_start event to notify client
+	startMessage := events.Message{
+		ID:      user.ID.String(),
+		Service: events.USER,
+		Event:   "sync_start",
+		UserID:  user.ID.String(),
+		Payload: map[string]any{
+			"message": "Collection sync started",
+		},
+		Timestamp: time.Now(),
+	}
+	if err := o.eventBus.Publish(events.WEBSOCKET, "user", startMessage); err != nil {
+		log.Warn("Failed to send sync_start event", "error", err)
+	}
+
 	// Step 1: Request folder discovery (async - will trigger folder processing)
 	_, err := o.foldersService.RequestUserFolders(ctx, user)
 	if err != nil {
+		// Send sync_error event
+		errorMessage := events.Message{
+			ID:      user.ID.String(),
+			Service: events.USER,
+			Event:   "sync_error",
+			UserID:  user.ID.String(),
+			Payload: map[string]any{
+				"error":   "Failed to initiate folder discovery",
+				"message": err.Error(),
+			},
+			Timestamp: time.Now(),
+		}
+		if publishErr := o.eventBus.Publish(events.WEBSOCKET, "user", errorMessage); publishErr != nil {
+			log.Warn("Failed to send sync_error event", "error", publishErr)
+		}
 		return log.Err("failed to initiate folder discovery", err)
 	}
 

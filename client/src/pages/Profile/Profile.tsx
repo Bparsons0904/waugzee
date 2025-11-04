@@ -1,5 +1,6 @@
 import { Button } from "@components/common/ui/Button/Button";
 import { DiscogsTokenModal } from "@components/common/ui/DiscogsTokenModal/DiscogsTokenModal";
+import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import { FolderSelector } from "@components/folders/FolderSelector";
 import { USER_ENDPOINTS } from "@constants/api.constants";
 import { useAuth } from "@context/AuthContext";
@@ -248,9 +249,14 @@ const Profile: Component = () => {
         </div>
       </Show>
 
-      <Show when={isDiscogsModalOpen()}>
+      <Modal
+        isOpen={isDiscogsModalOpen()}
+        onClose={() => setIsDiscogsModalOpen(false)}
+        title="Connect Discogs Account"
+        size={ModalSize.Large}
+      >
         <DiscogsTokenModal onClose={() => setIsDiscogsModalOpen(false)} />
-      </Show>
+      </Modal>
     </div>
   );
 };

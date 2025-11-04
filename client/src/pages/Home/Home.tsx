@@ -92,6 +92,7 @@ const Home: Component = () => {
       buttonText: getButtonText(),
       onClick: handleSyncCollection,
       disabled: syncMutation.isPending,
+      highlight: !user()?.configuration?.discogsToken,
     },
     {
       title: "Listening Insights",

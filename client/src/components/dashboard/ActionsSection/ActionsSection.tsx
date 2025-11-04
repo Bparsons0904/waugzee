@@ -8,6 +8,7 @@ export interface ActionItem {
   buttonText: string;
   onClick: () => void;
   disabled?: boolean;
+  highlight?: boolean;
 }
 
 interface ActionsSectionProps {
@@ -20,7 +21,9 @@ export const ActionsSection: Component<ActionsSectionProps> = (props) => {
       <div class={styles.cardGrid}>
         <For each={props.actions}>
           {(action) => (
-            <Card class={styles.actionCardContent}>
+            <Card
+              class={`${styles.actionCardContent} ${action.highlight ? styles.highlightCard : ""}`}
+            >
               <div class={styles.cardHeader}>
                 <h2>{action.title}</h2>
               </div>

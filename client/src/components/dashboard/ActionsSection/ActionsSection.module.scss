@@ -69,3 +69,50 @@
     transform: translateY(0);
   }
 }
+
+// ====================
+// Highlight Animation (for first-time user flow)
+// ====================
+
+@keyframes cardGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba($color-primary-500, 0.4),
+      0 0 20px rgba($color-primary-500, 0.2),
+      0 4px 6px rgba($color-black, 0.1);
+    border-color: rgba($color-primary-500, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 20px rgba($color-primary-500, 0.6),
+      0 0 40px rgba($color-primary-500, 0.3),
+      0 8px 12px rgba($color-black, 0.15);
+    border-color: rgba($color-primary-500, 0.5);
+  }
+}
+
+.highlightCard {
+  border: 2px solid rgba($color-primary-500, 0.3);
+  animation: cardGlow 2s ease-in-out infinite;
+  background: linear-gradient(
+    135deg,
+    rgba($color-primary-500, 0.05) 0%,
+    rgba($color-secondary-500, 0.05) 100%
+  );
+
+  .cardHeader h2 {
+    background: linear-gradient(
+      135deg,
+      $color-primary-600 0%,
+      $color-secondary-600 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  &:hover {
+    animation: none;
+    border-color: rgba($color-primary-500, 0.5);
+  }
+}

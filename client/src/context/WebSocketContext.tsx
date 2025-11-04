@@ -28,6 +28,9 @@ export const Events = {
   API_PROGRESS: "api_progress",
   API_COMPLETE: "api_complete",
   API_ERROR: "api_error",
+  SYNC_START: "sync_start",
+  SYNC_COMPLETE: "sync_complete",
+  SYNC_ERROR: "sync_error",
 } as const;
 
 // Service types matching server-side implementation
