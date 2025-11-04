@@ -19,16 +19,12 @@ type Config struct {
 	DatabaseCachePort    int    `mapstructure:"DB_CACHE_PORT"`
 	DatabaseCacheReset   int    `mapstructure:"DB_CACHE_RESET"`
 	CorsAllowOrigins     string `mapstructure:"CORS_ALLOW_ORIGINS"`
-	SecuritySalt         int    `mapstructure:"SECURITY_SALT"`
-	SecurityPepper       string `mapstructure:"SECURITY_PEPPER"`
-	SecurityJwtSecret    string `mapstructure:"SECURITY_JWT_SECRET"`
 	ZitadelClientID      string `mapstructure:"ZITADEL_CLIENT_ID"`
 	ZitadelClientSecret  string `mapstructure:"ZITADEL_CLIENT_SECRET"`
 	ZitadelInstanceURL   string `mapstructure:"ZITADEL_INSTANCE_URL"`
 	ZitadelPrivateKey    string `mapstructure:"ZITADEL_PRIVATE_KEY"`
 	ZitadelKeyID         string `mapstructure:"ZITADEL_KEY_ID"`
 	ZitadelClientIDM2M   string `mapstructure:"ZITADEL_CLIENT_ID_M2M"`
-	SchedulerEnabled     bool   `mapstructure:"SCHEDULER_ENABLED"`
 }
 
 var ConfigInstance Config
@@ -44,9 +40,8 @@ func New() (Config, error) {
 	envVars := []string{
 		"GENERAL_VERSION", "ENVIRONMENT", "SERVER_PORT", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD",
 		"DB_CACHE_ADDRESS", "DB_CACHE_PORT", "DB_CACHE_RESET",
-		"CORS_ALLOW_ORIGINS", "SECURITY_SALT", "SECURITY_PEPPER", "SECURITY_JWT_SECRET",
+		"CORS_ALLOW_ORIGINS",
 		"ZITADEL_CLIENT_ID", "ZITADEL_CLIENT_SECRET", "ZITADEL_INSTANCE_URL", "ZITADEL_PRIVATE_KEY", "ZITADEL_KEY_ID", "ZITADEL_CLIENT_ID_M2M",
-		"SCHEDULER_ENABLED",
 	}
 
 	for _, env := range envVars {
@@ -56,7 +51,7 @@ func New() (Config, error) {
 	}
 
 	// Check if key environment variables are already set
-	envVarsSet := viper.IsSet("SERVER_PORT") && viper.IsSet("SECURITY_JWT_SECRET")
+	envVarsSet := viper.IsSet("SERVER_PORT") && viper.IsSet("DB_HOST")
 
 	if envVarsSet {
 		log.Info("Environment variables detected, skipping file loading")

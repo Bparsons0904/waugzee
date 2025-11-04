@@ -13,8 +13,6 @@ steps:
   - name: build-frontend
     image: node:22-alpine
     environment:
-      VITE_GENERAL_VERSION:
-        from_secret: VITE_GENERAL_VERSION
       VITE_API_URL:
         from_secret: VITE_API_URL
       VITE_WS_URL:
@@ -54,8 +52,6 @@ steps:
   - name: build-client-image
     image: docker:24-cli
     environment:
-      VITE_GENERAL_VERSION:
-        from_secret: VITE_GENERAL_VERSION
       VITE_API_URL:
         from_secret: VITE_API_URL
       VITE_WS_URL:
@@ -65,7 +61,6 @@ steps:
     commands:
       - cd client
       - docker build -t waugzee-client:latest
-        --build-arg VITE_GENERAL_VERSION="$VITE_GENERAL_VERSION"
         --build-arg VITE_API_URL="$VITE_API_URL"
         --build-arg VITE_WS_URL="$VITE_WS_URL"
         --build-arg VITE_ENV="$VITE_ENV"
@@ -104,16 +99,10 @@ steps:
         from_secret: DB_CACHE_RESET
       CORS_ALLOW_ORIGINS:
         from_secret: CORS_ALLOW_ORIGINS
-      SECURITY_SALT:
-        from_secret: SECURITY_SALT
-      SECURITY_PEPPER:
-        from_secret: SECURITY_PEPPER
-      SECURITY_JWT_SECRET:
-        from_secret: SECURITY_JWT_SECRET
-      SCHEDULER_ENABLED:
-        from_secret: SCHEDULER_ENABLED
       ZITADEL_CLIENT_ID:
         from_secret: ZITADEL_CLIENT_ID
+      ZITADEL_CLIENT_SECRET:
+        from_secret: ZITADEL_CLIENT_SECRET
       ZITADEL_INSTANCE_URL:
         from_secret: ZITADEL_INSTANCE_URL
       ZITADEL_PRIVATE_KEY:
@@ -124,8 +113,6 @@ steps:
         from_secret: ZITADEL_CLIENT_ID_M2M
       CLIENT_PORT:
         from_secret: CLIENT_PORT
-      VITE_GENERAL_VERSION:
-        from_secret: VITE_GENERAL_VERSION
       VITE_API_URL:
         from_secret: VITE_API_URL
       VITE_WS_URL:
@@ -167,16 +154,10 @@ steps:
         from_secret: DB_CACHE_RESET
       CORS_ALLOW_ORIGINS:
         from_secret: CORS_ALLOW_ORIGINS
-      SECURITY_SALT:
-        from_secret: SECURITY_SALT
-      SECURITY_PEPPER:
-        from_secret: SECURITY_PEPPER
-      SECURITY_JWT_SECRET:
-        from_secret: SECURITY_JWT_SECRET
-      SCHEDULER_ENABLED:
-        from_secret: SCHEDULER_ENABLED
       ZITADEL_CLIENT_ID:
         from_secret: ZITADEL_CLIENT_ID
+      ZITADEL_CLIENT_SECRET:
+        from_secret: ZITADEL_CLIENT_SECRET
       ZITADEL_INSTANCE_URL:
         from_secret: ZITADEL_INSTANCE_URL
       ZITADEL_PRIVATE_KEY:
@@ -187,8 +168,6 @@ steps:
         from_secret: ZITADEL_CLIENT_ID_M2M
       CLIENT_PORT:
         from_secret: CLIENT_PORT
-      VITE_GENERAL_VERSION:
-        from_secret: VITE_GENERAL_VERSION
       VITE_API_URL:
         from_secret: VITE_API_URL
       VITE_WS_URL:
