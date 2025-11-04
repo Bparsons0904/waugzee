@@ -1,8 +1,16 @@
-package seed
+package initialize
 
 import (
 	. "waugzee/internal/models"
 )
+
+func intPtr(i int) *int {
+	return &i
+}
+
+func cartridgeTypePtr(ct CartridgeType) *CartridgeType {
+	return &ct
+}
 
 func getStylusesData() []Stylus {
 	return []Stylus{
