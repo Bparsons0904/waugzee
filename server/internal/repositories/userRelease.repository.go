@@ -166,9 +166,7 @@ func userReleasesWithPreloads(userID uuid.UUID) func(db *gorm.Statement) {
 		db.Preload("Release.Artists").
 			Preload("Release.Genres").
 			Preload("Release.Labels").
-			Preload("Release").
 			Preload("PlayHistory", "user_id = ?", userID).
-			Preload("PlayHistory.UserStylus").
 			Preload("PlayHistory.UserStylus.Stylus").
 			Preload("CleaningHistory", "user_id = ?", userID)
 	}
