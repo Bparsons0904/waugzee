@@ -121,7 +121,8 @@ func (r *historyRepository) GetUserPlayHistory(
 	}
 
 	playHistory, err := gorm.G[*PlayHistory](tx).
-		Scopes(historyWithPreloads()).
+		Preload("UserRelease.Release.Genres", nil).
+		Preload("UserStylus.Stylus", nil).
 		Where(PlayHistory{UserID: userID}).
 		Order("played_at DESC").
 		Limit(limit).
@@ -170,7 +171,8 @@ func (r *historyRepository) UpdatePlayHistory(
 	}
 
 	playHistory, err := gorm.G[*PlayHistory](tx).
-		Scopes(historyWithPreloads()).
+		Preload("UserRelease.Release", nil).
+		Preload("UserStylus.Stylus", nil).
 		Where(PlayHistory{BaseUUIDModel: BaseUUIDModel{ID: playHistoryID}}).
 		First(ctx)
 	if err != nil {
@@ -393,11 +395,4 @@ func (r *historyRepository) ClearUserHistoryCache(ctx context.Context, userID uu
 
 	log.Info("cleared user history cache", "userID", userID)
 	return nil
-}
-
-func historyWithPreloads() func(db *gorm.Statement) {
-	return func(db *gorm.Statement) {
-		db.Preload("UserRelease.Release.Genre", nil).
-			Preload("UserStylus.Stylus", nil)
-	}
 }
