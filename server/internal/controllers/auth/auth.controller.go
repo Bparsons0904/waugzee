@@ -14,6 +14,8 @@ import (
 type AuthController struct {
 	zitadelService *services.ZitadelService
 	userRepo       repositories.UserRepository
+	historyRepo    repositories.HistoryRepository
+	stylusRepo     repositories.StylusRepository
 	db             database.DB
 	log            logger.Logger
 }
@@ -62,7 +64,6 @@ type LogoutResponse struct {
 	RevokedTokens []string `json:"revoked_tokens,omitempty"`
 }
 
-
 func New(
 	services services.Service,
 	repos repositories.Repository,
@@ -71,6 +72,8 @@ func New(
 	return &AuthController{
 		zitadelService: services.Zitadel,
 		userRepo:       repos.User,
+		historyRepo:    repos.History,
+		stylusRepo:     repos.Stylus,
 		db:             db,
 		log:            logger.New("authController"),
 	}
@@ -261,6 +264,32 @@ func (ac *AuthController) LogoutUser(
 		log.Warn("no OIDC user ID available for cache clearing")
 	}
 
+	if user != nil {
+		if err := ac.historyRepo.ClearUserHistoryCache(ctx, user.ID); err != nil {
+			log.Warn(
+				"failed to clear user history cache",
+				"error",
+				err.Error(),
+				"userID",
+				user.ID,
+			)
+		} else {
+			log.Info("user history cache cleared successfully", "userID", user.ID)
+		}
+
+		if err := ac.stylusRepo.ClearUserStylusCache(ctx, user.ID); err != nil {
+			log.Warn(
+				"failed to clear user stylus cache",
+				"error",
+				err.Error(),
+				"userID",
+				user.ID,
+			)
+		} else {
+			log.Info("user stylus cache cleared successfully", "userID", user.ID)
+		}
+	}
+
 	// Generate logout URL
 	var logoutURL string
 	url, err := ac.zitadelService.GetLogoutURL(
@@ -277,7 +306,13 @@ func (ac *AuthController) LogoutUser(
 	}
 
 	if oidcUserID != "" {
-		log.Info("user logout completed", "oidcUserID", oidcUserID, "revokedTokens", len(revokedTokens))
+		log.Info(
+			"user logout completed",
+			"oidcUserID",
+			oidcUserID,
+			"revokedTokens",
+			len(revokedTokens),
+		)
 	}
 
 	response := &LogoutResponse{

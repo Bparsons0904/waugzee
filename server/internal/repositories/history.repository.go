@@ -19,7 +19,6 @@ const (
 )
 
 type HistoryRepository interface {
-	// Play History
 	CreatePlayHistory(ctx context.Context, tx *gorm.DB, playHistory *PlayHistory) error
 	GetUserPlayHistory(
 		ctx context.Context,
@@ -40,7 +39,6 @@ type HistoryRepository interface {
 		playHistoryID uuid.UUID,
 	) error
 
-	// Cleaning History
 	CreateCleaningHistory(ctx context.Context, tx *gorm.DB, cleaningHistory *CleaningHistory) error
 	GetUserCleaningHistory(
 		ctx context.Context,
@@ -60,6 +58,8 @@ type HistoryRepository interface {
 		userID uuid.UUID,
 		cleaningHistoryID uuid.UUID,
 	) error
+
+	ClearUserHistoryCache(ctx context.Context, userID uuid.UUID) error
 }
 
 type historyRepository struct {
@@ -387,4 +387,14 @@ func (r *historyRepository) clearUserCleaningHistoryCache(
 	if err != nil {
 		r.log.Warn("failed to clear user cleaning history cache", "userID", userID, "error", err)
 	}
+}
+
+func (r *historyRepository) ClearUserHistoryCache(ctx context.Context, userID uuid.UUID) error {
+	log := r.log.Function("ClearUserHistoryCache")
+
+	r.clearUserPlayHistoryCache(ctx, userID)
+	r.clearUserCleaningHistoryCache(ctx, userID)
+
+	log.Info("cleared user history cache", "userID", userID)
+	return nil
 }
