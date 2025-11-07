@@ -30,7 +30,7 @@ type HistoryRepository interface {
 		ctx context.Context,
 		tx *gorm.DB,
 		playHistoryID uuid.UUID,
-		updates map[string]interface{},
+		updates map[string]any,
 	) (*PlayHistory, error)
 	DeletePlayHistory(
 		ctx context.Context,
@@ -50,7 +50,7 @@ type HistoryRepository interface {
 		ctx context.Context,
 		tx *gorm.DB,
 		cleaningHistoryID uuid.UUID,
-		updates map[string]interface{},
+		updates map[string]any,
 	) (*CleaningHistory, error)
 	DeleteCleaningHistory(
 		ctx context.Context,
@@ -121,9 +121,7 @@ func (r *historyRepository) GetUserPlayHistory(
 	}
 
 	playHistory, err := gorm.G[*PlayHistory](tx).
-		Preload("UserRelease.Release.Genres", nil).
-		Preload("UserStylus", nil).
-		Preload("UserStylus.Stylus", nil).
+		Scopes(historyWithPreloads()).
 		Where(PlayHistory{UserID: userID}).
 		Order("played_at DESC").
 		Limit(limit).
@@ -157,7 +155,7 @@ func (r *historyRepository) UpdatePlayHistory(
 	ctx context.Context,
 	tx *gorm.DB,
 	playHistoryID uuid.UUID,
-	updates map[string]interface{},
+	updates map[string]any,
 ) (*PlayHistory, error) {
 	log := r.log.Function("UpdatePlayHistory")
 
@@ -172,9 +170,7 @@ func (r *historyRepository) UpdatePlayHistory(
 	}
 
 	playHistory, err := gorm.G[*PlayHistory](tx).
-		Preload("UserRelease.Release", nil).
-		Preload("UserStylus", nil).
-		Preload("UserStylus.Stylus", nil).
+		Scopes(historyWithPreloads()).
 		Where(PlayHistory{BaseUUIDModel: BaseUUIDModel{ID: playHistoryID}}).
 		First(ctx)
 	if err != nil {
@@ -303,7 +299,7 @@ func (r *historyRepository) UpdateCleaningHistory(
 	ctx context.Context,
 	tx *gorm.DB,
 	cleaningHistoryID uuid.UUID,
-	updates map[string]interface{},
+	updates map[string]any,
 ) (*CleaningHistory, error) {
 	log := r.log.Function("UpdateCleaningHistory")
 
@@ -397,4 +393,11 @@ func (r *historyRepository) ClearUserHistoryCache(ctx context.Context, userID uu
 
 	log.Info("cleared user history cache", "userID", userID)
 	return nil
+}
+
+func historyWithPreloads() func(db *gorm.Statement) {
+	return func(db *gorm.Statement) {
+		db.Preload("UserRelease.Release.Genre", nil).
+			Preload("UserStylus.Stylus", nil)
+	}
 }

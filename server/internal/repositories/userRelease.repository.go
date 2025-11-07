@@ -155,6 +155,19 @@ func (r *userReleaseRepository) GetExistingByUser(
 	return result, nil
 }
 
+func userReleasesWithPreloads(userID uuid.UUID) func(db *gorm.Statement) {
+	return func(db *gorm.Statement) {
+		db.Preload("Release.Artists").
+			Preload("Release.Genres").
+			Preload("Release.Labels").
+			Preload("Release").
+			Preload("PlayHistory", "user_id = ?", userID).
+			Preload("PlayHistory.UserStylus").
+			Preload("PlayHistory.UserStylus.Stylus").
+			Preload("CleaningHistory", "user_id = ?", userID)
+	}
+}
+
 func (r *userReleaseRepository) GetUserReleasesByFolderID(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -163,19 +176,18 @@ func (r *userReleaseRepository) GetUserReleasesByFolderID(
 ) ([]*UserRelease, error) {
 	log := r.log.Function("GetUserReleasesByFolderID")
 
-	var userReleases []*UserRelease
-	if err := tx.WithContext(ctx).
-		Preload("Release.Artists").
-		Preload("Release.Genres").
-		Preload("Release.Labels").
-		Preload("Release").
-		Preload("PlayHistory", "user_id = ?", userID).
-		Preload("PlayHistory.UserStylus").
-		Preload("PlayHistory.UserStylus.Stylus").
-		Preload("CleaningHistory", "user_id = ?", userID).
-		Where("user_id = ? AND folder_id = ? AND active = ?", userID, folderID, true).
-		Order("date_added DESC").
-		Find(&userReleases).Error; err != nil {
+	query := gorm.G[*UserRelease](tx).
+		Scopes(userReleasesWithPreloads(userID)).
+		Where("user_id = ? AND active = ?", userID, true).
+		Order("date_added DESC")
+
+	if folderID != 0 {
+		query = query.Where("folder_id = ?", folderID)
+	}
+
+	userReleases, err := query.
+		Find(ctx)
+	if err != nil {
 		return nil, log.Err(
 			"failed to get user releases by folder",
 			err,
