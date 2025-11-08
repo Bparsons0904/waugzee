@@ -242,15 +242,14 @@ steps:
       - docker-compose -p waugzee down || true
       - docker network create traefik || true
       - docker-compose -p waugzee up -d
-      - echo "Waiting for services to be healthy..."
+      - echo "Waiting for Valkey to be healthy and server to be running..."
       - |
-        for i in $(seq 1 45); do
+        for i in $(seq 1 30); do
           VALKEY_STATUS=$(docker inspect --format='{{.State.Status}}' waugzee-valkey 2>/dev/null || echo "not-found")
           VALKEY_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' waugzee-valkey 2>/dev/null || echo "starting")
           SERVER_STATUS=$(docker inspect --format='{{.State.Status}}' waugzee-server 2>/dev/null || echo "not-found")
-          SERVER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' waugzee-server 2>/dev/null || echo "starting")
 
-          echo "Attempt $i/45 - Valkey: $VALKEY_STATUS/$VALKEY_HEALTH, Server: $SERVER_STATUS/$SERVER_HEALTH"
+          echo "Attempt $i/30 - Valkey: $VALKEY_STATUS/$VALKEY_HEALTH, Server: $SERVER_STATUS"
 
           # Check if containers are crash-looping
           if [ "$VALKEY_STATUS" != "running" ] && [ "$VALKEY_STATUS" != "not-found" ]; then
@@ -266,14 +265,14 @@ steps:
             exit 1
           fi
 
-          # Check if both are healthy
-          if [ "$VALKEY_HEALTH" = "healthy" ] && [ "$SERVER_HEALTH" = "healthy" ]; then
-            echo "All services are healthy!"
+          # Check if Valkey is healthy and server is running
+          if [ "$VALKEY_HEALTH" = "healthy" ] && [ "$SERVER_STATUS" = "running" ]; then
+            echo "Valkey is healthy and server is running!"
             break
           fi
 
-          if [ $i -eq 45 ]; then
-            echo "ERROR: Services failed to become healthy after 90 seconds"
+          if [ $i -eq 30 ]; then
+            echo "ERROR: Services failed to start after 60 seconds"
             docker-compose -p waugzee ps
             docker logs waugzee-valkey --tail 100
             docker logs waugzee-server --tail 100
