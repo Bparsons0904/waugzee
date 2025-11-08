@@ -242,6 +242,46 @@ steps:
       - docker-compose -p waugzee down || true
       - docker network create traefik || true
       - docker-compose -p waugzee up -d
+      - echo "Waiting for services to be healthy..."
+      - |
+        for i in $(seq 1 45); do
+          VALKEY_STATUS=$(docker inspect --format='{{.State.Status}}' waugzee-valkey 2>/dev/null || echo "not-found")
+          VALKEY_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' waugzee-valkey 2>/dev/null || echo "starting")
+          SERVER_STATUS=$(docker inspect --format='{{.State.Status}}' waugzee-server 2>/dev/null || echo "not-found")
+          SERVER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' waugzee-server 2>/dev/null || echo "starting")
+
+          echo "Attempt $i/45 - Valkey: $VALKEY_STATUS/$VALKEY_HEALTH, Server: $SERVER_STATUS/$SERVER_HEALTH"
+
+          # Check if containers are crash-looping
+          if [ "$VALKEY_STATUS" != "running" ] && [ "$VALKEY_STATUS" != "not-found" ]; then
+            echo "ERROR: Valkey container is not running (status: $VALKEY_STATUS)"
+            docker-compose -p waugzee ps
+            docker logs waugzee-valkey --tail 100
+            exit 1
+          fi
+          if [ "$SERVER_STATUS" != "running" ] && [ "$SERVER_STATUS" != "not-found" ]; then
+            echo "ERROR: Server container is not running (status: $SERVER_STATUS)"
+            docker-compose -p waugzee ps
+            docker logs waugzee-server --tail 100
+            exit 1
+          fi
+
+          # Check if both are healthy
+          if [ "$VALKEY_HEALTH" = "healthy" ] && [ "$SERVER_HEALTH" = "healthy" ]; then
+            echo "All services are healthy!"
+            break
+          fi
+
+          if [ $i -eq 45 ]; then
+            echo "ERROR: Services failed to become healthy after 90 seconds"
+            docker-compose -p waugzee ps
+            docker logs waugzee-valkey --tail 100
+            docker logs waugzee-server --tail 100
+            exit 1
+          fi
+          sleep 2
+        done
+      - docker-compose -p waugzee ps
       - docker image prune -f
     when:
       branch:
