@@ -91,7 +91,7 @@ steps:
         from_secret: DOCKER_ENV
     commands:
       - docker network create traefik || true
-      - docker-compose up -d valkey
+      - docker-compose -p waugzee up -d valkey
       - sleep 5
     when:
       branch:
@@ -146,7 +146,7 @@ steps:
         from_secret: DOCKER_ENV
     commands:
       - echo "Debug - Cache Address:$DB_CACHE_ADDRESS Port:$DB_CACHE_PORT"
-      - docker-compose run --rm server ./migration up
+      - docker-compose -p waugzee run --rm server ./migration up
     when:
       branch:
         - main
@@ -201,9 +201,9 @@ steps:
       DOCKER_ENV:
         from_secret: DOCKER_ENV
     commands:
-      - docker-compose down || true
+      - docker-compose -p waugzee down || true
       - docker network create traefik || true
-      - docker-compose up -d
+      - docker-compose -p waugzee up -d
       - docker image prune -f
     when:
       branch:
