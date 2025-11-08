@@ -184,7 +184,7 @@ steps:
         from_secret: DOCKER_ENV
     commands:
       - echo "Debug - Cache Address:$DB_CACHE_ADDRESS Port:$DB_CACHE_PORT"
-      - docker-compose -p waugzee run --rm --network waugzee_waugzee-network server ./migration up
+      - docker-compose -p waugzee run --rm --entrypoint ./migration server up
     when:
       branch:
         - main
