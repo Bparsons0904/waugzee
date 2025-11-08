@@ -18,7 +18,7 @@ services:
     environment:
       - GO_ENV=production
       - GENERAL_VERSION=${GENERAL_VERSION}
-      - SERVER_PORT=${SERVER_PORT:-8288}
+      - SERVER_PORT=${SERVER_PORT:-8289}
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=${DB_NAME}
@@ -40,14 +40,20 @@ services:
       - "traefik.http.routers.waugzee-server.tls=true"
       - "traefik.http.routers.waugzee-server.tls.certresolver=letsencrypt"
       - "traefik.http.routers.waugzee-server.priority=100"
-      - "traefik.http.services.waugzee-server-service.loadbalancer.server.port=8288"
+      - "traefik.http.services.waugzee-server-service.loadbalancer.server.port=${SERVER_PORT:-8289}"
     volumes:
       - waugzee_data:/data
     depends_on:
       valkey:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8288/api/health"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:${SERVER_PORT:-8289}/api/health",
+        ]
       interval: 10s
       timeout: 10s
       retries: 3
