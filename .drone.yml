@@ -83,14 +83,52 @@ steps:
   - name: start-valkey
     image: docker/compose:alpine-1.29.2
     environment:
+      GENERAL_VERSION:
+        from_secret: GENERAL_VERSION
+      SERVER_PORT:
+        from_secret: SERVER_PORT
+      DB_HOST:
+        from_secret: DB_HOST
+      DB_PORT:
+        from_secret: DB_PORT
+      DB_NAME:
+        from_secret: DB_NAME
+      DB_USER:
+        from_secret: DB_USER
+      DB_PASSWORD:
+        from_secret: DB_PASSWORD
       DB_CACHE_ADDRESS:
         from_secret: DB_CACHE_ADDRESS
       DB_CACHE_PORT:
         from_secret: DB_CACHE_PORT
+      DB_CACHE_RESET:
+        from_secret: DB_CACHE_RESET
+      CORS_ALLOW_ORIGINS:
+        from_secret: CORS_ALLOW_ORIGINS
+      ZITADEL_CLIENT_ID:
+        from_secret: ZITADEL_CLIENT_ID
+      ZITADEL_INSTANCE_URL:
+        from_secret: ZITADEL_INSTANCE_URL
+      ZITADEL_PRIVATE_KEY:
+        from_secret: ZITADEL_PRIVATE_KEY
+      ZITADEL_KEY_ID:
+        from_secret: ZITADEL_KEY_ID
+      ZITADEL_CLIENT_ID_M2M:
+        from_secret: ZITADEL_CLIENT_ID_M2M
+      CLIENT_PORT:
+        from_secret: CLIENT_PORT
+      VITE_API_URL:
+        from_secret: VITE_API_URL
+      VITE_WS_URL:
+        from_secret: VITE_WS_URL
+      VITE_ENV:
+        from_secret: VITE_ENV
       DOCKER_ENV:
         from_secret: DOCKER_ENV
     commands:
       - docker network create traefik || true
+      - docker-compose -p waugzee stop valkey || true
+      - docker-compose -p waugzee rm -f valkey || true
       - docker-compose -p waugzee up -d valkey
       - sleep 5
     when:
