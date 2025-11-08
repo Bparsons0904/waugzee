@@ -73,16 +73,27 @@ services:
           memory: 128M
 
   valkey:
-    image: valkey/valkey:8.0-alpine
+    build:
+      context: ./database/valkey
+      dockerfile: Dockerfile
+    image: waugzee-valkey:latest
     container_name: waugzee-valkey
     restart: unless-stopped
     networks:
       - waugzee-network
+    ports:
+      - "6379:6379"
     volumes:
       - valkey_data:/data
       - valkey_logs:/var/log/valkey
     environment:
       - VALKEY_ENV=production
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     deploy:
       resources:
         limits:

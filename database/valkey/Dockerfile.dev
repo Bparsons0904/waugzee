@@ -1,5 +1,5 @@
 # Development Dockerfile for Valkey
-FROM valkey/valkey:7.2-alpine
+FROM valkey/valkey:9.0.0-alpine
 
 # Create valkey user and group if they don't exist
 RUN addgroup -g 999 valkey && adduser -D -s /bin/sh -u 999 -G valkey valkey || true

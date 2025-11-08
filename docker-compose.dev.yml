@@ -105,7 +105,7 @@ services:
           memory: 256MB
 
   valkey:
-    image: valkey/valkey:8.0-alpine
+    image: valkey/valkey:9.0.0-alpine
     container_name: waugzee-valkey-${DOCKER_ENV:-dev}
     command: valkey-server /usr/local/etc/valkey/valkey.conf
     ports:
