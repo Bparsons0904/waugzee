@@ -68,15 +68,14 @@ func New(app *app.App) (*AppServer, error) {
 		ContentTypeNosniff:        "nosniff",
 		XFrameOptions:             "DENY",
 		ReferrerPolicy:            "strict-origin-when-cross-origin",
-		CrossOriginEmbedderPolicy: "require-corp",
-		CrossOriginOpenerPolicy:   "same-origin",
-		CrossOriginResourcePolicy: "same-origin",
+		CrossOriginEmbedderPolicy: "",
+		CrossOriginOpenerPolicy:   "",
+		CrossOriginResourcePolicy: "cross-origin",
 		OriginAgentCluster:        "?1",
 		XDNSPrefetchControl:       "off",
 		XDownloadOptions:          "noopen",
 		XPermittedCrossDomain:     "none",
-		// CSP will be handled per-route basis for more flexibility
-		ContentSecurityPolicy: "",
+		ContentSecurityPolicy:     "",
 	}))
 
 	fiberApp := &AppServer{
