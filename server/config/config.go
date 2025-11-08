@@ -18,9 +18,9 @@ type Config struct {
 	DatabaseCacheAddress string `mapstructure:"DB_CACHE_ADDRESS"`
 	DatabaseCachePort    int    `mapstructure:"DB_CACHE_PORT"`
 	DatabaseCacheReset   int    `mapstructure:"DB_CACHE_RESET"`
-	CorsAllowOrigins   string `mapstructure:"CORS_ALLOW_ORIGINS"`
-	ZitadelClientID    string `mapstructure:"ZITADEL_CLIENT_ID"`
-	ZitadelInstanceURL string `mapstructure:"ZITADEL_INSTANCE_URL"`
+	CorsAllowOrigins     string `mapstructure:"CORS_ALLOW_ORIGINS"`
+	ZitadelClientID      string `mapstructure:"ZITADEL_CLIENT_ID"`
+	ZitadelInstanceURL   string `mapstructure:"ZITADEL_INSTANCE_URL"`
 	ZitadelPrivateKey    string `mapstructure:"ZITADEL_PRIVATE_KEY"`
 	ZitadelKeyID         string `mapstructure:"ZITADEL_KEY_ID"`
 	ZitadelClientIDM2M   string `mapstructure:"ZITADEL_CLIENT_ID_M2M"`
@@ -80,6 +80,8 @@ func New() (Config, error) {
 	if err := viper.Unmarshal(&config); err != nil {
 		return Config{}, log.Err("Fatal error: could not unmarshal config", err)
 	}
+
+	log.Info("Loaded fun stuff", config.DatabaseCacheAddress)
 
 	log.Info("Successfully initialized config", "config", config)
 	err := validateConfig(config, log)
