@@ -35,7 +35,7 @@ services:
       - ZITADEL_CLIENT_ID_M2M=${ZITADEL_CLIENT_ID_M2M}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.waugzee-server.rule=Host(`waugzee.com`) && PathPrefix(`/api`, `/ws`)"
+      - "traefik.http.routers.waugzee-server.rule=Host(`waugzee.com`) && (PathPrefix(`/api`) || PathPrefix(`/ws`))"
       - "traefik.http.routers.waugzee-server.entrypoints=http,https"
       - "traefik.http.routers.waugzee-server.tls=true"
       - "traefik.http.routers.waugzee-server.tls.certresolver=letsencrypt"
