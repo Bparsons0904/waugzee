@@ -81,8 +81,11 @@ func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 	// Parse private key if available (for machine-to-machine authentication)
 	var privateKey *rsa.PrivateKey
 	if cfg.ZitadelPrivateKey != "" {
+		// Replace literal \n with actual newlines (handles environment variable formatting)
+		privateKeyStr := strings.ReplaceAll(cfg.ZitadelPrivateKey, "\\n", "\n")
+
 		// Decode base64 private key
-		keyBytes, err := base64.StdEncoding.DecodeString(cfg.ZitadelPrivateKey)
+		keyBytes, err := base64.StdEncoding.DecodeString(privateKeyStr)
 		if err != nil {
 			return nil, log.Err("failed to decode Zitadel private key", err)
 		}
