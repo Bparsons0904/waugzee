@@ -62,15 +62,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Start scheduler if enabled
-	if app.Config.SchedulerEnabled {
-		ctx := context.Background()
-		if err := app.Services.Scheduler.Start(ctx); err != nil {
-			log.Er("failed to start scheduler service", err)
-			os.Exit(1)
-		}
-		log.Info("Scheduler service started successfully")
+	ctx := context.Background()
+	if err := app.Services.Scheduler.Start(ctx); err != nil {
+		log.Er("failed to start scheduler service", err)
+		os.Exit(1)
 	}
+	log.Info("Scheduler service started successfully")
 
 	// Create a done channel to signal when the shutdown is complete
 	done := make(chan bool, 1)

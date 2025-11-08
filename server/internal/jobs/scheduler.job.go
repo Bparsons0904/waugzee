@@ -20,14 +20,7 @@ func RegisterAllJobs(
 	repos repositories.Repository,
 ) error {
 	log := logger.New("jobs").Function("RegisterAllJobs")
-	log.Info("Registering jobs", "schedulerEnabled", config.SchedulerEnabled)
-
-	if !config.SchedulerEnabled {
-		log.Info("Scheduler disabled, skipping job registration")
-		return nil
-	}
-
-	log.Info("Scheduler enabled, proceeding with job registration")
+	log.Info("Registering jobs")
 
 	// Register Discogs download job - runs hourly for testing (TODO: change back to Daily)
 	discogsDownloadJob := NewDiscogsDownloadJob(

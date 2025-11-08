@@ -131,6 +131,14 @@ func (uc *UserController) GetUser(
 
 	// Get user releases for selected folder
 	var releases []*UserRelease
+
+	log.Info(
+		"selected folder ID",
+		"userID",
+		user.ID,
+		"folderID",
+		user.Configuration,
+	)
 	if user.Configuration != nil && user.Configuration.SelectedFolderID != nil {
 		// Get the folder using the composite key lookup
 		var selectedFolder *Folder
@@ -148,15 +156,24 @@ func (uc *UserController) GetUser(
 				"folderID",
 				*user.Configuration.SelectedFolderID,
 			)
+			log.Info(
+				"selected folder not found",
+				"userID",
+				user.ID,
+				"folderID",
+				*user.Configuration.SelectedFolderID,
+			)
 			releases = []*UserRelease{}
 		} else {
 			// Use the folder's ID to query user releases
+
 			releases, err = uc.userReleaseRepo.GetUserReleasesByFolderID(
 				ctx,
 				uc.db.SQL,
 				user.ID,
 				*selectedFolder.ID,
 			)
+			log.Info("selected folder found", "userID", user.ID, "releaseCount", len(releases))
 			if err != nil {
 				return nil, log.Err(
 					"failed to get user releases",
@@ -172,6 +189,7 @@ func (uc *UserController) GetUser(
 		}
 	}
 
+	log.Info("user releases found", "userID", user.ID, "releaseCount", len(releases))
 	// Get user styluses
 	styluses, err := uc.userStylusRepo.GetUserStyluses(ctx, uc.db.SQL, user.ID)
 	if err != nil {
@@ -251,7 +269,8 @@ func (uc *UserController) UpdateUserPreferences(
 	}
 
 	if preferences.RecentlyPlayedThresholdDays != nil {
-		if *preferences.RecentlyPlayedThresholdDays < 1 || *preferences.RecentlyPlayedThresholdDays > 365 {
+		if *preferences.RecentlyPlayedThresholdDays < 1 ||
+			*preferences.RecentlyPlayedThresholdDays > 365 {
 			return nil, log.ErrMsg("recentlyPlayedThresholdDays must be between 1 and 365")
 		}
 		user.Configuration.RecentlyPlayedThresholdDays = preferences.RecentlyPlayedThresholdDays
@@ -265,7 +284,8 @@ func (uc *UserController) UpdateUserPreferences(
 	}
 
 	if preferences.NeglectedRecordsThresholdDays != nil {
-		if *preferences.NeglectedRecordsThresholdDays < 1 || *preferences.NeglectedRecordsThresholdDays > 730 {
+		if *preferences.NeglectedRecordsThresholdDays < 1 ||
+			*preferences.NeglectedRecordsThresholdDays > 730 {
 			return nil, log.ErrMsg("neglectedRecordsThresholdDays must be between 1 and 730")
 		}
 		user.Configuration.NeglectedRecordsThresholdDays = preferences.NeglectedRecordsThresholdDays

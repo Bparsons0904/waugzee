@@ -19,7 +19,6 @@ const (
 )
 
 type HistoryRepository interface {
-	// Play History
 	CreatePlayHistory(ctx context.Context, tx *gorm.DB, playHistory *PlayHistory) error
 	GetUserPlayHistory(
 		ctx context.Context,
@@ -31,7 +30,7 @@ type HistoryRepository interface {
 		ctx context.Context,
 		tx *gorm.DB,
 		playHistoryID uuid.UUID,
-		updates map[string]interface{},
+		updates map[string]any,
 	) (*PlayHistory, error)
 	DeletePlayHistory(
 		ctx context.Context,
@@ -40,7 +39,6 @@ type HistoryRepository interface {
 		playHistoryID uuid.UUID,
 	) error
 
-	// Cleaning History
 	CreateCleaningHistory(ctx context.Context, tx *gorm.DB, cleaningHistory *CleaningHistory) error
 	GetUserCleaningHistory(
 		ctx context.Context,
@@ -52,7 +50,7 @@ type HistoryRepository interface {
 		ctx context.Context,
 		tx *gorm.DB,
 		cleaningHistoryID uuid.UUID,
-		updates map[string]interface{},
+		updates map[string]any,
 	) (*CleaningHistory, error)
 	DeleteCleaningHistory(
 		ctx context.Context,
@@ -60,6 +58,8 @@ type HistoryRepository interface {
 		userID uuid.UUID,
 		cleaningHistoryID uuid.UUID,
 	) error
+
+	ClearUserHistoryCache(ctx context.Context, userID uuid.UUID) error
 }
 
 type historyRepository struct {
@@ -122,7 +122,6 @@ func (r *historyRepository) GetUserPlayHistory(
 
 	playHistory, err := gorm.G[*PlayHistory](tx).
 		Preload("UserRelease.Release.Genres", nil).
-		Preload("UserStylus", nil).
 		Preload("UserStylus.Stylus", nil).
 		Where(PlayHistory{UserID: userID}).
 		Order("played_at DESC").
@@ -157,7 +156,7 @@ func (r *historyRepository) UpdatePlayHistory(
 	ctx context.Context,
 	tx *gorm.DB,
 	playHistoryID uuid.UUID,
-	updates map[string]interface{},
+	updates map[string]any,
 ) (*PlayHistory, error) {
 	log := r.log.Function("UpdatePlayHistory")
 
@@ -173,7 +172,6 @@ func (r *historyRepository) UpdatePlayHistory(
 
 	playHistory, err := gorm.G[*PlayHistory](tx).
 		Preload("UserRelease.Release", nil).
-		Preload("UserStylus", nil).
 		Preload("UserStylus.Stylus", nil).
 		Where(PlayHistory{BaseUUIDModel: BaseUUIDModel{ID: playHistoryID}}).
 		First(ctx)
@@ -303,7 +301,7 @@ func (r *historyRepository) UpdateCleaningHistory(
 	ctx context.Context,
 	tx *gorm.DB,
 	cleaningHistoryID uuid.UUID,
-	updates map[string]interface{},
+	updates map[string]any,
 ) (*CleaningHistory, error) {
 	log := r.log.Function("UpdateCleaningHistory")
 
@@ -387,4 +385,14 @@ func (r *historyRepository) clearUserCleaningHistoryCache(
 	if err != nil {
 		r.log.Warn("failed to clear user cleaning history cache", "userID", userID, "error", err)
 	}
+}
+
+func (r *historyRepository) ClearUserHistoryCache(ctx context.Context, userID uuid.UUID) error {
+	log := r.log.Function("ClearUserHistoryCache")
+
+	r.clearUserPlayHistoryCache(ctx, userID)
+	r.clearUserCleaningHistoryCache(ctx, userID)
+
+	log.Info("cleared user history cache", "userID", userID)
+	return nil
 }

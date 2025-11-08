@@ -33,7 +33,7 @@ export const FolderSelector: Component<FolderSelectorProps> = (props) => {
 
   const selectedFolder = () => {
     const folderId = selectedFolderId();
-    if (!folderId) {
+    if (folderId === null || folderId === undefined) {
       const allFolders = folders();
       return allFolders.length > 0 ? allFolders[0] : null;
     }

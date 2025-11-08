@@ -36,6 +36,8 @@ type StylusRepository interface {
 		stylusID uuid.UUID,
 		userID uuid.UUID,
 	) error
+
+	ClearUserStylusCache(ctx context.Context, userID uuid.UUID) error
 }
 
 type stylusRepository struct {
@@ -318,4 +320,13 @@ func (r *stylusRepository) clearUserStylusCache(ctx context.Context, userID uuid
 	if err != nil {
 		r.log.Warn("failed to clear user stylus cache", "userID", userID, "error", err)
 	}
+}
+
+func (r *stylusRepository) ClearUserStylusCache(ctx context.Context, userID uuid.UUID) error {
+	log := r.log.Function("ClearUserStylusCache")
+
+	r.clearUserStylusCache(ctx, userID)
+
+	log.Info("cleared user stylus cache", "userID", userID)
+	return nil
 }

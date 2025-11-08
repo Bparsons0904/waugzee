@@ -1,0 +1,38 @@
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.syncIndicator {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  background: linear-gradient(
+    135deg,
+    rgba($color-primary-500, 0.1) 0%,
+    rgba($color-secondary-500, 0.1) 100%
+  );
+  border-radius: $border-radius-full;
+  color: $color-primary-700;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  box-shadow: $shadow-sm;
+}
+
+.syncIcon {
+  animation: spin 1s linear infinite;
+  color: $color-primary-600;
+}
+
+.syncText {
+  white-space: nowrap;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
+}

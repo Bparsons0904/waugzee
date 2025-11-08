@@ -42,7 +42,7 @@ export const CompactFolderSelector: Component<CompactFolderSelectorProps> = (pro
             <div class={styles.compactSelector}>
               <select
                 class={styles.folderSelect}
-                value={selectedFolderId() || selectedFolder()?.id || ""}
+                value={selectedFolderId() ?? selectedFolder()?.id ?? ""}
                 disabled={isLoading}
                 onChange={(e) => {
                   const value = parseInt(e.target.value, 10);

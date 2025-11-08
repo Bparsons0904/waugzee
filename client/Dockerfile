@@ -14,13 +14,11 @@ RUN npm ci --include=dev
 COPY . .
 
 # Accept build arguments for Vite environment variables
-ARG VITE_GENERAL_VERSION
 ARG VITE_API_URL
 ARG VITE_WS_URL
 ARG VITE_ENV
 
 # Set environment variables for build
-ENV VITE_GENERAL_VERSION=$VITE_GENERAL_VERSION
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_WS_URL=$VITE_WS_URL
 ENV VITE_ENV=$VITE_ENV

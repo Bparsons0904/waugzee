@@ -1,6 +1,7 @@
 import "./App.scss";
 import { NavBar } from "@components/layout/Navbar/Navbar";
 import { ProxyService } from "@components/ProxyService";
+import { SyncStatusProvider } from "@context/SyncStatusContext";
 import { WebSocketProvider } from "@context/WebSocketContext";
 import type { RouteSectionProps } from "@solidjs/router";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
@@ -24,11 +25,13 @@ const App: Component<RouteSectionProps<unknown>> = (props) => {
         <AuthProvider>
           <UserDataProvider>
             <WebSocketProvider>
-              <ProxyService />
-              <NavBar />
-              <main class="content">
-                <Suspense fallback={<div />}>{props.children}</Suspense>
-              </main>
+              <SyncStatusProvider>
+                <ProxyService />
+                <NavBar />
+                <main class="content">
+                  <Suspense fallback={<div />}>{props.children}</Suspense>
+                </main>
+              </SyncStatusProvider>
             </WebSocketProvider>
           </UserDataProvider>
         </AuthProvider>

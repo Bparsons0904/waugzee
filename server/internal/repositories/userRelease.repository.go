@@ -48,6 +48,15 @@ func (r *userReleaseRepository) CreateBatch(
 		return nil
 	}
 
+	err := gorm.G[[]*UserRelease](tx).Create(ctx, &userReleases)
+	if err != nil {
+		return log.Err(
+			"failed to create user releases",
+			err,
+			"count",
+			len(userReleases),
+		)
+	}
 	if err := tx.WithContext(ctx).Create(&userReleases).Error; err != nil {
 		return log.Err(
 			"failed to create user releases",
@@ -73,7 +82,6 @@ func (r *userReleaseRepository) UpdateBatch(
 		return nil
 	}
 
-	// Update each record individually to ensure proper handling
 	for _, userRelease := range userReleases {
 		if err := tx.WithContext(ctx).Save(userRelease).Error; err != nil {
 			return log.Err(
@@ -102,14 +110,13 @@ func (r *userReleaseRepository) DeleteBatch(
 		return nil
 	}
 
-	result := tx.WithContext(ctx).
+	rowsAffected, err := gorm.G[*UserRelease](tx).
 		Where("user_id = ? AND instance_id IN ?", userID, instanceIDs).
-		Delete(&UserRelease{})
-
-	if result.Error != nil {
+		Delete(ctx)
+	if err != nil {
 		return log.Err(
 			"failed to delete user releases",
-			result.Error,
+			err,
 			"userID", userID,
 			"instanceCount", len(instanceIDs),
 		)
@@ -117,7 +124,7 @@ func (r *userReleaseRepository) DeleteBatch(
 
 	log.Info("Successfully deleted user releases",
 		"userID", userID,
-		"deletedCount", result.RowsAffected,
+		"deletedCount", rowsAffected,
 		"requestedCount", len(instanceIDs))
 
 	return nil
@@ -130,10 +137,10 @@ func (r *userReleaseRepository) GetExistingByUser(
 ) (map[int]*UserRelease, error) {
 	log := r.log.Function("GetExistingByUser")
 
-	var userReleases []*UserRelease
-	if err := tx.WithContext(ctx).
+	userReleases, err := gorm.G[*UserRelease](tx).
 		Where("user_id = ? AND active = ?", userID, true).
-		Find(&userReleases).Error; err != nil {
+		Find(ctx)
+	if err != nil {
 		return nil, log.Err(
 			"failed to get existing user releases",
 			err,
@@ -141,7 +148,6 @@ func (r *userReleaseRepository) GetExistingByUser(
 		)
 	}
 
-	// Convert to map with InstanceID as key for efficient lookup
 	result := make(map[int]*UserRelease, len(userReleases))
 	for _, userRelease := range userReleases {
 		result[userRelease.InstanceID] = userRelease
@@ -155,6 +161,17 @@ func (r *userReleaseRepository) GetExistingByUser(
 	return result, nil
 }
 
+func userReleasesWithPreloads(userID uuid.UUID) func(db *gorm.Statement) {
+	return func(db *gorm.Statement) {
+		db.Preload("Release.Artists").
+			Preload("Release.Genres").
+			Preload("Release.Labels").
+			Preload("PlayHistory", "user_id = ?", userID).
+			Preload("PlayHistory.UserStylus.Stylus").
+			Preload("CleaningHistory", "user_id = ?", userID)
+	}
+}
+
 func (r *userReleaseRepository) GetUserReleasesByFolderID(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -163,19 +180,18 @@ func (r *userReleaseRepository) GetUserReleasesByFolderID(
 ) ([]*UserRelease, error) {
 	log := r.log.Function("GetUserReleasesByFolderID")
 
-	var userReleases []*UserRelease
-	if err := tx.WithContext(ctx).
-		Preload("Release.Artists").
-		Preload("Release.Genres").
-		Preload("Release.Labels").
-		Preload("Release").
-		Preload("PlayHistory", "user_id = ?", userID).
-		Preload("PlayHistory.UserStylus").
-		Preload("PlayHistory.UserStylus.Stylus").
-		Preload("CleaningHistory", "user_id = ?", userID).
-		Where("user_id = ? AND folder_id = ? AND active = ?", userID, folderID, true).
-		Order("date_added DESC").
-		Find(&userReleases).Error; err != nil {
+	query := gorm.G[*UserRelease](tx).
+		Scopes(userReleasesWithPreloads(userID)).
+		Where("user_id = ? AND active = ?", userID, true).
+		Order("date_added DESC")
+
+	if folderID != 0 {
+		query = query.Where("folder_id = ?", folderID)
+	}
+
+	userReleases, err := query.
+		Find(ctx)
+	if err != nil {
 		return nil, log.Err(
 			"failed to get user releases by folder",
 			err,

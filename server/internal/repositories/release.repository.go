@@ -10,25 +10,21 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// ReleaseArtistAssociation represents a specific release-artist association pair
 type ReleaseArtistAssociation struct {
 	ReleaseID int64
 	ArtistID  int64
 }
 
-// ReleaseLabelAssociation represents a specific release-label association pair
 type ReleaseLabelAssociation struct {
 	ReleaseID int64
 	LabelID   int64
 }
 
-// ReleaseGenreAssociation represents a specific release-genre association pair
 type ReleaseGenreAssociation struct {
 	ReleaseID int64
 	GenreID   int64
 }
 
-// ReleaseImageUpdate represents image updates for releases
 type ReleaseImageUpdate struct {
 	ReleaseID  int64
 	Thumb      *string
@@ -38,14 +34,12 @@ type ReleaseImageUpdate struct {
 type ReleaseRepository interface {
 	GetByDiscogsID(ctx context.Context, tx *gorm.DB, discogsID int64) (*Release, error)
 	UpsertBatch(ctx context.Context, tx *gorm.DB, releases []*Release) error
-	// New methods for sync service
 	CheckReleaseExistence(
 		ctx context.Context,
 		tx *gorm.DB,
 		releaseIDs []int64,
 	) (existing []int64, missing []int64, err error)
 	UpdateReleaseImages(ctx context.Context, tx *gorm.DB, updates []ReleaseImageUpdate) error
-	// Association methods
 	CreateReleaseArtistAssociations(
 		ctx context.Context,
 		tx *gorm.DB,
@@ -211,7 +205,6 @@ func (r *releaseRepository) AssociateGenres(
 	return nil
 }
 
-// CreateReleaseArtistAssociations creates specific release-artist association pairs
 func (r *releaseRepository) CreateReleaseArtistAssociations(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -223,7 +216,6 @@ func (r *releaseRepository) CreateReleaseArtistAssociations(
 		return nil
 	}
 
-	// Prepare association pairs for bulk insert with ordered processing to prevent deadlocks
 	releaseIDs := make([]int64, len(associations))
 	artistIDs := make([]int64, len(associations))
 
@@ -257,7 +249,6 @@ func (r *releaseRepository) CreateReleaseArtistAssociations(
 	return nil
 }
 
-// CreateReleaseLabelAssociations creates specific release-label association pairs
 func (r *releaseRepository) CreateReleaseLabelAssociations(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -269,7 +260,6 @@ func (r *releaseRepository) CreateReleaseLabelAssociations(
 		return nil
 	}
 
-	// Prepare association pairs for bulk insert with ordered processing to prevent deadlocks
 	releaseIDs := make([]int64, len(associations))
 	labelIDs := make([]int64, len(associations))
 
@@ -303,7 +293,6 @@ func (r *releaseRepository) CreateReleaseLabelAssociations(
 	return nil
 }
 
-// UpsertReleaseArtistAssociationsBatch processes batches of association arrays for the EntityProcessor pattern
 func (r *releaseRepository) UpsertReleaseArtistAssociationsBatch(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -327,7 +316,6 @@ func (r *releaseRepository) UpsertReleaseArtistAssociationsBatch(
 		return nil
 	}
 
-	// Use the existing CreateReleaseArtistAssociations method which has foreign key validation
 	if err := r.CreateReleaseArtistAssociations(ctx, tx, allAssociations); err != nil {
 		return log.Err("failed to create release-artist associations batch", err,
 			"totalAssociations", len(allAssociations))
@@ -340,7 +328,6 @@ func (r *releaseRepository) UpsertReleaseArtistAssociationsBatch(
 	return nil
 }
 
-// UpsertReleaseLabelAssociationsBatch processes batches of association arrays for the EntityProcessor pattern
 func (r *releaseRepository) UpsertReleaseLabelAssociationsBatch(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -352,7 +339,6 @@ func (r *releaseRepository) UpsertReleaseLabelAssociationsBatch(
 		return nil
 	}
 
-	// Flatten all association batches into a single slice
 	var allAssociations []ReleaseLabelAssociation
 	for _, batch := range associationBatches {
 		if batch != nil && len(*batch) > 0 {
@@ -364,7 +350,6 @@ func (r *releaseRepository) UpsertReleaseLabelAssociationsBatch(
 		return nil
 	}
 
-	// Use the existing CreateReleaseLabelAssociations method which has foreign key validation
 	if err := r.CreateReleaseLabelAssociations(ctx, tx, allAssociations); err != nil {
 		return log.Err("failed to create release-label associations batch", err,
 			"totalAssociations", len(allAssociations))
@@ -377,7 +362,6 @@ func (r *releaseRepository) UpsertReleaseLabelAssociationsBatch(
 	return nil
 }
 
-// CreateReleaseGenreAssociations creates specific release-genre association pairs
 func (r *releaseRepository) CreateReleaseGenreAssociations(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -389,7 +373,6 @@ func (r *releaseRepository) CreateReleaseGenreAssociations(
 		return nil
 	}
 
-	// Prepare association pairs for bulk insert with ordered processing to prevent deadlocks
 	releaseIDs := make([]int64, len(associations))
 	genreIDs := make([]int64, len(associations))
 
@@ -423,7 +406,6 @@ func (r *releaseRepository) CreateReleaseGenreAssociations(
 	return nil
 }
 
-// UpsertReleaseGenreAssociationsBatch processes batches of association arrays for the EntityProcessor pattern
 func (r *releaseRepository) UpsertReleaseGenreAssociationsBatch(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -435,7 +417,6 @@ func (r *releaseRepository) UpsertReleaseGenreAssociationsBatch(
 		return nil
 	}
 
-	// Flatten all association batches into a single slice
 	var allAssociations []ReleaseGenreAssociation
 	for _, batch := range associationBatches {
 		if batch != nil && len(*batch) > 0 {
@@ -447,7 +428,6 @@ func (r *releaseRepository) UpsertReleaseGenreAssociationsBatch(
 		return nil
 	}
 
-	// Use the existing CreateReleaseGenreAssociations method which has foreign key validation
 	if err := r.CreateReleaseGenreAssociations(ctx, tx, allAssociations); err != nil {
 		return log.Err("failed to create release-genre associations batch", err,
 			"totalAssociations", len(allAssociations))
@@ -460,7 +440,6 @@ func (r *releaseRepository) UpsertReleaseGenreAssociationsBatch(
 	return nil
 }
 
-// CheckReleaseExistence checks which release IDs exist in the database
 func (r *releaseRepository) CheckReleaseExistence(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -484,13 +463,11 @@ func (r *releaseRepository) CheckReleaseExistence(
 		)
 	}
 
-	// Create a map for fast lookup of existing releases
 	existingMap := make(map[int64]bool, len(existingReleases))
 	for _, id := range existingReleases {
 		existingMap[id] = true
 	}
 
-	// Separate existing and missing
 	existing = make([]int64, 0, len(existingReleases))
 	missing = make([]int64, 0)
 
@@ -510,7 +487,6 @@ func (r *releaseRepository) CheckReleaseExistence(
 	return existing, missing, nil
 }
 
-// UpdateReleaseImages updates thumb and cover image URLs for releases
 func (r *releaseRepository) UpdateReleaseImages(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -525,10 +501,8 @@ func (r *releaseRepository) UpdateReleaseImages(
 	var totalRowsAffected int64
 	now := time.Now()
 
-	// Process updates individually using GORM's Updates method
 	for _, update := range updates {
-		// Build update map with only non-nil values
-		updateData := map[string]interface{}{
+		updateData := map[string]any{
 			"updated_at": now,
 		}
 
@@ -540,7 +514,6 @@ func (r *releaseRepository) UpdateReleaseImages(
 			updateData["cover_image"] = *update.CoverImage
 		}
 
-		// Only proceed if we have fields to update besides updated_at
 		if len(updateData) > 1 {
 			result := tx.WithContext(ctx).
 				Model(&Release{}).

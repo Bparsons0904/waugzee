@@ -624,6 +624,27 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 		log.Info("Collection sync completed successfully",
 			"userID", metadata.UserID,
 			"totalReleases", len(syncState.MergedReleases))
+
+		// Clear user cache to ensure frontend gets fresh data
+		if err = f.repos.User.ClearUserCacheByUserID(ctx, f.db.SQLWithContext(ctx), metadata.UserID.String()); err != nil {
+			log.Warn("Failed to clear user cache after sync completion", "error", err)
+		}
+
+		// Send sync_complete event to notify client
+		completeMessage := events.Message{
+			ID:      metadata.UserID.String(),
+			Service: events.USER,
+			Event:   "sync_complete",
+			UserID:  metadata.UserID.String(),
+			Payload: map[string]any{
+				"message":       "Collection sync completed successfully",
+				"totalReleases": len(syncState.MergedReleases),
+			},
+			Timestamp: time.Now(),
+		}
+		if err = f.eventBus.Publish(events.WEBSOCKET, "user", completeMessage); err != nil {
+			log.Warn("Failed to send sync_complete event", "error", err)
+		}
 	} else {
 		// Update sync state in cache
 		err = database.NewCacheBuilder(f.db.Cache.ClientAPI, metadata.UserID.String()).
@@ -1163,6 +1184,27 @@ func (f *FoldersService) TriggerSyncCompletion(ctx context.Context, userID uuid.
 		"userID", userID,
 		"totalReleases", len(syncState.MergedReleases))
 
+	// Clear user cache to ensure frontend gets fresh data
+	if err = f.repos.User.ClearUserCacheByUserID(ctx, f.db.SQLWithContext(ctx), userID.String()); err != nil {
+		log.Warn("Failed to clear user cache after sync completion", "error", err)
+	}
+
+	// Send sync_complete event to notify client
+	completeMessage := events.Message{
+		ID:      userID.String(),
+		Service: events.USER,
+		Event:   "sync_complete",
+		UserID:  userID.String(),
+		Payload: map[string]any{
+			"message":       "Collection sync completed successfully",
+			"totalReleases": len(syncState.MergedReleases),
+		},
+		Timestamp: time.Now(),
+	}
+	if err = f.eventBus.Publish(events.WEBSOCKET, "user", completeMessage); err != nil {
+		log.Warn("Failed to send sync_complete event", "error", err)
+	}
+
 	return nil
 }
 
@@ -1200,5 +1242,21 @@ func (f *FoldersService) clearSyncStateOnError(ctx context.Context, userID uuid.
 		log.Info("Cleared sync state due to error",
 			"userID", userID,
 			"reason", reason)
+	}
+
+	// Send sync_error event to notify client
+	errorMessage := events.Message{
+		ID:      userID.String(),
+		Service: events.USER,
+		Event:   "sync_error",
+		UserID:  userID.String(),
+		Payload: map[string]any{
+			"error":   "Sync failed",
+			"message": reason,
+		},
+		Timestamp: time.Now(),
+	}
+	if err = f.eventBus.Publish(events.WEBSOCKET, "user", errorMessage); err != nil {
+		log.Warn("Failed to send sync_error event", "error", err)
 	}
 }
