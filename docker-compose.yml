@@ -36,7 +36,8 @@ services:
     volumes:
       - waugzee_data:/data
     depends_on:
-      - valkey
+      valkey:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8288/api/health"]
       interval: 30s
