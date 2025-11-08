@@ -824,6 +824,22 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 	completedAt := time.Now().UTC()
 	processing.ProcessingCompletedAt = &completedAt
 
+	// Clean up XML files to save disk space
+	xmlFiles := []string{
+		filepath.Join(downloadDir, "artists.xml.gz"),
+		filepath.Join(downloadDir, "labels.xml.gz"),
+		filepath.Join(downloadDir, "masters.xml.gz"),
+		filepath.Join(downloadDir, "releases.xml.gz"),
+	}
+
+	for _, xmlFile := range xmlFiles {
+		if err := os.Remove(xmlFile); err != nil {
+			log.Warn("failed to clean up XML file", "error", err, "file", xmlFile)
+		} else {
+			log.Info("Cleaned up XML file", "file", xmlFile)
+		}
+	}
+
 	if err := s.repos.DiscogsDataProcessing.Update(ctx, processing); err != nil {
 		return log.Err("failed to update final processing status", err)
 	}
