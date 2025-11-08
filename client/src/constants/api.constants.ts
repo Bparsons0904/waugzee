@@ -74,6 +74,7 @@ export const ROUTES = {
   EQUIPMENT: "/equipment",
   DASHBOARD: "/dashboard",
   ANALYTICS: "/analytics",
+  ADMIN: "/admin",
 } as const;
 
 // Error retry configuration
