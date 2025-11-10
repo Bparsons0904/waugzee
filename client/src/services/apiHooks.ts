@@ -4,6 +4,7 @@ import {
   PLAY_HISTORY_ENDPOINTS,
   STYLUS_ENDPOINTS,
 } from "@constants/api.constants";
+import type { DownloadStatusResponse } from "@models/Admin";
 import type {
   LogBothRequest,
   LogBothResponse,
@@ -385,5 +386,40 @@ export function useLogBoth(options?: ApiMutationOptions<LogBothResponse, LogBoth
     successMessage: "Play and cleaning logged successfully!",
     errorMessage: "Failed to log play and cleaning. Please try again.",
     ...options,
+  });
+}
+
+// Admin - Monthly Downloads
+export function useDownloadStatus() {
+  return useApiQuery<DownloadStatusResponse>(
+    ["admin", "downloads", "status"],
+    "/admin/downloads/status",
+    undefined,
+    {
+      // Claude can we properly add the type for query?
+      refetchInterval: (query) => {
+        const data = query.state.data;
+        if (data?.status === "downloading" || data?.status === "processing") {
+          return 5000;
+        }
+        return false;
+      },
+    } as ApiQueryOptions<DownloadStatusResponse>,
+  );
+}
+
+export function useTriggerDownload() {
+  return useApiPost<void, void>("/admin/downloads/trigger", undefined, {
+    invalidateQueries: [["admin", "downloads", "status"]],
+    successMessage: "Download triggered successfully",
+    errorMessage: "Failed to trigger download",
+  });
+}
+
+export function useTriggerReprocess() {
+  return useApiPost<void, void>("/admin/downloads/reprocess", undefined, {
+    invalidateQueries: [["admin", "downloads", "status"]],
+    successMessage: "Reprocessing triggered successfully",
+    errorMessage: "Failed to trigger reprocessing",
   });
 }

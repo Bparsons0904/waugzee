@@ -1,4 +1,5 @@
 import type { Component } from "solid-js";
+import { MonthlyDownloadsSection } from "@components/admin/MonthlyDownloadsSection";
 import styles from "./AdminPage.module.scss";
 
 const AdminPage: Component = () => {
@@ -10,10 +11,7 @@ const AdminPage: Component = () => {
       </header>
 
       <div class={styles.container}>
-        <section class={styles.section}>
-          <h2>Monthly Downloads Status</h2>
-          <p>TODO: Implement MonthlyDownloadsSection</p>
-        </section>
+        <MonthlyDownloadsSection />
 
         <section class={styles.section}>
           <h2>Background Jobs</h2>
