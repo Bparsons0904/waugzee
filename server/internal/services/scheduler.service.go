@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 	"waugzee/internal/logger"
@@ -179,4 +180,38 @@ func (s *SchedulerService) GetNextRunTime() *time.Time {
 
 	nextRun := s.scheduler.Jobs()[0].NextRun()
 	return &nextRun
+}
+
+// TriggerJobByName manually executes a registered job by name
+// Claude is this really needed? The jobs should be pretty stupid and just kicking off other services, we should be able to directly kick off the event we want to work with
+func (s *SchedulerService) TriggerJobByName(ctx context.Context, jobName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	log := s.log.Function("TriggerJobByName")
+
+	var targetJob Job
+	for _, job := range s.jobs {
+		if job.Name() == jobName {
+			targetJob = job
+			break
+		}
+	}
+
+	if targetJob == nil {
+		// Claude again with using fmt for errors, use the damn logger package.
+		err := fmt.Errorf("job not found: %s", jobName)
+		return log.Err("job not found", err, "job", jobName)
+	}
+
+	go func() {
+		log.Info("Manually triggering job", "job", jobName)
+		if err := targetJob.Execute(ctx); err != nil {
+			_ = log.Err("Manual job execution failed", err, "job", jobName)
+		} else {
+			log.Info("Manual job execution completed", "job", jobName)
+		}
+	}()
+
+	return nil
 }

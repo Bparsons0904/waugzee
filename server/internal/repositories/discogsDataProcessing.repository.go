@@ -12,6 +12,7 @@ type DiscogsDataProcessingRepository interface {
 	Create(ctx context.Context, processing *DiscogsDataProcessing) (*DiscogsDataProcessing, error)
 	GetByYearMonth(ctx context.Context, yearMonth string) (*DiscogsDataProcessing, error)
 	Update(ctx context.Context, processing *DiscogsDataProcessing) error
+	Delete(ctx context.Context, id int64) error
 	GetAll(ctx context.Context) ([]*DiscogsDataProcessing, error)
 	GetLatestProcessing(ctx context.Context) (*DiscogsDataProcessing, error)
 }
@@ -28,7 +29,10 @@ func NewDiscogsDataProcessingRepository(db *gorm.DB) DiscogsDataProcessingReposi
 	}
 }
 
-func (r *discogsDataProcessingRepository) Create(ctx context.Context, processing *DiscogsDataProcessing) (*DiscogsDataProcessing, error) {
+func (r *discogsDataProcessingRepository) Create(
+	ctx context.Context,
+	processing *DiscogsDataProcessing,
+) (*DiscogsDataProcessing, error) {
 	log := r.log.Function("Create")
 
 	if err := r.db.WithContext(ctx).Create(processing).Error; err != nil {
@@ -38,10 +42,16 @@ func (r *discogsDataProcessingRepository) Create(ctx context.Context, processing
 	return processing, nil
 }
 
-func (r *discogsDataProcessingRepository) GetByYearMonth(ctx context.Context, yearMonth string) (*DiscogsDataProcessing, error) {
+func (r *discogsDataProcessingRepository) GetByYearMonth(
+	ctx context.Context,
+	yearMonth string,
+) (*DiscogsDataProcessing, error) {
 	log := r.log.Function("GetByYearMonth")
 
-	processing, err := gorm.G[*DiscogsDataProcessing](r.db).Where("year_month = ?", yearMonth).First(ctx)
+	processing, err := gorm.G[*DiscogsDataProcessing](
+		r.db,
+	).Where("year_month = ?", yearMonth).
+		First(ctx)
 	if err != nil {
 		return nil, log.Err("failed to get discogs data processing record by year month", err)
 	}
@@ -49,7 +59,10 @@ func (r *discogsDataProcessingRepository) GetByYearMonth(ctx context.Context, ye
 	return processing, nil
 }
 
-func (r *discogsDataProcessingRepository) Update(ctx context.Context, processing *DiscogsDataProcessing) error {
+func (r *discogsDataProcessingRepository) Update(
+	ctx context.Context,
+	processing *DiscogsDataProcessing,
+) error {
 	log := r.log.Function("Update")
 
 	if err := r.db.WithContext(ctx).Save(processing).Error; err != nil {
@@ -59,25 +72,39 @@ func (r *discogsDataProcessingRepository) Update(ctx context.Context, processing
 	return nil
 }
 
-func (r *discogsDataProcessingRepository) GetAll(ctx context.Context) ([]*DiscogsDataProcessing, error) {
+func (r *discogsDataProcessingRepository) Delete(ctx context.Context, id int64) error {
+	log := r.log.Function("Delete")
+
+	// Claude this should be using the generics from gorm
+	if err := r.db.WithContext(ctx).Delete(&DiscogsDataProcessing{}, "id = ?", id).Error; err != nil {
+		return log.Err("failed to delete discogs data processing record", err)
+	}
+
+	return nil
+}
+
+func (r *discogsDataProcessingRepository) GetAll(
+	ctx context.Context,
+) ([]*DiscogsDataProcessing, error) {
 	log := r.log.Function("GetAll")
 
-	processings, err := gorm.G[*DiscogsDataProcessing](r.db).Find(ctx)
+	results, err := gorm.G[*DiscogsDataProcessing](r.db).Find(ctx)
 	if err != nil {
 		return nil, log.Err("failed to get all discogs data processing records", err)
 	}
 
-	return processings, nil
+	return results, nil
 }
 
-func (r *discogsDataProcessingRepository) GetLatestProcessing(ctx context.Context) (*DiscogsDataProcessing, error) {
+func (r *discogsDataProcessingRepository) GetLatestProcessing(
+	ctx context.Context,
+) (*DiscogsDataProcessing, error) {
 	log := r.log.Function("GetLatestProcessing")
 
 	processing, err := gorm.G[*DiscogsDataProcessing](r.db).
 		Where("status IN (?)", []ProcessingStatus{ProcessingStatusReadyForProcessing, ProcessingStatusProcessing}).
 		Order("created_at DESC").
 		First(ctx)
-
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
@@ -87,3 +114,4 @@ func (r *discogsDataProcessingRepository) GetLatestProcessing(ctx context.Contex
 
 	return processing, nil
 }
+
