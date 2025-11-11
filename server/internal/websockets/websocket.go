@@ -164,7 +164,7 @@ func (m *Manager) sendToAdminUsers(message Message) {
 			continue
 		}
 
-		user, err := m.userRepo.GetByID(context.Background(), nil, client.UserID)
+		user, err := m.userRepo.GetByID(context.Background(), m.db.Primary, client.UserID)
 		if err != nil || user == nil {
 			log.Warn("Failed to get user for admin check", "userID", client.UserID, "error", err)
 			continue

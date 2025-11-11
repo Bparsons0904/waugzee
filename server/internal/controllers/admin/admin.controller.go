@@ -119,42 +119,24 @@ func (c *AdminController) TriggerDownload(ctx context.Context) error {
 	}
 
 	if existingRecord != nil {
-		switch existingRecord.Status {
-		case models.ProcessingStatusDownloading, models.ProcessingStatusProcessing:
-			return log.Err("download or processing already in progress",
-				fmt.Errorf("download or processing already in progress"))
-
-		case models.ProcessingStatusCompleted,
-			models.ProcessingStatusFailed,
-			models.ProcessingStatusReadyForProcessing:
-			existingRecord.Status = models.ProcessingStatusNotStarted
-			existingRecord.StartedAt = nil
-			existingRecord.DownloadCompletedAt = nil
-			existingRecord.ProcessingCompletedAt = nil
-			existingRecord.ErrorMessage = nil
-			existingRecord.ProcessingStats = nil
-			existingRecord.FileChecksums = nil
-			existingRecord.RetryCount = 0
-
-			if err := c.processingRepo.Update(ctx, existingRecord); err != nil {
-				return log.Err("failed to reset processing record", err)
-			}
-
-			log.Info("Reset existing processing record", "yearMonth", yearMonth)
+		log.Info("Deleting existing processing record", "yearMonth", yearMonth, "status", existingRecord.Status)
+		if err := c.processingRepo.Delete(ctx, existingRecord.ID); err != nil {
+			return log.Err("failed to delete existing processing record", err)
 		}
-	} else {
-		newRecord := &models.DiscogsDataProcessing{
-			YearMonth:  yearMonth,
-			Status:     models.ProcessingStatusNotStarted,
-			RetryCount: 0,
-		}
-
-		if _, err := c.processingRepo.Create(ctx, newRecord); err != nil {
-			return log.Err("failed to create processing record", err)
-		}
-
-		log.Info("Created new processing record", "yearMonth", yearMonth)
+		log.Info("Deleted existing processing record", "yearMonth", yearMonth)
 	}
+
+	newRecord := &models.DiscogsDataProcessing{
+		YearMonth:  yearMonth,
+		Status:     models.ProcessingStatusNotStarted,
+		RetryCount: 0,
+	}
+
+	if _, err := c.processingRepo.Create(ctx, newRecord); err != nil {
+		return log.Err("failed to create processing record", err)
+	}
+
+	log.Info("Created new processing record", "yearMonth", yearMonth)
 
 	if err := c.schedulerService.TriggerJobByName(ctx, constants.JobDiscogsDownload); err != nil {
 		return log.Err("failed to trigger download job", err)
