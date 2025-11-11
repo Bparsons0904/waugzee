@@ -68,13 +68,8 @@ type FileStatusInfo struct {
 func (c *AdminController) GetDownloadStatus(ctx context.Context) (*DownloadStatusResponse, error) {
 	log := c.log.Function("GetDownloadStatus")
 
-	// Claude if we are already checking if the processing record exists and throwing an error in the repository
-	// what is the benefit of checking again here?
 	record, err := c.processingRepo.GetLatestProcessing(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
 		return nil, log.Err("failed to get latest processing record", err)
 	}
 
@@ -170,16 +165,11 @@ func (c *AdminController) TriggerDownload(ctx context.Context) error {
 func (c *AdminController) TriggerReprocess(ctx context.Context) error {
 	log := c.log.Function("TriggerReprocess")
 
-	// Claude same thing here, do we need to check if the processing record exists?
 	record, err := c.processingRepo.GetLatestProcessing(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return log.Err("no processing record found", fmt.Errorf("no processing record found"))
-		}
 		return log.Err("failed to get latest processing record", err)
 	}
 
-	// Claude can we even get to this?
 	if record == nil {
 		return log.Err("no processing record found", fmt.Errorf("no processing record found"))
 	}

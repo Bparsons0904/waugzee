@@ -102,13 +102,12 @@ func (r *discogsDataProcessingRepository) GetAll(
 	return results, nil
 }
 
-// Claude why do we use a pointer here? Not necesarrily saying its wrong just curious of why.
 func (r *discogsDataProcessingRepository) GetLatestProcessing(
 	ctx context.Context,
 ) (*DiscogsDataProcessing, error) {
 	log := r.log.Function("GetLatestProcessing")
 
-	processing, err := gorm.G[*DiscogsDataProcessing](r.db).
+	processing, err := gorm.G[DiscogsDataProcessing](r.db).
 		Where("status IN (?)", []ProcessingStatus{ProcessingStatusReadyForProcessing, ProcessingStatusProcessing}).
 		Order("created_at DESC").
 		First(ctx)
@@ -119,5 +118,5 @@ func (r *discogsDataProcessingRepository) GetLatestProcessing(
 		return nil, log.Err("failed to get latest processing record", err)
 	}
 
-	return processing, nil
+	return &processing, nil
 }
