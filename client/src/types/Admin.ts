@@ -67,3 +67,14 @@ export interface StepStatus {
   records_count?: number;
   duration?: string;
 }
+
+export interface DownloadProgressEvent {
+  yearMonth: string;
+  status: string;
+  fileType: string;
+  stage: string;
+  downloaded: number;
+  total: number;
+  percentage: number;
+  errorMessage?: string;
+}

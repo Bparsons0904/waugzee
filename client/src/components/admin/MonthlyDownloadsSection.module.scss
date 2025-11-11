@@ -72,6 +72,21 @@
 	gap: $spacing-xl;
 }
 
+.progressSection {
+	padding: $spacing-xl;
+	background-color: $bg-surface;
+	border-radius: $border-radius-lg;
+	margin-bottom: $spacing-xl;
+	border: 1px solid $border-default;
+
+	h3 {
+		font-size: $font-size-lg;
+		font-weight: $font-weight-semibold;
+		color: $text-default;
+		margin-bottom: $spacing-md;
+	}
+}
+
 .statusOverview {
 	background-color: $bg-elevated;
 	border: 1px solid $border-default;
@@ -165,6 +180,20 @@
 
 	strong {
 		font-weight: $font-weight-semibold;
+	}
+}
+
+.activeDownload {
+	animation: pulse $transition-slow infinite;
+}
+
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.7;
 	}
 }
 

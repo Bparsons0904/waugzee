@@ -1,6 +1,7 @@
 import { Button } from "@components/common/ui/Button/Button";
 import { ConfirmationModal } from "@components/common/ui/ConfirmationModal/ConfirmationModal";
 import { LoadingSpinner } from "@components/icons/LoadingSpinner";
+import { useAdminWebSocket } from "@hooks/useAdminWebSocket";
 import {
   useDownloadStatus,
   useResetDownload,
@@ -13,12 +14,14 @@ import { createSignal, For, Show } from "solid-js";
 import { FileCard } from "./FileCard";
 import styles from "./MonthlyDownloadsSection.module.scss";
 import { ProcessingStepRow } from "./ProcessingStepRow";
+import { ProgressBar } from "./ProgressBar";
 
 export function MonthlyDownloadsSection() {
   const statusQuery = useDownloadStatus();
   const triggerDownload = useTriggerDownload();
   const triggerReprocess = useTriggerReprocess();
   const resetDownload = useResetDownload();
+  const { progress } = useAdminWebSocket();
   const [showTriggerModal, setShowTriggerModal] = createSignal(false);
   const [showReprocessModal, setShowReprocessModal] = createSignal(false);
   const [showResetModal, setShowResetModal] = createSignal(false);
@@ -64,6 +67,20 @@ export function MonthlyDownloadsSection() {
         >
           {(data) => (
             <div class={styles.content}>
+              <Show when={progress() && progress()?.stage !== "completed"}>
+                <div class={styles.progressSection}>
+                  <h3>Download Progress</h3>
+                  <ProgressBar
+                    label={progress()?.fileType || "Unknown"}
+                    percentage={progress()?.percentage || 0}
+                    variant={progress()?.stage === "error" ? "error" : "primary"}
+                  />
+                  <Show when={progress()?.errorMessage}>
+                    <p class={styles.errorMessage}>{progress()?.errorMessage}</p>
+                  </Show>
+                </div>
+              </Show>
+
               <div class={styles.statusOverview}>
                 <div class={styles.statusHeader}>
                   <h3 class={styles.yearMonth}>{data().year_month}</h3>

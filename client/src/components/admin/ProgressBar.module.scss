@@ -1,0 +1,50 @@
+@use "../../styles/variables" as *;
+@use "../../styles/colors" as *;
+
+.progressContainer {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  width: 100%;
+}
+
+.label {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $text-default;
+  min-width: 100px;
+}
+
+.progressBar {
+  flex: 1;
+  height: $spacing-lg;
+  background-color: $bg-subtle;
+  border-radius: $border-radius-full;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  transition: width $transition-normal ease-in-out;
+  border-radius: $border-radius-full;
+
+  &.primary {
+    background-color: $bg-primary;
+  }
+
+  &.success {
+    background-color: $bg-success;
+  }
+
+  &.error {
+    background-color: $bg-error;
+  }
+}
+
+.percentage {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: $text-muted;
+  min-width: 50px;
+  text-align: right;
+}
