@@ -17,6 +17,7 @@ type AdminControllerInterface interface {
 	GetDownloadStatus(ctx context.Context) (*DownloadStatusResponse, error)
 	TriggerDownload(ctx context.Context) error
 	TriggerReprocess(ctx context.Context) error
+	ResetStuckDownload(ctx context.Context) error
 }
 
 type AdminController struct {
@@ -200,5 +201,49 @@ func (c *AdminController) TriggerReprocess(ctx context.Context) error {
 		return log.Err("failed to trigger xml parser job", err)
 	}
 
+	return nil
+}
+
+func (c *AdminController) ResetStuckDownload(ctx context.Context) error {
+	log := c.log.Function("ResetStuckDownload")
+
+	yearMonth := time.Now().Format("2006-01")
+
+	record, err := c.processingRepo.GetByYearMonth(ctx, yearMonth)
+	if err != nil {
+		return log.Err("failed to get processing record", err, "yearMonth", yearMonth)
+	}
+
+	if record == nil {
+		return log.Err("no processing record found", fmt.Errorf("no record for %s", yearMonth))
+	}
+
+	if record.Status != models.ProcessingStatusDownloading &&
+		record.Status != models.ProcessingStatusProcessing &&
+		record.Status != models.ProcessingStatusFailed {
+		return log.Err(
+			"cannot reset record in this state",
+			fmt.Errorf("current status: %s", record.Status),
+		)
+	}
+
+	if err := c.downloadService.CleanupDownloadDirectory(ctx, yearMonth); err != nil {
+		return log.Err("failed to cleanup files", err)
+	}
+
+	record.Status = models.ProcessingStatusNotStarted
+	record.StartedAt = nil
+	record.DownloadCompletedAt = nil
+	record.ProcessingCompletedAt = nil
+	record.ErrorMessage = nil
+	record.ProcessingStats = nil
+	record.FileChecksums = nil
+	record.RetryCount = 0
+
+	if err := c.processingRepo.Update(ctx, record); err != nil {
+		return log.Err("failed to reset processing record", err)
+	}
+
+	log.Info("Successfully reset stuck download", "yearMonth", yearMonth)
 	return nil
 }

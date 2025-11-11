@@ -424,3 +424,11 @@ export function useTriggerReprocess() {
     errorMessage: "Failed to trigger reprocessing",
   });
 }
+
+export function useResetDownload() {
+  return useApiPost<void, void>("/admin/downloads/reset", undefined, {
+    invalidateQueries: [["admin", "downloads", "status"]],
+    successMessage: "Download reset successfully. You can now trigger a new download.",
+    errorMessage: "Failed to reset download",
+  });
+}

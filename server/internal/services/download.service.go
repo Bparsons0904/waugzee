@@ -593,6 +593,32 @@ func (ds *DownloadService) GetFileStatus(
 	return info, nil
 }
 
+// CleanupDownloadDirectory removes all downloaded files for a specific year-month
+func (ds *DownloadService) CleanupDownloadDirectory(ctx context.Context, yearMonth string) error {
+	log := ds.log.Function("CleanupDownloadDirectory")
+
+	if !isValidYearMonth(yearMonth) {
+		return log.Err(
+			"invalid yearMonth format",
+			fmt.Errorf("expected YYYY-MM format, got: %s", yearMonth),
+		)
+	}
+
+	downloadDir := fmt.Sprintf("%s/%s", DiscogsDataDir, yearMonth)
+
+	if _, err := os.Stat(downloadDir); os.IsNotExist(err) {
+		log.Info("Download directory does not exist, nothing to cleanup", "directory", downloadDir)
+		return nil
+	}
+
+	if err := os.RemoveAll(downloadDir); err != nil {
+		return log.Err("failed to remove download directory", err, "directory", downloadDir)
+	}
+
+	log.Info("Successfully cleaned up download directory", "directory", downloadDir)
+	return nil
+}
+
 // isValidYearMonth validates YYYY-MM format
 func isValidYearMonth(yearMonth string) bool {
 	parts := strings.Split(yearMonth, "-")

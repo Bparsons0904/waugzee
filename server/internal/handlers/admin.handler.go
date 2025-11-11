@@ -32,6 +32,7 @@ func (h *AdminHandler) Register() {
 	admin.Get("/downloads/status", h.getDownloadStatus)
 	admin.Post("/downloads/trigger", h.triggerDownload)
 	admin.Post("/downloads/reprocess", h.triggerReprocess)
+	admin.Post("/downloads/reset", h.resetStuckDownload)
 }
 
 func (h *AdminHandler) getDownloadStatus(c *fiber.Ctx) error {
@@ -87,4 +88,27 @@ func (h *AdminHandler) triggerReprocess(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).
 		JSON(fiber.Map{"message": "Reprocessing triggered successfully"})
+}
+
+func (h *AdminHandler) resetStuckDownload(c *fiber.Ctx) error {
+	log := h.log.Function("resetStuckDownload")
+
+	user := middleware.GetUser(c)
+
+	log.Info("Admin resetting stuck download", "userID", user.ID, "email", user.Email)
+
+	err := h.adminController.ResetStuckDownload(c.Context())
+	if err != nil {
+		if err.Error() == "no processing record found" ||
+			err.Error() == "cannot reset record in this state" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		_ = log.Err("Failed to reset download", err)
+		return c.Status(fiber.StatusInternalServerError).
+			JSON(fiber.Map{"error": "Failed to reset download"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Download reset successfully. You can now trigger a new download.",
+	})
 }

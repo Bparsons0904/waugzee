@@ -1,6 +1,6 @@
 package constants
 
 const (
-	JobDiscogsDownload  = "DiscogsDownloadJob"
-	JobDiscogsXMLParser = "DiscogsXMLParserJob"
+	JobDiscogsDownload  = "DiscogsDailyDownloadCheck"
+	JobDiscogsXMLParser = "DiscogsXMLParser"
 )

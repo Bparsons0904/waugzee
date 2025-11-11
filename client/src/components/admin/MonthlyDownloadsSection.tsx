@@ -1,7 +1,12 @@
 import { Button } from "@components/common/ui/Button/Button";
 import { ConfirmationModal } from "@components/common/ui/ConfirmationModal/ConfirmationModal";
 import { LoadingSpinner } from "@components/icons/LoadingSpinner";
-import { useDownloadStatus, useTriggerDownload, useTriggerReprocess } from "@services/apiHooks";
+import {
+  useDownloadStatus,
+  useResetDownload,
+  useTriggerDownload,
+  useTriggerReprocess,
+} from "@services/apiHooks";
 import { formatStatusLabel, formatTimestamp, getProcessingStatusColor } from "@utils/admin.utils";
 import clsx from "clsx";
 import { createSignal, For, Show } from "solid-js";
@@ -13,8 +18,10 @@ export function MonthlyDownloadsSection() {
   const statusQuery = useDownloadStatus();
   const triggerDownload = useTriggerDownload();
   const triggerReprocess = useTriggerReprocess();
+  const resetDownload = useResetDownload();
   const [showTriggerModal, setShowTriggerModal] = createSignal(false);
   const [showReprocessModal, setShowReprocessModal] = createSignal(false);
+  const [showResetModal, setShowResetModal] = createSignal(false);
 
   const processingSteps = () => {
     const steps = statusQuery.data?.processing_steps;
@@ -33,6 +40,11 @@ export function MonthlyDownloadsSection() {
   const canReprocess = () => {
     const status = statusQuery.data?.status;
     return status === "ready_for_processing" || status === "completed" || status === "failed";
+  };
+
+  const canReset = () => {
+    const status = statusQuery.data?.status;
+    return status === "downloading" || status === "processing" || status === "failed";
   };
 
   return (
@@ -162,6 +174,14 @@ export function MonthlyDownloadsSection() {
                 >
                   Reprocess Data
                 </Button>
+
+                <Button
+                  onClick={() => setShowResetModal(true)}
+                  disabled={!canReset()}
+                  variant="danger"
+                >
+                  Reset Download
+                </Button>
               </div>
             </div>
           )}
@@ -190,6 +210,19 @@ export function MonthlyDownloadsSection() {
         title="Reprocess Data"
         message="Are you sure you want to reprocess the data? This will reset processing steps and start from the beginning."
         isLoading={triggerReprocess.isPending}
+        variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={showResetModal()}
+        onClose={() => setShowResetModal(false)}
+        onConfirm={() => {
+          resetDownload.mutate();
+          setShowResetModal(false);
+        }}
+        title="Reset Download"
+        message="Are you sure you want to reset this download? This will stop any in-progress downloads, delete all downloaded files, and reset the status. You'll need to trigger a new download afterward."
+        isLoading={resetDownload.isPending}
         variant="danger"
       />
     </section>

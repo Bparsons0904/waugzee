@@ -108,7 +108,6 @@ func (r *discogsDataProcessingRepository) GetLatestProcessing(
 	log := r.log.Function("GetLatestProcessing")
 
 	processing, err := gorm.G[DiscogsDataProcessing](r.db).
-		Where("status IN (?)", []ProcessingStatus{ProcessingStatusReadyForProcessing, ProcessingStatusProcessing}).
 		Order("created_at DESC").
 		First(ctx)
 	if err != nil {
