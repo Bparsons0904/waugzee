@@ -25,6 +25,7 @@ import type {
   UpdateUserStylusRequest,
 } from "@models/Stylus";
 import {
+  type Query,
   type UseMutationOptions,
   type UseMutationResult,
   type UseQueryOptions,
@@ -46,6 +47,7 @@ export interface ApiQueryOptions<T>
     "queryKey" | "queryFn" | "enabled"
   > {
   enabled?: boolean | Accessor<boolean>;
+  refetchInterval?: number | false | ((query: Query<T, Error>) => number | false | undefined);
 }
 
 // Enhanced mutation options with common patterns
@@ -396,15 +398,14 @@ export function useDownloadStatus() {
     "/admin/downloads/status",
     undefined,
     {
-      // Claude can we properly add the type for query?
-      refetchInterval: (query) => {
+      refetchInterval: (query: Query<DownloadStatusResponse, Error>) => {
         const data = query.state.data;
         if (data?.status === "downloading" || data?.status === "processing") {
           return 5000;
         }
         return false;
       },
-    } as ApiQueryOptions<DownloadStatusResponse>,
+    },
   );
 }
 

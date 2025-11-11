@@ -35,7 +35,8 @@ func (r *discogsDataProcessingRepository) Create(
 ) (*DiscogsDataProcessing, error) {
 	log := r.log.Function("Create")
 
-	if err := r.db.WithContext(ctx).Create(processing).Error; err != nil {
+	err := gorm.G[DiscogsDataProcessing](r.db).Create(ctx, processing)
+	if err != nil {
 		return nil, log.Err("failed to create discogs data processing record", err)
 	}
 
@@ -75,9 +76,14 @@ func (r *discogsDataProcessingRepository) Update(
 func (r *discogsDataProcessingRepository) Delete(ctx context.Context, id int64) error {
 	log := r.log.Function("Delete")
 
-	// Claude this should be using the generics from gorm
-	if err := r.db.WithContext(ctx).Delete(&DiscogsDataProcessing{}, "id = ?", id).Error; err != nil {
-		return log.Err("failed to delete discogs data processing record", err)
+	rowsAffected, err := gorm.G[DiscogsDataProcessing](r.db).Where("id = ?", id).Delete(ctx)
+	if err != nil || rowsAffected == 0 {
+		return log.Err(
+			"failed to delete discogs data processing record",
+			err,
+			"rowsAffected",
+			rowsAffected,
+		)
 	}
 
 	return nil
@@ -96,6 +102,7 @@ func (r *discogsDataProcessingRepository) GetAll(
 	return results, nil
 }
 
+// Claude why do we use a pointer here? Not necesarrily saying its wrong just curious of why.
 func (r *discogsDataProcessingRepository) GetLatestProcessing(
 	ctx context.Context,
 ) (*DiscogsDataProcessing, error) {
@@ -114,4 +121,3 @@ func (r *discogsDataProcessingRepository) GetLatestProcessing(
 
 	return processing, nil
 }
-

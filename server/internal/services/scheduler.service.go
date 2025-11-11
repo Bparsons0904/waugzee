@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 	"waugzee/internal/logger"
@@ -199,9 +198,7 @@ func (s *SchedulerService) TriggerJobByName(ctx context.Context, jobName string)
 	}
 
 	if targetJob == nil {
-		// Claude again with using fmt for errors, use the damn logger package.
-		err := fmt.Errorf("job not found: %s", jobName)
-		return log.Err("job not found", err, "job", jobName)
+		return log.Errorf("job not found: %s", jobName)
 	}
 
 	go func() {
