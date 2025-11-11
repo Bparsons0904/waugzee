@@ -20,17 +20,19 @@ import (
 type Message = events.Message
 
 const (
-	MESSAGE_TYPE_PING = "ping"
-	MESSAGE_TYPE_PONG = "pong"
-	API_REQUEST       = "api_request"
-	API_RESPONSE      = "api_response"
-	API_PROGRESS      = "api_progress"
-	API_COMPLETE      = "api_complete"
-	API_ERROR         = "api_error"
-	USER_JOIN         = "user_join"
-	BROADCAST         = "broadcast"
-	SEND              = "send"
-	MESSAGE           = "message"
+	MESSAGE_TYPE_PING       = "ping"
+	MESSAGE_TYPE_PONG       = "pong"
+	API_REQUEST             = "api_request"
+	API_RESPONSE            = "api_response"
+	API_PROGRESS            = "api_progress"
+	API_COMPLETE            = "api_complete"
+	API_ERROR               = "api_error"
+	USER_JOIN               = "user_join"
+	BROADCAST               = "broadcast"
+	SEND                    = "send"
+	MESSAGE                 = "message"
+	ADMIN_DOWNLOAD_PROGRESS = "admin_download_progress"
+	ADMIN_DOWNLOAD_STATUS   = "admin_download_status"
 )
 
 const (
@@ -140,9 +142,46 @@ func (m *Manager) BroadcastMessage(message Message) {
 
 	select {
 	case m.hub.broadcast <- message:
-		default:
+	default:
 		log.Warn("Broadcast channel is full, dropping message", "messageID", message.ID)
 	}
+}
+
+func (m *Manager) sendToAdminUsers(message Message) {
+	log := m.log.Function("sendToAdminUsers")
+	m.hub.mutex.RLock()
+	defer m.hub.mutex.RUnlock()
+
+	sentCount := 0
+	totalAdmins := 0
+
+	for _, client := range m.hub.clients {
+		if client.Status != STATUS_AUTHENTICATED {
+			continue
+		}
+
+		if client.UserID == uuid.Nil {
+			continue
+		}
+
+		user, err := m.userRepo.GetByID(context.Background(), nil, client.UserID)
+		if err != nil || user == nil {
+			log.Warn("Failed to get user for admin check", "userID", client.UserID, "error", err)
+			continue
+		}
+
+		if user.IsAdmin {
+			totalAdmins++
+			select {
+			case client.send <- message:
+				sentCount++
+			default:
+				log.Warn("Admin client send channel full", "clientID", client.ID)
+			}
+		}
+	}
+
+	log.Info("Admin broadcast complete", "sentTo", sentCount, "totalAdmins", totalAdmins)
 }
 
 func (c *Client) readPump() {
@@ -255,12 +294,14 @@ func (m *Manager) subscribeToEventBus() {
 	log.Info("Starting WebSocket events subscription")
 
 	if err := m.eventBus.Subscribe(events.WEBSOCKET, func(event events.ChannelEvent) error {
-	
+
 		switch event.Event {
 		case "broadcast":
 			m.sendToAuthenticatedClients(event.Message)
 		case "user":
 			m.sendToSpecificUser(event.Message)
+		case "admin":
+			m.sendToAdminUsers(event.Message)
 		default:
 			log.Warn("Unknown WebSocket event type", "event", event.Event)
 		}

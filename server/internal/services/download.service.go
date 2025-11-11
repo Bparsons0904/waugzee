@@ -14,8 +14,11 @@ import (
 	"strings"
 	"time"
 	"waugzee/config"
+	"waugzee/internal/events"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
+
+	"github.com/google/uuid"
 )
 
 // Discogs S3 configuration constants
@@ -32,6 +35,7 @@ type DownloadService struct {
 	config     config.Config
 	httpClient *http.Client
 	log        logger.Logger
+	eventBus   *events.EventBus
 }
 
 // Exponential backoff schedule (immediate, 5min, 25min, 75min, 375min)
@@ -45,7 +49,7 @@ var retrySchedule = []time.Duration{
 
 const maxRetries = DiscogsMaxRetries
 
-func NewDownloadService(cfg config.Config) *DownloadService {
+func NewDownloadService(cfg config.Config, eventBus *events.EventBus) *DownloadService {
 	log := logger.New("downloadService")
 
 	// Create HTTP client with constant timeout
@@ -65,6 +69,47 @@ func NewDownloadService(cfg config.Config) *DownloadService {
 		config:     cfg,
 		httpClient: httpClient,
 		log:        log,
+		eventBus:   eventBus,
+	}
+}
+
+func (ds *DownloadService) BroadcastProgress(yearMonth, status, fileType, stage string, downloaded, total int64, err error) {
+	if ds.eventBus == nil {
+		return
+	}
+
+	var percentage float64
+	if total > 0 {
+		percentage = float64(downloaded) / float64(total) * 100
+	}
+
+	var errMsg *string
+	if err != nil {
+		msg := err.Error()
+		errMsg = &msg
+	}
+
+	progressEvent := map[string]any{
+		"yearMonth":    yearMonth,
+		"status":       status,
+		"fileType":     fileType,
+		"stage":        stage,
+		"downloaded":   downloaded,
+		"total":        total,
+		"percentage":   percentage,
+		"errorMessage": errMsg,
+	}
+
+	message := events.Message{
+		ID:        uuid.New().String(),
+		Service:   events.SYSTEM,
+		Event:     "admin_download_progress",
+		Payload:   progressEvent,
+		Timestamp: time.Now(),
+	}
+
+	if err := ds.eventBus.Publish(events.WEBSOCKET, "admin", message); err != nil {
+		ds.log.Warn("Failed to publish admin download progress", "error", err)
 	}
 }
 
@@ -416,10 +461,17 @@ func (ds *DownloadService) downloadFile(ctx context.Context, url, targetFile str
 	lastLogTime := time.Now()
 	stallTimeout := time.Duration(DiscogsStallTimeoutSec) * time.Second
 
+	// Extract metadata for WebSocket broadcasts
+	yearMonth := ds.extractYearMonthFromPath(targetFile)
+	fileType := ds.extractFileTypeFromURL(url)
+
 	log.Info("Starting download with progress-based timeout",
 		"url", url,
 		"stallTimeoutSec", DiscogsStallTimeoutSec,
 		"contentLength", contentLength)
+
+	// Broadcast download started
+	ds.BroadcastProgress(yearMonth, "downloading", fileType, "in_progress", 0, contentLength, nil)
 
 	// Copy response body to file with progress tracking and stall detection
 	buffer := make([]byte, 32*1024) // 32KB buffer
@@ -450,10 +502,11 @@ func (ds *DownloadService) downloadFile(ctx context.Context, url, targetFile str
 			downloaded += int64(n)
 			lastProgressTime = time.Now()
 
-			// Log progress every 30 seconds
+			// Log and broadcast progress every 30 seconds
 			now := time.Now()
 			if now.Sub(lastLogTime) >= 30*time.Second {
 				ds.logDownloadProgress(contentLength, downloaded, url)
+				ds.BroadcastProgress(yearMonth, "downloading", fileType, "in_progress", downloaded, contentLength, nil)
 				lastLogTime = now
 				log.Debug("Progress detected, stall timer reset",
 					"downloaded", downloaded,
@@ -469,8 +522,9 @@ func (ds *DownloadService) downloadFile(ctx context.Context, url, targetFile str
 		}
 	}
 
-	// Final progress log
+	// Final progress log and broadcast
 	ds.logDownloadProgress(contentLength, downloaded, url)
+	ds.BroadcastProgress(yearMonth, "completed", fileType, "completed", downloaded, contentLength, nil)
 
 	log.Info("File download completed",
 		"url", url,
@@ -495,6 +549,33 @@ func (ds *DownloadService) logDownloadProgress(contentLength, downloaded int64, 
 			"downloaded", downloaded,
 			"total", "unknown")
 	}
+}
+
+// extractFileTypeFromURL extracts file type from Discogs S3 URL
+func (ds *DownloadService) extractFileTypeFromURL(url string) string {
+	if strings.Contains(url, "artists") {
+		return "artists"
+	} else if strings.Contains(url, "labels") {
+		return "labels"
+	} else if strings.Contains(url, "masters") {
+		return "masters"
+	} else if strings.Contains(url, "releases") {
+		return "releases"
+	} else if strings.Contains(url, "CHECKSUM") {
+		return "checksum"
+	}
+	return "unknown"
+}
+
+// extractYearMonthFromURL extracts yearMonth from target file path
+func (ds *DownloadService) extractYearMonthFromPath(targetFile string) string {
+	parts := strings.Split(targetFile, "/")
+	for _, part := range parts {
+		if len(part) == 7 && strings.Count(part, "-") == 1 {
+			return part
+		}
+	}
+	return ""
 }
 
 // ensureDirectory creates directory if it doesn't exist

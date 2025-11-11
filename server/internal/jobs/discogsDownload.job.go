@@ -194,6 +194,7 @@ func (j *DiscogsDownloadJob) Execute(ctx context.Context) error {
 				"yearMonth",
 				yearMonth,
 			)
+			j.download.BroadcastProgress(yearMonth, "not_available", "all", "waiting", 0, 0, err)
 			// Reset status back to not_started so it will be retried next day
 			if statusErr := processingRecord.UpdateStatus(models.ProcessingStatusNotStarted); statusErr != nil {
 				log.Warn("failed to reset processing record status", "error", statusErr)
@@ -205,6 +206,7 @@ func (j *DiscogsDownloadJob) Execute(ctx context.Context) error {
 		}
 
 		// For other errors, mark as failed
+		j.download.BroadcastProgress(yearMonth, "failed", "all", "error", 0, 0, err)
 		errorMsg := err.Error()
 		processingRecord.ErrorMessage = &errorMsg
 		if statusErr := processingRecord.UpdateStatus(models.ProcessingStatusFailed); statusErr != nil {
@@ -231,18 +233,25 @@ func (j *DiscogsDownloadJob) performDownload(
 	log := j.log.Function("performDownload")
 
 	log.Info("Starting checksum download", "yearMonth", yearMonth)
+	j.download.BroadcastProgress(yearMonth, "downloading", "checksum", "starting", 0, 0, nil)
 
 	// Download the CHECKSUM.txt file using the download service
 	if err := j.download.DownloadChecksum(ctx, yearMonth); err != nil {
+		j.download.BroadcastProgress(yearMonth, "failed", "checksum", "error", 0, 0, err)
 		return log.Err("failed to download checksum file", err, "yearMonth", yearMonth)
 	}
+
+	j.download.BroadcastProgress(yearMonth, "completed", "checksum", "parsing", 0, 0, nil)
 
 	// Parse the downloaded checksum file
 	checksumFile := filepath.Join(fmt.Sprintf("/app/discogs-data/%s", yearMonth), "CHECKSUM.txt")
 	checksums, err := j.download.ParseChecksumFile(checksumFile)
 	if err != nil {
+		j.download.BroadcastProgress(yearMonth, "failed", "checksum", "error", 0, 0, err)
 		return log.Err("failed to parse checksum file", err, "checksumFile", checksumFile)
 	}
+
+	j.download.BroadcastProgress(yearMonth, "completed", "checksum", "completed", 0, 0, nil)
 
 	// Update processing record with checksums
 	processingRecord.FileChecksums = checksums
@@ -256,9 +265,12 @@ func (j *DiscogsDownloadJob) performDownload(
 	fileTypes := []string{"artists", "labels", "masters", "releases"}
 	for _, fileType := range fileTypes {
 		log.Info("Downloading XML file", "fileType", fileType, "yearMonth", yearMonth)
+		j.download.BroadcastProgress(yearMonth, "downloading", fileType, "starting", 0, 0, nil)
 		if err := j.download.DownloadXMLFile(ctx, yearMonth, fileType); err != nil {
+			j.download.BroadcastProgress(yearMonth, "failed", fileType, "error", 0, 0, err)
 			return log.Err("failed to download XML file", err, "fileType", fileType, "yearMonth", yearMonth)
 		}
+		j.download.BroadcastProgress(yearMonth, "completed", fileType, "completed", 0, 0, nil)
 		log.Info("Downloaded XML file successfully", "fileType", fileType, "yearMonth", yearMonth)
 	}
 
@@ -279,6 +291,9 @@ func (j *DiscogsDownloadJob) performDownload(
 	if err := os.Remove(checksumFile); err != nil {
 		log.Warn("failed to clean up checksum file", "error", err, "file", checksumFile)
 	}
+
+	// Broadcast final completion status
+	j.download.BroadcastProgress(yearMonth, "ready_for_processing", "all", "completed", 0, 0, nil)
 
 	log.Info("Download completed successfully",
 		"yearMonth", yearMonth,
