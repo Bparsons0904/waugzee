@@ -1,0 +1,326 @@
+@import "../../styles/variables";
+@import "../../styles/colors";
+
+.section {
+	padding: $spacing-xl;
+}
+
+.sectionTitle {
+	font-size: $font-size-2xl;
+	font-weight: $font-weight-bold;
+	color: $text-default;
+	margin: 0 0 $spacing-lg 0;
+}
+
+.loadingContainer {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: $spacing-3xl;
+	gap: $spacing-md;
+}
+
+.loadingText {
+	color: $text-muted;
+	font-size: $font-size-md;
+}
+
+.emptyContainer {
+	padding: $spacing-3xl;
+	text-align: center;
+}
+
+.emptyText {
+	color: $text-muted;
+	font-size: $font-size-lg;
+}
+
+.skeleton {
+	background: linear-gradient(90deg, $bg-muted 25%, $bg-subtle 50%, $bg-muted 75%);
+	background-size: 200% 100%;
+	animation: loading 1.5s ease-in-out infinite;
+	height: 100px;
+	border-radius: $border-radius-lg;
+}
+
+@keyframes loading {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
+}
+
+.emptyState {
+	padding: $spacing-2xl;
+	text-align: center;
+	color: $text-muted;
+	background-color: $bg-subtle;
+	border-radius: $border-radius-lg;
+
+	p {
+		margin: 0;
+		font-size: $font-size-lg;
+	}
+}
+
+.content {
+	display: flex;
+	flex-direction: column;
+	gap: $spacing-xl;
+}
+
+.statusOverview {
+	background-color: $bg-elevated;
+	border: 1px solid $border-default;
+	border-radius: $border-radius-lg;
+	padding: $spacing-lg;
+}
+
+.statusHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: $spacing-lg;
+}
+
+.yearMonth {
+	font-size: $font-size-xl;
+	font-weight: $font-weight-semibold;
+	color: $text-default;
+	margin: 0;
+}
+
+.statusBadge {
+	display: inline-block;
+	padding: $spacing-xs $spacing-md;
+	border-radius: $border-radius-full;
+	font-size: $font-size-sm;
+	font-weight: $font-weight-medium;
+
+	&.gray {
+		background-color: $bg-muted;
+		color: $text-muted;
+	}
+
+	&.blue {
+		background-color: $bg-info-subtle;
+		color: $text-info;
+	}
+
+	&.yellow {
+		background-color: $bg-warning-subtle;
+		color: $text-warning;
+	}
+
+	&.green {
+		background-color: $bg-success-subtle;
+		color: $text-success;
+	}
+
+	&.red {
+		background-color: $bg-error-subtle;
+		color: $text-error;
+	}
+}
+
+.statusDetails {
+	display: flex;
+	flex-direction: column;
+	gap: $spacing-sm;
+}
+
+.statusDetail {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: $spacing-sm 0;
+	border-bottom: 1px solid $border-default;
+
+	&:last-child {
+		border-bottom: none;
+	}
+}
+
+.label {
+	font-size: $font-size-sm;
+	font-weight: $font-weight-medium;
+	color: $text-muted;
+}
+
+.value {
+	font-size: $font-size-sm;
+	color: $text-default;
+}
+
+.errorMessage {
+	padding: $spacing-md;
+	background-color: $bg-error-subtle;
+	color: $text-error;
+	border-radius: $border-radius-md;
+	font-size: $font-size-sm;
+	margin-top: $spacing-sm;
+
+	strong {
+		font-weight: $font-weight-semibold;
+	}
+}
+
+.subsectionTitle {
+	font-size: $font-size-xl;
+	font-weight: $font-weight-semibold;
+	color: $text-default;
+	margin: 0 0 $spacing-md 0;
+}
+
+.filesSection {
+	margin-top: $spacing-lg;
+}
+
+.filesGrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: $spacing-lg;
+
+	@media (min-width: $breakpoint-md) {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	@media (min-width: $breakpoint-xl) {
+		grid-template-columns: repeat(4, 1fr);
+	}
+}
+
+.fileCard {
+	background-color: $bg-elevated;
+	border: 1px solid $border-default;
+	border-radius: $border-radius-lg;
+	padding: $spacing-lg;
+	display: flex;
+	flex-direction: column;
+	gap: $spacing-md;
+}
+
+.fileTitle {
+	font-size: $font-size-lg;
+	font-weight: $font-weight-semibold;
+	color: $text-default;
+	margin: 0;
+}
+
+.fileDetails {
+	display: flex;
+	flex-direction: column;
+	gap: $spacing-xs;
+}
+
+.fileDetail {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-size: $font-size-sm;
+}
+
+.processingSection {
+	margin-top: $spacing-lg;
+}
+
+.processingTable {
+	background-color: $bg-elevated;
+	border: 1px solid $border-default;
+	border-radius: $border-radius-lg;
+	overflow: hidden;
+}
+
+.processingRow {
+	display: grid;
+	grid-template-columns: 2fr 1fr 1fr 1fr;
+	gap: $spacing-md;
+	padding: $spacing-md $spacing-lg;
+	border-bottom: 1px solid $border-default;
+	align-items: center;
+
+	&:last-child {
+		border-bottom: none;
+	}
+
+	&.completed {
+		background-color: $bg-success-subtle;
+	}
+
+	&.error {
+		background-color: $bg-error-subtle;
+	}
+
+	@media (max-width: $breakpoint-md) {
+		grid-template-columns: 1fr;
+		gap: $spacing-sm;
+	}
+}
+
+.stepName {
+	font-size: $font-size-md;
+	font-weight: $font-weight-medium;
+	color: $text-default;
+}
+
+.stepStatus,
+.stepRecords,
+.stepDuration {
+	display: flex;
+	align-items: center;
+	gap: $spacing-xs;
+	font-size: $font-size-sm;
+}
+
+.stepError {
+	grid-column: 1 / -1;
+	padding: $spacing-sm;
+	background-color: $bg-error-subtle;
+	color: $text-error;
+	border-radius: $border-radius-md;
+	font-size: $font-size-sm;
+
+	strong {
+		font-weight: $font-weight-semibold;
+	}
+}
+
+.actionsSection {
+	display: flex;
+	gap: $spacing-md;
+	justify-content: flex-start;
+	margin-top: $spacing-lg;
+}
+
+.actionButton {
+	padding: $spacing-md $spacing-xl;
+	border-radius: $border-radius-md;
+	font-size: $font-size-md;
+	font-weight: $font-weight-medium;
+	border: none;
+	cursor: pointer;
+	transition: all $transition-fast;
+	background-color: $button-primary-bg;
+	color: $button-primary-text;
+
+	&:hover:not(:disabled) {
+		background-color: $button-primary-hover;
+	}
+
+	&:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	&.secondary {
+		background-color: $button-secondary-bg;
+		color: $button-secondary-text;
+
+		&:hover:not(:disabled) {
+			background-color: $button-secondary-hover;
+		}
+	}
+}

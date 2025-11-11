@@ -1,50 +1,67 @@
-import clsx from "clsx";
-import { type Component, Show } from "solid-js";
+import { Button } from "@components/common/ui/Button/Button";
+import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
+import { type Component, createEffect, onCleanup } from "solid-js";
 import styles from "./ConfirmationModal.module.scss";
 
 export interface ConfirmationModalProps {
   isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
   title: string;
   message: string;
   confirmText?: string;
   cancelText?: string;
-  onConfirm: () => void;
-  onCancel: () => void;
+  variant?: "default" | "danger";
+  isLoading?: boolean;
 }
 
 export const ConfirmationModal: Component<ConfirmationModalProps> = (props) => {
   const confirmText = () => props.confirmText || "Confirm";
   const cancelText = () => props.cancelText || "Cancel";
+  const variant = () => props.variant || "default";
+
+  createEffect(() => {
+    if (props.isOpen && !props.isLoading) {
+      const handleEnter = (e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          props.onConfirm();
+        }
+      };
+
+      window.addEventListener("keydown", handleEnter);
+
+      onCleanup(() => {
+        window.removeEventListener("keydown", handleEnter);
+      });
+    }
+  });
 
   return (
-    <Show when={props.isOpen}>
-      <div class={styles.modalOverlay} onClick={props.onCancel}>
-        <div class={styles.modal} onClick={(e) => e.stopPropagation()}>
-          <div class={styles.modalHeader}>
-            <h2 class={styles.modalTitle}>{props.title}</h2>
-            <button type="button" class={styles.closeButton} onClick={props.onCancel}>
-              ×
-            </button>
-          </div>
+    <Modal
+      isOpen={props.isOpen}
+      onClose={props.onClose}
+      title={props.title}
+      size={ModalSize.Small}
+      closeOnEscape={!props.isLoading}
+      closeOnBackdropClick={!props.isLoading}
+    >
+      <div class={styles.content}>
+        <p class={styles.message}>{props.message}</p>
 
-          <div class={styles.modalBody}>
-            <p class={styles.message}>{props.message}</p>
-          </div>
+        <div class={styles.buttonContainer}>
+          <Button variant="secondary" onClick={props.onClose} disabled={props.isLoading}>
+            {cancelText()}
+          </Button>
 
-          <div class={styles.modalFooter}>
-            <button type="button" class={styles.cancelButton} onClick={props.onCancel}>
-              {cancelText()}
-            </button>
-            <button
-              type="button"
-              class={clsx(styles.confirmButton, styles.destructive)}
-              onClick={props.onConfirm}
-            >
-              {confirmText()}
-            </button>
-          </div>
+          <Button
+            variant={variant() === "danger" ? "danger" : "primary"}
+            onClick={props.onConfirm}
+            disabled={props.isLoading}
+          >
+            {props.isLoading ? "Processing..." : confirmText()}
+          </Button>
         </div>
       </div>
-    </Show>
+    </Modal>
   );
 };

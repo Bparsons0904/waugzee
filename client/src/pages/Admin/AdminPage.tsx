@@ -1,5 +1,5 @@
-import type { Component } from "solid-js";
 import { MonthlyDownloadsSection } from "@components/admin/MonthlyDownloadsSection";
+import type { Component } from "solid-js";
 import styles from "./AdminPage.module.scss";
 
 const AdminPage: Component = () => {

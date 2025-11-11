@@ -1,4 +1,5 @@
 import { SearchInput } from "@components/common/forms/SearchInput/SearchInput";
+import { Select } from "@components/common/forms/Select/Select";
 import { Button } from "@components/common/ui/Button/Button";
 import FilterIcon from "@components/icons/FilterIcon";
 import GridIcon from "@components/icons/GridIcon";
@@ -48,19 +49,18 @@ const CollectionControls: Component<CollectionControlsProps> = (props) => {
             <span>Filter</span>
           </button>
 
-          {/* Claude should we use the existing select here? */}
-          <div class={styles.sortContainer}>
-            <select
-              value={props.sortBy}
-              onInput={(e) => props.onSortChange(e.currentTarget.value)}
-              class={styles.sortSelect}
-            >
-              <option value="album">Album (A-Z)</option>
-              <option value="artist">Artist (A-Z)</option>
-              <option value="year">Year (newest first)</option>
-              <option value="recentlyAdded">Recently Added</option>
-            </select>
-          </div>
+          <Select
+            name="sortBy"
+            options={[
+              { value: "album", label: "Album (A-Z)" },
+              { value: "artist", label: "Artist (A-Z)" },
+              { value: "year", label: "Year (newest first)" },
+              { value: "recentlyAdded", label: "Recently Added" },
+            ]}
+            value={props.sortBy}
+            onChange={props.onSortChange}
+            class={styles.sortSelect}
+          />
 
           <div class={styles.gridSizeToggle}>
             <button
