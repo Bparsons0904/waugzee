@@ -41,7 +41,7 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 	)
 	folderDataExtractionService := NewFolderDataExtractionService(repos)
 	downloadService := NewDownloadService(config, eventBus)
-	discogsXMLParserService := NewDiscogsXMLParserService(repos, db)
+	discogsXMLParserService := NewDiscogsXMLParserService(repos, db, eventBus)
 	releaseSyncService := NewReleaseSyncService(eventBus, repos, db, discogsRateLimiterService)
 
 	return Service{

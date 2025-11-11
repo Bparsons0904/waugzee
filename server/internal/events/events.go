@@ -47,6 +47,14 @@ const (
 	API    Service = "api"
 )
 
+type EventType string
+
+const (
+	ADMIN_DOWNLOAD_PROGRESS   EventType = "admin_download_progress"
+	ADMIN_DOWNLOAD_STATUS     EventType = "admin_download_status"
+	ADMIN_PROCESSING_PROGRESS EventType = "admin_processing_progress"
+)
+
 type Message struct {
 	ID        string         `json:"id"`
 	Service   Service        `json:"service,omitempty"`
@@ -69,13 +77,17 @@ func New(client valkey.Client, config config.Config) *EventBus {
 	}
 }
 
-// Publish supports both old ChannelEvent struct and new individual parameters
-func (eb *EventBus) Publish(channel Channel, eventTypeOrChannelEvent any, message ...Message) error {
+func (eb *EventBus) Publish(
+	channel Channel,
+	eventTypeOrChannelEvent any,
+	message ...Message,
+) error {
 	log := eb.logger.Function("Publish")
 
 	var channelEvent ChannelEvent
 
 	// Handle different parameter combinations
+	// TODO: There is no reason to handle 2 different parameter combinations, factor
 	switch v := eventTypeOrChannelEvent.(type) {
 	case ChannelEvent:
 		// Legacy usage: Publish(channel, channelEvent)
@@ -113,7 +125,6 @@ func (eb *EventBus) Publish(channel Channel, eventTypeOrChannelEvent any, messag
 			channelEvent,
 		)
 	}
-
 
 	eb.notifyLocalHandlers(channel, channelEvent)
 
@@ -178,7 +189,7 @@ func (eb *EventBus) listenToChannel(channel Channel) {
 				return
 			}
 
-					eb.notifyLocalHandlers(channel, event)
+			eb.notifyLocalHandlers(channel, event)
 		},
 	)
 	if err != nil {

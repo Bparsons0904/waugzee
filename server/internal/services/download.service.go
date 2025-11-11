@@ -103,7 +103,7 @@ func (ds *DownloadService) BroadcastProgress(yearMonth, status, fileType, stage 
 	message := events.Message{
 		ID:        uuid.New().String(),
 		Service:   events.SYSTEM,
-		Event:     "admin_download_progress",
+		Event:     string(events.ADMIN_DOWNLOAD_PROGRESS),
 		Payload:   progressEvent,
 		Timestamp: time.Now(),
 	}

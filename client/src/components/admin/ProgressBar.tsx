@@ -3,6 +3,7 @@ import styles from "./ProgressBar.module.scss";
 interface ProgressBarProps {
   percentage: number;
   label?: string;
+  subLabel?: string;
   variant?: "primary" | "success" | "error";
 }
 
@@ -12,6 +13,7 @@ export const ProgressBar = (props: ProgressBarProps) => {
   return (
     <div class={styles.progressContainer}>
       {props.label && <span class={styles.label}>{props.label}</span>}
+      {props.subLabel && <span class={styles.subLabel}>{props.subLabel}</span>}
       <div class={styles.progressBar}>
         <div
           class={`${styles.progressFill} ${styles[props.variant || "primary"]}`}

@@ -78,3 +78,15 @@ export interface DownloadProgressEvent {
   percentage: number;
   errorMessage?: string;
 }
+
+export interface ProcessingProgressEvent {
+  yearMonth: string;
+  status: string;
+  fileType: string;
+  step: string;
+  stage: string;
+  filesProcessed: number;
+  totalFiles: number;
+  percentage: number;
+  errorMessage?: string;
+}

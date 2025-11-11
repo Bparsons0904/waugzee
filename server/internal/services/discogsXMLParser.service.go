@@ -13,29 +13,114 @@ import (
 	"strings"
 	"time"
 	"waugzee/internal/database"
+	"waugzee/internal/events"
 	"waugzee/internal/logger"
 	"waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/types"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type DiscogsXMLParserService struct {
-	log   logger.Logger
-	repos repositories.Repository
-	db    database.DB
+	log      logger.Logger
+	repos    repositories.Repository
+	db       database.DB
+	eventBus *events.EventBus
 }
 
 func NewDiscogsXMLParserService(
 	repos repositories.Repository,
 	db database.DB,
+	eventBus *events.EventBus,
 ) *DiscogsXMLParserService {
 	return &DiscogsXMLParserService{
-		log:   logger.New("discogsXMLParser"),
-		repos: repos,
-		db:    db,
+		log:      logger.New("discogsXMLParser"),
+		repos:    repos,
+		db:       db,
+		eventBus: eventBus,
 	}
+}
+
+func (s *DiscogsXMLParserService) BroadcastProgress(
+	yearMonth string,
+	status string,
+	fileType string,
+	step string,
+	stage string,
+	filesProcessed int64,
+	totalFiles int64,
+	errorMessage *string,
+) {
+	if s.eventBus == nil {
+		return
+	}
+
+	percentage := 0.0
+	if totalFiles > 0 {
+		percentage = (float64(filesProcessed) / float64(totalFiles)) * 100
+	}
+
+	progressEvent := map[string]any{
+		"yearMonth":      yearMonth,
+		"status":         status,
+		"fileType":       fileType,
+		"step":           step,
+		"stage":          stage,
+		"filesProcessed": filesProcessed,
+		"totalFiles":     totalFiles,
+		"percentage":     percentage,
+		"errorMessage":   errorMessage,
+	}
+
+	message := events.Message{
+		ID:        uuid.New().String(),
+		Service:   events.SYSTEM,
+		Event:     string(events.ADMIN_PROCESSING_PROGRESS),
+		Payload:   progressEvent,
+		Timestamp: time.Now(),
+	}
+
+	if err := s.eventBus.Publish(events.WEBSOCKET, "admin", message); err != nil {
+		s.log.Warn("Failed to publish admin processing progress", "error", err)
+	}
+}
+
+// GetDatabaseCounts queries the database for current record counts
+func (s *DiscogsXMLParserService) GetDatabaseCounts(ctx context.Context) (map[string]int64, error) {
+	counts := make(map[string]int64)
+
+	var artistCount, labelCount, masterCount, releaseCount int64
+
+	if err := s.db.SQLWithContext(ctx).Model(&models.Artist{}).Count(&artistCount).Error; err != nil {
+		return nil, fmt.Errorf("failed to count artists: %w", err)
+	}
+	counts["artists"] = artistCount
+
+	if err := s.db.SQLWithContext(ctx).Model(&models.Label{}).Count(&labelCount).Error; err != nil {
+		return nil, fmt.Errorf("failed to count labels: %w", err)
+	}
+	counts["labels"] = labelCount
+
+	if err := s.db.SQLWithContext(ctx).Model(&models.Master{}).Count(&masterCount).Error; err != nil {
+		return nil, fmt.Errorf("failed to count masters: %w", err)
+	}
+	counts["masters"] = masterCount
+
+	if err := s.db.SQLWithContext(ctx).Model(&models.Release{}).Count(&releaseCount).Error; err != nil {
+		return nil, fmt.Errorf("failed to count releases: %w", err)
+	}
+	counts["releases"] = releaseCount
+
+	s.log.Info("Database counts retrieved",
+		"artists", artistCount,
+		"labels", labelCount,
+		"masters", masterCount,
+		"releases", releaseCount,
+	)
+
+	return counts, nil
 }
 
 const (
@@ -60,6 +145,10 @@ func ProcessXMLEntities[XMLType any, TModelType any](
 	config EntityProcessorConfig[XMLType, TModelType],
 	db database.DB,
 	log logger.Logger,
+	service *DiscogsXMLParserService,
+	yearMonth string,
+	stepName string,
+	totalFiles int64,
 ) error {
 	processingLog := log.Function("ProcessXMLEntities").With("entityType", config.EntityTypeName)
 
@@ -84,6 +173,10 @@ func ProcessXMLEntities[XMLType any, TModelType any](
 
 	processedCount := 0
 	var entities []*TModelType
+	lastBroadcastTime := time.Now()
+	broadcastInterval := 10 * time.Second
+
+	service.BroadcastProgress(yearMonth, "processing", config.EntityTypeName, stepName, "in_progress", 0, totalFiles, nil)
 
 	for xmlEntity := range xmlChan {
 		processedCount++
@@ -104,6 +197,12 @@ func ProcessXMLEntities[XMLType any, TModelType any](
 			}
 			entities = []*TModelType{}
 		}
+
+		now := time.Now()
+		if now.Sub(lastBroadcastTime) >= broadcastInterval {
+			service.BroadcastProgress(yearMonth, "processing", config.EntityTypeName, stepName, "in_progress", int64(processedCount), totalFiles, nil)
+			lastBroadcastTime = now
+		}
 	}
 
 	if len(entities) > 0 {
@@ -118,6 +217,8 @@ func ProcessXMLEntities[XMLType any, TModelType any](
 			processingLog.Info("Processed final batch", "batchSize", len(entities), "totalProcessed", processedCount)
 		}
 	}
+
+	service.BroadcastProgress(yearMonth, "completed", config.EntityTypeName, stepName, "completed", int64(processedCount), totalFiles, nil)
 
 	processingLog.Info(
 		"Entity processing completed",
@@ -545,6 +646,18 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 
 	log.Info("All required XML files found, starting processing", "yearMonth", yearMonth)
 
+	// Get current database counts for accurate percentage calculation
+	dbCounts, err := s.GetDatabaseCounts(ctx)
+	if err != nil {
+		log.Warn("Failed to get database counts, proceeding with 0 counts", "error", err)
+		dbCounts = map[string]int64{
+			"artists":  0,
+			"labels":   0,
+			"masters":  0,
+			"releases": 0,
+		}
+	}
+
 	// Process labels using the abstracted entity processor
 	labelsFilePath := filepath.Join(downloadDir, "labels.xml.gz")
 	err = s.executeProcessingStep(
@@ -562,7 +675,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 				ConvertFunc:    s.convertXMLLabelToModel,
 				UpsertFunc:     s.repos.Label.UpsertBatch,
 			}
-			return ProcessXMLEntities(ctx, labelsConfig, s.db, log)
+			return ProcessXMLEntities(ctx, labelsConfig, s.db, log, s, yearMonth, "Labels Processing", dbCounts["labels"])
 		},
 	)
 	if err != nil {
@@ -586,7 +699,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 				ConvertFunc:    s.convertXMLArtistToModel,
 				UpsertFunc:     s.repos.Artist.UpsertBatch,
 			}
-			return ProcessXMLEntities(ctx, artistsConfig, s.db, log)
+			return ProcessXMLEntities(ctx, artistsConfig, s.db, log, s, yearMonth, "Artists Processing", dbCounts["artists"])
 		},
 	)
 	if err != nil {
@@ -610,7 +723,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 				ConvertFunc:    s.convertXMLMasterToModel,
 				UpsertFunc:     s.repos.Master.UpsertBatch,
 			}
-			return ProcessXMLEntities(ctx, mastersConfig, s.db, log)
+			return ProcessXMLEntities(ctx, mastersConfig, s.db, log, s, yearMonth, "Masters Processing", dbCounts["masters"])
 		},
 	)
 	if err != nil {
@@ -634,7 +747,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 				ConvertFunc:    s.convertXMLReleaseToModel,
 				UpsertFunc:     s.repos.Release.UpsertBatch,
 			}
-			return ProcessXMLEntities(ctx, releasesConfig, s.db, log)
+			return ProcessXMLEntities(ctx, releasesConfig, s.db, log, s, yearMonth, "Releases Processing", dbCounts["releases"])
 		},
 	)
 	if err != nil {
@@ -654,7 +767,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 		models.StepMasterGenresCollection,
 		"Master Genres Collection",
 		func() error {
-			return s.collectGenresFromXML(ctx, mastersFilePath, "master", genreManager, log)
+			return s.collectGenresFromXML(ctx, mastersFilePath, "master", genreManager, log, yearMonth, dbCounts["masters"])
 		},
 	)
 	if err != nil {
@@ -691,7 +804,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 				},
 				UpsertFunc: s.repos.Master.UpsertMasterGenreAssociationsBatch,
 			}
-			return ProcessXMLEntities(ctx, masterGenreConfig, s.db, log)
+			return ProcessXMLEntities(ctx, masterGenreConfig, s.db, log, s, yearMonth, "Master Genre Associations", dbCounts["masters"])
 		},
 	)
 	if err != nil {
@@ -706,7 +819,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 		"Release Genres Collection",
 		func() error {
 			genreManager.Reset()
-			return s.collectGenresFromXML(ctx, releasesFilePath, "release", genreManager, log)
+			return s.collectGenresFromXML(ctx, releasesFilePath, "release", genreManager, log, yearMonth, dbCounts["releases"])
 		},
 	)
 	if err != nil {
@@ -743,7 +856,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 				},
 				UpsertFunc: s.repos.Release.UpsertReleaseGenreAssociationsBatch,
 			}
-			return ProcessXMLEntities(ctx, releaseGenreConfig, s.db, log)
+			return ProcessXMLEntities(ctx, releaseGenreConfig, s.db, log, s, yearMonth, "Release Genre Associations", dbCounts["releases"])
 		},
 	)
 	if err != nil {
@@ -768,7 +881,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 				ConvertFunc:    s.convertReleaseToLabelAssociations,
 				UpsertFunc:     s.repos.Release.UpsertReleaseLabelAssociationsBatch,
 			}
-			return ProcessXMLEntities(ctx, releaseLabelConfig, s.db, log)
+			return ProcessXMLEntities(ctx, releaseLabelConfig, s.db, log, s, yearMonth, "Release Label Associations", dbCounts["releases"])
 		},
 	)
 	if err != nil {
@@ -790,7 +903,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 				ConvertFunc:    s.convertMasterToArtistAssociations,
 				UpsertFunc:     s.repos.Master.UpsertMasterArtistAssociationsBatch,
 			}
-			return ProcessXMLEntities(ctx, masterArtistConfig, s.db, log)
+			return ProcessXMLEntities(ctx, masterArtistConfig, s.db, log, s, yearMonth, "Master Artist Associations", dbCounts["masters"])
 		},
 	)
 	if err != nil {
@@ -812,7 +925,7 @@ func (s *DiscogsXMLParserService) ParseXMLFiles(ctx context.Context) error {
 				ConvertFunc:    s.convertReleaseToArtistAssociations,
 				UpsertFunc:     s.repos.Release.UpsertReleaseArtistAssociationsBatch,
 			}
-			return ProcessXMLEntities(ctx, releaseArtistConfig, s.db, log)
+			return ProcessXMLEntities(ctx, releaseArtistConfig, s.db, log, s, yearMonth, "Release Artist Associations", dbCounts["releases"])
 		},
 	)
 	if err != nil {
@@ -935,11 +1048,20 @@ func (s *DiscogsXMLParserService) collectGenresFromXML(
 	elementName string,
 	genreManager *GenreStyleManager,
 	log logger.Logger,
+	yearMonth string,
+	totalFiles int64,
 ) error {
 	log = log.Function("collectGenresFromXML").With("elementName", elementName)
 
+	lastBroadcastTime := time.Now()
+	broadcastInterval := 10 * time.Second
+	processedCount := 0
+
 	switch elementName {
 	case "master":
+		stepName := "Collecting Master Genres"
+		s.BroadcastProgress(yearMonth, "processing", "masters", stepName, "in_progress", 0, totalFiles, nil)
+
 		// Create channel for streaming Master XML entities
 		masterChan := make(chan types.Master, 5000)
 
@@ -955,9 +1077,21 @@ func (s *DiscogsXMLParserService) collectGenresFromXML(
 		// Collect genres from masters
 		for xmlMaster := range masterChan {
 			genreManager.CollectNames(xmlMaster.Genres, xmlMaster.Styles)
+			processedCount++
+
+			now := time.Now()
+			if now.Sub(lastBroadcastTime) >= broadcastInterval {
+				s.BroadcastProgress(yearMonth, "processing", "masters", stepName, "in_progress", int64(processedCount), totalFiles, nil)
+				lastBroadcastTime = now
+			}
 		}
 
+		s.BroadcastProgress(yearMonth, "processing", "masters", stepName, "completed", int64(processedCount), totalFiles, nil)
+
 	case "release":
+		stepName := "Collecting Release Genres"
+		s.BroadcastProgress(yearMonth, "processing", "releases", stepName, "in_progress", 0, totalFiles, nil)
+
 		// Create channel for streaming Release XML entities
 		releaseChan := make(chan types.Release, 5000)
 
@@ -973,7 +1107,16 @@ func (s *DiscogsXMLParserService) collectGenresFromXML(
 		// Collect genres from releases
 		for xmlRelease := range releaseChan {
 			genreManager.CollectNames(xmlRelease.Genres, xmlRelease.Styles)
+			processedCount++
+
+			now := time.Now()
+			if now.Sub(lastBroadcastTime) >= broadcastInterval {
+				s.BroadcastProgress(yearMonth, "processing", "releases", stepName, "in_progress", int64(processedCount), totalFiles, nil)
+				lastBroadcastTime = now
+			}
 		}
+
+		s.BroadcastProgress(yearMonth, "processing", "releases", stepName, "completed", int64(processedCount), totalFiles, nil)
 
 	default:
 		return log.Err(

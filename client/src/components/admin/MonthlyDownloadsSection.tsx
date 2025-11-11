@@ -21,7 +21,7 @@ export function MonthlyDownloadsSection() {
   const triggerDownload = useTriggerDownload();
   const triggerReprocess = useTriggerReprocess();
   const resetDownload = useResetDownload();
-  const { progress } = useAdminWebSocket();
+  const { progress, processingProgress } = useAdminWebSocket();
   const [showTriggerModal, setShowTriggerModal] = createSignal(false);
   const [showReprocessModal, setShowReprocessModal] = createSignal(false);
   const [showResetModal, setShowResetModal] = createSignal(false);
@@ -77,6 +77,25 @@ export function MonthlyDownloadsSection() {
                   />
                   <Show when={progress()?.errorMessage}>
                     <p class={styles.errorMessage}>{progress()?.errorMessage}</p>
+                  </Show>
+                </div>
+              </Show>
+
+              <Show when={processingProgress() && processingProgress()?.stage !== "completed"}>
+                <div class={styles.progressSection}>
+                  <h3>Processing Progress</h3>
+                  <ProgressBar
+                    label={`${processingProgress()?.fileType || "Unknown"} - ${processingProgress()?.step || ""}`}
+                    subLabel={
+                      processingProgress()?.totalFiles
+                        ? `${processingProgress()?.filesProcessed || 0} / ${processingProgress()?.totalFiles} files`
+                        : undefined
+                    }
+                    percentage={processingProgress()?.percentage || 0}
+                    variant={processingProgress()?.stage === "error" ? "error" : "primary"}
+                  />
+                  <Show when={processingProgress()?.errorMessage}>
+                    <p class={styles.errorMessage}>{processingProgress()?.errorMessage}</p>
                   </Show>
                 </div>
               </Show>

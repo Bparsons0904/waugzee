@@ -396,16 +396,6 @@ export function useDownloadStatus() {
   return useApiQuery<DownloadStatusResponse>(
     ["admin", "downloads", "status"],
     "/admin/downloads/status",
-    undefined,
-    {
-      refetchInterval: (query: Query<DownloadStatusResponse, Error>) => {
-        const data = query.state.data;
-        if (data?.status === "downloading" || data?.status === "processing") {
-          return 5000;
-        }
-        return false;
-      },
-    },
   );
 }
 
