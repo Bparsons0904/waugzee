@@ -44,6 +44,7 @@ func New(
 			services.DiscogsXMLParser,
 			services.Scheduler,
 			services.FileCleanup,
+			services.KleioImport, // TODO: REMOVE_AFTER_MIGRATION
 		),
 	}
 }

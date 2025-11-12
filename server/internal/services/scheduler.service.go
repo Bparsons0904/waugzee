@@ -83,7 +83,7 @@ func (s *SchedulerService) AddJob(job Job) error {
 			s.executeJob(job, log)
 		})
 	case Monthly:
-		_, err = s.scheduler.MonthLastDay().At("02:00").Do(func() {
+		_, err = s.scheduler.Every(1).MonthLastDay().At("02:00").Do(func() {
 			s.executeJob(job, log)
 		})
 	case Hourly:

@@ -10,6 +10,7 @@ import (
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -21,6 +22,8 @@ type AdminControllerInterface interface {
 	ListStoredFiles(ctx context.Context) (*StoredFilesResponse, error)
 	CleanupAllFiles(ctx context.Context) error
 	CleanupYearMonth(ctx context.Context, yearMonth string) error
+	// TODO: REMOVE_AFTER_MIGRATION - One-time Kleio data import method
+	ImportKleioData(ctx context.Context, userID uuid.UUID, jsonData []byte) (*services.ImportSummary, error)
 }
 
 type AdminController struct {
@@ -30,6 +33,7 @@ type AdminController struct {
 	xmlProcessingService *services.DiscogsXMLParserService
 	schedulerService     *services.SchedulerService
 	fileCleanupService   *services.FileCleanupService
+	kleioImportService   *services.KleioImportService // TODO: REMOVE_AFTER_MIGRATION
 	log                  logger.Logger
 }
 
@@ -40,6 +44,7 @@ func NewAdminController(
 	xmlProcessingService *services.DiscogsXMLParserService,
 	schedulerService *services.SchedulerService,
 	fileCleanupService *services.FileCleanupService,
+	kleioImportService *services.KleioImportService, // TODO: REMOVE_AFTER_MIGRATION
 ) AdminControllerInterface {
 	return &AdminController{
 		db:                   db,
@@ -48,6 +53,7 @@ func NewAdminController(
 		xmlProcessingService: xmlProcessingService,
 		schedulerService:     schedulerService,
 		fileCleanupService:   fileCleanupService,
+		kleioImportService:   kleioImportService, // TODO: REMOVE_AFTER_MIGRATION
 		log:                  logger.New("adminController"),
 	}
 }
@@ -282,4 +288,27 @@ func (c *AdminController) CleanupYearMonth(ctx context.Context, yearMonth string
 
 	log.Info("Successfully cleaned up year-month files", "yearMonth", yearMonth)
 	return nil
+}
+
+// TODO: REMOVE_AFTER_MIGRATION
+// This controller method is for one-time Kleio data migration and should be deleted after import is complete.
+func (c *AdminController) ImportKleioData(
+	ctx context.Context,
+	userID uuid.UUID,
+	jsonData []byte,
+) (*services.ImportSummary, error) {
+	log := c.log.Function("ImportKleioData")
+
+	summary, err := c.kleioImportService.ImportKleioData(ctx, userID, jsonData)
+	if err != nil {
+		return nil, log.Err("failed to import kleio data", err)
+	}
+
+	log.Info("Kleio data imported successfully",
+		"userID", userID,
+		"stylusesCreated", summary.StylusesCreated,
+		"playHistoryImported", summary.PlayHistoryImported,
+		"cleaningImported", summary.CleaningImported)
+
+	return summary, nil
 }

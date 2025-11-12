@@ -19,6 +19,8 @@ type Service struct {
 	DiscogsXMLParser     *DiscogsXMLParserService
 	ReleaseSync          *ReleaseSyncService
 	FileCleanup          *FileCleanupService
+	KleioImport          *KleioImportService       // TODO: REMOVE_AFTER_MIGRATION
+	CacheInvalidation    *CacheInvalidationService
 }
 
 func New(db database.DB, config config.Config, eventBus *events.EventBus) (Service, error) {
@@ -45,6 +47,15 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 	discogsXMLParserService := NewDiscogsXMLParserService(repos, db, eventBus)
 	releaseSyncService := NewReleaseSyncService(eventBus, repos, db, discogsRateLimiterService)
 	fileCleanupService := NewFileCleanupService(config)
+	cacheInvalidationService := NewCacheInvalidationService(eventBus)
+	// TODO: REMOVE_AFTER_MIGRATION - One-time Kleio data import service
+	kleioImportService := NewKleioImportService(
+		db,
+		repos.Stylus,
+		repos.UserRelease,
+		repos.History,
+		transactionService,
+	)
 
 	return Service{
 		Zitadel:              zitadelService,
@@ -58,5 +69,7 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 		DiscogsXMLParser:     discogsXMLParserService,
 		ReleaseSync:          releaseSyncService,
 		FileCleanup:          fileCleanupService,
+		CacheInvalidation:    cacheInvalidationService,
+		KleioImport:          kleioImportService, // TODO: REMOVE_AFTER_MIGRATION
 	}, nil
 }

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"io"
+	"strings"
 	"waugzee/internal/app"
 	"waugzee/internal/controllers/admin"
 	"waugzee/internal/handlers/middleware"
@@ -37,6 +39,9 @@ func (h *AdminHandler) Register() {
 	admin.Get("/files", h.listStoredFiles)
 	admin.Delete("/files", h.cleanupAllFiles)
 	admin.Delete("/files/:yearMonth", h.cleanupYearMonth)
+
+	// TODO: REMOVE_AFTER_MIGRATION - One-time Kleio data import endpoint
+	admin.Post("/import-kleio-data", h.importKleioData)
 }
 
 func (h *AdminHandler) getDownloadStatus(c *fiber.Ctx) error {
@@ -175,5 +180,66 @@ func (h *AdminHandler) cleanupYearMonth(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Year-month files cleaned up successfully",
 		"yearMonth": yearMonth,
+	})
+}
+
+// TODO: REMOVE_AFTER_MIGRATION
+// This handler is for one-time Kleio data migration and should be deleted after import is complete.
+func (h *AdminHandler) importKleioData(c *fiber.Ctx) error {
+	log := h.log.Function("importKleioData")
+
+	user := middleware.GetUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authentication required"})
+	}
+
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		_ = log.Err("Failed to get uploaded file", err)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "File upload required"})
+	}
+
+	const maxFileSize = 10 * 1024 * 1024
+	if fileHeader.Size > maxFileSize {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "File size exceeds maximum allowed (10MB)",
+		})
+	}
+
+	if !strings.HasSuffix(strings.ToLower(fileHeader.Filename), ".json") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Only JSON files are allowed",
+		})
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		_ = log.Err("Failed to open uploaded file", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to process uploaded file"})
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	jsonData, err := io.ReadAll(io.LimitReader(file, maxFileSize))
+	if err != nil {
+		_ = log.Err("Failed to read uploaded file", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to read uploaded file"})
+	}
+
+	log.Info("Admin importing Kleio data",
+		"userID", user.ID,
+		"email", user.Email,
+		"fileSize", fileHeader.Size)
+
+	summary, err := h.adminController.ImportKleioData(c.Context(), user.ID, jsonData)
+	if err != nil {
+		_ = log.Err("Failed to import Kleio data", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to import Kleio data"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Kleio data imported successfully",
+		"summary": summary,
 	})
 }
