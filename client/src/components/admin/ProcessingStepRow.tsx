@@ -18,17 +18,16 @@ export function ProcessingStepRow(props: ProcessingStepRowProps) {
         props.status.error_message && styles.error,
       )}
     >
-      <div class={styles.stepName}>{getStepLabel(props.step)}</div>
-      <div class={styles.stepStatus}>{props.status.completed ? "✓ Completed" : "Pending"}</div>
-      <Show when={props.status.records_count !== undefined}>
-        <div class={styles.stepRecords}>{props.status.records_count} records</div>
-      </Show>
-      <Show when={props.status.duration}>
-        <div class={styles.stepDuration}>{formatDuration(props.status.duration)}</div>
-      </Show>
-      <Show when={props.status.completed_at}>
-        <div class={styles.stepTime}>{formatTimestamp(props.status.completed_at)}</div>
-      </Show>
+      <div class={styles.stepName}>
+        {props.status.completed ? "✓ " : ""}
+        {getStepLabel(props.step)}
+      </div>
+      <div class={styles.stepDuration}>
+        {props.status.duration ? formatDuration(props.status.duration) : ""}
+      </div>
+      <div class={styles.stepTime}>
+        {props.status.completed_at ? formatTimestamp(props.status.completed_at) : ""}
+      </div>
       <Show when={props.status.error_message}>
         <div class={styles.stepError}>{props.status.error_message}</div>
       </Show>

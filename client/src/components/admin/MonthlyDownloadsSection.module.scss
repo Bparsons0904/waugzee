@@ -141,32 +141,34 @@
 	}
 }
 
-.statusDetails {
+.statsGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: $spacing-md;
+	margin-top: $spacing-lg;
+}
+
+.statCard {
+	background-color: $bg-surface;
+	border: 1px solid $border-default;
+	border-radius: $border-radius-md;
+	padding: $spacing-md;
 	display: flex;
 	flex-direction: column;
-	gap: $spacing-sm;
+	gap: $spacing-xs;
 }
 
-.statusDetail {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	padding: $spacing-sm 0;
-	border-bottom: 1px solid $border-default;
-
-	&:last-child {
-		border-bottom: none;
-	}
-}
-
-.label {
-	font-size: $font-size-sm;
+.statLabel {
+	font-size: $font-size-xs;
 	font-weight: $font-weight-medium;
 	color: $text-muted;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
 }
 
-.value {
-	font-size: $font-size-sm;
+.statValue {
+	font-size: $font-size-lg;
+	font-weight: $font-weight-semibold;
 	color: $text-default;
 }
 
@@ -208,48 +210,11 @@
 	margin-top: $spacing-lg;
 }
 
-.filesGrid {
-	display: grid;
-	grid-template-columns: 1fr;
-	gap: $spacing-lg;
-
-	@media (min-width: $breakpoint-md) {
-		grid-template-columns: repeat(2, 1fr);
-	}
-
-	@media (min-width: $breakpoint-xl) {
-		grid-template-columns: repeat(4, 1fr);
-	}
-}
-
-.fileCard {
+.filesTable {
 	background-color: $bg-elevated;
 	border: 1px solid $border-default;
 	border-radius: $border-radius-lg;
-	padding: $spacing-lg;
-	display: flex;
-	flex-direction: column;
-	gap: $spacing-md;
-}
-
-.fileTitle {
-	font-size: $font-size-lg;
-	font-weight: $font-weight-semibold;
-	color: $text-default;
-	margin: 0;
-}
-
-.fileDetails {
-	display: flex;
-	flex-direction: column;
-	gap: $spacing-xs;
-}
-
-.fileDetail {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	font-size: $font-size-sm;
+	overflow: hidden;
 }
 
 .processingSection {
@@ -261,60 +226,6 @@
 	border: 1px solid $border-default;
 	border-radius: $border-radius-lg;
 	overflow: hidden;
-}
-
-.processingRow {
-	display: grid;
-	grid-template-columns: 2fr 1fr 1fr 1fr;
-	gap: $spacing-md;
-	padding: $spacing-md $spacing-lg;
-	border-bottom: 1px solid $border-default;
-	align-items: center;
-
-	&:last-child {
-		border-bottom: none;
-	}
-
-	&.completed {
-		background-color: $bg-success-subtle;
-	}
-
-	&.error {
-		background-color: $bg-error-subtle;
-	}
-
-	@media (max-width: $breakpoint-md) {
-		grid-template-columns: 1fr;
-		gap: $spacing-sm;
-	}
-}
-
-.stepName {
-	font-size: $font-size-md;
-	font-weight: $font-weight-medium;
-	color: $text-default;
-}
-
-.stepStatus,
-.stepRecords,
-.stepDuration {
-	display: flex;
-	align-items: center;
-	gap: $spacing-xs;
-	font-size: $font-size-sm;
-}
-
-.stepError {
-	grid-column: 1 / -1;
-	padding: $spacing-sm;
-	background-color: $bg-error-subtle;
-	color: $text-error;
-	border-radius: $border-radius-md;
-	font-size: $font-size-sm;
-
-	strong {
-		font-weight: $font-weight-semibold;
-	}
 }
 
 .actionsSection {

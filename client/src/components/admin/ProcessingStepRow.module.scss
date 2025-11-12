@@ -3,7 +3,7 @@
 
 .processingRow {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr;
+  grid-template-columns: 2.5fr 1fr 1.5fr;
   gap: $spacing-md;
   padding: $spacing-md;
   border-bottom: 1px solid $border-default;
@@ -11,25 +11,17 @@
   align-items: center;
 
   &.completed {
-    background: $bg-success;
+    border-left: 3px solid $border-success;
   }
 
   &.error {
-    background: $bg-error;
+    border-left: 3px solid $border-error;
   }
 }
 
 .stepName {
   font-weight: $font-weight-medium;
   color: $text-default;
-}
-
-.stepStatus {
-  color: $text-muted;
-}
-
-.stepRecords {
-  color: $text-muted;
 }
 
 .stepDuration {

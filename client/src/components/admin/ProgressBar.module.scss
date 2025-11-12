@@ -33,18 +33,7 @@
   height: 100%;
   transition: width $transition-normal ease-in-out;
   border-radius: $border-radius-full;
-
-  &.primary {
-    background-color: $bg-primary;
-  }
-
-  &.success {
-    background-color: $bg-success;
-  }
-
-  &.error {
-    background-color: $bg-error;
-  }
+  background-color: $bg-info;
 }
 
 .percentage {

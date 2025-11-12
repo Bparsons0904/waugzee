@@ -87,7 +87,7 @@ func (eb *EventBus) Publish(
 	var channelEvent ChannelEvent
 
 	// Handle different parameter combinations
-	// TODO: There is no reason to handle 2 different parameter combinations, factor
+	// TODO: There is no reason to handle 2 different parameter combinations, refactor
 	switch v := eventTypeOrChannelEvent.(type) {
 	case ChannelEvent:
 		// Legacy usage: Publish(channel, channelEvent)

@@ -11,7 +11,7 @@ import {
 import { formatStatusLabel, formatTimestamp, getProcessingStatusColor } from "@utils/admin.utils";
 import clsx from "clsx";
 import { createSignal, For, Show } from "solid-js";
-import { FileCard } from "./FileCard";
+import { FileDownloadRow } from "./FileDownloadRow";
 import styles from "./MonthlyDownloadsSection.module.scss";
 import { ProcessingStepRow } from "./ProcessingStepRow";
 import { ProgressBar } from "./ProgressBar";
@@ -73,7 +73,6 @@ export function MonthlyDownloadsSection() {
                   <ProgressBar
                     label={progress()?.fileType || "Unknown"}
                     percentage={progress()?.percentage || 0}
-                    variant={progress()?.stage === "error" ? "error" : "primary"}
                   />
                   <Show when={progress()?.errorMessage}>
                     <p class={styles.errorMessage}>{progress()?.errorMessage}</p>
@@ -92,7 +91,6 @@ export function MonthlyDownloadsSection() {
                         : undefined
                     }
                     percentage={processingProgress()?.percentage || 0}
-                    variant={processingProgress()?.stage === "error" ? "error" : "primary"}
                   />
                   <Show when={processingProgress()?.errorMessage}>
                     <p class={styles.errorMessage}>{processingProgress()?.errorMessage}</p>
@@ -113,76 +111,60 @@ export function MonthlyDownloadsSection() {
                   </span>
                 </div>
 
-                <div class={styles.statusDetails}>
-                  <div class={styles.statusDetail}>
-                    <span class={styles.label}>Started:</span>
-                    <span class={styles.value}>{formatTimestamp(data().started_at)}</span>
+                <div class={styles.statsGrid}>
+                  <div class={styles.statCard}>
+                    <div class={styles.statLabel}>Started</div>
+                    <div class={styles.statValue}>{formatTimestamp(data().started_at)}</div>
                   </div>
-                  <div class={styles.statusDetail}>
-                    <span class={styles.label}>Download Completed:</span>
-                    <span class={styles.value}>
+                  <div class={styles.statCard}>
+                    <div class={styles.statLabel}>Download Complete</div>
+                    <div class={styles.statValue}>
                       {formatTimestamp(data().download_completed_at)}
-                    </span>
-                  </div>
-                  <div class={styles.statusDetail}>
-                    <span class={styles.label}>Processing Completed:</span>
-                    <span class={styles.value}>
-                      {formatTimestamp(data().processing_completed_at)}
-                    </span>
-                  </div>
-                  <div class={styles.statusDetail}>
-                    <span class={styles.label}>Retry Count:</span>
-                    <span class={styles.value}>{data().retry_count}</span>
-                  </div>
-
-                  <Show when={data().error_message}>
-                    <div class={styles.errorMessage}>
-                      <strong>Error:</strong> {data().error_message}
                     </div>
-                  </Show>
+                  </div>
+                  <div class={styles.statCard}>
+                    <div class={styles.statLabel}>Processing Complete</div>
+                    <div class={styles.statValue}>
+                      {formatTimestamp(data().processing_completed_at)}
+                    </div>
+                  </div>
+                  <div class={styles.statCard}>
+                    <div class={styles.statLabel}>Retry Count</div>
+                    <div class={styles.statValue}>{data().retry_count}</div>
+                  </div>
                 </div>
+
+                <Show when={data().error_message}>
+                  <div class={styles.errorMessage}>
+                    <strong>Error:</strong> {data().error_message}
+                  </div>
+                </Show>
               </div>
 
               <Show when={data().files}>
                 <div class={styles.filesSection}>
                   <h3 class={styles.subsectionTitle}>File Downloads</h3>
-                  <div class={styles.filesGrid}>
-                    <Show when={data().files?.artists}>
-                      {(file) => (
-                        <FileCard
-                          title="Artists"
-                          file={file()}
-                          checksum={data().file_checksums?.artists_dump}
-                        />
-                      )}
-                    </Show>
-                    <Show when={data().files?.labels}>
-                      {(file) => (
-                        <FileCard
-                          title="Labels"
-                          file={file()}
-                          checksum={data().file_checksums?.labels_dump}
-                        />
-                      )}
-                    </Show>
-                    <Show when={data().files?.masters}>
-                      {(file) => (
-                        <FileCard
-                          title="Masters"
-                          file={file()}
-                          checksum={data().file_checksums?.masters_dump}
-                        />
-                      )}
-                    </Show>
-                    <Show when={data().files?.releases}>
-                      {(file) => (
-                        <FileCard
-                          title="Releases"
-                          file={file()}
-                          checksum={data().file_checksums?.releases_dump}
-                        />
-                      )}
-                    </Show>
+                  <div class={styles.filesTable}>
+                    <FileDownloadRow
+                      fileName="Artists"
+                      fileInfo={data().files?.artists}
+                      checksum={data().file_checksums?.artists_dump}
+                    />
+                    <FileDownloadRow
+                      fileName="Labels"
+                      fileInfo={data().files?.labels}
+                      checksum={data().file_checksums?.labels_dump}
+                    />
+                    <FileDownloadRow
+                      fileName="Masters"
+                      fileInfo={data().files?.masters}
+                      checksum={data().file_checksums?.masters_dump}
+                    />
+                    <FileDownloadRow
+                      fileName="Releases"
+                      fileInfo={data().files?.releases}
+                      checksum={data().file_checksums?.releases_dump}
+                    />
                   </div>
                 </div>
               </Show>

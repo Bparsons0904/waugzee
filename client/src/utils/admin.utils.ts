@@ -55,7 +55,23 @@ export function formatBytes(bytes: number): string {
 // Format Go duration string to human-readable format
 export function formatDuration(durationStr?: string): string {
   if (!durationStr) return "N/A";
-  return durationStr;
+
+  // Parse Go duration format (e.g., "1h2m3.5s", "45m30s", "1.5h")
+  const regex = /(?:(\d+(?:\.\d+)?)h)?(?:(\d+(?:\.\d+)?)m)?(?:(\d+(?:\.\d+)?)s)?/;
+  const matches = durationStr.match(regex);
+
+  if (!matches) return durationStr;
+
+  const hours = parseFloat(matches[1] || "0");
+  const minutes = parseFloat(matches[2] || "0");
+  const seconds = parseFloat(matches[3] || "0");
+
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${Math.floor(hours)}h`);
+  if (minutes > 0) parts.push(`${Math.floor(minutes)}m`);
+  if (seconds > 0) parts.push(`${Math.floor(seconds)}s`);
+
+  return parts.length > 0 ? parts.join(" ") : "0s";
 }
 
 // Truncate checksum for display

@@ -255,6 +255,10 @@ func (j *DiscogsDownloadJob) performDownload(
 
 	// Update processing record with checksums
 	processingRecord.FileChecksums = checksums
+
+	// Initialize processing stats to track file downloads
+	processingRecord.InitializeProcessingStats()
+
 	if err := j.repo.Update(ctx, processingRecord); err != nil {
 		return log.Err("failed to update processing record with checksums", err, "yearMonth", yearMonth)
 	}
@@ -264,6 +268,12 @@ func (j *DiscogsDownloadJob) performDownload(
 
 	fileTypes := []string{"artists", "labels", "masters", "releases"}
 	for _, fileType := range fileTypes {
+		// Initialize file info before download
+		processingRecord.InitializeFileInfo(fileType)
+		if err := j.repo.Update(ctx, processingRecord); err != nil {
+			log.Warn("failed to initialize file info", "fileType", fileType, "error", err)
+		}
+
 		log.Info("Downloading XML file", "fileType", fileType, "yearMonth", yearMonth)
 		j.download.BroadcastProgress(yearMonth, "downloading", fileType, "starting", 0, 0, nil)
 		if err := j.download.DownloadXMLFile(ctx, yearMonth, fileType); err != nil {
@@ -272,6 +282,20 @@ func (j *DiscogsDownloadJob) performDownload(
 		}
 		j.download.BroadcastProgress(yearMonth, "completed", fileType, "completed", 0, 0, nil)
 		log.Info("Downloaded XML file successfully", "fileType", fileType, "yearMonth", yearMonth)
+
+		// Update file info after successful download
+		filePath := filepath.Join(fmt.Sprintf("/app/discogs-data/%s", yearMonth), fmt.Sprintf("%s.xml.gz", fileType))
+		checksum := processingRecord.GetFileChecksum(fileType)
+
+		fileInfo, err := j.download.GetFileStatus(filePath, checksum)
+		if err != nil {
+			log.Warn("failed to get file status", "fileType", fileType, "error", err)
+		} else {
+			processingRecord.SetFileInfo(fileType, fileInfo)
+			if err := j.repo.Update(ctx, processingRecord); err != nil {
+				log.Warn("failed to update file info", "fileType", fileType, "error", err)
+			}
+		}
 	}
 
 	// Transition to ready_for_processing after all downloads complete
