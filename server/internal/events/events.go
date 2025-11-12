@@ -126,8 +126,6 @@ func (eb *EventBus) Publish(
 		)
 	}
 
-	eb.notifyLocalHandlers(channel, channelEvent)
-
 	return nil
 }
 

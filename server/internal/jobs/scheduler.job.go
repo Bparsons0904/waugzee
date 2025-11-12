@@ -9,8 +9,9 @@ import (
 
 // Import schedule constants
 const (
-	Daily  = services.Daily
-	Hourly = services.Hourly
+	Daily   = services.Daily
+	Hourly  = services.Hourly
+	Monthly = services.Monthly
 )
 
 func RegisterAllJobs(
@@ -42,6 +43,16 @@ func RegisterAllJobs(
 		return log.Err("failed to register Discogs XML parser job", err)
 	}
 	log.Info("Registered Discogs XML parser job", "schedule", "hourly")
+
+	// Register file cleanup job - runs on last day of month
+	fileCleanupJob := NewFileCleanupJob(
+		services.FileCleanup,
+		Monthly,
+	)
+	if err := schedulerService.AddJob(fileCleanupJob); err != nil {
+		return log.Err("failed to register file cleanup job", err)
+	}
+	log.Info("Registered file cleanup job", "schedule", "monthly")
 
 	return nil
 }

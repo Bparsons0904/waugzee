@@ -90,3 +90,17 @@ export interface ProcessingProgressEvent {
   percentage: number;
   errorMessage?: string;
 }
+
+export interface StoredFileInfo {
+  path: string;
+  size: number;
+  modified_at: string;
+  is_xml: boolean;
+  is_gz: boolean;
+}
+
+export interface StoredFilesResponse {
+  files: StoredFileInfo[];
+  total_count: number;
+  total_size: number;
+}

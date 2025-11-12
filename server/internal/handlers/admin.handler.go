@@ -33,6 +33,10 @@ func (h *AdminHandler) Register() {
 	admin.Post("/downloads/trigger", h.triggerDownload)
 	admin.Post("/downloads/reprocess", h.triggerReprocess)
 	admin.Post("/downloads/reset", h.resetStuckDownload)
+
+	admin.Get("/files", h.listStoredFiles)
+	admin.Delete("/files", h.cleanupAllFiles)
+	admin.Delete("/files/:yearMonth", h.cleanupYearMonth)
 }
 
 func (h *AdminHandler) getDownloadStatus(c *fiber.Ctx) error {
@@ -110,5 +114,66 @@ func (h *AdminHandler) resetStuckDownload(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Download reset successfully. You can now trigger a new download.",
+	})
+}
+
+func (h *AdminHandler) listStoredFiles(c *fiber.Ctx) error {
+	log := h.log.Function("listStoredFiles")
+
+	response, err := h.adminController.ListStoredFiles(c.Context())
+	if err != nil {
+		_ = log.Err("Failed to list stored files", err)
+		return c.Status(fiber.StatusInternalServerError).
+			JSON(fiber.Map{"error": "Failed to list stored files"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(response)
+}
+
+func (h *AdminHandler) cleanupAllFiles(c *fiber.Ctx) error {
+	log := h.log.Function("cleanupAllFiles")
+
+	user := middleware.GetUser(c)
+
+	log.Info("Admin cleaning up all files", "userID", user.ID, "email", user.Email)
+
+	err := h.adminController.CleanupAllFiles(c.Context())
+	if err != nil {
+		_ = log.Err("Failed to cleanup all files", err)
+		return c.Status(fiber.StatusInternalServerError).
+			JSON(fiber.Map{"error": "Failed to cleanup all files"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "All files cleaned up successfully",
+	})
+}
+
+func (h *AdminHandler) cleanupYearMonth(c *fiber.Ctx) error {
+	log := h.log.Function("cleanupYearMonth")
+
+	yearMonth := c.Params("yearMonth")
+	if yearMonth == "" {
+		return c.Status(fiber.StatusBadRequest).
+			JSON(fiber.Map{"error": "yearMonth parameter is required"})
+	}
+
+	user := middleware.GetUser(c)
+
+	log.Info("Admin cleaning up year-month files",
+		"userID", user.ID,
+		"email", user.Email,
+		"yearMonth", yearMonth)
+
+	err := h.adminController.CleanupYearMonth(c.Context(), yearMonth)
+	if err != nil {
+		_ = log.Err("Failed to cleanup year-month files", err, "yearMonth", yearMonth)
+		return c.Status(fiber.StatusInternalServerError).
+			JSON(fiber.Map{"error": "Failed to cleanup year-month files"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Year-month files cleaned up successfully",
+		"yearMonth": yearMonth,
 	})
 }

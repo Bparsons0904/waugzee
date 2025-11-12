@@ -18,6 +18,9 @@ type AdminControllerInterface interface {
 	TriggerDownload(ctx context.Context) error
 	TriggerReprocess(ctx context.Context) error
 	ResetStuckDownload(ctx context.Context) error
+	ListStoredFiles(ctx context.Context) (*StoredFilesResponse, error)
+	CleanupAllFiles(ctx context.Context) error
+	CleanupYearMonth(ctx context.Context, yearMonth string) error
 }
 
 type AdminController struct {
@@ -26,6 +29,7 @@ type AdminController struct {
 	downloadService      *services.DownloadService
 	xmlProcessingService *services.DiscogsXMLParserService
 	schedulerService     *services.SchedulerService
+	fileCleanupService   *services.FileCleanupService
 	log                  logger.Logger
 }
 
@@ -35,6 +39,7 @@ func NewAdminController(
 	downloadService *services.DownloadService,
 	xmlProcessingService *services.DiscogsXMLParserService,
 	schedulerService *services.SchedulerService,
+	fileCleanupService *services.FileCleanupService,
 ) AdminControllerInterface {
 	return &AdminController{
 		db:                   db,
@@ -42,6 +47,7 @@ func NewAdminController(
 		downloadService:      downloadService,
 		xmlProcessingService: xmlProcessingService,
 		schedulerService:     schedulerService,
+		fileCleanupService:   fileCleanupService,
 		log:                  logger.New("adminController"),
 	}
 }
@@ -64,6 +70,12 @@ type FileStatusInfo struct {
 	Labels   *models.FileDownloadInfo `json:"labels,omitempty"`
 	Masters  *models.FileDownloadInfo `json:"masters,omitempty"`
 	Releases *models.FileDownloadInfo `json:"releases,omitempty"`
+}
+
+type StoredFilesResponse struct {
+	Files      []services.StoredFile `json:"files"`
+	TotalCount int                   `json:"total_count"`
+	TotalSize  int64                 `json:"total_size"`
 }
 
 func (c *AdminController) GetDownloadStatus(ctx context.Context) (*DownloadStatusResponse, error) {
@@ -227,5 +239,47 @@ func (c *AdminController) ResetStuckDownload(ctx context.Context) error {
 	}
 
 	log.Info("Successfully reset stuck download", "yearMonth", yearMonth)
+	return nil
+}
+
+func (c *AdminController) ListStoredFiles(ctx context.Context) (*StoredFilesResponse, error) {
+	log := c.log.Function("ListStoredFiles")
+
+	files, err := c.fileCleanupService.ListStoredFiles(ctx)
+	if err != nil {
+		return nil, log.Err("failed to list stored files", err)
+	}
+
+	totalSize := int64(0)
+	for _, f := range files {
+		totalSize += f.Size
+	}
+
+	return &StoredFilesResponse{
+		Files:      files,
+		TotalCount: len(files),
+		TotalSize:  totalSize,
+	}, nil
+}
+
+func (c *AdminController) CleanupAllFiles(ctx context.Context) error {
+	log := c.log.Function("CleanupAllFiles")
+
+	if err := c.fileCleanupService.CleanupAllFiles(ctx); err != nil {
+		return log.Err("failed to cleanup all files", err)
+	}
+
+	log.Info("Successfully cleaned up all files")
+	return nil
+}
+
+func (c *AdminController) CleanupYearMonth(ctx context.Context, yearMonth string) error {
+	log := c.log.Function("CleanupYearMonth")
+
+	if err := c.fileCleanupService.CleanupYearMonth(ctx, yearMonth); err != nil {
+		return log.Err("failed to cleanup year-month files", err, "yearMonth", yearMonth)
+	}
+
+	log.Info("Successfully cleaned up year-month files", "yearMonth", yearMonth)
 	return nil
 }

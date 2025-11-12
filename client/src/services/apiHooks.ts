@@ -1,10 +1,11 @@
 import {
+  ADMIN_ENDPOINTS,
   CLEANING_HISTORY_ENDPOINTS,
   HISTORY_ENDPOINTS,
   PLAY_HISTORY_ENDPOINTS,
   STYLUS_ENDPOINTS,
 } from "@constants/api.constants";
-import type { DownloadStatusResponse } from "@models/Admin";
+import type { DownloadStatusResponse, StoredFilesResponse } from "@models/Admin";
 import type {
   LogBothRequest,
   LogBothResponse,
@@ -395,12 +396,12 @@ export function useLogBoth(options?: ApiMutationOptions<LogBothResponse, LogBoth
 export function useDownloadStatus() {
   return useApiQuery<DownloadStatusResponse>(
     ["admin", "downloads", "status"],
-    "/admin/downloads/status",
+    ADMIN_ENDPOINTS.DOWNLOADS_STATUS,
   );
 }
 
 export function useTriggerDownload() {
-  return useApiPost<void, void>("/admin/downloads/trigger", undefined, {
+  return useApiPost<void, void>(ADMIN_ENDPOINTS.DOWNLOADS_TRIGGER, undefined, {
     invalidateQueries: [["admin", "downloads", "status"]],
     successMessage: "Download triggered successfully",
     errorMessage: "Failed to trigger download",
@@ -408,7 +409,7 @@ export function useTriggerDownload() {
 }
 
 export function useTriggerReprocess() {
-  return useApiPost<void, void>("/admin/downloads/reprocess", undefined, {
+  return useApiPost<void, void>(ADMIN_ENDPOINTS.DOWNLOADS_REPROCESS, undefined, {
     invalidateQueries: [["admin", "downloads", "status"]],
     successMessage: "Reprocessing triggered successfully",
     errorMessage: "Failed to trigger reprocessing",
@@ -416,9 +417,28 @@ export function useTriggerReprocess() {
 }
 
 export function useResetDownload() {
-  return useApiPost<void, void>("/admin/downloads/reset", undefined, {
+  return useApiPost<void, void>(ADMIN_ENDPOINTS.DOWNLOADS_RESET, undefined, {
     invalidateQueries: [["admin", "downloads", "status"]],
     successMessage: "Download reset successfully. You can now trigger a new download.",
     errorMessage: "Failed to reset download",
+  });
+}
+
+// Admin - File Management
+export function useStoredFiles(options?: ApiQueryOptions<StoredFilesResponse>) {
+  return useApiQuery<StoredFilesResponse>(
+    ["admin", "files", "stored"],
+    ADMIN_ENDPOINTS.FILES_LIST,
+    undefined,
+    options,
+  );
+}
+
+export function useCleanupFiles(options?: ApiMutationOptions<void, void>) {
+  return useApiDelete<void>(ADMIN_ENDPOINTS.FILES_CLEANUP, {
+    invalidateQueries: [["admin", "files", "stored"]],
+    successMessage: "Files cleaned up successfully",
+    errorMessage: "Failed to cleanup files",
+    ...options,
   });
 }

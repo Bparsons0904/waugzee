@@ -15,6 +15,7 @@ const (
 	Hourly          Schedule = iota
 	Daily                    // Start at 02:00 UTC every day
 	DailyProcessing          // Start at 03:00 UTC every day (1 hour after download)
+	Monthly                  // Start at 02:00 UTC on last day of month
 )
 
 // Job represents a scheduled task that can be executed by the scheduler
@@ -79,6 +80,10 @@ func (s *SchedulerService) AddJob(job Job) error {
 		})
 	case DailyProcessing:
 		_, err = s.scheduler.Every(1).Day().At("03:00").Do(func() {
+			s.executeJob(job, log)
+		})
+	case Monthly:
+		_, err = s.scheduler.MonthLastDay().At("02:00").Do(func() {
 			s.executeJob(job, log)
 		})
 	case Hourly:

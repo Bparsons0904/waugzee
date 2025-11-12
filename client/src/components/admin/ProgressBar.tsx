@@ -11,12 +11,14 @@ export const ProgressBar = (props: ProgressBarProps) => {
 
   return (
     <div class={styles.progressContainer}>
-      {props.label && <span class={styles.label}>{props.label}</span>}
-      {props.subLabel && <span class={styles.subLabel}>{props.subLabel}</span>}
+      <div class={styles.labelRow}>
+        {props.label && <span class={styles.label}>{props.label}</span>}
+        {props.subLabel && <span class={styles.subLabel}>{props.subLabel}</span>}
+        <span class={styles.percentage}>{safePercentage().toFixed(1)}%</span>
+      </div>
       <div class={styles.progressBar}>
         <div class={styles.progressFill} style={{ width: `${safePercentage()}%` }} />
       </div>
-      <span class={styles.percentage}>{safePercentage().toFixed(1)}%</span>
     </div>
   );
 };

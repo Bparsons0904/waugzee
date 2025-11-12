@@ -2,9 +2,10 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 	"waugzee/config"
 	"waugzee/internal/logger"
@@ -23,11 +24,11 @@ func NewFileCleanupService(config config.Config) *FileCleanupService {
 }
 
 type StoredFile struct {
-	FileName     string    `json:"file_name"`
-	FilePath     string    `json:"file_path"`
-	YearMonth    string    `json:"year_month"`
-	SizeBytes    int64     `json:"size_bytes"`
-	ModifiedTime time.Time `json:"modified_time"`
+	Path       string    `json:"path"`
+	Size       int64     `json:"size"`
+	ModifiedAt time.Time `json:"modified_at"`
+	IsXML      bool      `json:"is_xml"`
+	IsGZ       bool      `json:"is_gz"`
 }
 
 func (fcs *FileCleanupService) ListStoredFiles(ctx context.Context) ([]StoredFile, error) {
@@ -54,17 +55,14 @@ func (fcs *FileCleanupService) ListStoredFiles(ctx context.Context) ([]StoredFil
 			return err
 		}
 
-		yearMonth := filepath.Dir(relPath)
-		if yearMonth == "." {
-			yearMonth = ""
-		}
+		fileName := info.Name()
 
 		files = append(files, StoredFile{
-			FileName:     info.Name(),
-			FilePath:     path,
-			YearMonth:    yearMonth,
-			SizeBytes:    info.Size(),
-			ModifiedTime: info.ModTime(),
+			Path:       relPath,
+			Size:       info.Size(),
+			ModifiedAt: info.ModTime(),
+			IsXML:      strings.HasSuffix(fileName, ".xml") || strings.Contains(fileName, ".xml."),
+			IsGZ:       strings.HasSuffix(fileName, ".gz"),
 		})
 
 		return nil
@@ -86,16 +84,34 @@ func (fcs *FileCleanupService) CleanupAllFiles(ctx context.Context) error {
 		return nil
 	}
 
-	if err := os.RemoveAll(DiscogsDataDir); err != nil {
-		return log.Err("failed to remove download directory", err, "directory", DiscogsDataDir)
+	entries, err := os.ReadDir(DiscogsDataDir)
+	if err != nil {
+		return log.Err("failed to read download directory", err, "directory", DiscogsDataDir)
 	}
 
-	log.Info("Successfully cleaned up all files", "directory", DiscogsDataDir)
+	var errors []error
+	for _, entry := range entries {
+		entryPath := filepath.Join(DiscogsDataDir, entry.Name())
+		if err := os.RemoveAll(entryPath); err != nil {
+			errors = append(errors, err)
+			log.Err("failed to remove entry", err, "path", entryPath)
+		}
+	}
+
+	if len(errors) > 0 {
+		return log.Err("failed to cleanup some files", errors[0], "errorCount", len(errors))
+	}
+
+	log.Info("Successfully cleaned up all files", "directory", DiscogsDataDir, "itemsRemoved", len(entries))
 	return nil
 }
 
 func (fcs *FileCleanupService) CleanupYearMonth(ctx context.Context, yearMonth string) error {
 	log := fcs.log.Function("CleanupYearMonth")
+
+	if !regexp.MustCompile(`^\d{4}-\d{2}$`).MatchString(yearMonth) {
+		return log.Err("invalid yearMonth format", nil, "yearMonth", yearMonth, "expected", "YYYY-MM")
+	}
 
 	downloadDir := filepath.Join(DiscogsDataDir, yearMonth)
 
@@ -112,28 +128,9 @@ func (fcs *FileCleanupService) CleanupYearMonth(ctx context.Context, yearMonth s
 	return nil
 }
 
-func (fcs *FileCleanupService) IsLastDayOfMonth() bool {
-	now := time.Now()
-	tomorrow := now.AddDate(0, 0, 1)
-	return tomorrow.Month() != now.Month()
-}
-
 func (fcs *FileCleanupService) ScheduledMonthlyCleanup(ctx context.Context) error {
 	log := fcs.log.Function("ScheduledMonthlyCleanup")
 
-	if !fcs.IsLastDayOfMonth() {
-		log.Info("Not last day of month, skipping cleanup")
-		return nil
-	}
-
-	log.Info("Last day of month detected, running cleanup")
+	log.Info("Running scheduled monthly cleanup (last day of month)")
 	return fcs.CleanupAllFiles(ctx)
-}
-
-func isValidYearMonth(yearMonth string) error {
-	_, err := time.Parse("2006-01", yearMonth)
-	if err != nil {
-		return fmt.Errorf("invalid year-month format, expected YYYY-MM: %w", err)
-	}
-	return nil
 }

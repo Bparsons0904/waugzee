@@ -3,26 +3,32 @@
 
 .progressContainer {
   display: flex;
-  align-items: center;
-  gap: $spacing-md;
+  flex-direction: column;
+  gap: $spacing-sm;
   width: 100%;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-md;
 }
 
 .label {
   font-size: $font-size-sm;
   font-weight: $font-weight-medium;
   color: $text-default;
-  min-width: 100px;
 }
 
 .subLabel {
   font-size: $font-size-xs;
   color: $text-muted;
-  min-width: 80px;
+  margin-left: auto;
 }
 
 .progressBar {
-  flex: 1;
+  width: 100%;
   height: $spacing-lg;
   background-color: $bg-subtle;
   border-radius: $border-radius-full;
@@ -40,6 +46,5 @@
   font-size: $font-size-sm;
   font-weight: $font-weight-semibold;
   color: $text-muted;
-  min-width: 50px;
   text-align: right;
 }

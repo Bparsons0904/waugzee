@@ -8,10 +8,15 @@ import {
   useTriggerDownload,
   useTriggerReprocess,
 } from "@services/apiHooks";
-import { formatStatusLabel, formatTimestamp, getProcessingStatusColor } from "@utils/admin.utils";
+import {
+  formatFileType,
+  formatProcessingLabel,
+  formatStatusLabel,
+  formatTimestamp,
+  getProcessingStatusColor,
+} from "@utils/admin.utils";
 import clsx from "clsx";
 import { createSignal, For, Show } from "solid-js";
-import { FileDownloadRow } from "./FileDownloadRow";
 import styles from "./MonthlyDownloadsSection.module.scss";
 import { ProcessingStepRow } from "./ProcessingStepRow";
 import { ProgressBar } from "./ProgressBar";
@@ -71,7 +76,7 @@ export function MonthlyDownloadsSection() {
                 <div class={styles.progressSection}>
                   <h3>Download Progress</h3>
                   <ProgressBar
-                    label={progress()?.fileType || "Unknown"}
+                    label={formatFileType(progress()?.fileType || "Unknown")}
                     percentage={progress()?.percentage || 0}
                   />
                   <Show when={progress()?.errorMessage}>
@@ -84,7 +89,10 @@ export function MonthlyDownloadsSection() {
                 <div class={styles.progressSection}>
                   <h3>Processing Progress</h3>
                   <ProgressBar
-                    label={`${processingProgress()?.fileType || "Unknown"} - ${processingProgress()?.step || ""}`}
+                    label={formatProcessingLabel(
+                      processingProgress()?.fileType || "Unknown",
+                      processingProgress()?.step,
+                    )}
                     subLabel={
                       processingProgress()?.totalFiles
                         ? `${processingProgress()?.filesProcessed || 0} / ${processingProgress()?.totalFiles} files`
@@ -140,34 +148,6 @@ export function MonthlyDownloadsSection() {
                   </div>
                 </Show>
               </div>
-
-              <Show when={data().files}>
-                <div class={styles.filesSection}>
-                  <h3 class={styles.subsectionTitle}>File Downloads</h3>
-                  <div class={styles.filesTable}>
-                    <FileDownloadRow
-                      fileName="Artists"
-                      fileInfo={data().files?.artists}
-                      checksum={data().file_checksums?.artists_dump}
-                    />
-                    <FileDownloadRow
-                      fileName="Labels"
-                      fileInfo={data().files?.labels}
-                      checksum={data().file_checksums?.labels_dump}
-                    />
-                    <FileDownloadRow
-                      fileName="Masters"
-                      fileInfo={data().files?.masters}
-                      checksum={data().file_checksums?.masters_dump}
-                    />
-                    <FileDownloadRow
-                      fileName="Releases"
-                      fileInfo={data().files?.releases}
-                      checksum={data().file_checksums?.releases_dump}
-                    />
-                  </div>
-                </div>
-              </Show>
 
               <Show when={processingSteps().length > 0}>
                 <div class={styles.processingSection}>

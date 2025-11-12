@@ -43,6 +43,7 @@ func New(
 			services.Download,
 			services.DiscogsXMLParser,
 			services.Scheduler,
+			services.FileCleanup,
 		),
 	}
 }

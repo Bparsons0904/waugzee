@@ -18,6 +18,7 @@ type Service struct {
 	Download             *DownloadService
 	DiscogsXMLParser     *DiscogsXMLParserService
 	ReleaseSync          *ReleaseSyncService
+	FileCleanup          *FileCleanupService
 }
 
 func New(db database.DB, config config.Config, eventBus *events.EventBus) (Service, error) {
@@ -43,6 +44,7 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 	downloadService := NewDownloadService(config, eventBus)
 	discogsXMLParserService := NewDiscogsXMLParserService(repos, db, eventBus)
 	releaseSyncService := NewReleaseSyncService(eventBus, repos, db, discogsRateLimiterService)
+	fileCleanupService := NewFileCleanupService(config)
 
 	return Service{
 		Zitadel:              zitadelService,
@@ -55,5 +57,6 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 		Download:             downloadService,
 		DiscogsXMLParser:     discogsXMLParserService,
 		ReleaseSync:          releaseSyncService,
+		FileCleanup:          fileCleanupService,
 	}, nil
 }

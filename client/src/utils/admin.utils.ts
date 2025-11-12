@@ -90,3 +90,15 @@ export function formatTimestamp(timestamp?: string): string {
 export function getStepLabel(step: string): string {
   return formatStatusLabel(step);
 }
+
+// Format file type to capitalized form
+export function formatFileType(fileType: string): string {
+  return fileType.charAt(0).toUpperCase() + fileType.slice(1);
+}
+
+// Format processing progress label (e.g., "Artists Processing")
+export function formatProcessingLabel(fileType: string, step?: string): string {
+  if (!step) return formatFileType(fileType);
+
+  return formatStatusLabel(step);
+}
