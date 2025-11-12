@@ -25,6 +25,19 @@
   height: 100%;
 }
 
+.cardInteractive {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  outline: none;
+
+  &:focus-visible {
+    outline: 2px solid $border-focus;
+    outline-offset: 2px;
+    border-radius: $border-radius-lg;
+  }
+}
+
 .cardHeader {
   h2 {
     margin: 0 0 $spacing-md 0;

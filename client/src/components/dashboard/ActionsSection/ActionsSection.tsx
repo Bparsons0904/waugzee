@@ -16,6 +16,15 @@ interface ActionsSectionProps {
 }
 
 export const ActionsSection: Component<ActionsSectionProps> = (props) => {
+  const handleKeyDown = (event: KeyboardEvent, action: ActionItem) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (!action.disabled) {
+        action.onClick();
+      }
+    }
+  };
+
   return (
     <section class={styles.actionsSection}>
       <div class={styles.cardGrid}>
@@ -23,22 +32,35 @@ export const ActionsSection: Component<ActionsSectionProps> = (props) => {
           {(action) => (
             <Card
               class={`${styles.actionCardContent} ${action.highlight ? styles.highlightCard : ""}`}
+              onClick={action.disabled ? undefined : action.onClick}
             >
-              <div class={styles.cardHeader}>
-                <h2>{action.title}</h2>
-              </div>
-              <div class={styles.cardBody}>
-                <p>{action.description}</p>
-              </div>
-              <div class={styles.cardFooter}>
-                <button
-                  type="button"
-                  class={styles.button}
-                  onClick={action.onClick}
-                  disabled={action.disabled}
-                >
-                  {action.buttonText}
-                </button>
+              {/* biome-ignore lint/a11y/useSemanticElements: Using div to avoid nested buttons (card contains button inside) */}
+              <div
+                role="button"
+                tabIndex={action.disabled ? -1 : 0}
+                onKeyDown={(e) => handleKeyDown(e, action)}
+                class={styles.cardInteractive}
+              >
+                <div class={styles.cardHeader}>
+                  <h2>{action.title}</h2>
+                </div>
+                <div class={styles.cardBody}>
+                  <p>{action.description}</p>
+                </div>
+                <div class={styles.cardFooter}>
+                  <button
+                    type="button"
+                    class={styles.button}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      action.onClick();
+                    }}
+                    disabled={action.disabled}
+                    tabIndex={-1}
+                  >
+                    {action.buttonText}
+                  </button>
+                </div>
               </div>
             </Card>
           )}
