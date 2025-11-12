@@ -214,6 +214,57 @@ export function AuthProvider(props: { children: JSX.Element }) {
     });
   });
 
+  createEffect(() => {
+    if (!authState.oidcInitialized || !authState.config?.configured) {
+      return;
+    }
+
+    const checkAndRenewToken = async (source: string) => {
+      console.debug(`App ${source} - checking token status`);
+
+      try {
+        const isExpired = await oidcService.isTokenExpired();
+
+        if (isExpired) {
+          console.info("Token expired or near expiry - attempting renewal");
+
+          const renewedUser = await oidcService.renewToken();
+
+          if (renewedUser?.access_token) {
+            console.info("Token renewal successful");
+            setAuthState("token", renewedUser.access_token);
+          } else {
+            console.warn("Token renewal failed - logging out");
+            performLocalLogout();
+          }
+        } else {
+          console.debug("Token still valid");
+        }
+      } catch (error) {
+        console.error(`Token check/renewal on ${source} failed:`, error);
+        performLocalLogout();
+      }
+    };
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === "visible") {
+        await checkAndRenewToken("became visible");
+      }
+    };
+
+    const handleFocus = async () => {
+      await checkAndRenewToken("gained focus");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    onCleanup(() => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    });
+  });
+
   const loginWithOIDC = async (returnTo?: string) => {
     try {
       if (!authState.config?.configured) {
