@@ -79,7 +79,7 @@ func (c *RecommendationController) MarkAsListened(
 	}
 
 	if err := c.recommendationRepo.MarkAsListened(ctx, c.db, recommendationID, user.ID); err != nil {
-		return log.Err("failed to mark as listened", err, "recommendationID", recommendationID)
+    		return log.Err("failed to mark as listened", err, "recommendationID", recommendationID)
 	}
 
 	log.Info(

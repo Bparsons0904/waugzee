@@ -10,6 +10,7 @@ import type {
   UserStylus,
   UserWithFoldersAndReleasesResponse,
 } from "src/types/User";
+import type { DailyRecommendation } from "src/types/DailyRecommendation";
 import { useAuth } from "./AuthContext";
 
 type UserDataContextValue = {
@@ -19,6 +20,7 @@ type UserDataContextValue = {
   styluses: () => UserStylus[];
   playHistory: () => PlayHistory[];
   cleaningHistory: () => CleaningHistory[];
+  dailyRecommendation: () => DailyRecommendation | null;
   isLoading: () => boolean;
   error: () => string | null;
   updateUser: (user: User) => void;
@@ -80,6 +82,7 @@ export function UserDataProvider(props: { children: JSX.Element }) {
         styluses: () => userQuery.data?.styluses || [],
         playHistory: () => userQuery.data?.playHistory || [],
         cleaningHistory,
+        dailyRecommendation: () => userQuery.data?.dailyRecommendation || null,
         isLoading: () => userQuery.isPending,
         error: () => userQuery.error?.message || null,
         updateUser,

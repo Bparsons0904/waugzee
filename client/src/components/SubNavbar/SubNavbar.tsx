@@ -13,7 +13,7 @@ const RecordActionModal = lazy(() => import("@components/RecordActionModal/Recor
 type SuggestionMode = "one" | "several" | "leastPlayed" | "randomGenre";
 
 export const SubNavbar: Component = () => {
-  const { user, releases, playHistory, styluses } = useUserData();
+  const { user, releases, playHistory, styluses, dailyRecommendation } = useUserData();
   const [suggestionMode, setSuggestionMode] = createSignal<SuggestionMode>("one");
   const [showSuggestions, setShowSuggestions] = createSignal(false);
   const [suggestions, setSuggestions] = createSignal<UserRelease[]>([]);
@@ -21,7 +21,6 @@ export const SubNavbar: Component = () => {
   const [isModalOpen, setIsModalOpen] = createSignal(false);
   const [selectedRelease, setSelectedRelease] = createSignal<UserRelease | null>(null);
 
-  const dailyRecommendation = createMemo(() => user()?.dailyRecommendation);
   const isListened = createMemo(() => !!dailyRecommendation()?.listenedAt);
   const primaryStylus = createMemo(() => styluses().find((s) => s.isPrimary));
 

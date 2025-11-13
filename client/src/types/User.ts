@@ -200,4 +200,5 @@ export interface UserWithFoldersAndReleasesResponse {
   releases: UserRelease[];
   styluses: UserStylus[];
   playHistory: PlayHistory[];
+  dailyRecommendation?: DailyRecommendation | null;
 }

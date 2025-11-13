@@ -18,8 +18,8 @@
 }
 
 .recordOfTheDay {
-  flex: 1;
-  min-width: 0;
+  display: flex;
+  align-items: center;
 }
 
 .recordCard {
@@ -44,8 +44,8 @@
 }
 
 .recordInfo {
-  flex: 1;
   min-width: 0;
+  max-width: 400px;
   overflow: hidden;
 }
 
@@ -67,6 +67,7 @@
 }
 
 .playButton {
+  flex-shrink: 0;
   padding: $spacing-sm $spacing-lg;
   background-color: $button-primary-bg;
   color: $button-primary-text;
@@ -83,6 +84,7 @@
 }
 
 .playedBadge {
+  flex-shrink: 0;
   padding: $spacing-sm $spacing-lg;
   background-color: $bg-success;
   color: $text-inverse;

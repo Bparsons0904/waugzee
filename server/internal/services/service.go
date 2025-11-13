@@ -36,12 +36,14 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 	discogsService := NewDiscogsService()
 	schedulerService := NewSchedulerService()
 	discogsRateLimiterService := NewDiscogsRateLimiterService(db.Cache.ClientAPI)
+	recommendationService := NewRecommendationService(repos, db.SQL, db.Cache.ClientAPI)
 	orchestrationService := NewOrchestrationService(
 		eventBus,
 		repos,
 		db,
 		transactionService,
 		discogsRateLimiterService,
+		recommendationService,
 	)
 	folderDataExtractionService := NewFolderDataExtractionService(repos)
 	downloadService := NewDownloadService(config, eventBus)
@@ -57,8 +59,6 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 		repos.History,
 		transactionService,
 	)
-
-	recommendationService := NewRecommendationService(repos, db.SQL, db.Cache.ClientAPI)
 
 	return Service{
 		Zitadel:              zitadelService,
