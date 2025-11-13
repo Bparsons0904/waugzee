@@ -23,6 +23,12 @@ type DailyRecommendationRepository interface {
 		tx *gorm.DB,
 		userID uuid.UUID,
 	) (*DailyRecommendation, error)
+	GetByID(
+		ctx context.Context,
+		tx *gorm.DB,
+		recommendationID uuid.UUID,
+		userID uuid.UUID,
+	) (*DailyRecommendation, error)
 	CreateRecommendation(
 		ctx context.Context,
 		tx *gorm.DB,
@@ -96,6 +102,27 @@ func (r *dailyRecommendationRepository) GetTodayRecommendation(
 	}
 
 	log.Info("Daily recommendation retrieved from database and cached", "userID", userID)
+	return recommendation, nil
+}
+
+func (r *dailyRecommendationRepository) GetByID(
+	ctx context.Context,
+	tx *gorm.DB,
+	recommendationID uuid.UUID,
+	userID uuid.UUID,
+) (*DailyRecommendation, error) {
+	log := r.log.Function("GetByID")
+
+	recommendation, err := gorm.G[*DailyRecommendation](tx).
+		Where(DailyRecommendation{BaseUUIDModel: BaseUUIDModel{ID: recommendationID}, UserID: userID}).
+		First(ctx)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, err
+		}
+		return nil, log.Err("failed to get recommendation by ID", err, "recommendationID", recommendationID, "userID", userID)
+	}
+
 	return recommendation, nil
 }
 
