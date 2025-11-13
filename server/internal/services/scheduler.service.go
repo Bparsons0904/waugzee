@@ -187,7 +187,6 @@ func (s *SchedulerService) GetNextRunTime() *time.Time {
 }
 
 // TriggerJobByName manually executes a registered job by name
-// Claude is this really needed? The jobs should be pretty stupid and just kicking off other services, we should be able to directly kick off the event we want to work with
 func (s *SchedulerService) TriggerJobByName(ctx context.Context, jobName string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -1,11 +1,14 @@
 import { Select } from "@components/common/forms/Select/Select";
 import { Button } from "@components/common/ui/Button/Button";
 import { useUserData } from "@context/UserDataContext";
+import { useToast } from "@context/ToastContext";
 import type { UserRelease } from "@models/User";
 import { useLogPlay, useMarkRecommendationListened } from "@services/apiHooks";
 import { suggestByGenre, suggestLeastPlayed, suggestRandom } from "@utils/recommendationAlgorithms";
-import { type Component, createMemo, createSignal, For, Show } from "solid-js";
+import { type Component, createMemo, createSignal, For, lazy, Show } from "solid-js";
 import styles from "./SubNavbar.module.scss";
+
+const RecordActionModal = lazy(() => import("@components/RecordActionModal/RecordActionModal"));
 
 type SuggestionMode = "one" | "several" | "leastPlayed" | "randomGenre";
 
@@ -15,12 +18,15 @@ export const SubNavbar: Component = () => {
   const [showSuggestions, setShowSuggestions] = createSignal(false);
   const [suggestions, setSuggestions] = createSignal<UserRelease[]>([]);
   const [selectedGenre, setSelectedGenre] = createSignal<string>("");
+  const [isModalOpen, setIsModalOpen] = createSignal(false);
+  const [selectedRelease, setSelectedRelease] = createSignal<UserRelease | null>(null);
 
   const dailyRecommendation = createMemo(() => user()?.dailyRecommendation);
   const isListened = createMemo(() => !!dailyRecommendation()?.listenedAt);
   const primaryStylus = createMemo(() => styluses().find((s) => s.isPrimary));
 
   const logPlayMutation = useLogPlay({
+    invalidateQueries: [["user"]],
     onSuccess: async () => {
       await markListenedMutation.mutateAsync({});
     },
@@ -30,12 +36,12 @@ export const SubNavbar: Component = () => {
 
   const handleQuickPlay = () => {
     const recommendation = dailyRecommendation();
-    const stylus = primaryStylus();
-    if (!recommendation || !stylus) return;
+    if (!recommendation) return;
 
+    const stylus = primaryStylus();
     logPlayMutation.mutate({
       userReleaseId: recommendation.userReleaseId,
-      userStylusId: stylus.id,
+      userStylusId: stylus?.id,
       playedAt: new Date().toISOString(),
       notes: "Quick play from daily recommendation",
     });
@@ -75,18 +81,33 @@ export const SubNavbar: Component = () => {
     setShowSuggestions(true);
   };
 
-  const suggestionPlayMutation = useLogPlay();
+  const suggestionPlayMutation = useLogPlay({
+    invalidateQueries: [["user"]],
+    successMessage: "Play logged successfully!",
+  });
 
-  const handleSuggestionPlay = (releaseId: string) => {
+  const handleSuggestionPlay = (e: MouseEvent, releaseId: string) => {
+    e.stopPropagation();
     const stylus = primaryStylus();
-    if (!stylus) return;
 
-    suggestionPlayMutation.mutate({
+    const payload = {
       userReleaseId: releaseId,
-      userStylusId: stylus.id,
+      userStylusId: stylus?.id,
       playedAt: new Date().toISOString(),
       notes: "From suggestion system",
-    });
+    };
+
+    suggestionPlayMutation.mutate(payload);
+  };
+
+  const handleCardClick = (release: UserRelease) => {
+    setSelectedRelease(release);
+    setIsModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setSelectedRelease(null);
   };
 
   return (
@@ -159,7 +180,7 @@ export const SubNavbar: Component = () => {
               <div class={styles.suggestionsGrid}>
                 <For each={suggestions()}>
                   {(release) => (
-                    <div class={styles.suggestionCard}>
+                    <div class={styles.suggestionCard} onClick={() => handleCardClick(release)}>
                       <img
                         src={release.release?.thumb || "/placeholder-vinyl.png"}
                         alt={release.release?.title || "Album"}
@@ -174,7 +195,7 @@ export const SubNavbar: Component = () => {
                         </div>
                       </div>
                       <Button
-                        onClick={() => handleSuggestionPlay(release.id)}
+                        onClick={(e) => handleSuggestionPlay(e, release.id)}
                         class={styles.suggestionPlayButton}
                       >
                         Play
@@ -193,6 +214,16 @@ export const SubNavbar: Component = () => {
             </Button>
           </div>
         </div>
+      </Show>
+
+      <Show when={selectedRelease()}>
+        {(release) => (
+          <RecordActionModal
+            isOpen={isModalOpen()}
+            onClose={handleModalClose}
+            release={release()}
+          />
+        )}
       </Show>
     </>
   );

@@ -17,6 +17,7 @@ type Repository struct {
 	DiscogsDataProcessing DiscogsDataProcessingRepository
 	Stylus                StylusRepository
 	History               HistoryRepository
+	DailyRecommendation   DailyRecommendationRepository
 }
 
 func New(db database.DB) Repository {
@@ -33,5 +34,6 @@ func New(db database.DB) Repository {
 		DiscogsDataProcessing: NewDiscogsDataProcessingRepository(db.SQL),
 		Stylus:                NewStylusRepository(db.Cache.ClientAPI),
 		History:               NewHistoryRepository(db.Cache.ClientAPI),
+		DailyRecommendation:   NewDailyRecommendationRepository(db.Cache.ClientAPI),
 	}
 }

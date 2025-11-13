@@ -13,23 +13,25 @@ import (
 )
 
 type UserController struct {
-	userRepo        repositories.UserRepository
-	userConfigRepo  repositories.UserConfigurationRepository
-	folderRepo      repositories.FolderRepository
-	userReleaseRepo repositories.UserReleaseRepository
-	userStylusRepo  repositories.StylusRepository
-	historyRepo     repositories.HistoryRepository
-	discogsService  *services.DiscogsService
-	db              database.DB
-	Config          config.Config
-	log             logger.Logger
+	userRepo           repositories.UserRepository
+	userConfigRepo     repositories.UserConfigurationRepository
+	folderRepo         repositories.FolderRepository
+	userReleaseRepo    repositories.UserReleaseRepository
+	userStylusRepo     repositories.StylusRepository
+	historyRepo        repositories.HistoryRepository
+	recommendationRepo repositories.DailyRecommendationRepository
+	discogsService     *services.DiscogsService
+	db                 database.DB
+	Config             config.Config
+	log                logger.Logger
 }
 
 type GetUserResponse struct {
-	Folders     []*Folder      `json:"folders"`
-	Releases    []*UserRelease `json:"releases"`
-	Styluses    []*UserStylus  `json:"styluses"`
-	PlayHistory []*PlayHistory `json:"playHistory"`
+	Folders             []*Folder            `json:"folders"`
+	Releases            []*UserRelease       `json:"releases"`
+	Styluses            []*UserStylus        `json:"styluses"`
+	PlayHistory         []*PlayHistory       `json:"playHistory"`
+	DailyRecommendation *DailyRecommendation `json:"dailyRecommendation"`
 }
 
 type UpdateUserPreferencesRequest struct {
@@ -64,16 +66,17 @@ func New(
 	db database.DB,
 ) UserControllerInterface {
 	return &UserController{
-		userRepo:        repos.User,
-		userConfigRepo:  repos.UserConfiguration,
-		folderRepo:      repos.Folder,
-		userReleaseRepo: repos.UserRelease,
-		userStylusRepo:  repos.Stylus,
-		historyRepo:     repos.History,
-		discogsService:  services.Discogs,
-		db:              db,
-		Config:          config,
-		log:             logger.New("userController"),
+		userRepo:           repos.User,
+		userConfigRepo:     repos.UserConfiguration,
+		folderRepo:         repos.Folder,
+		userReleaseRepo:    repos.UserRelease,
+		userStylusRepo:     repos.Stylus,
+		historyRepo:        repos.History,
+		recommendationRepo: repos.DailyRecommendation,
+		discogsService:     services.Discogs,
+		db:                 db,
+		Config:             config,
+		log:                logger.New("userController"),
 	}
 }
 
@@ -202,11 +205,20 @@ func (uc *UserController) GetUser(
 		return nil, log.Err("failed to get user play history", err, "userID", user.ID)
 	}
 
+	// Get today's daily recommendation (if one exists)
+	var dailyRecommendation *DailyRecommendation
+	dailyRecommendation, err = uc.recommendationRepo.GetTodayRecommendation(ctx, uc.db.SQL, user.ID)
+	if err != nil {
+		log.Info("no daily recommendation found for today", "userID", user.ID)
+		dailyRecommendation = nil
+	}
+
 	return &GetUserResponse{
-		Folders:     folders,
-		Releases:    releases,
-		Styluses:    styluses,
-		PlayHistory: playHistory,
+		Folders:             folders,
+		Releases:            releases,
+		Styluses:            styluses,
+		PlayHistory:         playHistory,
+		DailyRecommendation: dailyRecommendation,
 	}, nil
 }
 

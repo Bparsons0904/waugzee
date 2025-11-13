@@ -186,6 +186,7 @@
   border: 1px solid $border-default;
   border-radius: $border-radius-md;
   background-color: $bg-surface;
+  cursor: pointer;
   transition:
     transform $transition-fast,
     box-shadow $transition-fast;

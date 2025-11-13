@@ -38,6 +38,7 @@ var MODELS_TO_MIGRATE = []any{
 	&CleaningHistory{},
 	&UserConfiguration{},
 	&DiscogsDataProcessing{},
+	&DailyRecommendation{},
 }
 
 func main() {

@@ -23,28 +23,25 @@ func RegisterAllJobs(
 	log := logger.New("jobs").Function("RegisterAllJobs")
 	log.Info("Registering jobs")
 
-	// Register Discogs download job - runs hourly for testing (TODO: change back to Daily)
 	discogsDownloadJob := NewDiscogsDownloadJob(
 		services.Download,
 		repos.DiscogsDataProcessing,
-		Hourly, // TODO: Change back to Daily after testing
+		Daily,
 	)
 	if err := schedulerService.AddJob(discogsDownloadJob); err != nil {
 		return log.Err("failed to register Discogs download job", err)
 	}
 	log.Info("Registered Discogs download job", "schedule", "hourly")
 
-	// Register Discogs XML parser job - runs hourly for testing
 	discogsXMLParserJob := NewDiscogsXMLParserJob(
 		services.DiscogsXMLParser,
-		Hourly,
+		Daily,
 	)
 	if err := schedulerService.AddJob(discogsXMLParserJob); err != nil {
 		return log.Err("failed to register Discogs XML parser job", err)
 	}
 	log.Info("Registered Discogs XML parser job", "schedule", "hourly")
 
-	// Register file cleanup job - runs on last day of month
 	fileCleanupJob := NewFileCleanupJob(
 		services.FileCleanup,
 		Monthly,
@@ -53,6 +50,15 @@ func RegisterAllJobs(
 		return log.Err("failed to register file cleanup job", err)
 	}
 	log.Info("Registered file cleanup job", "schedule", "monthly")
+
+	dailyRecommendationJob := NewDailyRecommendationJob(
+		services.Recommendation,
+		Daily,
+	)
+	if err := schedulerService.AddJob(dailyRecommendationJob); err != nil {
+		return log.Err("failed to register daily recommendation job", err)
+	}
+	log.Info("Registered daily recommendation job", "schedule", "daily")
 
 	return nil
 }
