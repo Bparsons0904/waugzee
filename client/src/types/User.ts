@@ -1,3 +1,4 @@
+import type { DailyRecommendation } from "./DailyRecommendation";
 import type { CleaningHistory, PlayHistory } from "./Release";
 
 export interface UserConfiguration {
@@ -30,6 +31,7 @@ export interface User {
   lastLoginAt?: string;
   profileVerified: boolean;
   configuration?: UserConfiguration;
+  dailyRecommendation?: DailyRecommendation | null;
 }
 
 export interface UserWithFoldersResponse {

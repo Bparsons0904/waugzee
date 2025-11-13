@@ -3,6 +3,7 @@ import {
   CLEANING_HISTORY_ENDPOINTS,
   HISTORY_ENDPOINTS,
   PLAY_HISTORY_ENDPOINTS,
+  RECOMMENDATION_ENDPOINTS,
   STYLUS_ENDPOINTS,
 } from "@constants/api.constants";
 import type { DownloadStatusResponse, StoredFilesResponse } from "@models/Admin";
@@ -435,10 +436,27 @@ export function useStoredFiles(options?: ApiQueryOptions<StoredFilesResponse>) {
 }
 
 export function useCleanupFiles(options?: ApiMutationOptions<void, void>) {
-  return useApiDelete<void>(ADMIN_ENDPOINTS.FILES_CLEANUP, {
+  return useApiDelete<void>(ADMIN_ENDPOINTS.FILES_CLEANUP, undefined, {
     invalidateQueries: [["admin", "files", "stored"]],
     successMessage: "Files cleaned up successfully",
     errorMessage: "Failed to cleanup files",
     ...options,
   });
+}
+
+// Recommendation API Hooks
+export function useMarkRecommendationListened(
+  recommendationId: string,
+  options?: ApiMutationOptions<void, Record<string, never>>,
+) {
+  return useApiPost<void, Record<string, never>>(
+    RECOMMENDATION_ENDPOINTS.MARK_LISTENED(recommendationId),
+    undefined,
+    {
+      invalidateQueries: [["user"]],
+      successMessage: "Recommendation marked as listened!",
+      errorMessage: "Failed to mark recommendation as listened",
+      ...options,
+    },
+  );
 }

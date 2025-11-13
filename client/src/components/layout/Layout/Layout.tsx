@@ -1,15 +1,17 @@
+import { SubNavbar } from "@components/SubNavbar/SubNavbar";
+import { useAuth } from "@context/AuthContext";
 import { NavBar } from "@layout/Navbar/Navbar";
-import type { Component, JSX } from "solid-js";
+import { type Component, Show } from "solid-js";
 
-interface LayoutProps {
-  children: JSX.Element;
-}
+export const Layout: Component = () => {
+  const { isAuthenticated } = useAuth();
 
-export const Layout: Component<LayoutProps> = (props) => {
   return (
     <>
       <NavBar />
-      <main class="content">{props.children}</main>
+      <Show when={isAuthenticated()}>
+        <SubNavbar />
+      </Show>
     </>
   );
 };

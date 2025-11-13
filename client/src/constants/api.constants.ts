@@ -100,3 +100,8 @@ export const ADMIN_ENDPOINTS = {
   FILES_LIST: "/admin/files",
   FILES_CLEANUP: "/admin/files",
 } as const;
+
+// Recommendation endpoints
+export const RECOMMENDATION_ENDPOINTS = {
+  MARK_LISTENED: (id: string) => `/recommendations/${id}/listen`,
+} as const;
