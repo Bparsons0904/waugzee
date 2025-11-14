@@ -2,6 +2,9 @@ package userController
 
 import (
 	"context"
+	"math/rand"
+	"sort"
+	"time"
 	"waugzee/config"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
@@ -10,6 +13,12 @@ import (
 	"waugzee/internal/services"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+const (
+	UserStreakCachePrefix = "user_streak"
+	UserStreakCacheTTL    = 24 * time.Hour
 )
 
 type UserController struct {
@@ -26,12 +35,18 @@ type UserController struct {
 	log                logger.Logger
 }
 
+type StreakData struct {
+	CurrentStreak int `json:"currentStreak"`
+	LongestStreak int `json:"longestStreak"`
+}
+
 type GetUserResponse struct {
 	Folders             []*Folder            `json:"folders"`
 	Releases            []*UserRelease       `json:"releases"`
 	Styluses            []*UserStylus        `json:"styluses"`
 	PlayHistory         []*PlayHistory       `json:"playHistory"`
 	DailyRecommendation *DailyRecommendation `json:"dailyRecommendation"`
+	Streak              *StreakData          `json:"streak"`
 }
 
 type UpdateUserPreferencesRequest struct {
@@ -205,12 +220,17 @@ func (uc *UserController) GetUser(
 		return nil, log.Err("failed to get user play history", err, "userID", user.ID)
 	}
 
-	// Get today's daily recommendation (if one exists)
-	var dailyRecommendation *DailyRecommendation
-	dailyRecommendation, err = uc.recommendationRepo.GetTodayRecommendation(ctx, uc.db.SQL, user.ID)
+	dailyRecommendation, err := uc.getOrCreateRecommendation(ctx, user)
 	if err != nil {
-		log.Info("no daily recommendation found for today", "userID", user.ID)
+		log.Warn("failed to get or create recommendation", "userID", user.ID, "error", err)
 		dailyRecommendation = nil
+	}
+
+	var streak *StreakData
+	streak, err = uc.calculateUserStreak(ctx, user.ID)
+	if err != nil {
+		log.Warn("failed to calculate user streak", "userID", user.ID, "error", err)
+		streak = nil
 	}
 
 	return &GetUserResponse{
@@ -219,7 +239,259 @@ func (uc *UserController) GetUser(
 		Styluses:            styluses,
 		PlayHistory:         playHistory,
 		DailyRecommendation: dailyRecommendation,
+		Streak:              streak,
 	}, nil
+}
+
+func (uc *UserController) getOrCreateRecommendation(
+	ctx context.Context,
+	user *User,
+) (*DailyRecommendation, error) {
+	log := uc.log.Function("getOrCreateRecommendation")
+
+	mostRecent, err := uc.recommendationRepo.GetMostRecentRecommendation(ctx, uc.db.SQL, user.ID)
+
+	now := time.Now()
+
+	if err == gorm.ErrRecordNotFound {
+		return uc.generateNewRecommendation(ctx, user)
+	}
+
+	if err != nil {
+		return nil, log.Err("failed to get most recent recommendation", err, "userID", user.ID)
+	}
+
+	if mostRecent.ListenedAt == nil {
+		createdHoursAgo := now.Sub(mostRecent.CreatedAt).Hours()
+
+		if createdHoursAgo < 24 {
+			log.Info(
+				"returning existing unlistened recommendation",
+				"userID",
+				user.ID,
+				"recommendationID",
+				mostRecent.ID,
+				"createdHoursAgo",
+				createdHoursAgo,
+			)
+			return mostRecent, nil
+		}
+
+		log.Info(
+			"existing recommendation is old, generating new one",
+			"userID",
+			user.ID,
+			"recommendationID",
+			mostRecent.ID,
+			"createdHoursAgo",
+			createdHoursAgo,
+		)
+		return uc.generateNewRecommendation(ctx, user)
+	}
+
+	listenedHoursAgo := now.Sub(*mostRecent.ListenedAt).Hours()
+
+	if listenedHoursAgo < 18 {
+		log.Info(
+			"user completed recommendation recently, generating new one",
+			"userID",
+			user.ID,
+			"recommendationID",
+			mostRecent.ID,
+			"listenedHoursAgo",
+			listenedHoursAgo,
+		)
+		return uc.generateNewRecommendation(ctx, user)
+	}
+
+	log.Info(
+		"returning existing listened recommendation",
+		"userID",
+		user.ID,
+		"recommendationID",
+		mostRecent.ID,
+		"listenedHoursAgo",
+		listenedHoursAgo,
+	)
+	return mostRecent, nil
+}
+
+func (uc *UserController) generateNewRecommendation(
+	ctx context.Context,
+	user *User,
+) (*DailyRecommendation, error) {
+	log := uc.log.Function("generateNewRecommendation")
+
+	folderID := 0
+	if user.Configuration != nil && user.Configuration.SelectedFolderID != nil {
+		folderID = *user.Configuration.SelectedFolderID
+	}
+
+	releases, err := uc.userReleaseRepo.GetUserReleasesByFolderID(ctx, uc.db.SQL, user.ID, folderID)
+	if err != nil {
+		return nil, log.Err(
+			"failed to get user releases",
+			err,
+			"userID",
+			user.ID,
+			"folderID",
+			folderID,
+		)
+	}
+
+	if len(releases) == 0 {
+		return nil, log.Error("no releases found for user", "userID", user.ID, "folderID", folderID)
+	}
+
+	playHistory, err := uc.historyRepo.GetUserPlayHistory(ctx, uc.db.SQL, user.ID, 1000)
+	if err != nil {
+		log.Warn(
+			"failed to get play history, falling back to random",
+			"userID",
+			user.ID,
+			"error",
+			err,
+		)
+		return uc.generateRandomRecommendation(ctx, user.ID, releases)
+	}
+
+	playCountMap := make(map[uuid.UUID]int)
+	lastPlayedMap := make(map[uuid.UUID]time.Time)
+	for _, play := range playHistory {
+		playCountMap[play.UserReleaseID]++
+		if lastPlayed, exists := lastPlayedMap[play.UserReleaseID]; !exists ||
+			play.PlayedAt.After(lastPlayed) {
+			lastPlayedMap[play.UserReleaseID] = play.PlayedAt
+		}
+	}
+
+	type releaseWeight struct {
+		UserRelease *UserRelease
+		Weight      int
+	}
+
+	weights := make([]releaseWeight, 0, len(releases))
+	now := time.Now()
+
+	for _, release := range releases {
+		baseWeight := 100
+
+		playCount := playCountMap[release.ID]
+		playPenalty := min(playCount*10, 95)
+
+		lastPlayed, exists := lastPlayedMap[release.ID]
+		recentPenalty := 0
+		if exists {
+			daysSincePlay := int(now.Sub(lastPlayed).Hours() / 24)
+			if daysSincePlay < 30 {
+				recentPenalty = 20
+			}
+		}
+
+		randomBonus := rand.Intn(11)
+
+		finalWeight := max(baseWeight-playPenalty-recentPenalty+randomBonus, 0)
+
+		weights = append(weights, releaseWeight{
+			UserRelease: release,
+			Weight:      finalWeight,
+		})
+	}
+
+	if len(weights) == 0 {
+		log.Warn("no weighted releases available, falling back to random", "userID", user.ID)
+		return uc.generateRandomRecommendation(ctx, user.ID, releases)
+	}
+
+	maxWeight := 0
+	var selectedRelease *UserRelease
+	for _, w := range weights {
+		if w.Weight > maxWeight {
+			maxWeight = w.Weight
+			selectedRelease = w.UserRelease
+		}
+	}
+
+	if selectedRelease == nil {
+		log.Warn("no release selected by weight, falling back to random", "userID", user.ID)
+		return uc.generateRandomRecommendation(ctx, user.ID, releases)
+	}
+
+	today := time.Now().Truncate(24 * time.Hour)
+	recommendation := &DailyRecommendation{
+		UserID:        user.ID,
+		UserReleaseID: selectedRelease.ID,
+		Date:          today,
+		Algorithm:     "smart",
+	}
+
+	err = uc.recommendationRepo.CreateRecommendation(ctx, uc.db.SQL, recommendation)
+	if err != nil {
+		return nil, log.Err("failed to create recommendation", err, "userID", user.ID)
+	}
+
+	recommendation, err = uc.recommendationRepo.GetMostRecentRecommendation(
+		ctx,
+		uc.db.SQL,
+		user.ID,
+	)
+	if err != nil {
+		return nil, log.Err("failed to get newly created recommendation", err, "userID", user.ID)
+	}
+
+	log.Info(
+		"generated smart recommendation",
+		"userID",
+		user.ID,
+		"releaseID",
+		selectedRelease.ReleaseID,
+		"weight",
+		maxWeight,
+	)
+
+	return recommendation, nil
+}
+
+func (uc *UserController) generateRandomRecommendation(
+	ctx context.Context,
+	userID uuid.UUID,
+	releases []*UserRelease,
+) (*DailyRecommendation, error) {
+	log := uc.log.Function("generateRandomRecommendation")
+
+	selectedRelease := releases[rand.Intn(len(releases))]
+
+	today := time.Now().Truncate(24 * time.Hour)
+	recommendation := &DailyRecommendation{
+		UserID:        userID,
+		UserReleaseID: selectedRelease.ID,
+		Date:          today,
+		Algorithm:     "random",
+	}
+
+	err := uc.recommendationRepo.CreateRecommendation(ctx, uc.db.SQL, recommendation)
+	if err != nil {
+		return nil, log.Err("failed to create random recommendation", err, "userID", userID)
+	}
+
+	recommendation, err = uc.recommendationRepo.GetMostRecentRecommendation(
+		ctx,
+		uc.db.SQL,
+		userID,
+	)
+	if err != nil {
+		return nil, log.Err("failed to get newly created recommendation", err, "userID", userID)
+	}
+
+	log.Info(
+		"generated random recommendation",
+		"userID",
+		userID,
+		"releaseID",
+		selectedRelease.ReleaseID,
+	)
+
+	return recommendation, nil
 }
 
 func (uc *UserController) UpdateSelectedFolder(
@@ -228,12 +500,6 @@ func (uc *UserController) UpdateSelectedFolder(
 	folderID int,
 ) (*User, error) {
 	log := uc.log.Function("UpdateSelectedFolder")
-
-	// Validate that the folder exists and belongs to the user
-	_, err := uc.folderRepo.GetFolderByID(ctx, uc.db.SQL, user.ID, folderID)
-	if err != nil {
-		return nil, log.Err("folder not found or not owned by user", err)
-	}
 
 	if user.Configuration == nil {
 		return nil, log.ErrMsg(
@@ -247,7 +513,6 @@ func (uc *UserController) UpdateSelectedFolder(
 		return nil, log.Err("failed to update user configuration with selected folder", err)
 	}
 
-	// Clear the user folders cache since the configuration changed
 	if err := uc.clearUserFoldersCache(ctx, user.ID); err != nil {
 		log.Warn("failed to clear user folders cache", "userID", user.ID, "error", err)
 	}
@@ -320,4 +585,134 @@ func (uc *UserController) UpdateUserPreferences(
 	)
 
 	return user, nil
+}
+
+// Claude couldn't we do this with a sql query? Rather than returning every single record and parsing through them?
+func (uc *UserController) calculateUserStreak(
+	ctx context.Context,
+	userID uuid.UUID,
+) (*StreakData, error) {
+	log := uc.log.Function("calculateUserStreak")
+
+	var cachedStreak *StreakData
+	found, err := database.NewCacheBuilder(uc.db.Cache.ClientAPI, userID.String()).
+		WithContext(ctx).
+		WithHash(UserStreakCachePrefix).
+		Get(&cachedStreak)
+	if err != nil {
+		log.Warn("failed to get streak from cache", "userID", userID, "error", err)
+	}
+
+	if found {
+		log.Info("streak retrieved from cache", "userID", userID)
+		return cachedStreak, nil
+	}
+
+	recommendations, err := uc.recommendationRepo.GetAllUserRecommendations(ctx, uc.db.SQL, userID)
+	if err != nil {
+		return nil, log.Err("failed to get user recommendations", err, "userID", userID)
+	}
+
+	if len(recommendations) == 0 {
+		streakData := &StreakData{
+			CurrentStreak: 0,
+			LongestStreak: 0,
+		}
+		uc.cacheStreak(ctx, userID, streakData)
+		return streakData, nil
+	}
+
+	currentStreak := uc.calculateCurrentStreak(recommendations)
+	longestStreak := uc.calculateLongestStreak(recommendations)
+
+	streakData := &StreakData{
+		CurrentStreak: currentStreak,
+		LongestStreak: longestStreak,
+	}
+
+	err = database.NewCacheBuilder(uc.db.Cache.ClientAPI, userID.String()).
+		WithContext(ctx).
+		WithHash(UserStreakCachePrefix).
+		WithStruct(streakData).
+		WithTTL(UserStreakCacheTTL).
+		Set()
+	if err != nil {
+		log.Warn("failed to cache streak data", "userID", userID, "error", err)
+	}
+
+	log.Info(
+		"calculated user streak",
+		"userID",
+		userID,
+		"currentStreak",
+		currentStreak,
+		"longestStreak",
+		longestStreak,
+	)
+
+	return streakData, nil
+}
+
+func (uc *UserController) calculateCurrentStreak(recommendations []*DailyRecommendation) int {
+	if len(recommendations) == 0 {
+		return 0
+	}
+
+	sort.Slice(recommendations, func(i, j int) bool {
+		return recommendations[i].CreatedAt.After(recommendations[j].CreatedAt)
+	})
+
+	streak := 0
+	for _, rec := range recommendations {
+		if rec.ListenedAt == nil {
+			break
+		}
+		streak++
+	}
+	return streak
+}
+
+func (uc *UserController) calculateLongestStreak(recommendations []*DailyRecommendation) int {
+	if len(recommendations) == 0 {
+		return 0
+	}
+
+	sort.Slice(recommendations, func(i, j int) bool {
+		return recommendations[i].CreatedAt.After(recommendations[j].CreatedAt)
+	})
+
+	longestStreak := 0
+	currentStreak := 0
+
+	for _, rec := range recommendations {
+		if rec.ListenedAt == nil {
+			if currentStreak > longestStreak {
+				longestStreak = currentStreak
+			}
+			currentStreak = 0
+		} else {
+			currentStreak++
+			if currentStreak > longestStreak {
+				longestStreak = currentStreak
+			}
+		}
+	}
+
+	return longestStreak
+}
+
+func (uc *UserController) cacheStreak(
+	ctx context.Context,
+	userID uuid.UUID,
+	streakData *StreakData,
+) {
+	err := database.NewCacheBuilder(uc.db.Cache.ClientAPI, userID.String()).
+		WithContext(ctx).
+		WithHash(UserStreakCachePrefix).
+		WithStruct(streakData).
+		WithTTL(UserStreakCacheTTL).
+		Set()
+	if err != nil {
+		uc.log.Warn("failed to cache empty streak data", "userID", userID, "error", err)
+	}
 }

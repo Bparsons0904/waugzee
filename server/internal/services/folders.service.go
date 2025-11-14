@@ -26,7 +26,6 @@ type FoldersService struct {
 	folderDataExtractionService *FolderDataExtractionService
 	folderValidationService     *FolderValidationService
 	discogsRateLimiter          *DiscogsRateLimiterService
-	recommendationService       *RecommendationService
 }
 
 func NewFoldersService(
@@ -36,7 +35,6 @@ func NewFoldersService(
 	transactionService *TransactionService,
 	folderDataExtractionService *FolderDataExtractionService,
 	discogsRateLimiter *DiscogsRateLimiterService,
-	recommendationService *RecommendationService,
 ) *FoldersService {
 	log := logger.New("FoldersService")
 	folderValidationService := NewFolderValidationService(repos, db)
@@ -49,7 +47,6 @@ func NewFoldersService(
 		folderDataExtractionService: folderDataExtractionService,
 		folderValidationService:     folderValidationService,
 		discogsRateLimiter:          discogsRateLimiter,
-		recommendationService:       recommendationService,
 	}
 }
 
@@ -633,38 +630,7 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 			log.Warn("Failed to clear user cache after sync completion", "error", err)
 		}
 
-		// Check if user has a recommendation for today, generate if not
-		recommendation, err := f.repos.DailyRecommendation.GetTodayRecommendation(ctx, f.db.SQLWithContext(ctx), metadata.UserID)
-		if err != nil && err != gorm.ErrRecordNotFound {
-			log.Warn("Failed to check for existing recommendation", "error", err)
-		} else if err == gorm.ErrRecordNotFound || recommendation == nil {
-			log.Info("No recommendation found for user, generating new recommendation", "userID", metadata.UserID)
-
-			folders, folderErr := f.repos.Folder.GetUserFolders(ctx, f.db.SQLWithContext(ctx), metadata.UserID)
-			if folderErr != nil {
-				log.Warn("Failed to get user folders for recommendation generation", "error", folderErr)
-			} else if len(folders) > 0 {
-				var defaultFolder *Folder
-				for _, folder := range folders {
-					if folder.ID != nil && *folder.ID == 0 {
-						defaultFolder = folder
-						break
-					}
-				}
-
-				if defaultFolder == nil {
-					defaultFolder = folders[0]
-				}
-
-				if err = f.recommendationService.GenerateSmartRecommendation(ctx, metadata.UserID, *defaultFolder.ID); err != nil {
-					log.Warn("Failed to generate recommendation after sync", "error", err)
-				} else {
-					log.Info("Successfully generated recommendation after sync", "userID", metadata.UserID)
-				}
-			}
-		} else {
-			log.Info("User already has a recommendation for today", "userID", metadata.UserID)
-		}
+		log.Info("Sync completed - user will receive recommendation on next login", "userID", metadata.UserID)
 
 		// Send sync_complete event to notify client
 		completeMessage := events.Message{
@@ -1225,38 +1191,7 @@ func (f *FoldersService) TriggerSyncCompletion(ctx context.Context, userID uuid.
 		log.Warn("Failed to clear user cache after sync completion", "error", err)
 	}
 
-	// Check if user has a recommendation for today, generate if not
-	recommendation, err := f.repos.DailyRecommendation.GetTodayRecommendation(ctx, f.db.SQLWithContext(ctx), userID)
-	if err != nil && err != gorm.ErrRecordNotFound {
-		log.Warn("Failed to check for existing recommendation", "error", err)
-	} else if err == gorm.ErrRecordNotFound || recommendation == nil {
-		log.Info("No recommendation found for user, generating new recommendation", "userID", userID)
-
-		folders, folderErr := f.repos.Folder.GetUserFolders(ctx, f.db.SQLWithContext(ctx), userID)
-		if folderErr != nil {
-			log.Warn("Failed to get user folders for recommendation generation", "error", folderErr)
-		} else if len(folders) > 0 {
-			var defaultFolder *Folder
-			for _, folder := range folders {
-				if folder.ID != nil && *folder.ID == 0 {
-					defaultFolder = folder
-					break
-				}
-			}
-
-			if defaultFolder == nil {
-				defaultFolder = folders[0]
-			}
-
-			if err = f.recommendationService.GenerateSmartRecommendation(ctx, userID, *defaultFolder.ID); err != nil {
-				log.Warn("Failed to generate recommendation after sync", "error", err)
-			} else {
-				log.Info("Successfully generated recommendation after sync", "userID", userID)
-			}
-		}
-	} else {
-		log.Info("User already has a recommendation for today", "userID", userID)
-	}
+	log.Info("Sync completed - user will receive recommendation on next login", "userID", userID)
 
 	// Send sync_complete event to notify client
 	completeMessage := events.Message{

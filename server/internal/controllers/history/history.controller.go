@@ -226,10 +226,11 @@ func (c *HistoryController) UpdatePlayHistory(
 		return nil, log.ErrorWithType(ErrValidation, "play history does not belong to user")
 	}
 
-	updates := make(map[string]interface{})
+	updates := make(map[string]any)
 
 	if request.PlayedAt != nil {
-		playedAt, err := parseDateTime(*request.PlayedAt)
+		var playedAt time.Time
+		playedAt, err = parseDateTime(*request.PlayedAt)
 		if err != nil {
 			return nil, log.ErrorWithType(ErrValidation, "invalid playedAt", "error", err)
 		}
@@ -242,7 +243,7 @@ func (c *HistoryController) UpdatePlayHistory(
 	}
 
 	if request.UserStylusID != nil {
-		if err := c.stylusRepo.VerifyUserOwnership(ctx, c.db.SQL, *request.UserStylusID, user.ID); err != nil {
+		if err = c.stylusRepo.VerifyUserOwnership(ctx, c.db.SQL, *request.UserStylusID, user.ID); err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return nil, log.ErrorWithType(
 					ErrNotFound,
@@ -403,10 +404,11 @@ func (c *HistoryController) UpdateCleaningHistory(
 		return nil, log.ErrorWithType(ErrValidation, "cleaning history does not belong to user")
 	}
 
-	updates := make(map[string]interface{})
+	updates := make(map[string]any)
 
 	if request.CleanedAt != nil {
-		cleanedAt, err := parseDateTime(*request.CleanedAt)
+		var cleanedAt time.Time
+		cleanedAt, err = parseDateTime(*request.CleanedAt)
 		if err != nil {
 			return nil, log.ErrorWithType(ErrValidation, "invalid cleanedAt", "error", err)
 		}

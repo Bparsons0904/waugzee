@@ -48,6 +48,6 @@ func New(
 			services.FileCleanup,
 			services.KleioImport, // TODO: REMOVE_AFTER_MIGRATION
 		),
-		Recommendation: recommendationController.New(repos, db.SQL),
+		Recommendation: recommendationController.New(repos, db.SQL, db.Cache.ClientAPI),
 	}
 }

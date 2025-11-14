@@ -21,7 +21,6 @@ type Service struct {
 	FileCleanup          *FileCleanupService
 	KleioImport          *KleioImportService       // TODO: REMOVE_AFTER_MIGRATION
 	CacheInvalidation    *CacheInvalidationService
-	Recommendation       *RecommendationService
 }
 
 func New(db database.DB, config config.Config, eventBus *events.EventBus) (Service, error) {
@@ -36,14 +35,12 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 	discogsService := NewDiscogsService()
 	schedulerService := NewSchedulerService()
 	discogsRateLimiterService := NewDiscogsRateLimiterService(db.Cache.ClientAPI)
-	recommendationService := NewRecommendationService(repos, db.SQL, db.Cache.ClientAPI)
 	orchestrationService := NewOrchestrationService(
 		eventBus,
 		repos,
 		db,
 		transactionService,
 		discogsRateLimiterService,
-		recommendationService,
 	)
 	folderDataExtractionService := NewFolderDataExtractionService(repos)
 	downloadService := NewDownloadService(config, eventBus)
@@ -74,6 +71,5 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 		FileCleanup:          fileCleanupService,
 		CacheInvalidation:    cacheInvalidationService,
 		KleioImport:          kleioImportService, // TODO: REMOVE_AFTER_MIGRATION
-		Recommendation:       recommendationService,
 	}, nil
 }

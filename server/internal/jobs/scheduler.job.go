@@ -51,14 +51,5 @@ func RegisterAllJobs(
 	}
 	log.Info("Registered file cleanup job", "schedule", "monthly")
 
-	dailyRecommendationJob := NewDailyRecommendationJob(
-		services.Recommendation,
-		Daily,
-	)
-	if err := schedulerService.AddJob(dailyRecommendationJob); err != nil {
-		return log.Err("failed to register daily recommendation job", err)
-	}
-	log.Info("Registered daily recommendation job", "schedule", "daily")
-
 	return nil
 }

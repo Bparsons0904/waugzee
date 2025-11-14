@@ -24,15 +24,14 @@ type RequestMetadata struct {
 }
 
 type OrchestrationService struct {
-	log                   logger.Logger
-	eventBus              *events.EventBus
-	cache                 valkey.Client
-	repos                 repositories.Repository
-	transactionService    *TransactionService
-	foldersService        *FoldersService
-	releaseSyncService    *ReleaseSyncService
-	discogsRateLimiter    *DiscogsRateLimiterService
-	recommendationService *RecommendationService
+	log                logger.Logger
+	eventBus           *events.EventBus
+	cache              valkey.Client
+	repos              repositories.Repository
+	transactionService *TransactionService
+	foldersService     *FoldersService
+	releaseSyncService *ReleaseSyncService
+	discogsRateLimiter *DiscogsRateLimiterService
 }
 
 func NewOrchestrationService(
@@ -41,7 +40,6 @@ func NewOrchestrationService(
 	db database.DB,
 	transactionService *TransactionService,
 	discogsRateLimiter *DiscogsRateLimiterService,
-	recommendationService *RecommendationService,
 ) *OrchestrationService {
 	log := logger.New("OrchestrationService")
 	folderDataExtractionService := NewFolderDataExtractionService(repos)
@@ -52,19 +50,17 @@ func NewOrchestrationService(
 		transactionService,
 		folderDataExtractionService,
 		discogsRateLimiter,
-		recommendationService,
 	)
 	releaseSyncService := NewReleaseSyncService(eventBus, repos, db, discogsRateLimiter)
 	return &OrchestrationService{
-		log:                   log,
-		eventBus:              eventBus,
-		cache:                 transactionService.db.Cache.ClientAPI,
-		repos:                 repos,
-		transactionService:    transactionService,
-		foldersService:        foldersService,
-		releaseSyncService:    releaseSyncService,
-		discogsRateLimiter:    discogsRateLimiter,
-		recommendationService: recommendationService,
+		log:                log,
+		eventBus:           eventBus,
+		cache:              transactionService.db.Cache.ClientAPI,
+		repos:              repos,
+		transactionService: transactionService,
+		foldersService:     foldersService,
+		releaseSyncService: releaseSyncService,
+		discogsRateLimiter: discogsRateLimiter,
 	}
 }
 
