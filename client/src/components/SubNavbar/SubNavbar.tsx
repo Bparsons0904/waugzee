@@ -1,7 +1,7 @@
 import { Select } from "@components/common/forms/Select/Select";
 import { Button } from "@components/common/ui/Button/Button";
+import { StreakBadge } from "@components/StreakBadge/StreakBadge";
 import { useUserData } from "@context/UserDataContext";
-import { useToast } from "@context/ToastContext";
 import type { UserRelease } from "@models/User";
 import { useLogPlay, useMarkRecommendationListened } from "@services/apiHooks";
 import { suggestByGenre, suggestLeastPlayed, suggestRandom } from "@utils/recommendationAlgorithms";
@@ -13,7 +13,7 @@ const RecordActionModal = lazy(() => import("@components/RecordActionModal/Recor
 type SuggestionMode = "one" | "several" | "leastPlayed" | "randomGenre";
 
 export const SubNavbar: Component = () => {
-  const { user, releases, playHistory, styluses, dailyRecommendation } = useUserData();
+  const { releases, playHistory, styluses, dailyRecommendation, streak } = useUserData();
   const [suggestionMode, setSuggestionMode] = createSignal<SuggestionMode>("one");
   const [showSuggestions, setShowSuggestions] = createSignal(false);
   const [suggestions, setSuggestions] = createSignal<UserRelease[]>([]);
@@ -133,6 +133,14 @@ export const SubNavbar: Component = () => {
                         .join(", ") || "Unknown Artist"}
                     </div>
                   </div>
+                  <Show when={streak()}>
+                    {(s) => (
+                      <StreakBadge
+                        currentStreak={s().currentStreak}
+                        longestStreak={s().longestStreak}
+                      />
+                    )}
+                  </Show>
                   <Show
                     when={!isListened()}
                     fallback={<div class={styles.playedBadge}>Played ✓</div>}

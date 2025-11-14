@@ -1,5 +1,6 @@
 import type { DailyRecommendation } from "./DailyRecommendation";
 import type { CleaningHistory, PlayHistory } from "./Release";
+import type { Streak } from "./Streak";
 
 export interface UserConfiguration {
   id: string;
@@ -201,4 +202,5 @@ export interface UserWithFoldersAndReleasesResponse {
   styluses: UserStylus[];
   playHistory: PlayHistory[];
   dailyRecommendation?: DailyRecommendation | null;
+  streak?: Streak | null;
 }
