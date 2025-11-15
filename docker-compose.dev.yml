@@ -21,6 +21,7 @@ services:
       - GOCACHE=/.cache/go-build
       - GOMODCACHE=/go/pkg/mod
       - SERVER_PORT=8288 # Internal port should always be 8288
+      - LOG_FORMAT=${LOG_FORMAT:-json} # Set to "text" for human-readable logs in development
     working_dir: /app
     networks:
       - dev-network-dev
