@@ -57,14 +57,6 @@ func (r *userReleaseRepository) CreateBatch(
 			len(userReleases),
 		)
 	}
-	if err := tx.WithContext(ctx).Create(&userReleases).Error; err != nil {
-		return log.Err(
-			"failed to create user releases",
-			err,
-			"count",
-			len(userReleases),
-		)
-	}
 
 	log.Info("Successfully created user releases", "count", len(userReleases))
 	return nil
