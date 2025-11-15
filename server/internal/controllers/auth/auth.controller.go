@@ -214,11 +214,11 @@ func (ac *AuthController) LogoutUser(
 		log.Info("processing logout request", "dbUserID", user.ID)
 	}
 
-	// Get OIDC User ID from the access token since cached user may not have it
+	// Get OIDC User ID from the ID token since cached user may not have it
 	if req.AccessToken != "" {
-		tokenInfo, _, err := ac.zitadelService.ValidateTokenWithFallback(ctx, req.AccessToken)
+		tokenInfo, err := ac.zitadelService.ValidateIDToken(ctx, req.AccessToken)
 		if err != nil {
-			log.Warn("failed to validate access token during logout", "error", err.Error())
+			log.Warn("failed to validate ID token during logout", "error", err.Error())
 		} else {
 			oidcUserID = tokenInfo.UserID
 			log.Info("extracted OIDC user ID from token", "oidcUserID", oidcUserID)

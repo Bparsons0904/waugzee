@@ -70,11 +70,8 @@ func (c *Client) handleAuthResponse(message Message) {
 		return
 	}
 
-	// Validate token using the consolidated method
-	tokenInfo, validationMethod, err := c.Manager.zitadelService.ValidateTokenWithFallback(
-		context.Background(),
-		token,
-	)
+	// Validate ID token (JWT)
+	tokenInfo, err := c.Manager.zitadelService.ValidateIDToken(context.Background(), token)
 	if err != nil {
 		log.Info("WebSocket token validation failed", "clientID", c.ID, "error", err.Error())
 		c.sendAuthFailure("Authentication failed")
@@ -99,8 +96,7 @@ func (c *Client) handleAuthResponse(message Message) {
 	log.Info("WebSocket client authenticated successfully",
 		"clientID", c.ID,
 		"userID", user.ID,
-		"email", tokenInfo.Email,
-		"method", validationMethod)
+		"email", tokenInfo.Email)
 
 	authSuccess := Message{
 		ID:        uuid.New().String(),

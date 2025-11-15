@@ -67,6 +67,7 @@ export function MonthlyDownloadsSection() {
               <p class={styles.emptyText}>
                 No download records found. Trigger a download to get started.
               </p>
+              <Button onClick={() => setShowTriggerModal(true)}>Trigger New Download</Button>
             </div>
           }
         >

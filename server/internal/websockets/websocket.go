@@ -46,7 +46,7 @@ const (
 
 // ZitadelService interface to avoid circular imports
 type ZitadelService interface {
-	ValidateTokenWithFallback(ctx context.Context, token string) (*types.TokenInfo, string, error)
+	ValidateIDToken(ctx context.Context, token string) (*types.TokenInfo, error)
 }
 
 type Client struct {

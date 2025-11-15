@@ -34,9 +34,16 @@ func New(name string) Logger {
 	var handler slog.Handler
 
 	if isTestMode() {
-		handler = slog.NewJSONHandler(io.Discard, nil)
+		handler = slog.NewTextHandler(io.Discard, nil)
 	} else {
-		handler = slog.Default().Handler()
+		logFormat := os.Getenv("LOG_FORMAT")
+		if logFormat == "text" {
+			handler = slog.Default().Handler()
+		} else {
+			handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+				Level: slog.LevelInfo,
+			})
+		}
 	}
 
 	return &SlogLogger{
