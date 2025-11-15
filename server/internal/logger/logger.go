@@ -38,9 +38,7 @@ func New(name string) Logger {
 	} else {
 		logFormat := os.Getenv("LOG_FORMAT")
 		if logFormat == "text" {
-			handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-				Level: slog.LevelInfo,
-			})
+			handler = slog.Default().Handler()
 		} else {
 			handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 				Level: slog.LevelInfo,
