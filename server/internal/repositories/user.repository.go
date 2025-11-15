@@ -16,10 +16,10 @@ const (
 	USER_CACHE_EXPIRY = 7 * 24 * time.Hour
 )
 
-
 type UserRepository interface {
 	GetByID(ctx context.Context, tx *gorm.DB, userID uuid.UUID) (*User, error)
 	GetByOIDCUserID(ctx context.Context, tx *gorm.DB, oidcUserID string) (*User, error)
+	GetAllUsers(ctx context.Context, tx *gorm.DB) ([]*User, error)
 	Update(ctx context.Context, tx *gorm.DB, user *User) error
 	FindOrCreateOIDCUser(ctx context.Context, tx *gorm.DB, user *User) (*User, error)
 	ClearUserCacheByOIDC(ctx context.Context, oidcUserID string) error
@@ -38,7 +38,11 @@ func NewUserRepository(cache database.DB) UserRepository {
 	}
 }
 
-func (r *userRepository) GetByID(ctx context.Context, tx *gorm.DB, userID uuid.UUID) (*User, error) {
+func (r *userRepository) GetByID(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+) (*User, error) {
 	log := r.log.Function("GetByID")
 
 	var user User
@@ -199,7 +203,11 @@ func (r *userRepository) ClearUserCacheByOIDC(ctx context.Context, oidcUserID st
 	return nil
 }
 
-func (r *userRepository) ClearUserCacheByUserID(ctx context.Context, tx *gorm.DB, userID string) error {
+func (r *userRepository) ClearUserCacheByUserID(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID string,
+) error {
 	log := r.log.Function("ClearUserCacheByUserID")
 
 	var user User
@@ -214,3 +222,16 @@ func (r *userRepository) ClearUserCacheByUserID(ctx context.Context, tx *gorm.DB
 	return r.ClearUserCacheByOIDC(ctx, user.OIDCUserID)
 }
 
+func (r *userRepository) GetAllUsers(ctx context.Context, tx *gorm.DB) ([]*User, error) {
+	log := r.log.Function("GetAllUsers")
+
+	users, err := gorm.G[*User](tx).
+		Where(User{IsActive: true}).
+		Find(ctx)
+	if err != nil {
+		return nil, log.Err("failed to get all active users", err)
+	}
+
+	log.Info("retrieved all active users", "count", len(users))
+	return users, nil
+}

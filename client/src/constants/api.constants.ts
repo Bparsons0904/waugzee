@@ -74,6 +74,7 @@ export const ROUTES = {
   EQUIPMENT: "/equipment",
   DASHBOARD: "/dashboard",
   ANALYTICS: "/analytics",
+  ADMIN: "/admin",
 } as const;
 
 // Error retry configuration
@@ -88,4 +89,19 @@ export const RETRY_CONFIG = {
 export const TOKEN_CONFIG = {
   EXPIRY_BUFFER_MINUTES: 5, // Refresh token 5 minutes before expiry
   MAX_RETRY_ATTEMPTS: 2,
+} as const;
+
+// Admin endpoints
+export const ADMIN_ENDPOINTS = {
+  DOWNLOADS_STATUS: "/admin/downloads/status",
+  DOWNLOADS_TRIGGER: "/admin/downloads/trigger",
+  DOWNLOADS_REPROCESS: "/admin/downloads/reprocess",
+  DOWNLOADS_RESET: "/admin/downloads/reset",
+  FILES_LIST: "/admin/files",
+  FILES_CLEANUP: "/admin/files",
+} as const;
+
+// Recommendation endpoints
+export const RECOMMENDATION_ENDPOINTS = {
+  MARK_LISTENED: (id: string) => `/recommendations/${id}/listen`,
 } as const;

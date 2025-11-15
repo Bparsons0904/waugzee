@@ -3,6 +3,8 @@ import type { CleaningHistory, PlayHistory } from "@models/Release";
 import { useApiQuery } from "@services/apiHooks";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createContext, type JSX, useContext } from "solid-js";
+import type { DailyRecommendation } from "src/types/DailyRecommendation";
+import type { Streak } from "src/types/Streak";
 import type {
   Folder,
   User,
@@ -19,6 +21,8 @@ type UserDataContextValue = {
   styluses: () => UserStylus[];
   playHistory: () => PlayHistory[];
   cleaningHistory: () => CleaningHistory[];
+  dailyRecommendation: () => DailyRecommendation | null;
+  streak: () => Streak | null;
   isLoading: () => boolean;
   error: () => string | null;
   updateUser: (user: User) => void;
@@ -80,6 +84,8 @@ export function UserDataProvider(props: { children: JSX.Element }) {
         styluses: () => userQuery.data?.styluses || [],
         playHistory: () => userQuery.data?.playHistory || [],
         cleaningHistory,
+        dailyRecommendation: () => userQuery.data?.dailyRecommendation || null,
+        streak: () => userQuery.data?.streak || null,
         isLoading: () => userQuery.isPending,
         error: () => userQuery.error?.message || null,
         updateUser,

@@ -1,0 +1,76 @@
+@import "@styles/variables";
+@import "@styles/colors";
+
+.fileCard {
+  background: $bg-elevated;
+  border: 1px solid $border-default;
+  border-radius: $border-radius-lg;
+  padding: $spacing-lg;
+}
+
+.fileTitle {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+  margin: 0 0 $spacing-md 0;
+}
+
+.fileDetails {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: $font-size-sm;
+
+  &.error {
+    color: $text-error;
+  }
+}
+
+.detailLabel {
+  color: $text-muted;
+  font-weight: $font-weight-medium;
+}
+
+.statusBadge {
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $border-radius-md;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+
+  &.gray {
+    background: $bg-subtle;
+    color: $text-muted;
+  }
+
+  &.blue {
+    background: $bg-info;
+    color: $text-info;
+  }
+
+  &.yellow {
+    background: $bg-warning;
+    color: $text-warning;
+  }
+
+  &.green {
+    background: $bg-success;
+    color: $text-success;
+  }
+
+  &.red {
+    background: $bg-error;
+    color: $text-error;
+  }
+}
+
+.checksum {
+  font-family: monospace;
+  font-size: $font-size-xs;
+  color: $text-muted;
+}

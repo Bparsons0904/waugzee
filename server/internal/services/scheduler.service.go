@@ -15,6 +15,7 @@ const (
 	Hourly          Schedule = iota
 	Daily                    // Start at 02:00 UTC every day
 	DailyProcessing          // Start at 03:00 UTC every day (1 hour after download)
+	Monthly                  // Start at 02:00 UTC on last day of month
 )
 
 // Job represents a scheduled task that can be executed by the scheduler
@@ -79,6 +80,10 @@ func (s *SchedulerService) AddJob(job Job) error {
 		})
 	case DailyProcessing:
 		_, err = s.scheduler.Every(1).Day().At("03:00").Do(func() {
+			s.executeJob(job, log)
+		})
+	case Monthly:
+		_, err = s.scheduler.Every(1).MonthLastDay().At("02:00").Do(func() {
 			s.executeJob(job, log)
 		})
 	case Hourly:
@@ -179,4 +184,35 @@ func (s *SchedulerService) GetNextRunTime() *time.Time {
 
 	nextRun := s.scheduler.Jobs()[0].NextRun()
 	return &nextRun
+}
+
+// TriggerJobByName manually executes a registered job by name
+func (s *SchedulerService) TriggerJobByName(ctx context.Context, jobName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	log := s.log.Function("TriggerJobByName")
+
+	var targetJob Job
+	for _, job := range s.jobs {
+		if job.Name() == jobName {
+			targetJob = job
+			break
+		}
+	}
+
+	if targetJob == nil {
+		return log.Errorf("job not found: %s", jobName)
+	}
+
+	go func() {
+		log.Info("Manually triggering job", "job", jobName)
+		if err := targetJob.Execute(ctx); err != nil {
+			_ = log.Err("Manual job execution failed", err, "job", jobName)
+		} else {
+			log.Info("Manual job execution completed", "job", jobName)
+		}
+	}()
+
+	return nil
 }

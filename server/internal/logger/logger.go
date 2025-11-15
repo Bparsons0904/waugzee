@@ -34,7 +34,7 @@ func New(name string) Logger {
 	var handler slog.Handler
 
 	if isTestMode() {
-		handler = slog.NewTextHandler(io.Discard, nil)
+		handler = slog.NewJSONHandler(io.Discard, nil)
 	} else {
 		handler = slog.Default().Handler()
 	}

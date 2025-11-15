@@ -19,6 +19,7 @@ const (
 type StylusRepository interface {
 	GetAllStyluses(ctx context.Context, tx *gorm.DB, userID *uuid.UUID) ([]*Stylus, error)
 	GetUserStyluses(ctx context.Context, tx *gorm.DB, userID uuid.UUID) ([]*UserStylus, error)
+	GetPrimaryUserStylus(ctx context.Context, tx *gorm.DB, userID uuid.UUID) (*UserStylus, error)
 	CreateCustomStylus(ctx context.Context, tx *gorm.DB, stylus *Stylus) error
 	Create(ctx context.Context, tx *gorm.DB, userStylus *UserStylus) error
 	Update(
@@ -134,6 +135,28 @@ func (r *stylusRepository) GetUserStyluses(
 	)
 
 	return styluses, nil
+}
+
+func (r *stylusRepository) GetPrimaryUserStylus(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+) (*UserStylus, error) {
+	log := r.log.Function("GetPrimaryUserStylus")
+
+	userStylus, err := gorm.G[*UserStylus](tx).
+		Preload("Stylus", nil).
+		Where(UserStylus{UserID: userID, IsPrimary: true}).
+		First(ctx)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, log.Err("failed to get primary user stylus", err, "userID", userID)
+	}
+
+	log.Info("Primary user stylus retrieved", "userID", userID, "stylusID", userStylus.StylusID)
+	return userStylus, nil
 }
 
 func (r *stylusRepository) CreateCustomStylus(
