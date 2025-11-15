@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"time"
+	"waugzee/internal/constants"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
@@ -17,8 +18,18 @@ const (
 	DAILY_RECOMMENDATIONS_CACHE_EXPIRY = 24 * time.Hour
 )
 
+type StreakData struct {
+	CurrentStreak int
+	LongestStreak int
+}
+
 type DailyRecommendationRepository interface {
 	GetTodayRecommendation(
+		ctx context.Context,
+		tx *gorm.DB,
+		userID uuid.UUID,
+	) (*DailyRecommendation, error)
+	GetMostRecentRecommendation(
 		ctx context.Context,
 		tx *gorm.DB,
 		userID uuid.UUID,
@@ -29,6 +40,11 @@ type DailyRecommendationRepository interface {
 		recommendationID uuid.UUID,
 		userID uuid.UUID,
 	) (*DailyRecommendation, error)
+	GetAllUserRecommendations(
+		ctx context.Context,
+		tx *gorm.DB,
+		userID uuid.UUID,
+	) ([]*DailyRecommendation, error)
 	CreateRecommendation(
 		ctx context.Context,
 		tx *gorm.DB,
@@ -41,6 +57,10 @@ type DailyRecommendationRepository interface {
 		userID uuid.UUID,
 	) error
 	ClearUserRecommendationCache(ctx context.Context, userID uuid.UUID) error
+	ClearUserStreakCache(ctx context.Context, userID uuid.UUID) error
+	CalculateUserStreaks(ctx context.Context, tx *gorm.DB, userID uuid.UUID) (*StreakData, error)
+	GetUserStreakFromCache(ctx context.Context, userID uuid.UUID) (*StreakData, bool, error)
+	SetUserStreakCache(ctx context.Context, userID uuid.UUID, streakData *StreakData) error
 }
 
 type dailyRecommendationRepository struct {
@@ -105,6 +125,26 @@ func (r *dailyRecommendationRepository) GetTodayRecommendation(
 	return recommendation, nil
 }
 
+func (r *dailyRecommendationRepository) GetMostRecentRecommendation(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+) (*DailyRecommendation, error) {
+	log := r.log.Function("GetMostRecentRecommendation")
+
+	recommendation, err := gorm.G[*DailyRecommendation](tx).
+		Where(DailyRecommendation{UserID: userID}).
+		Preload("UserRelease.Release.Genres", nil).
+		Preload("UserRelease.Release.Artists", nil).
+		Order("created_at DESC").
+		First(ctx)
+	if err != nil {
+		return nil, log.Err("failed to get most recent recommendation", err, "userID", userID)
+	}
+
+	return recommendation, nil
+}
+
 func (r *dailyRecommendationRepository) GetByID(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -117,10 +157,14 @@ func (r *dailyRecommendationRepository) GetByID(
 		Where(DailyRecommendation{BaseUUIDModel: BaseUUIDModel{ID: recommendationID}, UserID: userID}).
 		First(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, err
-		}
-		return nil, log.Err("failed to get recommendation by ID", err, "recommendationID", recommendationID, "userID", userID)
+		return nil, log.Err(
+			"failed to get recommendation by ID",
+			err,
+			"recommendationID",
+			recommendationID,
+			"userID",
+			userID,
+		)
 	}
 
 	return recommendation, nil
@@ -212,6 +256,25 @@ func (r *dailyRecommendationRepository) clearUserRecommendationCacheWithError(
 	return nil
 }
 
+func (r *dailyRecommendationRepository) GetAllUserRecommendations(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+) ([]*DailyRecommendation, error) {
+	log := r.log.Function("GetAllUserRecommendations")
+
+	recommendations, err := gorm.G[*DailyRecommendation](tx).
+		Where(DailyRecommendation{UserID: userID}).
+		Order("date DESC").
+		Find(ctx)
+	if err != nil {
+		return nil, log.Err("failed to get all user recommendations", err, "userID", userID)
+	}
+
+	log.Info("retrieved all user recommendations", "userID", userID, "count", len(recommendations))
+	return recommendations, nil
+}
+
 func (r *dailyRecommendationRepository) ClearUserRecommendationCache(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -221,5 +284,150 @@ func (r *dailyRecommendationRepository) ClearUserRecommendationCache(
 	r.clearUserRecommendationCache(ctx, userID)
 
 	log.Info("cleared user recommendation cache", "userID", userID)
+	return nil
+}
+
+func (r *dailyRecommendationRepository) ClearUserStreakCache(
+	ctx context.Context,
+	userID uuid.UUID,
+) error {
+	err := database.NewCacheBuilder(r.cache, userID.String()).
+		WithContext(ctx).
+		WithHash(constants.UserStreakCachePrefix).
+		Delete()
+	if err != nil {
+		return r.log.Err("failed to clear user streak cache", err, "userID", userID)
+	}
+
+	r.log.Info("cleared user streak cache", "userID", userID)
+	return nil
+}
+
+func (r *dailyRecommendationRepository) CalculateUserStreaks(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+) (*StreakData, error) {
+	log := r.log.Function("CalculateUserStreaks")
+
+	// Calculate streaks using CTEs:
+	// 1. ordered_recs: Order recommendations by date DESC with row numbers
+	// 2. current_streak_calc: Count consecutive listened from most recent date
+	//    - Handles edge case: if all recommendations are listened, count all (not 0)
+	// 3. consecutive_groups: Use gap-and-islands technique for grouping consecutive listened periods
+	// 4. longest_streak_calc: Find maximum consecutive listened group across all time
+	query := `
+		WITH ordered_recs AS (
+			SELECT
+				date,
+				listened_at,
+				ROW_NUMBER() OVER (ORDER BY date DESC) as rn
+			FROM daily_recommendations
+			WHERE user_id = ?
+			ORDER BY date DESC
+		),
+		current_streak_calc AS (
+			SELECT
+				CASE
+					-- If most recent (rn=1) is not listened, streak is broken
+					WHEN EXISTS(SELECT 1 FROM ordered_recs WHERE listened_at IS NULL AND rn = 1)
+					THEN 0
+					-- If all are listened (no unlistened records exist), count all
+					WHEN NOT EXISTS(SELECT 1 FROM ordered_recs WHERE listened_at IS NULL)
+					THEN (SELECT COUNT(*) FROM ordered_recs WHERE listened_at IS NOT NULL)
+					-- Otherwise, count consecutive listened from start until first unlistened
+					ELSE (
+						SELECT COUNT(*)
+						FROM ordered_recs
+						WHERE rn < (SELECT MIN(rn) FROM ordered_recs WHERE listened_at IS NULL)
+						AND listened_at IS NOT NULL
+					)
+				END as current_streak
+		),
+		consecutive_groups AS (
+			SELECT
+				date,
+				listened_at,
+				ROW_NUMBER() OVER (ORDER BY date) -
+				ROW_NUMBER() OVER (PARTITION BY CASE WHEN listened_at IS NOT NULL THEN 1 ELSE 0 END ORDER BY date) as grp
+			FROM daily_recommendations
+			WHERE user_id = ?
+		),
+		longest_streak_calc AS (
+			SELECT
+				COALESCE(MAX(streak_length), 0) as longest_streak
+			FROM (
+				SELECT
+					COUNT(*) as streak_length
+				FROM consecutive_groups
+				WHERE listened_at IS NOT NULL
+				GROUP BY grp
+			) streaks
+		)
+		SELECT
+			(SELECT current_streak FROM current_streak_calc) as current_streak,
+			(SELECT longest_streak FROM longest_streak_calc) as longest_streak
+	`
+
+	var result StreakData
+	err := tx.WithContext(ctx).Raw(query, userID, userID).Scan(&result).Error
+	if err != nil {
+		return nil, log.Err("failed to calculate user streaks", err, "userID", userID)
+	}
+
+	log.Info(
+		"calculated user streaks",
+		"userID",
+		userID,
+		"currentStreak",
+		result.CurrentStreak,
+		"longestStreak",
+		result.LongestStreak,
+	)
+
+	return &result, nil
+}
+
+func (r *dailyRecommendationRepository) GetUserStreakFromCache(
+	ctx context.Context,
+	userID uuid.UUID,
+) (*StreakData, bool, error) {
+	log := r.log.Function("GetUserStreakFromCache")
+
+	var cachedStreak *StreakData
+	found, err := database.NewCacheBuilder(r.cache, userID.String()).
+		WithContext(ctx).
+		WithHash(constants.UserStreakCachePrefix).
+		Get(&cachedStreak)
+	if err != nil {
+		log.Warn("failed to get streak from cache", "userID", userID, "error", err)
+		return nil, false, err
+	}
+
+	if found {
+		log.Info("streak retrieved from cache", "userID", userID)
+	}
+
+	return cachedStreak, found, nil
+}
+
+func (r *dailyRecommendationRepository) SetUserStreakCache(
+	ctx context.Context,
+	userID uuid.UUID,
+	streakData *StreakData,
+) error {
+	log := r.log.Function("SetUserStreakCache")
+
+	err := database.NewCacheBuilder(r.cache, userID.String()).
+		WithContext(ctx).
+		WithHash(constants.UserStreakCachePrefix).
+		WithStruct(streakData).
+		WithTTL(constants.UserStreakCacheTTL).
+		Set()
+	if err != nil {
+		log.Warn("failed to cache streak data", "userID", userID, "error", err)
+		return err
+	}
+
 	return nil
 }

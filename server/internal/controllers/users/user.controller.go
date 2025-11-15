@@ -3,7 +3,6 @@ package userController
 import (
 	"context"
 	"math/rand"
-	"sort"
 	"time"
 	"waugzee/config"
 	"waugzee/internal/database"
@@ -14,11 +13,6 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-)
-
-const (
-	UserStreakCachePrefix = "user_streak"
-	UserStreakCacheTTL    = 24 * time.Hour
 )
 
 type UserController struct {
@@ -35,18 +29,13 @@ type UserController struct {
 	log                logger.Logger
 }
 
-type StreakData struct {
-	CurrentStreak int `json:"currentStreak"`
-	LongestStreak int `json:"longestStreak"`
-}
-
 type GetUserResponse struct {
-	Folders             []*Folder            `json:"folders"`
-	Releases            []*UserRelease       `json:"releases"`
-	Styluses            []*UserStylus        `json:"styluses"`
-	PlayHistory         []*PlayHistory       `json:"playHistory"`
-	DailyRecommendation *DailyRecommendation `json:"dailyRecommendation"`
-	Streak              *StreakData          `json:"streak"`
+	Folders             []*Folder                `json:"folders"`
+	Releases            []*UserRelease           `json:"releases"`
+	Styluses            []*UserStylus            `json:"styluses"`
+	PlayHistory         []*PlayHistory           `json:"playHistory"`
+	DailyRecommendation *DailyRecommendation     `json:"dailyRecommendation"`
+	Streak              *repositories.StreakData `json:"streak"`
 }
 
 type UpdateUserPreferencesRequest struct {
@@ -226,7 +215,7 @@ func (uc *UserController) GetUser(
 		dailyRecommendation = nil
 	}
 
-	var streak *StreakData
+	var streak *repositories.StreakData
 	streak, err = uc.calculateUserStreak(ctx, user.ID)
 	if err != nil {
 		log.Warn("failed to calculate user streak", "userID", user.ID, "error", err)
@@ -587,56 +576,27 @@ func (uc *UserController) UpdateUserPreferences(
 	return user, nil
 }
 
-// Claude couldn't we do this with a sql query? Rather than returning every single record and parsing through them?
 func (uc *UserController) calculateUserStreak(
 	ctx context.Context,
 	userID uuid.UUID,
-) (*StreakData, error) {
+) (*repositories.StreakData, error) {
 	log := uc.log.Function("calculateUserStreak")
 
-	var cachedStreak *StreakData
-	found, err := database.NewCacheBuilder(uc.db.Cache.ClientAPI, userID.String()).
-		WithContext(ctx).
-		WithHash(UserStreakCachePrefix).
-		Get(&cachedStreak)
+	cachedStreak, found, err := uc.recommendationRepo.GetUserStreakFromCache(ctx, userID)
 	if err != nil {
 		log.Warn("failed to get streak from cache", "userID", userID, "error", err)
 	}
 
 	if found {
-		log.Info("streak retrieved from cache", "userID", userID)
 		return cachedStreak, nil
 	}
 
-	recommendations, err := uc.recommendationRepo.GetAllUserRecommendations(ctx, uc.db.SQL, userID)
+	streakData, err := uc.recommendationRepo.CalculateUserStreaks(ctx, uc.db.SQL, userID)
 	if err != nil {
-		return nil, log.Err("failed to get user recommendations", err, "userID", userID)
+		return nil, log.Err("failed to calculate user streaks", err, "userID", userID)
 	}
 
-	if len(recommendations) == 0 {
-		streakData := &StreakData{
-			CurrentStreak: 0,
-			LongestStreak: 0,
-		}
-		uc.cacheStreak(ctx, userID, streakData)
-		return streakData, nil
-	}
-
-	currentStreak := uc.calculateCurrentStreak(recommendations)
-	longestStreak := uc.calculateLongestStreak(recommendations)
-
-	streakData := &StreakData{
-		CurrentStreak: currentStreak,
-		LongestStreak: longestStreak,
-	}
-
-	err = database.NewCacheBuilder(uc.db.Cache.ClientAPI, userID.String()).
-		WithContext(ctx).
-		WithHash(UserStreakCachePrefix).
-		WithStruct(streakData).
-		WithTTL(UserStreakCacheTTL).
-		Set()
-	if err != nil {
+	if err = uc.recommendationRepo.SetUserStreakCache(ctx, userID, streakData); err != nil {
 		log.Warn("failed to cache streak data", "userID", userID, "error", err)
 	}
 
@@ -645,74 +605,10 @@ func (uc *UserController) calculateUserStreak(
 		"userID",
 		userID,
 		"currentStreak",
-		currentStreak,
+		streakData.CurrentStreak,
 		"longestStreak",
-		longestStreak,
+		streakData.LongestStreak,
 	)
 
 	return streakData, nil
-}
-
-func (uc *UserController) calculateCurrentStreak(recommendations []*DailyRecommendation) int {
-	if len(recommendations) == 0 {
-		return 0
-	}
-
-	sort.Slice(recommendations, func(i, j int) bool {
-		return recommendations[i].CreatedAt.After(recommendations[j].CreatedAt)
-	})
-
-	streak := 0
-	for _, rec := range recommendations {
-		if rec.ListenedAt == nil {
-			break
-		}
-		streak++
-	}
-	return streak
-}
-
-func (uc *UserController) calculateLongestStreak(recommendations []*DailyRecommendation) int {
-	if len(recommendations) == 0 {
-		return 0
-	}
-
-	sort.Slice(recommendations, func(i, j int) bool {
-		return recommendations[i].CreatedAt.After(recommendations[j].CreatedAt)
-	})
-
-	longestStreak := 0
-	currentStreak := 0
-
-	for _, rec := range recommendations {
-		if rec.ListenedAt == nil {
-			if currentStreak > longestStreak {
-				longestStreak = currentStreak
-			}
-			currentStreak = 0
-		} else {
-			currentStreak++
-			if currentStreak > longestStreak {
-				longestStreak = currentStreak
-			}
-		}
-	}
-
-	return longestStreak
-}
-
-func (uc *UserController) cacheStreak(
-	ctx context.Context,
-	userID uuid.UUID,
-	streakData *StreakData,
-) {
-	err := database.NewCacheBuilder(uc.db.Cache.ClientAPI, userID.String()).
-		WithContext(ctx).
-		WithHash(UserStreakCachePrefix).
-		WithStruct(streakData).
-		WithTTL(UserStreakCacheTTL).
-		Set()
-	if err != nil {
-		uc.log.Warn("failed to cache empty streak data", "userID", userID, "error", err)
-	}
 }
