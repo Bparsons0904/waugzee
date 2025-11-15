@@ -47,13 +47,10 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 			})
 		}
 
-		// Validate token with Zitadel using hybrid approach
-		tokenInfo, validationMethod, err := zitadelService.ValidateTokenWithFallback(
-			c.Context(),
-			token,
-		)
+		// Validate ID token (JWT) with Zitadel
+		tokenInfo, err := zitadelService.ValidateIDToken(c.Context(), token)
 		if err != nil {
-			log.Info("token validation failed", "method", validationMethod, "error", err.Error())
+			log.Info("token validation failed", "error", err.Error())
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Invalid token",
 			})
@@ -83,8 +80,6 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 
 		log.Info(
 			"user authenticated",
-			"method",
-			validationMethod,
 			"userID",
 			tokenInfo.UserID,
 			"email",

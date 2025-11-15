@@ -80,10 +80,10 @@ export function AuthProvider(props: { children: JSX.Element }) {
     if (!authState.oidcInitialized) return;
 
     try {
-      const token = await oidcService.getAccessToken();
+      const token = await oidcService.getIDToken();
       setAuthState("token", token);
     } catch (error) {
-      console.warn("Failed to get access token:", error);
+      console.warn("Failed to get ID token:", error);
       setAuthState("token", null);
     }
   });
@@ -172,13 +172,13 @@ export function AuthProvider(props: { children: JSX.Element }) {
           return;
         }
 
-        // Set authenticated status with token
+        // Set authenticated status with ID token (JWT) for backend validation
         if (!cancelled) {
           console.info("Authentication successful");
 
           setAuthState({
             status: "authenticated",
-            token: oidcUser.access_token,
+            token: oidcUser.id_token,
             error: null,
           });
 
@@ -257,7 +257,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       }
 
       // Temporarily update the token in auth state so the API call can use it
-      setAuthState("token", oidcUser.access_token);
+      setAuthState("token", oidcUser.id_token);
 
       // Call our backend's callback endpoint with the ID token to create/update the user
       try {
@@ -280,7 +280,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
       // Set authenticated status after successful backend callback
       setAuthState({
         status: "authenticated",
-        token: oidcUser.access_token,
+        token: oidcUser.id_token,
         error: null,
       });
 

@@ -239,6 +239,14 @@ export class OIDCService {
   }
 
   /**
+   * Get current ID token (JWT)
+   */
+  async getIDToken(): Promise<string | null> {
+    const user = await this.getUser();
+    return user?.id_token || null;
+  }
+
+  /**
    * Check if user is currently authenticated
    */
   async isAuthenticated(): Promise<boolean> {
