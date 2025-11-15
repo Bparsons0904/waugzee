@@ -71,7 +71,6 @@ export const Select: Component<SelectProps> = (props) => {
 
   return (
     <div class={clsx(styles.selectContainer, props.class)}>
-      {/* Claude should this be part of the Field component?  */}
       <Show when={props.label}>
         <label for={id} class={styles.label}>
           {props.label}

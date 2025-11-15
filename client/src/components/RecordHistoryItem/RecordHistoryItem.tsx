@@ -156,7 +156,8 @@ export const RecordHistoryItem: Component<RecordHistoryItemProps> = (props) => {
         message={`Are you sure you want to delete this ${props.item.type === "play" ? "play" : "cleaning"} record? This action cannot be undone.`}
         confirmText="Delete"
         onConfirm={handleDelete}
-        onCancel={() => setIsDeleteConfirmOpen(false)}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        variant="danger"
       />
     </>
   );

@@ -1,0 +1,231 @@
+@import "../../styles/variables";
+@import "../../styles/colors";
+
+.section {
+  background: $bg-surface;
+  border-radius: $border-radius-lg;
+  padding: $spacing-xl;
+  box-shadow: $shadow-sm;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: $spacing-xl;
+  gap: $spacing-lg;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    white-space: nowrap;
+  }
+}
+
+.sectionTitle {
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  color: $text-default;
+  margin: 0 0 $spacing-xs 0;
+}
+
+.sectionDescription {
+  font-size: $font-size-sm;
+  color: $text-muted;
+  margin: 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.statsBar {
+  display: flex;
+  gap: $spacing-xl;
+  padding: $spacing-lg;
+  background: $bg-subtle;
+  border-radius: $border-radius-md;
+  border: 1px solid $border-default;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: $spacing-md;
+  }
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.statLabel {
+  font-size: $font-size-sm;
+  color: $text-muted;
+  font-weight: $font-weight-medium;
+}
+
+.statValue {
+  font-size: $font-size-lg;
+  color: $text-default;
+  font-weight: $font-weight-semibold;
+}
+
+.filesTable {
+  border: 1px solid $border-default;
+  border-radius: $border-radius-md;
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 2fr auto auto auto;
+  gap: $spacing-md;
+  padding: $spacing-md $spacing-lg;
+  background: $bg-subtle;
+  border-bottom: 1px solid $border-default;
+  font-weight: $font-weight-semibold;
+  font-size: $font-size-sm;
+  color: $text-muted;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+
+    .headerCell:not(:first-child) {
+      display: none;
+    }
+  }
+}
+
+.headerCell {
+  text-align: left;
+}
+
+.tableBody {
+  background: $bg-surface;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 2fr auto auto auto;
+  gap: $spacing-md;
+  padding: $spacing-md $spacing-lg;
+  border-bottom: 1px solid $border-default;
+  transition: background-color $transition-fast;
+  align-items: center;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: $bg-subtle;
+  }
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+    gap: $spacing-sm;
+  }
+}
+
+.filePath {
+  font-size: $font-size-sm;
+  color: $text-default;
+  font-family: $font-family-mono;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @media (max-width: 1024px) {
+    white-space: normal;
+    word-break: break-all;
+  }
+}
+
+.fileType {
+  display: flex;
+  justify-content: flex-start;
+
+  @media (max-width: 1024px) {
+    justify-content: flex-start;
+  }
+}
+
+.typeBadge {
+  display: inline-block;
+  padding: $spacing-xs $spacing-sm;
+  background: $bg-primary-subtle;
+  color: $color-primary-700;
+  border-radius: $border-radius-sm;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  text-transform: uppercase;
+}
+
+.fileSize {
+  font-size: $font-size-sm;
+  color: $text-muted;
+  text-align: right;
+
+  @media (max-width: 1024px) {
+    text-align: left;
+
+    &::before {
+      content: "Size: ";
+      font-weight: $font-weight-medium;
+    }
+  }
+}
+
+.fileModified {
+  font-size: $font-size-sm;
+  color: $text-muted;
+  text-align: right;
+
+  @media (max-width: 1024px) {
+    text-align: left;
+
+    &::before {
+      content: "Modified: ";
+      font-weight: $font-weight-medium;
+    }
+  }
+}
+
+.emptyContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-3xl;
+  text-align: center;
+}
+
+.emptyText {
+  font-size: $font-size-md;
+  color: $text-muted;
+  margin: 0;
+}
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-3xl;
+  gap: $spacing-lg;
+}
+
+.loadingText {
+  font-size: $font-size-md;
+  color: $text-muted;
+  margin: 0;
+}

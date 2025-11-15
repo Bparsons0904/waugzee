@@ -1,0 +1,32 @@
+@import "@styles/variables";
+@import "@styles/colors";
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  padding: $spacing-lg;
+  text-align: center;
+
+  h2 {
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-semibold;
+    color: $text-default;
+    margin: 0 0 $spacing-md 0;
+  }
+
+  p {
+    font-size: $font-size-md;
+    color: $text-muted;
+    margin: 0 0 $spacing-lg 0;
+  }
+}

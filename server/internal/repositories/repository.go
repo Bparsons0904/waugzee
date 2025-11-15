@@ -5,33 +5,35 @@ import (
 )
 
 type Repository struct {
-	User                    UserRepository
-	UserConfiguration       UserConfigurationRepository
-	Artist                  ArtistRepository
-	Master                  MasterRepository
-	Release                 ReleaseRepository
-	Genre                   GenreRepository
-	Label                   LabelRepository
-	Folder                  FolderRepository
-	UserRelease             UserReleaseRepository
-	DiscogsDataProcessing   DiscogsDataProcessingRepository
-	Stylus                  StylusRepository
-	History                 HistoryRepository
+	User                  UserRepository
+	UserConfiguration     UserConfigurationRepository
+	Artist                ArtistRepository
+	Master                MasterRepository
+	Release               ReleaseRepository
+	Genre                 GenreRepository
+	Label                 LabelRepository
+	Folder                FolderRepository
+	UserRelease           UserReleaseRepository
+	DiscogsDataProcessing DiscogsDataProcessingRepository
+	Stylus                StylusRepository
+	History               HistoryRepository
+	DailyRecommendation   DailyRecommendationRepository
 }
 
 func New(db database.DB) Repository {
 	return Repository{
-		User:                    NewUserRepository(db),
-		UserConfiguration:       NewUserConfigurationRepository(),
-		Artist:                  NewArtistRepository(),
-		Master:                  NewMasterRepository(),
-		Release:                 NewReleaseRepository(),
-		Genre:                   NewGenreRepository(),
-		Label:                   NewLabelRepository(),
-		Folder:                  NewFolderRepository(db),
-		UserRelease:             NewUserReleaseRepository(),
-		DiscogsDataProcessing:   NewDiscogsDataProcessingRepository(db.SQL),
-		Stylus:                  NewStylusRepository(db.Cache.ClientAPI),
-		History:                 NewHistoryRepository(db.Cache.ClientAPI),
+		User:                  NewUserRepository(db),
+		UserConfiguration:     NewUserConfigurationRepository(),
+		Artist:                NewArtistRepository(),
+		Master:                NewMasterRepository(),
+		Release:               NewReleaseRepository(),
+		Genre:                 NewGenreRepository(),
+		Label:                 NewLabelRepository(),
+		Folder:                NewFolderRepository(db),
+		UserRelease:           NewUserReleaseRepository(),
+		DiscogsDataProcessing: NewDiscogsDataProcessingRepository(db.SQL),
+		Stylus:                NewStylusRepository(db.Cache.ClientAPI),
+		History:               NewHistoryRepository(db.Cache.ClientAPI),
+		DailyRecommendation:   NewDailyRecommendationRepository(db.Cache.ClientAPI),
 	}
 }

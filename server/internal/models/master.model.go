@@ -18,7 +18,6 @@ type Master struct {
 	Uri                          string     `gorm:"type:text"        json:"uri"`
 	ResourceURL                  string     `gorm:"type:text"        json:"resourceUrl"`
 
-	// Claude add Data - Images, Videos
 	Data datatypes.JSON `gorm:"type:jsonb" json:"data,omitempty"`
 
 	// Relationships

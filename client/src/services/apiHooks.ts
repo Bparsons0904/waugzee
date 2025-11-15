@@ -1,9 +1,12 @@
 import {
+  ADMIN_ENDPOINTS,
   CLEANING_HISTORY_ENDPOINTS,
   HISTORY_ENDPOINTS,
   PLAY_HISTORY_ENDPOINTS,
+  RECOMMENDATION_ENDPOINTS,
   STYLUS_ENDPOINTS,
 } from "@constants/api.constants";
+import type { DownloadStatusResponse, StoredFilesResponse } from "@models/Admin";
 import type {
   LogBothRequest,
   LogBothResponse,
@@ -24,6 +27,7 @@ import type {
   UpdateUserStylusRequest,
 } from "@models/Stylus";
 import {
+  type Query,
   type UseMutationOptions,
   type UseMutationResult,
   type UseQueryOptions,
@@ -45,6 +49,7 @@ export interface ApiQueryOptions<T>
     "queryKey" | "queryFn" | "enabled"
   > {
   enabled?: boolean | Accessor<boolean>;
+  refetchInterval?: number | false | ((query: Query<T, Error>) => number | false | undefined);
 }
 
 // Enhanced mutation options with common patterns
@@ -386,4 +391,72 @@ export function useLogBoth(options?: ApiMutationOptions<LogBothResponse, LogBoth
     errorMessage: "Failed to log play and cleaning. Please try again.",
     ...options,
   });
+}
+
+// Admin - Monthly Downloads
+export function useDownloadStatus() {
+  return useApiQuery<DownloadStatusResponse>(
+    ["admin", "downloads", "status"],
+    ADMIN_ENDPOINTS.DOWNLOADS_STATUS,
+  );
+}
+
+export function useTriggerDownload() {
+  return useApiPost<void, void>(ADMIN_ENDPOINTS.DOWNLOADS_TRIGGER, undefined, {
+    invalidateQueries: [["admin", "downloads", "status"]],
+    successMessage: "Download triggered successfully",
+    errorMessage: "Failed to trigger download",
+  });
+}
+
+export function useTriggerReprocess() {
+  return useApiPost<void, void>(ADMIN_ENDPOINTS.DOWNLOADS_REPROCESS, undefined, {
+    invalidateQueries: [["admin", "downloads", "status"]],
+    successMessage: "Reprocessing triggered successfully",
+    errorMessage: "Failed to trigger reprocessing",
+  });
+}
+
+export function useResetDownload() {
+  return useApiPost<void, void>(ADMIN_ENDPOINTS.DOWNLOADS_RESET, undefined, {
+    invalidateQueries: [["admin", "downloads", "status"]],
+    successMessage: "Download reset successfully. You can now trigger a new download.",
+    errorMessage: "Failed to reset download",
+  });
+}
+
+// Admin - File Management
+export function useStoredFiles(options?: ApiQueryOptions<StoredFilesResponse>) {
+  return useApiQuery<StoredFilesResponse>(
+    ["admin", "files", "stored"],
+    ADMIN_ENDPOINTS.FILES_LIST,
+    undefined,
+    options,
+  );
+}
+
+export function useCleanupFiles(options?: ApiMutationOptions<void, void>) {
+  return useApiDelete<void>(ADMIN_ENDPOINTS.FILES_CLEANUP, undefined, {
+    invalidateQueries: [["admin", "files", "stored"]],
+    successMessage: "Files cleaned up successfully",
+    errorMessage: "Failed to cleanup files",
+    ...options,
+  });
+}
+
+// Recommendation API Hooks
+export function useMarkRecommendationListened(
+  recommendationId: string,
+  options?: ApiMutationOptions<void, Record<string, never>>,
+) {
+  return useApiPost<void, Record<string, never>>(
+    RECOMMENDATION_ENDPOINTS.MARK_LISTENED(recommendationId),
+    undefined,
+    {
+      invalidateQueries: [["user"]],
+      successMessage: "Recommendation marked as listened!",
+      errorMessage: "Failed to mark recommendation as listened",
+      ...options,
+    },
+  );
 }

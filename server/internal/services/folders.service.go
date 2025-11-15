@@ -630,6 +630,8 @@ func (f *FoldersService) ProcessFolderReleasesResponse(
 			log.Warn("Failed to clear user cache after sync completion", "error", err)
 		}
 
+		log.Info("Sync completed - user will receive recommendation on next login", "userID", metadata.UserID)
+
 		// Send sync_complete event to notify client
 		completeMessage := events.Message{
 			ID:      metadata.UserID.String(),
@@ -1188,6 +1190,8 @@ func (f *FoldersService) TriggerSyncCompletion(ctx context.Context, userID uuid.
 	if err = f.repos.User.ClearUserCacheByUserID(ctx, f.db.SQLWithContext(ctx), userID.String()); err != nil {
 		log.Warn("Failed to clear user cache after sync completion", "error", err)
 	}
+
+	log.Info("Sync completed - user will receive recommendation on next login", "userID", userID)
 
 	// Send sync_complete event to notify client
 	completeMessage := events.Message{

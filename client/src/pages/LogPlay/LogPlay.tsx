@@ -294,7 +294,6 @@ const LogPlay: Component = () => {
         </div>
       </div>
 
-      {/* Claude shouldn't this be a modal? If the modal is in the RecordActionModal component, then it should be moved here   */}
       <Show when={selectedRelease()}>
         <RecordActionModal
           isOpen={isModalOpen()}

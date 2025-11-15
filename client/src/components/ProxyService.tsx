@@ -34,7 +34,6 @@ class ExternalNetworkError extends Error {
 
 // Handle external API errors consistently
 const handleExternalApiError = (error: AxiosError): ExternalApiError | ExternalNetworkError => {
-  // Claude should this be a switch statement?
   if (error.response) {
     const response = error.response as AxiosResponse<{ message?: string }>;
     const errorMessage = response.data?.message || error.message || "External API error";
@@ -78,7 +77,6 @@ const makeExternalRequest = async <T = unknown>(
 };
 
 // Convert external API errors to standardized format
-// Claude should this be a switch statement?
 const formatError = (error: unknown): ApiError => {
   if (error instanceof ExternalApiError) {
     return {

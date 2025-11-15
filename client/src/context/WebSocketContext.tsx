@@ -31,6 +31,9 @@ export const Events = {
   SYNC_START: "sync_start",
   SYNC_COMPLETE: "sync_complete",
   SYNC_ERROR: "sync_error",
+  ADMIN_DOWNLOAD_PROGRESS: "admin_download_progress",
+  ADMIN_DOWNLOAD_STATUS: "admin_download_status",
+  ADMIN_PROCESSING_PROGRESS: "admin_processing_progress",
 } as const;
 
 // Service types matching server-side implementation

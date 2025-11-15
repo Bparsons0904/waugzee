@@ -1,5 +1,5 @@
 import "./App.scss";
-import { NavBar } from "@components/layout/Navbar/Navbar";
+import { Layout } from "@components/layout/Layout/Layout";
 import { ProxyService } from "@components/ProxyService";
 import { SyncStatusProvider } from "@context/SyncStatusContext";
 import { WebSocketProvider } from "@context/WebSocketContext";
@@ -27,7 +27,7 @@ const App: Component<RouteSectionProps<unknown>> = (props) => {
             <WebSocketProvider>
               <SyncStatusProvider>
                 <ProxyService />
-                <NavBar />
+                <Layout />
                 <main class="content">
                   <Suspense fallback={<div />}>{props.children}</Suspense>
                 </main>

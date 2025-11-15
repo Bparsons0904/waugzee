@@ -1,0 +1,32 @@
+@use "../../styles/variables" as *;
+@use "../../styles/colors" as *;
+
+.streakBadge {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  padding: $spacing-xs $spacing-sm;
+  background: $bg-primary-subtle;
+  border-radius: $border-radius-lg;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+  cursor: help;
+  transition: all $transition-fast;
+
+  &:hover {
+    background: $bg-primary;
+    color: $text-inverse;
+    transform: scale(1.05);
+  }
+}
+
+.fireEmoji {
+  font-size: $font-size-lg;
+  line-height: 1;
+}
+
+.streakCount {
+  color: inherit;
+  line-height: 1;
+}

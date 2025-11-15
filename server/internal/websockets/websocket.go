@@ -20,17 +20,20 @@ import (
 type Message = events.Message
 
 const (
-	MESSAGE_TYPE_PING = "ping"
-	MESSAGE_TYPE_PONG = "pong"
-	API_REQUEST       = "api_request"
-	API_RESPONSE      = "api_response"
-	API_PROGRESS      = "api_progress"
-	API_COMPLETE      = "api_complete"
-	API_ERROR         = "api_error"
-	USER_JOIN         = "user_join"
-	BROADCAST         = "broadcast"
-	SEND              = "send"
-	MESSAGE           = "message"
+	MESSAGE_TYPE_PING         = "ping"
+	MESSAGE_TYPE_PONG         = "pong"
+	API_REQUEST               = "api_request"
+	API_RESPONSE              = "api_response"
+	API_PROGRESS              = "api_progress"
+	API_COMPLETE              = "api_complete"
+	API_ERROR                 = "api_error"
+	USER_JOIN                 = "user_join"
+	BROADCAST                 = "broadcast"
+	SEND                      = "send"
+	MESSAGE                   = "message"
+	ADMIN_DOWNLOAD_PROGRESS   = string(events.ADMIN_DOWNLOAD_PROGRESS)
+	ADMIN_DOWNLOAD_STATUS     = string(events.ADMIN_DOWNLOAD_STATUS)
+	ADMIN_PROCESSING_PROGRESS = string(events.ADMIN_PROCESSING_PROGRESS)
 )
 
 const (
@@ -140,9 +143,46 @@ func (m *Manager) BroadcastMessage(message Message) {
 
 	select {
 	case m.hub.broadcast <- message:
-		default:
+	default:
 		log.Warn("Broadcast channel is full, dropping message", "messageID", message.ID)
 	}
+}
+
+func (m *Manager) sendToAdminUsers(message Message) {
+	log := m.log.Function("sendToAdminUsers")
+	m.hub.mutex.RLock()
+	defer m.hub.mutex.RUnlock()
+
+	sentCount := 0
+	totalAdmins := 0
+
+	for _, client := range m.hub.clients {
+		if client.Status != STATUS_AUTHENTICATED {
+			continue
+		}
+
+		if client.UserID == uuid.Nil {
+			continue
+		}
+
+		user, err := m.userRepo.GetByID(context.Background(), m.db.Primary, client.UserID)
+		if err != nil || user == nil {
+			log.Warn("Failed to get user for admin check", "userID", client.UserID, "error", err)
+			continue
+		}
+
+		if user.IsAdmin {
+			totalAdmins++
+			select {
+			case client.send <- message:
+				sentCount++
+			default:
+				log.Warn("Admin client send channel full", "clientID", client.ID)
+			}
+		}
+	}
+
+	log.Info("Admin broadcast complete", "sentTo", sentCount, "totalAdmins", totalAdmins)
 }
 
 func (c *Client) readPump() {
@@ -166,7 +206,7 @@ func (c *Client) readPump() {
 	for {
 		var message Message
 		err := c.Connection.ReadJSON(&message)
-			if err != nil {
+		if err != nil {
 			log.Er("failed to read message", err)
 			if websocket.IsUnexpectedCloseError(
 				err,
@@ -200,7 +240,7 @@ func (c *Client) routeMessage(message Message) {
 
 	switch message.Event {
 	case API_RESPONSE:
-			c.handleAPIResponse(message)
+		c.handleAPIResponse(message)
 	default:
 		log.Warn("Unknown message event", "event", message.Event)
 	}
@@ -240,7 +280,7 @@ func (c *Client) writePump() {
 			}
 
 		case <-ticker.C:
-					if err := c.Connection.SetWriteDeadline(time.Now().Add(WRITE_TIMEOUT)); err != nil {
+			if err := c.Connection.SetWriteDeadline(time.Now().Add(WRITE_TIMEOUT)); err != nil {
 				log.Er("failed to set write deadline for ping", err, "clientID", c.ID)
 			}
 			if err := c.Connection.WriteMessage(websocket.PingMessage, nil); err != nil {
@@ -255,12 +295,13 @@ func (m *Manager) subscribeToEventBus() {
 	log.Info("Starting WebSocket events subscription")
 
 	if err := m.eventBus.Subscribe(events.WEBSOCKET, func(event events.ChannelEvent) error {
-	
 		switch event.Event {
 		case "broadcast":
 			m.sendToAuthenticatedClients(event.Message)
 		case "user":
 			m.sendToSpecificUser(event.Message)
+		case "admin":
+			m.sendToAdminUsers(event.Message)
 		default:
 			log.Warn("Unknown WebSocket event type", "event", event.Event)
 		}
@@ -284,7 +325,6 @@ func (m *Manager) sendToAuthenticatedClients(message Message) {
 			}
 		}
 	}
-
 }
 
 func (m *Manager) sendToSpecificUser(message Message) {
@@ -312,15 +352,29 @@ func (m *Manager) sendToSpecificUser(message Message) {
 	}
 
 	if targetClient == nil {
-		log.Warn("User not found or not connected", "messageID", message.ID, "userID", message.UserID)
+		log.Warn(
+			"User not found or not connected",
+			"messageID",
+			message.ID,
+			"userID",
+			message.UserID,
+		)
 		return
 	}
 
 	// Send message to the specific user's client
 	select {
 	case targetClient.send <- message:
-		default:
-		log.Warn("User's send channel full, dropping message", "messageID", message.ID, "userID", message.UserID, "clientID", targetClient.ID)
+	default:
+		log.Warn(
+			"User's send channel full, dropping message",
+			"messageID",
+			message.ID,
+			"userID",
+			message.UserID,
+			"clientID",
+			targetClient.ID,
+		)
 	}
 }
 
@@ -339,7 +393,6 @@ func (c *Client) handleAPIResponse(message Message) {
 		return
 	}
 
-
 	// Pass the response to the orchestration service for processing
 	if err := c.Manager.orchestrationService.HandleAPIResponse(context.Background(), message.Payload); err != nil {
 		log.Er("Failed to process API response", err,
@@ -348,6 +401,4 @@ func (c *Client) handleAPIResponse(message Message) {
 			"userID", c.UserID)
 		return
 	}
-
 }
-

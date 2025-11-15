@@ -5,6 +5,7 @@ import (
 	"os"
 	"waugzee/config"
 	"waugzee/internal/database"
+	"waugzee/internal/events"
 	"waugzee/internal/jobs"
 	"waugzee/internal/logger"
 	"waugzee/internal/repositories"
@@ -36,8 +37,16 @@ func main() {
 	// Initialize repositories
 	repos := repositories.New(db)
 
+	// Initialize event bus
+	eventBus := events.New(db.Cache.Events, config)
+	defer func() {
+		if err := eventBus.Close(); err != nil {
+			log.Er("failed to close event bus", err)
+		}
+	}()
+
 	// Initialize download service
-	downloadService := services.NewDownloadService(config)
+	downloadService := services.NewDownloadService(config, eventBus)
 
 	// Create download job
 	downloadJob := jobs.NewDiscogsDownloadJob(

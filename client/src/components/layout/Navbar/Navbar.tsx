@@ -47,6 +47,13 @@ export const NavBar: Component = () => {
                   Play History
                 </A>
               </li>
+              <Show when={user()?.isAdmin}>
+                <li class={styles.navbarItem}>
+                  <A href={ROUTES.ADMIN} class={styles.navbarLink} activeClass={styles.active}>
+                    Admin
+                  </A>
+                </li>
+              </Show>
             </Show>
           </ul>
 

@@ -1,0 +1,95 @@
+@import "@styles/variables";
+@import "@styles/colors";
+
+.fileRow {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1.5fr 1fr;
+  gap: $spacing-md;
+  padding: $spacing-md;
+  border-bottom: 1px solid $border-default;
+  font-size: $font-size-sm;
+  align-items: center;
+
+  &.validated {
+    background: $bg-success-subtle;
+    border-left: 3px solid $border-success;
+  }
+
+  &.error {
+    background: $bg-error-subtle;
+    border-left: 3px solid $border-error;
+  }
+}
+
+.fileName {
+  font-weight: $font-weight-medium;
+  color: $text-default;
+}
+
+.fileStatus {
+  color: $text-muted;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $border-radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+
+  &.gray {
+    background-color: $bg-muted;
+    color: $text-muted;
+  }
+
+  &.blue {
+    background-color: $bg-info-subtle;
+    color: $text-info;
+  }
+
+  &.green {
+    background-color: $bg-success-subtle;
+    color: $text-success;
+  }
+
+  &.red {
+    background-color: $bg-error-subtle;
+    color: $text-error;
+  }
+}
+
+.fileSize {
+  color: $text-muted;
+  font-family: monospace;
+}
+
+.fileChecksum {
+  color: $text-muted;
+  font-family: monospace;
+  font-size: $font-size-xs;
+}
+
+.fileTimestamp {
+  color: $text-muted;
+  font-size: $font-size-xs;
+}
+
+.fileValidation {
+  color: $text-muted;
+}
+
+.fileError {
+  grid-column: 1 / -1;
+  color: $text-error;
+  padding: $spacing-sm;
+  background: $bg-elevated;
+  border-radius: $border-radius-sm;
+  margin-top: $spacing-sm;
+}
+
+@media (max-width: 768px) {
+  .fileRow {
+    grid-template-columns: 1fr;
+    gap: $spacing-xs;
+  }
+}
