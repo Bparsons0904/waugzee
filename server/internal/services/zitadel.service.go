@@ -98,11 +98,16 @@ func NewZitadelService(cfg config.Config) (*ZitadelService, error) {
 		log.Info("Zitadel private key loaded successfully")
 	}
 
-	// Create HTTP client with reasonable timeout
+	// Create HTTP client with reasonable timeout and DNS resolution retry settings
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: false},
+			TLSClientConfig:     &tls.Config{InsecureSkipVerify: false},
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+			// DNS resolver settings to handle transient failures
+			DisableKeepAlives: false,
 		},
 	}
 
@@ -260,6 +265,49 @@ func (zs *ZitadelService) ValidateIDToken(
 	}, nil
 }
 
+// retryHTTPRequest performs an HTTP request with retry logic for transient failures
+func (zs *ZitadelService) retryHTTPRequest(
+	ctx context.Context,
+	req *http.Request,
+	maxRetries int,
+) (*http.Response, error) {
+	var lastErr error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: 100ms, 200ms, 400ms
+			backoff := time.Duration(100*1<<uint(attempt-1)) * time.Millisecond
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+
+		resp, err := zs.httpClient.Do(req)
+		if err == nil {
+			return resp, nil
+		}
+
+		lastErr = err
+
+		// Check if error is retryable (DNS, network errors)
+		if strings.Contains(err.Error(), "dial tcp") ||
+			strings.Contains(err.Error(), "lookup") ||
+			strings.Contains(err.Error(), "server misbehaving") ||
+			strings.Contains(err.Error(), "connection refused") ||
+			strings.Contains(err.Error(), "no such host") {
+			// Retryable error, continue loop
+			continue
+		}
+
+		// Non-retryable error, return immediately
+		return nil, err
+	}
+
+	return nil, lastErr
+}
+
 // getOIDCDiscovery fetches and caches the OIDC discovery document
 func (zs *ZitadelService) getOIDCDiscovery(ctx context.Context) (*OIDCDiscovery, error) {
 	log := zs.log.Function("getOIDCDiscovery")
@@ -281,9 +329,10 @@ func (zs *ZitadelService) getOIDCDiscovery(ctx context.Context) (*OIDCDiscovery,
 		return nil, log.Err("failed to create discovery request", err)
 	}
 
-	resp, err := zs.httpClient.Do(req)
+	// Use retry logic for DNS/network failures
+	resp, err := zs.retryHTTPRequest(ctx, req, 3)
 	if err != nil {
-		return nil, log.Err("failed to fetch OIDC discovery", err)
+		return nil, log.Err("failed to fetch OIDC discovery after retries", err)
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
@@ -347,9 +396,10 @@ func (zs *ZitadelService) getJWKS(ctx context.Context) (*JWKSet, error) {
 		return nil, log.Err("failed to create JWKS request", err)
 	}
 
-	resp, err := zs.httpClient.Do(req)
+	// Use retry logic for DNS/network failures
+	resp, err := zs.retryHTTPRequest(ctx, req, 3)
 	if err != nil {
-		return nil, log.Err("failed to fetch JWKS", err)
+		return nil, log.Err("failed to fetch JWKS after retries", err)
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {

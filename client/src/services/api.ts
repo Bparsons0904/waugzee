@@ -22,7 +22,11 @@
  */
 
 import { env } from "@services/env.service";
-import axios, { type AxiosError, type AxiosRequestConfig } from "axios";
+import axios, {
+  type AxiosError,
+  type AxiosRequestConfig,
+  type InternalAxiosRequestConfig,
+} from "axios";
 
 // Types
 export interface ApiError {
@@ -72,9 +76,14 @@ const axiosClient = axios.create({
 
 // Token getter function - set by AuthContext to avoid closure issues
 let getAuthToken: (() => string | null) | null = null;
+let onTokenExpired: (() => Promise<void>) | null = null;
 
 export const setTokenGetter = (getter: () => string | null) => {
   getAuthToken = getter;
+};
+
+export const setTokenExpiredCallback = (callback: () => Promise<void>) => {
+  onTokenExpired = callback;
 };
 
 // Request interceptor to add Authorization header
@@ -89,10 +98,36 @@ axiosClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// Response interceptor for error handling
+// Response interceptor for error handling with automatic token refresh
 axiosClient.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(handleApiError(error)),
+  async (error) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    // Check if this is a 401 error and we haven't already retried
+    if (error.response?.status === 401 && !originalRequest._retry && onTokenExpired) {
+      originalRequest._retry = true;
+
+      try {
+        // Attempt to refresh the token
+        await onTokenExpired();
+
+        // Get the new token
+        const newToken = getAuthToken?.();
+        if (newToken) {
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        }
+
+        // Retry the original request with the new token
+        return axiosClient(originalRequest);
+      } catch (_refreshError) {
+        // Token refresh failed, reject with the original error
+        return Promise.reject(handleApiError(error));
+      }
+    }
+
+    return Promise.reject(handleApiError(error));
+  },
 );
 
 // Error handling

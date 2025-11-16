@@ -41,6 +41,16 @@ export function UserDataProvider(props: { children: JSX.Element }) {
     undefined,
     {
       enabled: () => auth.isAuthenticated() && !!auth.authToken(),
+      retry: (failureCount, error) => {
+        // Retry up to 2 times for transient errors (network issues, temporary 5xx errors)
+        // Don't retry on 401 (handled by axios interceptor) or 403/404 (permanent errors)
+        const status = (error as { status?: number }).status;
+        if (status === 401 || status === 403 || status === 404) {
+          return false;
+        }
+        return failureCount < 2;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
     },
   );
 

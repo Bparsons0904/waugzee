@@ -23,6 +23,10 @@ services:
       - SERVER_PORT=8288 # Internal port should always be 8288
       - LOG_FORMAT=${LOG_FORMAT:-json} # Set to "text" for human-readable logs in development
     working_dir: /app
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     networks:
       - dev-network-dev
     restart: unless-stopped
@@ -52,6 +56,10 @@ services:
       - VITE_HOST=0.0.0.0
       - VITE_PORT=3021 # Internal port should always be 3020
     working_dir: /app
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     networks:
       - dev-network-dev
     restart: unless-stopped

@@ -31,7 +31,7 @@ export class OIDCService {
   private eventCallbacks: OIDCEventCallbacks = {};
 
   /**
-   * Discover OIDC configuration from the provider
+   * Discover OIDC configuration from the provider with retry logic
    */
   private async discoverOIDCConfiguration(instanceUrl: string): Promise<Record<string, unknown>> {
     console.debug("Attempting OIDC discovery for:", instanceUrl);
@@ -43,36 +43,74 @@ export class OIDCService {
       `${instanceUrl}/oidc/v1/.well-known/openid-configuration`, // Zitadel with path prefix
     ];
 
-    for (const discoveryUrl of discoveryUrls) {
-      try {
-        console.debug(`Trying discovery URL: ${discoveryUrl}`);
-        const response = await fetch(discoveryUrl);
+    const maxRetries = 3;
+    const retryDelay = 500; // Start with 500ms
 
-        if (response.ok) {
-          const metadata = await response.json();
-          console.debug("OIDC discovery successful:", {
-            discoveryUrl,
-            issuer: metadata.issuer,
-            endpoints: {
-              authorization: metadata.authorization_endpoint,
-              token: metadata.token_endpoint,
-              userinfo: metadata.userinfo_endpoint,
-              end_session: metadata.end_session_endpoint,
-            },
+    for (const discoveryUrl of discoveryUrls) {
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          if (attempt > 0) {
+            // Exponential backoff
+            const backoff = retryDelay * 2 ** (attempt - 1);
+            console.debug(
+              `Retrying discovery URL after ${backoff}ms (attempt ${attempt + 1}/${maxRetries})`,
+            );
+            await new Promise((resolve) => setTimeout(resolve, backoff));
+          }
+
+          console.debug(
+            `Trying discovery URL: ${discoveryUrl} (attempt ${attempt + 1}/${maxRetries})`,
+          );
+          const response = await fetch(discoveryUrl, {
+            signal: AbortSignal.timeout(10000), // 10 second timeout
           });
 
-          return metadata;
-        } else {
+          if (response.ok) {
+            const metadata = await response.json();
+            console.debug("OIDC discovery successful:", {
+              discoveryUrl,
+              issuer: metadata.issuer,
+              endpoints: {
+                authorization: metadata.authorization_endpoint,
+                token: metadata.token_endpoint,
+                userinfo: metadata.userinfo_endpoint,
+                end_session: metadata.end_session_endpoint,
+              },
+            });
+
+            return metadata;
+          }
+
           console.debug(
             `Discovery URL failed: ${discoveryUrl} - ${response.status} ${response.statusText}`,
           );
+          break; // Don't retry on HTTP errors, try next URL
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.debug(
+            `Discovery URL error (attempt ${attempt + 1}/${maxRetries}): ${discoveryUrl} -`,
+            errorMessage,
+          );
+
+          // Check if it's a network/DNS error that should be retried
+          if (
+            errorMessage.includes("Failed to fetch") ||
+            errorMessage.includes("NetworkError") ||
+            errorMessage.includes("DNS") ||
+            errorMessage.includes("timeout")
+          ) {
+            if (attempt < maxRetries - 1) {
+              continue; // Retry on network errors
+            }
+          }
+
+          // Non-retryable error or last attempt, try next URL
+          break;
         }
-      } catch (error) {
-        console.debug(`Discovery URL error: ${discoveryUrl} -`, error);
       }
     }
 
-    console.warn("All OIDC discovery URLs failed, falling back to Zitadel endpoints");
+    console.warn("All OIDC discovery URLs failed after retries, falling back to Zitadel endpoints");
 
     // Fallback to hardcoded Zitadel endpoints
     return {

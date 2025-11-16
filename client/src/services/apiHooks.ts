@@ -50,6 +50,8 @@ export interface ApiQueryOptions<T>
   > {
   enabled?: boolean | Accessor<boolean>;
   refetchInterval?: number | false | ((query: Query<T, Error>) => number | false | undefined);
+  retry?: boolean | number | ((failureCount: number, error: Error) => boolean);
+  retryDelay?: number | ((retryAttempt: number, error: Error) => number);
 }
 
 // Enhanced mutation options with common patterns

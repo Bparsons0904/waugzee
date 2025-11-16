@@ -1,5 +1,5 @@
 import { AUTH_ENDPOINTS, ROUTES } from "@constants/api.constants";
-import { api, setTokenGetter } from "@services/api";
+import { api, setTokenExpiredCallback, setTokenGetter } from "@services/api";
 import { oidcService } from "@services/oidc.service";
 import { useNavigate } from "@solidjs/router";
 import { createContext, createEffect, type JSX, onCleanup, Show, useContext } from "solid-js";
@@ -61,6 +61,28 @@ export function AuthProvider(props: { children: JSX.Element }) {
   const isAuthenticated = () => authState.status === "authenticated";
 
   setTokenGetter(() => authState.token);
+
+  // Set up automatic token refresh callback for API interceptor
+  const handleTokenRefresh = async () => {
+    console.debug("Token refresh requested by API interceptor");
+
+    try {
+      const renewedUser = await oidcService.renewToken();
+
+      if (renewedUser?.id_token) {
+        console.info("Token refresh successful via API interceptor");
+        setAuthState("token", renewedUser.id_token);
+        return;
+      }
+
+      throw new Error("Token renewal returned no valid token");
+    } catch (error) {
+      console.error("Token refresh failed in API interceptor:", error);
+      throw error;
+    }
+  };
+
+  setTokenExpiredCallback(handleTokenRefresh);
 
   // Define performLocalLogout early so it can be used in callbacks
   const performLocalLogout = () => {
@@ -230,15 +252,22 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
           const renewedUser = await oidcService.renewToken();
 
-          if (renewedUser?.access_token) {
+          if (renewedUser?.id_token) {
             console.info("Token renewal successful");
-            setAuthState("token", renewedUser.access_token);
+            setAuthState("token", renewedUser.id_token);
           } else {
             console.warn("Token renewal failed - logging out");
             performLocalLogout();
           }
         } else {
           console.debug("Token still valid");
+
+          // Even if not expired, proactively get the latest token to ensure consistency
+          const currentUser = await oidcService.getUser();
+          if (currentUser?.id_token && currentUser.id_token !== authState.token) {
+            console.debug("Updating token to latest version from OIDC session");
+            setAuthState("token", currentUser.id_token);
+          }
         }
       } catch (error) {
         console.error(`Token check/renewal on ${source} failed:`, error);
