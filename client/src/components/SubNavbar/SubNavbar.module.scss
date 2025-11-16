@@ -1,25 +1,85 @@
 @use "../../styles/variables" as *;
 @use "../../styles/colors" as *;
+@use "../../styles/mixins" as *;
 
 .subNavbar {
   background-color: $bg-subtle;
   border-bottom: 1px solid $border-default;
   box-shadow: $shadow-sm;
+  position: relative;
+}
+
+.mobileHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: $spacing-md $spacing-lg;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color $transition-fast;
+
+  &:hover {
+    background-color: rgba($color-primary-500, 0.05);
+  }
+
+  &:active {
+    background-color: rgba($color-primary-500, 0.1);
+  }
+
+  @include breakpoint(md) {
+    display: none;
+  }
+}
+
+.mobileHeaderTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $text-default;
+}
+
+.chevron {
+  color: $text-muted;
+  transition: transform $transition-normal $transition-timing-smooth;
+}
+
+.chevronRotated {
+  transform: rotate(180deg);
 }
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: $spacing-md $spacing-lg;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: $spacing-xl;
+  padding: 0;
+  display: none;
+  flex-direction: column;
+  gap: $spacing-md;
+
+  &.expanded {
+    display: flex;
+    padding: $spacing-md $spacing-lg;
+    border-top: 1px solid rgba($border-default, 0.3);
+  }
+
+  @include breakpoint(md) {
+    display: flex;
+    padding: $spacing-md $spacing-lg;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: $spacing-xl;
+  }
 }
 
 .recordOfTheDay {
   display: flex;
   align-items: center;
+  width: 100%;
+
+  @include breakpoint(md) {
+    width: auto;
+  }
 }
 
 .recordCard {
@@ -27,15 +87,21 @@
   align-items: center;
   gap: $spacing-md;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .albumArt {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: $border-radius-md;
+  width: 48px;
+  height: 48px;
+  border-radius: $border-radius-lg;
   overflow: hidden;
   box-shadow: $shadow-sm;
+
+  @include breakpoint(md) {
+    width: 40px;
+    height: 40px;
+  }
 
   img {
     width: 100%;
@@ -46,8 +112,12 @@
 
 .recordInfo {
   min-width: 0;
-  max-width: 400px;
+  flex: 1;
   overflow: hidden;
+
+  @include breakpoint(md) {
+    max-width: 400px;
+  }
 }
 
 .title {
@@ -69,56 +139,96 @@
 
 .playButton {
   flex-shrink: 0;
-  padding: $spacing-sm $spacing-lg;
+  padding: $spacing-sm $spacing-xl;
+  min-width: 120px;
   background-color: $button-primary-bg;
   color: $button-primary-text;
   border: none;
-  border-radius: $border-radius-md;
+  border-radius: $border-radius-lg;
   font-size: $font-size-sm;
   font-weight: $font-weight-medium;
   cursor: pointer;
-  transition: background-color $transition-fast;
+  transition: all $transition-fast;
 
   &:hover {
     background-color: $button-primary-hover;
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  @include breakpoint(md) {
+    padding: $spacing-sm $spacing-lg;
+    min-width: auto;
   }
 }
 
 .playedBadge {
   flex-shrink: 0;
-  padding: $spacing-sm $spacing-lg;
+  padding: $spacing-sm $spacing-xl;
   background-color: $bg-success;
   color: $text-inverse;
-  border-radius: $border-radius-md;
+  border-radius: $border-radius-lg;
   font-size: $font-size-sm;
   font-weight: $font-weight-medium;
+
+  @include breakpoint(md) {
+    padding: $spacing-sm $spacing-lg;
+  }
 }
 
 .noRecommendation {
   font-size: $font-size-sm;
   color: $text-muted;
   font-style: italic;
+  text-align: center;
+  width: 100%;
+
+  @include breakpoint(md) {
+    text-align: left;
+    width: auto;
+  }
 }
 
 .suggestionSystem {
   display: flex;
   gap: $spacing-md;
   align-items: center;
+  justify-content: space-between;
+  width: 100%;
+
+  @include breakpoint(md) {
+    width: auto;
+    justify-content: flex-end;
+  }
 }
 
 .suggestButton {
-  padding: $spacing-sm $spacing-lg;
+  padding: $spacing-sm $spacing-xl;
+  min-width: 120px;
   background-color: $color-social-start;
   color: $text-inverse;
   border: none;
-  border-radius: $border-radius-md;
+  border-radius: $border-radius-lg;
   font-size: $font-size-sm;
   font-weight: $font-weight-medium;
   cursor: pointer;
-  transition: background-color $transition-fast;
+  transition: all $transition-fast;
 
   &:hover {
     background-color: $color-hero-end;
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  @include breakpoint(md) {
+    padding: $spacing-sm $spacing-lg;
+    min-width: auto;
   }
 }
 
@@ -143,10 +253,17 @@
 .suggestionsContainer {
   max-width: 1200px;
   margin: 0 auto;
-  padding: $spacing-lg;
+  padding: $spacing-md $spacing-lg;
   display: flex;
-  gap: $spacing-lg;
+  flex-direction: column;
+  gap: $spacing-md;
   align-items: flex-start;
+
+  @include breakpoint(md) {
+    padding: $spacing-lg;
+    flex-direction: row;
+    gap: $spacing-lg;
+  }
 }
 
 .suggestionsContent {
@@ -168,26 +285,35 @@
 
 .closeButton {
   flex-shrink: 0;
-  align-self: flex-start;
-  font-size: $font-size-3xl;
+  align-self: flex-end;
+  font-size: $font-size-2xl;
   color: $text-muted;
   padding: $spacing-xs;
   line-height: 1;
+
+  @include breakpoint(md) {
+    align-self: flex-start;
+    font-size: $font-size-3xl;
+  }
 }
 
 .suggestionsGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr;
   gap: $spacing-md;
+
+  @include breakpoint(md) {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 .suggestionCard {
   display: flex;
   align-items: center;
   gap: $spacing-md;
-  padding: $spacing-sm $spacing-md;
+  padding: $spacing-md;
   border: 1px solid $border-default;
-  border-radius: $border-radius-md;
+  border-radius: $border-radius-lg;
   background-color: $bg-surface;
   cursor: pointer;
   transition:
@@ -198,14 +324,23 @@
     transform: translateY(-2px);
     box-shadow: $shadow-md;
   }
+
+  @include breakpoint(md) {
+    padding: $spacing-sm $spacing-md;
+  }
 }
 
 .suggestionImage {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   object-fit: cover;
-  border-radius: $border-radius-sm;
+  border-radius: $border-radius-md;
   flex-shrink: 0;
+
+  @include breakpoint(md) {
+    width: 48px;
+    height: 48px;
+  }
 }
 
 .suggestionInfo {
@@ -233,39 +368,4 @@
 
 .suggestionPlayButton {
   flex-shrink: 0;
-}
-
-@media (max-width: 768px) {
-  .container {
-    flex-direction: column;
-    gap: $spacing-md;
-  }
-
-  .recordOfTheDay,
-  .suggestionSystem {
-    width: 100%;
-  }
-
-  .suggestionSystem {
-    justify-content: center;
-  }
-
-  .suggestionsContainer {
-    flex-direction: column;
-  }
-
-  .suggestionsGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 480px) {
-  .container {
-    padding: $spacing-sm $spacing-md;
-  }
-
-  .suggestButton {
-    font-size: $font-size-xs;
-    padding: $spacing-xs $spacing-sm;
-  }
 }

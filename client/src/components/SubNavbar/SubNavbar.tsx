@@ -1,3 +1,4 @@
+import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import { Select } from "@components/common/forms/Select/Select";
 import { Button } from "@components/common/ui/Button/Button";
 import { StreakBadge } from "@components/StreakBadge/StreakBadge";
@@ -20,6 +21,7 @@ export const SubNavbar: Component = () => {
   const [selectedGenre, setSelectedGenre] = createSignal<string>("");
   const [isModalOpen, setIsModalOpen] = createSignal(false);
   const [selectedRelease, setSelectedRelease] = createSignal<UserRelease | null>(null);
+  const [isExpanded, setIsExpanded] = createSignal(false);
 
   const isListened = createMemo(() => !!dailyRecommendation()?.listenedAt);
   const primaryStylus = createMemo(() => styluses().find((s) => s.isPrimary));
@@ -109,10 +111,29 @@ export const SubNavbar: Component = () => {
     setSelectedRelease(null);
   };
 
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded());
+  };
+
   return (
     <>
       <div class={styles.subNavbar}>
-        <div class={styles.container}>
+        <button
+          type="button"
+          class={styles.mobileHeader}
+          onClick={toggleExpanded}
+          aria-expanded={isExpanded()}
+          aria-label={isExpanded() ? "Collapse recommendations" : "Expand recommendations"}
+        >
+          <span class={styles.mobileHeaderTitle}>Daily Recommendation</span>
+          <ChevronDownIcon
+            class={styles.chevron}
+            classList={{ [styles.chevronRotated]: isExpanded() }}
+            size={20}
+          />
+        </button>
+
+        <div class={styles.container} classList={{ [styles.expanded]: isExpanded() }}>
           <div class={styles.recordOfTheDay}>
             <Show when={dailyRecommendation()}>
               {(rec) => (
