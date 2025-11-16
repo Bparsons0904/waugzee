@@ -3,6 +3,8 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile.dev
+      args:
+        GOEXPERIMENT: ${GOEXPERIMENT:-greenteagc,jsonv2}
     container_name: waugzee-server-${DOCKER_ENV:-dev}
     ports:
       - "${SERVER_PORT:-8289}:8288"
@@ -20,6 +22,7 @@ services:
       - CGO_ENABLED=1
       - GOCACHE=/.cache/go-build
       - GOMODCACHE=/go/pkg/mod
+      - GOEXPERIMENT=${GOEXPERIMENT:-greenteagc,jsonv2}
       - SERVER_PORT=8288 # Internal port should always be 8288
       - LOG_FORMAT=${LOG_FORMAT:-json} # Set to "text" for human-readable logs in development
     working_dir: /app
