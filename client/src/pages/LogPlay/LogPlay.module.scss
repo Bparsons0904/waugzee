@@ -92,6 +92,31 @@
   }
 }
 
+.searchSection {
+  flex: 1;
+  display: none;
+  flex-direction: column;
+
+  @media (min-width: $breakpoint-sm) {
+    display: flex;
+  }
+}
+
+.searchInput {
+  width: 100%;
+  padding: $spacing-sm $spacing-md;
+  border: $border-width-thin solid $input-border;
+  border-radius: $border-radius-md;
+  font-size: $font-size-md;
+  background-color: $input-bg;
+
+  &:focus {
+    outline: none;
+    border-color: $input-border-focus;
+    box-shadow: $focus-ring;
+  }
+}
+
 .sortSection {
   flex: 1;
   display: flex;

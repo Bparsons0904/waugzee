@@ -191,6 +191,19 @@ const LogPlay: Component = () => {
 
       <div class={styles.logForm}>
         <div class={styles.controlsRow}>
+          <div class={styles.searchSection}>
+            <Field label="Search" htmlFor="searchInput">
+              <input
+                type="text"
+                id="searchInput"
+                class={styles.searchInput}
+                value={searchTerm()}
+                onInput={(e) => setSearchTerm(e.currentTarget.value)}
+                placeholder="Search by title or artist..."
+              />
+            </Field>
+          </div>
+
           <div class={styles.sortSection}>
             <Field label="Sort By" htmlFor="sortOptions">
               <Select
