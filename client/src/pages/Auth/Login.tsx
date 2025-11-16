@@ -32,8 +32,8 @@ const Login: Component = () => {
       <div class={styles.authContainer}>
         <div class={styles.authCard}>
           <div class={styles.authHeader}>
-            <h1 class={styles.authTitle}>Welcome Back</h1>
-            <p class={styles.authSubtitle}>Sign in to continue your vinyl journey</p>
+            <h1 class={styles.authTitle}>Welcome to Waugzee</h1>
+            <p class={styles.authSubtitle}>Sign in or create an account to start tracking your vinyl collection</p>
           </div>
 
           <div class={styles.authContent}>
@@ -53,13 +53,13 @@ const Login: Component = () => {
 
               <div class={styles.authActions}>
                 <Button variant="gradient" size="lg" onClick={handleOIDCLogin} disabled={loading()}>
-                  {loading() ? "Signing In..." : "Sign In with Zitadel"}
+                  {loading() ? "Signing In..." : "Continue"}
                 </Button>
               </div>
 
               <div class={styles.authInfo}>
                 <p class={styles.authInfoText}>
-                  You'll be redirected to our secure authentication provider to sign in.
+                  You'll be securely redirected to complete sign in or create your account.
                 </p>
               </div>
             </Show>

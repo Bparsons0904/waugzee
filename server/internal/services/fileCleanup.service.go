@@ -94,7 +94,7 @@ func (fcs *FileCleanupService) CleanupAllFiles(ctx context.Context) error {
 		entryPath := filepath.Join(DiscogsDataDir, entry.Name())
 		if err := os.RemoveAll(entryPath); err != nil {
 			errors = append(errors, err)
-			log.Err("failed to remove entry", err, "path", entryPath)
+			log.Er("failed to remove entry", err, "path", entryPath)
 		}
 	}
 
