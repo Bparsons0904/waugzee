@@ -15,10 +15,9 @@ export default defineConfig({
       },
     },
     globals: true,
-    // Disable vite-plugin-solid auto jest-dom setup
     server: {
       deps: {
-        external: [/solid-js/],
+        inline: [/@solidjs\/router/],
       },
     },
   },
@@ -31,6 +30,11 @@ export default defineConfig({
       "@hooks": path.resolve(__dirname, "./src/hooks/"),
       "@services": path.resolve(__dirname, "./src/services/"),
       "@context": path.resolve(__dirname, "./src/context/"),
+      "@models": path.resolve(__dirname, "./src/types/"),
+      "@constants": path.resolve(__dirname, "./src/constants/"),
+      "@utils": path.resolve(__dirname, "./src/utils/"),
     },
+    conditions: ["development", "browser"],
+    extensions: [".mjs", ".js", ".mts", ".ts", ".jsx", ".tsx", ".json"],
   },
 });

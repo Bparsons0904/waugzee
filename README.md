@@ -23,7 +23,7 @@ waugzee/
 
 - [Docker](https://docs.docker.com/get-docker/)
 - [Tilt](https://tilt.dev/) - Modern development environment orchestrator
-- [Node.js v22](https://nodejs.org/) (for local development)
+- [Node.js v24](https://nodejs.org/) (for local development)
 - [Go 1.25.4+](https://golang.org/) (for local development)
 
 ### Development Environment
