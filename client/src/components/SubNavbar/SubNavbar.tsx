@@ -26,26 +26,13 @@ export const SubNavbar: Component = () => {
   const isListened = createMemo(() => !!dailyRecommendation()?.listenedAt);
   const primaryStylus = createMemo(() => styluses().find((s) => s.isPrimary));
 
-  const logPlayMutation = useLogPlay({
-    invalidateQueries: [["user"]],
-    onSuccess: async () => {
-      await markListenedMutation.mutateAsync({});
-    },
-  });
-
-  const markListenedMutation = useMarkRecommendationListened(dailyRecommendation()?.id || "");
+  const markListenedMutation = useMarkRecommendationListened();
 
   const handleQuickPlay = () => {
     const recommendation = dailyRecommendation();
-    if (!recommendation) return;
+    if (!recommendation?.id) return;
 
-    const stylus = primaryStylus();
-    logPlayMutation.mutate({
-      userReleaseId: recommendation.userReleaseId,
-      userStylusId: stylus?.id,
-      playedAt: new Date().toISOString(),
-      notes: "Quick play from daily recommendation",
-    });
+    markListenedMutation.mutate({ recommendationId: recommendation.id });
   };
 
   const handleSuggest = () => {

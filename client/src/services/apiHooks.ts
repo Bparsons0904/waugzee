@@ -446,15 +446,14 @@ export function useCleanupFiles(options?: ApiMutationOptions<void, void>) {
 
 // Recommendation API Hooks
 export function useMarkRecommendationListened(
-  recommendationId: string,
-  options?: ApiMutationOptions<void, Record<string, never>>,
+  options?: ApiMutationOptions<void, { recommendationId: string }>,
 ) {
-  return useApiPost<void, Record<string, never>>(
-    RECOMMENDATION_ENDPOINTS.MARK_LISTENED(recommendationId),
+  return useApiPost<void, { recommendationId: string }>(
+    (variables) => RECOMMENDATION_ENDPOINTS.MARK_LISTENED(variables.recommendationId),
     undefined,
     {
       invalidateQueries: [["user"]],
-      successMessage: "Recommendation marked as listened!",
+      successMessage: "Play logged and recommendation marked as listened!",
       errorMessage: "Failed to mark recommendation as listened",
       ...options,
     },

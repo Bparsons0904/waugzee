@@ -122,6 +122,7 @@ func (r *historyRepository) GetUserPlayHistory(
 
 	playHistory, err := gorm.G[*PlayHistory](tx).
 		Preload("UserRelease.Release.Genres", nil).
+		Preload("UserRelease.Release.Artists", nil).
 		Preload("UserStylus.Stylus", nil).
 		Where(PlayHistory{UserID: userID}).
 		Order("played_at DESC").
@@ -171,7 +172,8 @@ func (r *historyRepository) UpdatePlayHistory(
 	}
 
 	playHistory, err := gorm.G[*PlayHistory](tx).
-		Preload("UserRelease.Release", nil).
+		Preload("UserRelease.Release.Genres", nil).
+		Preload("UserRelease.Release.Artists", nil).
 		Preload("UserStylus.Stylus", nil).
 		Where(PlayHistory{BaseUUIDModel: BaseUUIDModel{ID: playHistoryID}}).
 		First(ctx)
@@ -267,7 +269,8 @@ func (r *historyRepository) GetUserCleaningHistory(
 	}
 
 	cleaningHistory, err := gorm.G[*CleaningHistory](tx).
-		Preload("UserRelease.Release", nil).
+		Preload("UserRelease.Release.Genres", nil).
+		Preload("UserRelease.Release.Artists", nil).
 		Where(CleaningHistory{UserID: userID}).
 		Order("cleaned_at DESC").
 		Limit(limit).
@@ -316,7 +319,8 @@ func (r *historyRepository) UpdateCleaningHistory(
 	}
 
 	cleaningHistory, err := gorm.G[*CleaningHistory](tx).
-		Preload("UserRelease.Release", nil).
+		Preload("UserRelease.Release.Genres", nil).
+		Preload("UserRelease.Release.Artists", nil).
 		Where(CleaningHistory{BaseUUIDModel: BaseUUIDModel{ID: cleaningHistoryID}}).
 		First(ctx)
 	if err != nil {

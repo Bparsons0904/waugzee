@@ -27,7 +27,6 @@ func Router(router fiber.Router, app *app.App) (err error) {
 	NewStylusHandler(*app, api).Register()
 	NewHistoryHandler(*app, api).Register()
 	NewRecommendationHandler(*app, api).Register()
-	api.Use(app.Middleware.RequireAdmin())
 	NewAdminHandler(*app, api).Register()
 
 	return nil
