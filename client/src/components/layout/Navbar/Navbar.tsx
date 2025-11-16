@@ -6,7 +6,7 @@ import { useAuth } from "@context/AuthContext";
 import { useSyncStatus } from "@context/SyncStatusContext";
 import { useUserData } from "@context/UserDataContext";
 import { A } from "@solidjs/router";
-import { type Component, Match, Show, Switch, createSignal } from "solid-js";
+import { type Component, createSignal, Match, Show, Switch } from "solid-js";
 import styles from "./NavBar.module.scss";
 import { SyncStatusIndicator } from "./SyncStatusIndicator";
 
@@ -47,10 +47,7 @@ export const NavBar: Component = () => {
           </button>
         </div>
 
-        <div
-          class={styles.navbarMenu}
-          classList={{ [styles.mobileMenuOpen]: isMobileMenuOpen() }}
-        >
+        <div class={styles.navbarMenu} classList={{ [styles.mobileMenuOpen]: isMobileMenuOpen() }}>
           <ul class={styles.navbarItems}>
             <li class={styles.navbarItem}>
               <A
@@ -143,9 +140,9 @@ export const NavBar: Component = () => {
                   <A
                     href={ROUTES.HOME}
                     class={`${styles.navbarLink} ${styles.authButton}`}
-                    onClick={(e) => {
+                    onClick={() => {
                       closeMobileMenu();
-                      logout(e);
+                      logout();
                     }}
                   >
                     Logout

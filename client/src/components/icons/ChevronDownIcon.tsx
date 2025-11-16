@@ -1,8 +1,9 @@
-import type { Component } from "solid-js";
+import type { Component, JSX } from "solid-js";
 
 interface ChevronDownIconProps {
   size?: number;
   class?: string;
+  classList?: JSX.CustomAttributes<HTMLElement>["classList"];
 }
 
 export const ChevronDownIcon: Component<ChevronDownIconProps> = (props) => {
@@ -16,6 +17,7 @@ export const ChevronDownIcon: Component<ChevronDownIconProps> = (props) => {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       class={props.class}
+      classList={props.classList}
       role="img"
       aria-label="Chevron down"
     >

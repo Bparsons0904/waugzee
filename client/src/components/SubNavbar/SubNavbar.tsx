@@ -1,6 +1,6 @@
-import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import { Select } from "@components/common/forms/Select/Select";
 import { Button } from "@components/common/ui/Button/Button";
+import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import { StreakBadge } from "@components/StreakBadge/StreakBadge";
 import { useUserData } from "@context/UserDataContext";
 import type { UserRelease } from "@models/User";
