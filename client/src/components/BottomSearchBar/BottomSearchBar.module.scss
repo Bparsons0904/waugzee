@@ -1,0 +1,27 @@
+@import "@styles/variables";
+@import "@styles/colors";
+
+.bottomSearchBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: $bg-elevated;
+  border-top: 1px solid $border-default;
+  padding: $spacing-md;
+  box-shadow: $shadow-lg;
+  z-index: 100;
+
+  @media (min-width: $breakpoint-md) {
+    display: none;
+  }
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.searchInput {
+  width: 100%;
+}

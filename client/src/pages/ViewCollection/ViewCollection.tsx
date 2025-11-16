@@ -1,4 +1,4 @@
-import { SearchInput } from "@components/common/forms/SearchInput/SearchInput";
+import { BottomSearchBar } from "@components/BottomSearchBar/BottomSearchBar";
 import { Select } from "@components/common/forms/Select/Select";
 import { Button } from "@components/common/ui/Button/Button";
 import FilterIcon from "@components/icons/FilterIcon";
@@ -13,8 +13,6 @@ import type { UserRelease } from "src/types/User";
 import styles from "./ViewCollection.module.scss";
 
 interface CollectionControlsProps {
-  searchTerm: string;
-  onSearchChange: (value: string) => void;
   sortBy: string;
   onSortChange: (value: string) => void;
   gridSize: "small" | "medium" | "large";
@@ -31,13 +29,6 @@ const CollectionControls: Component<CollectionControlsProps> = (props) => {
   return (
     <>
       <div class={styles.controls}>
-        <SearchInput
-          value={props.searchTerm}
-          onInput={props.onSearchChange}
-          placeholder="Search by album or artist..."
-          class={styles.searchBar}
-        />
-
         <div class={styles.controlButtons}>
           <button
             class={styles.filterButton}
@@ -297,8 +288,6 @@ const ViewCollection: Component = () => {
       <h1 class={styles.title}>Your Collection</h1>
 
       <CollectionControls
-        searchTerm={viewState.searchTerm}
-        onSearchChange={(value) => setViewState("searchTerm", value)}
         sortBy={viewState.sortBy}
         onSortChange={(value) => setViewState("sortBy", value)}
         gridSize={viewState.gridSize}
@@ -333,6 +322,12 @@ const ViewCollection: Component = () => {
           release={selectedRelease() as never}
         />
       </Show>
+
+      <BottomSearchBar
+        value={viewState.searchTerm}
+        onInput={(value) => setViewState("searchTerm", value)}
+        placeholder="Search by album or artist..."
+      />
     </div>
   );
 };

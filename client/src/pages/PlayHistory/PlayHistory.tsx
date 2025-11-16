@@ -1,4 +1,4 @@
-import { SearchInput } from "@components/common/forms/SearchInput/SearchInput";
+import { BottomSearchBar } from "@components/BottomSearchBar/BottomSearchBar";
 import { Select } from "@components/common/forms/Select/Select";
 import { EditHistoryPanel } from "@components/common/ui/EditHistoryPanel/EditHistoryPanel";
 import { useUserData } from "@context/UserDataContext";
@@ -147,18 +147,6 @@ const PlayHistoryPage: Component = () => {
             onChange={(value) => setGroupBy(value)}
           />
         </div>
-
-        <div class={styles.searchBox}>
-          <label class={styles.label} for="playHistorySearch">
-            Search
-          </label>
-          <SearchInput
-            id="playHistorySearch"
-            placeholder="Search by artist, album, stylus or notes..."
-            value={searchTerm()}
-            onInput={setSearchTerm}
-          />
-        </div>
       </div>
 
       <Show when={filteredHistory().length === 0}>
@@ -207,6 +195,12 @@ const PlayHistoryPage: Component = () => {
           />
         )}
       </Show>
+
+      <BottomSearchBar
+        value={searchTerm()}
+        onInput={setSearchTerm}
+        placeholder="Search by artist, album, stylus or notes..."
+      />
     </div>
   );
 };

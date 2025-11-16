@@ -5,6 +5,16 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: $spacing-xl;
+
+  @media (max-width: $breakpoint-md) {
+    padding: $spacing-md;
+    padding-bottom: calc(#{$spacing-md} + 80px);
+  }
+
+  @media (max-width: $breakpoint-sm) {
+    padding: $spacing-sm;
+    padding-bottom: calc(#{$spacing-sm} + 80px);
+  }
 }
 
 .title {
@@ -13,6 +23,16 @@
   color: $text-default;
   margin-bottom: $spacing-lg;
   text-align: center;
+
+  @media (max-width: $breakpoint-md) {
+    font-size: $font-size-3xl;
+    margin-bottom: $spacing-md;
+  }
+
+  @media (max-width: $breakpoint-sm) {
+    font-size: $font-size-2xl;
+    margin-bottom: $spacing-sm;
+  }
 }
 
 .filters {
@@ -25,25 +45,24 @@
   border-radius: $border-radius-lg;
   box-shadow: $shadow-sm;
   align-items: flex-start;
+
+  @media (max-width: $breakpoint-md) {
+    gap: $spacing-md;
+    margin-bottom: $spacing-md;
+    padding: $spacing-sm;
+  }
+
+  @media (max-width: $breakpoint-sm) {
+    gap: $spacing-sm;
+    margin-bottom: $spacing-sm;
+    padding: $spacing-xs;
+    border-radius: $border-radius-md;
+  }
 }
 
 .filterGroup {
   flex: 1;
   min-width: 200px;
-}
-
-.searchBox {
-  flex: 2;
-  min-width: 300px;
-  display: flex;
-  flex-direction: column;
-}
-
-.label {
-  display: block;
-  font-weight: $font-weight-medium;
-  margin-bottom: $spacing-sm;
-  color: $text-default;
 }
 
 .historyList {
@@ -194,13 +213,8 @@
     align-items: stretch;
   }
 
-  .filterGroup,
-  .searchBox {
+  .filterGroup {
     min-width: 100%;
-  }
-
-  .container {
-    padding: $spacing-lg;
   }
 
   .indicators {
