@@ -1,4 +1,4 @@
-FROM golang:1.25.1-alpine AS base
+FROM golang:1.25.4-alpine AS base
 
 # Install necessary packages in a single layer
 RUN apk add --no-cache git make gcc musl-dev curl && \
