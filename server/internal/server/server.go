@@ -62,6 +62,19 @@ func New(app *app.App) (*AppServer, error) {
 	server.Use(fiberLogs.New())
 	server.Use(compress.New())
 
+	server.Use(func(c *fiber.Ctx) error {
+		if c.Path() == "/api/health" {
+			c.Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			return c.Next()
+		}
+		if c.Method() == "GET" && c.Path() != "/ws" {
+			c.Set("Cache-Control", "no-cache, must-revalidate")
+			c.Set("Pragma", "no-cache")
+			c.Set("Expires", "0")
+		}
+		return c.Next()
+	})
+
 	// Enhanced security headers
 	server.Use(helmet.New(helmet.Config{
 		XSSProtection:             "1; mode=block",

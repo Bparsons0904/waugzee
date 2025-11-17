@@ -35,15 +35,46 @@ FROM nginx:alpine
 # Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration for SPA routing
+# Copy nginx configuration for SPA routing with caching
 RUN echo 'server { \
     listen 80; \
     server_name localhost; \
     root /usr/share/nginx/html; \
     index index.html; \
+    \
+    # Gzip compression \
+    gzip on; \
+    gzip_vary on; \
+    gzip_min_length 1024; \
+    gzip_types text/css text/javascript application/javascript application/json image/svg+xml; \
+    \
+    # Cache static assets with hash in filename for 1 year \
+    location ~* ^/assets/.*\.(js|css|woff2?|ttf|eot|svg)$ { \
+        expires 1y; \
+        add_header Cache-Control "public, immutable"; \
+        access_log off; \
+    } \
+    \
+    # Cache images for 1 month \
+    location ~* ^/images/.*\.(jpg|jpeg|png|gif|ico|svg|webp)$ { \
+        expires 30d; \
+        add_header Cache-Control "public, immutable"; \
+        access_log off; \
+    } \
+    \
+    # No cache for index.html (always check for updates) \
+    location = /index.html { \
+        expires -1; \
+        add_header Cache-Control "no-cache, no-store, must-revalidate"; \
+    } \
+    \
+    # SPA routing fallback \
     location / { \
         try_files $uri $uri/ /index.html; \
+        expires -1; \
+        add_header Cache-Control "no-cache, no-store, must-revalidate"; \
     } \
+    \
     location /api { \
         proxy_pass http://server:8288; \
         proxy_set_header Host $host; \
@@ -51,6 +82,7 @@ RUN echo 'server { \
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
         proxy_set_header X-Forwarded-Proto $scheme; \
     } \
+    \
     location /ws { \
         proxy_pass http://server:8288; \
         proxy_http_version 1.1; \
