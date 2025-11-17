@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 365 334" width="365" height="334">
+  <defs>
+    <style>
+      .vinyl-blue { fill: none; stroke: #2B5A9E; stroke-width: 8; }
+      .vinyl-blue-filled { fill: #2B5A9E; }
+    </style>
+  </defs>
+
+  <!-- Outer circle (largest groove) -->
+  <circle cx="167" cy="167" r="155" class="vinyl-blue"/>
+
+  <!-- Second circle -->
+  <circle cx="167" cy="167" r="125" class="vinyl-blue"/>
+
+  <!-- Third circle -->
+  <circle cx="167" cy="167" r="95" class="vinyl-blue"/>
+
+  <!-- Fourth circle -->
+  <circle cx="167" cy="167" r="65" class="vinyl-blue"/>
+
+  <!-- Center label (filled circle) -->
+  <circle cx="167" cy="167" r="42" class="vinyl-blue-filled"/>
+
+  <!-- Center dot (white) -->
+  <circle cx="167" cy="167" r="12" fill="white"/>
+
+  <!-- Tonearm line - from lower-right on vinyl to upper-right corner -->
+  <line x1="220" y1="210" x2="315" y2="75" class="vinyl-blue"/>
+
+  <!-- Tonearm top-right circle (counterweight) -->
+  <circle cx="315" cy="75" r="18" class="vinyl-blue"/>
+  <circle cx="315" cy="75" r="8" fill="white"/>
+
+  <!-- Tonearm bottom-left circle (stylus on vinyl) -->
+  <circle cx="220" cy="210" r="14" class="vinyl-blue"/>
+  <circle cx="220" cy="210" r="6" fill="white"/>
+</svg>

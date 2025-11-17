@@ -36,7 +36,7 @@ export const NavBar: Component = () => {
         <div class={styles.navbarHeader}>
           <div class={styles.navbarLogo}>
             <A href={ROUTES.HOME} class={styles.navbarTitle} onClick={closeMobileMenu}>
-              <img src="/images/waugzee_logo.png" alt="Waugzee" class={styles.vinylLogo} />
+              <img src="/images/waugzee_logo.svg" alt="Waugzee" class={styles.vinylLogo} />
               {/* <VinylIcon size={42} class={styles.vinylIcon} /> */}
               Waugzee
             </A>
