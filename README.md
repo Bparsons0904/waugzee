@@ -23,8 +23,8 @@ waugzee/
 
 - [Docker](https://docs.docker.com/get-docker/)
 - [Tilt](https://tilt.dev/) - Modern development environment orchestrator
-- [Node.js v22](https://nodejs.org/) (for local development)
-- [Go 1.25.1+](https://golang.org/) (for local development)
+- [Node.js v24](https://nodejs.org/) (for local development)
+- [Go 1.25.4+](https://golang.org/) (for local development)
 
 ### Development Environment
 
@@ -178,26 +178,31 @@ VITE_ENV=local
 ## 🎵 Core Features
 
 ### Multi-User Collection Management
+
 - User-scoped vinyl record collections
 - Zitadel OIDC authentication
 - Multi-tenant data isolation
 
 ### Discogs Integration
+
 - Automatic collection synchronization
 - Rich metadata import
 - Cover art and release information
 
 ### Play Session Tracking
+
 - Log listening sessions with equipment details
 - Duration tracking and listening statistics
 - Personal notes and ratings
 
 ### Equipment Management
+
 - Track turntables, cartridges, and styluses
 - Usage monitoring and wear tracking
 - Maintenance scheduling
 
 ### Analytics Dashboard
+
 - Listening patterns and trends
 - Collection insights and statistics
 - Equipment usage analysis
@@ -259,3 +264,4 @@ While the current setup is optimized for development, production deployment cons
 **Project Status**: 🚧 **Active Development** - Foundation phase in progress
 
 **Happy coding! 🎉**
+

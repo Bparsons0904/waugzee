@@ -1,4 +1,4 @@
-FROM golang:1.25.1-alpine AS base
+FROM golang:1.25.4-alpine AS base
 
 # Install necessary packages in a single layer
 RUN apk add --no-cache git make gcc musl-dev curl && \
@@ -33,6 +33,10 @@ RUN chmod -R 755 /app
 # Set environment variables for Go build cache
 ENV GOCACHE=/.cache/go-build
 ENV GOMODCACHE=/go/pkg/mod
+
+# Enable Go 1.25 experimental features
+ARG GOEXPERIMENT=greenteagc,jsonv2
+ENV GOEXPERIMENT=${GOEXPERIMENT}
 
 # Add air to PATH explicitly
 ENV PATH="/root/go/bin:${PATH}"

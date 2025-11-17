@@ -1,5 +1,5 @@
+import { BottomSearchBar } from "@components/BottomSearchBar/BottomSearchBar";
 import { Field } from "@components/common/forms/Field/Field";
-import { SearchInput } from "@components/common/forms/SearchInput/SearchInput";
 import { Select, type SelectOption } from "@components/common/forms/Select/Select";
 import { Toggle } from "@components/common/forms/Toggle/Toggle";
 import { Image } from "@components/common/ui/Image/Image";
@@ -192,15 +192,16 @@ const LogPlay: Component = () => {
       <div class={styles.logForm}>
         <div class={styles.controlsRow}>
           <div class={styles.searchSection}>
-            <label class={styles.label} for="releaseSearch">
-              Search Your Collection
-            </label>
-            <SearchInput
-              id="releaseSearch"
-              value={searchTerm()}
-              onInput={setSearchTerm}
-              placeholder="Search by title or artist..."
-            />
+            <Field label="Search" htmlFor="searchInput">
+              <input
+                type="text"
+                id="searchInput"
+                class={styles.searchInput}
+                value={searchTerm()}
+                onInput={(e) => setSearchTerm(e.currentTarget.value)}
+                placeholder="Search by title or artist..."
+              />
+            </Field>
           </div>
 
           <div class={styles.sortSection}>
@@ -213,12 +214,12 @@ const LogPlay: Component = () => {
               />
             </Field>
           </div>
-        </div>
 
-        <div class={styles.optionsSection}>
-          <Field label="Show status details">
-            <Toggle checked={showStatusDetails()} onChange={setShowStatusDetails} />
-          </Field>
+          <div class={styles.optionsSection}>
+            <Field label="Show status details">
+              <Toggle checked={showStatusDetails()} onChange={setShowStatusDetails} />
+            </Field>
+          </div>
         </div>
 
         <h2 class={styles.sectionTitle}>Your Collection</h2>
@@ -301,6 +302,12 @@ const LogPlay: Component = () => {
           release={selectedRelease() as never}
         />
       </Show>
+
+      <BottomSearchBar
+        value={searchTerm()}
+        onInput={setSearchTerm}
+        placeholder="Search by title or artist..."
+      />
     </div>
   );
 };

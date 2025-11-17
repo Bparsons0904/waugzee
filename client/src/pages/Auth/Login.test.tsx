@@ -1,16 +1,17 @@
-import { MemoryRouter, Route } from "@solidjs/router";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
-import { createSignal, type JSX } from "solid-js";
+import { createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Login from "./Login";
 
-// Mock the auth context
-const mockLogin = vi.fn();
+const mockLoginWithOIDC = vi.fn();
+const mockAuthConfig = createSignal({ configured: true });
 const mockAuthContext = {
-  login: mockLogin,
+  loginWithOIDC: mockLoginWithOIDC,
+  authConfig: mockAuthConfig[0],
   isAuthenticated: createSignal(false)[0],
   user: null,
   authToken: createSignal(null)[0],
+  login: vi.fn(),
   register: vi.fn(),
   logout: vi.fn(),
 };
@@ -19,215 +20,88 @@ vi.mock("@context/AuthContext", () => ({
   useAuth: () => mockAuthContext,
 }));
 
-// Mock the router
-const MockRouter = (props: { children: unknown }) => (
-  <MemoryRouter>
-    <Route path="*" component={() => props.children as JSX.Element} />
-  </MemoryRouter>
-);
-
 describe("Login", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("renders login form elements", () => {
-    render(() => (
-      <MockRouter>
-        <Login />
-      </MockRouter>
-    ));
+  it("renders login page with OIDC button", () => {
+    render(() => <Login />);
 
     expect(screen.getByText("Welcome Back")).toBeInTheDocument();
-    expect(screen.getByText("Sign in to continue your creative journey")).toBeInTheDocument();
-    expect(screen.getByLabelText(/Username or Email/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Password/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
+    expect(screen.getByText("Sign in to continue your vinyl journey")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sign in with zitadel/i })).toBeInTheDocument();
   });
 
-  it("shows registration link", () => {
-    render(() => (
-      <MockRouter>
-        <Login />
-      </MockRouter>
-    ));
+  it("shows authentication info message", () => {
+    render(() => <Login />);
 
-    expect(screen.getByText("Don't have an account?")).toBeInTheDocument();
-    expect(screen.getByText("Create one here")).toBeInTheDocument();
-
-    const registerLink = screen.getByRole("link", { name: /create one here/i });
-    expect(registerLink).toHaveAttribute("href", "/register");
+    expect(
+      screen.getByText("You'll be redirected to our secure authentication provider to sign in."),
+    ).toBeInTheDocument();
   });
 
-  it("has default values in form fields", () => {
-    render(() => (
-      <MockRouter>
-        <Login />
-      </MockRouter>
-    ));
+  it("shows error message when auth is not configured", () => {
+    mockAuthConfig[1]({ configured: false });
 
-    const usernameInput = screen.getByLabelText(/Username or Email/) as HTMLInputElement;
-    const passwordInput = screen.getByLabelText(/Password/) as HTMLInputElement;
+    render(() => <Login />);
 
-    expect(usernameInput.value).toBe("admin");
-    expect(passwordInput.value).toBe("password");
+    expect(screen.getByText("Authentication is not configured")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sign in/i })).not.toBeInTheDocument();
+
+    mockAuthConfig[1]({ configured: true });
   });
 
-  it("validates required fields", () => {
-    render(() => (
-      <MockRouter>
-        <Login />
-      </MockRouter>
-    ));
+  it("calls loginWithOIDC when button is clicked", async () => {
+    render(() => <Login />);
 
-    const usernameInput = screen.getByLabelText(/Username or Email/);
-    const passwordInput = screen.getByLabelText(/Password/);
+    const loginButton = screen.getByRole("button", { name: /sign in with zitadel/i });
+    fireEvent.click(loginButton);
 
-    // Clear the default values
-    fireEvent.input(usernameInput, { target: { value: "" } });
-    fireEvent.blur(usernameInput);
-
-    expect(screen.getByText("Username or Email is required")).toBeInTheDocument();
-
-    fireEvent.input(passwordInput, { target: { value: "" } });
-    fireEvent.blur(passwordInput);
-
-    expect(screen.getByText("Password is required")).toBeInTheDocument();
+    expect(mockLoginWithOIDC).toHaveBeenCalledWith(undefined);
   });
 
-  it("validates minimum length requirements", () => {
-    render(() => (
-      <MockRouter>
-        <Login />
-      </MockRouter>
-    ));
+  it("retrieves and uses returnTo from sessionStorage", async () => {
+    sessionStorage.setItem("returnTo", "/dashboard");
 
-    const usernameInput = screen.getByLabelText(/Username or Email/);
-    const passwordInput = screen.getByLabelText(/Password/);
+    render(() => <Login />);
 
-    // Enter values that are too short
-    fireEvent.input(usernameInput, { target: { value: "ab" } });
-    fireEvent.blur(usernameInput);
+    const loginButton = screen.getByRole("button", { name: /sign in with zitadel/i });
+    fireEvent.click(loginButton);
 
-    expect(screen.getByText("Username or Email must be at least 3 characters")).toBeInTheDocument();
-
-    fireEvent.input(passwordInput, { target: { value: "12345" } });
-    fireEvent.blur(passwordInput);
-
-    expect(screen.getByText("Password must be at least 6 characters")).toBeInTheDocument();
+    expect(mockLoginWithOIDC).toHaveBeenCalledWith("/dashboard");
+    expect(sessionStorage.getItem("returnTo")).toBeNull();
   });
 
-  it("disables submit button when form is invalid", () => {
-    render(() => (
-      <MockRouter>
-        <Login />
-      </MockRouter>
-    ));
+  it("shows loading state during login", async () => {
+    mockLoginWithOIDC.mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)));
 
-    const submitButton = screen.getByRole("button", { name: /sign in/i });
-    const usernameInput = screen.getByLabelText(/Username or Email/);
+    render(() => <Login />);
 
-    // Clear username to make form invalid
-    fireEvent.input(usernameInput, { target: { value: "" } });
-    fireEvent.blur(usernameInput);
+    const loginButton = screen.getByRole("button", { name: /sign in with zitadel/i });
+    fireEvent.click(loginButton);
 
-    expect(submitButton).toBeDisabled();
+    expect(await screen.findByText("Signing In...")).toBeInTheDocument();
+    expect(loginButton).toBeDisabled();
   });
 
-  it("enables submit button when form is valid", () => {
-    render(() => (
-      <MockRouter>
-        <Login />
-      </MockRouter>
-    ));
-
-    const submitButton = screen.getByRole("button", { name: /sign in/i });
-
-    // With default values, form should be valid
-    expect(submitButton).not.toBeDisabled();
-  });
-
-  it("calls login function with correct credentials on form submission", () => {
-    render(() => (
-      <MockRouter>
-        <Login />
-      </MockRouter>
-    ));
-
-    const form = document.querySelector("form");
-    const usernameInput = screen.getByLabelText(/Username or Email/);
-    const passwordInput = screen.getByLabelText(/Password/);
-
-    // Enter custom values and blur to update form context
-    fireEvent.input(usernameInput, { target: { value: "testuser" } });
-    fireEvent.blur(usernameInput);
-    fireEvent.input(passwordInput, { target: { value: "testpass123" } });
-    fireEvent.blur(passwordInput);
-
-    // Submit the form
-    fireEvent.submit(form);
-
-    expect(mockLogin).toHaveBeenCalledWith({
-      login: "testuser",
-      password: "testpass123",
+  it("shows error message when login fails", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {
+      // Suppress console.error output during test
     });
-  });
+    mockLoginWithOIDC.mockRejectedValue(new Error("Login failed"));
 
-  it("uses default values when submitting form", () => {
-    render(() => (
-      <MockRouter>
-        <Login />
-      </MockRouter>
-    ));
+    render(() => <Login />);
 
-    const form = document.querySelector("form");
+    const loginButton = screen.getByRole("button", { name: /sign in with zitadel/i });
+    fireEvent.click(loginButton);
 
-    // Submit without changing values
-    fireEvent.submit(form);
-
-    expect(mockLogin).toHaveBeenCalledWith({
-      login: "admin",
-      password: "password",
-    });
-  });
-
-  it("has proper form field attributes", () => {
-    render(() => (
-      <MockRouter>
-        <Login />
-      </MockRouter>
-    ));
-
-    const usernameInput = screen.getByLabelText(/Username or Email/);
-    const passwordInput = screen.getByLabelText(/Password/);
-
-    expect(usernameInput).toHaveAttribute("name", "login");
-    expect(usernameInput).toHaveAttribute("autocomplete", "username");
-
-    expect(passwordInput).toHaveAttribute("name", "password");
-    expect(passwordInput).toHaveAttribute("type", "password");
-    expect(passwordInput).toHaveAttribute("autocomplete", "current-password");
-  });
-
-  it("shows required asterisks for required fields", () => {
-    render(() => (
-      <MockRouter>
-        <Login />
-      </MockRouter>
-    ));
-
-    // Check that asterisks are present in the DOM
-    const pageContainer = document.body;
-    expect(pageContainer.textContent).toContain("*");
-
-    // Check specifically for username and password fields
-    const usernameInput = screen.getByLabelText(/Username or Email/);
-    const passwordInput = screen.getByLabelText(/Password/);
-    expect(usernameInput).toBeInTheDocument();
-    expect(passwordInput).toBeInTheDocument();
+    expect(await screen.findByText("Login failed")).toBeInTheDocument();
+    consoleErrorSpy.mockRestore();
   });
 });

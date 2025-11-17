@@ -254,7 +254,7 @@ export function useCreateUserStylus(
     STYLUS_ENDPOINTS.CREATE,
     undefined,
     {
-      invalidateQueries: [["styluses", "user"]],
+      invalidateQueries: [["styluses", "user"], ["user"]],
       successMessage: "Stylus added to equipment successfully!",
       errorMessage: "Failed to add stylus to equipment. Please try again.",
       ...options,
@@ -269,10 +269,7 @@ export function useCreateCustomStylus(
     STYLUS_ENDPOINTS.CUSTOM,
     undefined,
     {
-      invalidateQueries: [
-        ["styluses", "user"],
-        ["styluses", "available"],
-      ],
+      invalidateQueries: [["styluses", "user"], ["styluses", "available"], ["user"]],
       successMessage: "Custom stylus created and added to equipment!",
       errorMessage: "Failed to create custom stylus. Please try again.",
       ...options,
@@ -287,7 +284,7 @@ export function useUpdateUserStylus(
     (variables) => STYLUS_ENDPOINTS.UPDATE(variables.id),
     undefined,
     {
-      invalidateQueries: [["styluses", "user"]],
+      invalidateQueries: [["styluses", "user"], ["user"]],
       successMessage: "Stylus updated successfully!",
       errorMessage: "Failed to update stylus. Please try again.",
       ...options,
@@ -297,7 +294,7 @@ export function useUpdateUserStylus(
 
 export function useDeleteUserStylus(options?: ApiMutationOptions<void, string>) {
   return useApiMutation<void, string>("DELETE", (id) => STYLUS_ENDPOINTS.DELETE(id), undefined, {
-    invalidateQueries: [["styluses", "user"]],
+    invalidateQueries: [["styluses", "user"], ["user"]],
     successMessage: "Stylus removed from equipment successfully!",
     errorMessage: "Failed to remove stylus. Please try again.",
     ...options,
@@ -446,15 +443,14 @@ export function useCleanupFiles(options?: ApiMutationOptions<void, void>) {
 
 // Recommendation API Hooks
 export function useMarkRecommendationListened(
-  recommendationId: string,
-  options?: ApiMutationOptions<void, Record<string, never>>,
+  options?: ApiMutationOptions<void, { recommendationId: string }>,
 ) {
-  return useApiPost<void, Record<string, never>>(
-    RECOMMENDATION_ENDPOINTS.MARK_LISTENED(recommendationId),
+  return useApiPost<void, { recommendationId: string }>(
+    (variables) => RECOMMENDATION_ENDPOINTS.MARK_LISTENED(variables.recommendationId),
     undefined,
     {
       invalidateQueries: [["user"]],
-      successMessage: "Recommendation marked as listened!",
+      successMessage: "Play logged and recommendation marked as listened!",
       errorMessage: "Failed to mark recommendation as listened",
       ...options,
     },

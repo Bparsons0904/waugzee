@@ -3,12 +3,14 @@
 
 .backdrop {
   @include absolute-fill;
+  position: fixed;
   background-color: $overlay-medium;
   backdrop-filter: blur(4px);
   z-index: $z-index-modal-backdrop;
   @include flex-center;
   opacity: 0;
   animation: fadeIn $transition-normal ease-out forwards;
+  overflow-y: auto;
 }
 
 .modal {

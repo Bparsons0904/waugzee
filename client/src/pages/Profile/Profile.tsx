@@ -2,10 +2,11 @@ import { Button } from "@components/common/ui/Button/Button";
 import { DiscogsTokenModal } from "@components/common/ui/DiscogsTokenModal/DiscogsTokenModal";
 import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import { FolderSelector } from "@components/folders/FolderSelector";
-import { USER_ENDPOINTS } from "@constants/api.constants";
+import { ROUTES, USER_ENDPOINTS } from "@constants/api.constants";
 import { useAuth } from "@context/AuthContext";
 import { useUserData } from "@context/UserDataContext";
 import { useApiPut } from "@services/apiHooks";
+import { useNavigate } from "@solidjs/router";
 import clsx from "clsx";
 import { type Component, createSignal, Show } from "solid-js";
 import type { UpdateUserPreferencesRequest, UpdateUserPreferencesResponse } from "src/types/User";
@@ -13,9 +14,16 @@ import styles from "./Profile.module.scss";
 
 const Profile: Component = () => {
   const { logout } = useAuth();
-  const { user } = useUserData();
+  const { user, styluses } = useUserData();
+  const navigate = useNavigate();
 
   const [isDiscogsModalOpen, setIsDiscogsModalOpen] = createSignal(false);
+
+  const needsPrimaryStylus = () => {
+    const hasDiscogsToken = !!user()?.configuration?.discogsToken;
+    const hasPrimaryStylus = styluses().some((s) => s.isPrimary);
+    return hasDiscogsToken && !hasPrimaryStylus;
+  };
 
   const [recentlyPlayedThreshold, setRecentlyPlayedThreshold] = createSignal<number>(
     user()?.configuration?.recentlyPlayedThresholdDays ?? 90,
@@ -122,6 +130,39 @@ const Profile: Component = () => {
             <h2 class={styles.sectionTitle}>Folder Selection</h2>
           </div>
           <FolderSelector />
+        </div>
+
+        <div
+          class={clsx(styles.section, {
+            [styles.needsAttention]: needsPrimaryStylus(),
+          })}
+        >
+          <div class={styles.sectionHeader}>
+            <h2 class={styles.sectionTitle}>My Styluses</h2>
+          </div>
+          <div class={styles.stylusInfo}>
+            <div class={styles.statusInfo}>
+              <span class={styles.infoLabel}>Primary Stylus Status</span>
+              <span
+                class={clsx(styles.statusBadge, {
+                  [styles.statusConnected]: !needsPrimaryStylus(),
+                  [styles.statusDisconnected]: needsPrimaryStylus(),
+                })}
+              >
+                {needsPrimaryStylus()
+                  ? "✗ No Primary Stylus Selected"
+                  : "✓ Primary Stylus Configured"}
+              </span>
+            </div>
+            <p class={styles.helpText}>
+              {needsPrimaryStylus()
+                ? "Select a primary stylus to track your listening sessions and needle wear."
+                : "Your primary stylus is set up and ready to track plays."}
+            </p>
+            <Button variant="secondary" onClick={() => navigate(ROUTES.EQUIPMENT)}>
+              Manage Styluses
+            </Button>
+          </div>
         </div>
 
         <div class={styles.section}>

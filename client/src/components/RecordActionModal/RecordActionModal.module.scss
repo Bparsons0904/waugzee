@@ -8,15 +8,19 @@
 
 .recordDetails {
   display: flex;
-  padding: $spacing-xl;
+  padding: $spacing-md;
   border-bottom: $border-width-thin solid $border-default;
+
+  @media (min-width: $breakpoint-md) {
+    padding: $spacing-xl;
+  }
 }
 
 .recordImage {
   width: 120px;
   height: 120px;
   flex-shrink: 0;
-  margin-right: $spacing-xl;
+  margin-right: $spacing-md;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -24,6 +28,10 @@
   border-radius: $border-radius-md;
   overflow: hidden;
   box-shadow: $shadow-md;
+
+  @media (min-width: $breakpoint-md) {
+    margin-right: $spacing-xl;
+  }
 
   img {
     width: 100%;
@@ -65,8 +73,15 @@
 
 .formRow {
   display: flex;
-  gap: $spacing-xl;
-  margin-bottom: $spacing-lg;
+  flex-direction: column;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-sm;
+
+  @media (min-width: $breakpoint-md) {
+    flex-direction: row;
+    gap: $spacing-xl;
+    margin-bottom: $spacing-lg;
+  }
 
   .formGroup {
     flex: 1;
@@ -74,12 +89,20 @@
 }
 
 .formSection {
-  padding: $spacing-xl;
+  padding: $spacing-md;
   border-bottom: $border-width-thin solid $border-default;
+
+  @media (min-width: $breakpoint-md) {
+    padding: $spacing-xl;
+  }
 }
 
 .formGroup {
-  margin-bottom: $spacing-lg;
+  margin-bottom: $spacing-sm;
+
+  @media (min-width: $breakpoint-md) {
+    margin-bottom: $spacing-lg;
+  }
 
   &:last-child {
     margin-bottom: 0;
@@ -138,13 +161,24 @@
 
 .actionButtons {
   display: flex;
+  flex-direction: column;
   justify-content: center;
-  gap: $spacing-2xl;
-  padding: $spacing-xl;
+  gap: $spacing-sm;
+  padding: $spacing-md;
   border-bottom: $border-width-thin solid $border-default;
 
   button {
-    width: 200px;
+    width: 100%;
+  }
+
+  @media (min-width: $breakpoint-md) {
+    flex-direction: row;
+    gap: $spacing-2xl;
+    padding: $spacing-xl;
+
+    button {
+      width: 200px;
+    }
   }
 }
 
@@ -218,7 +252,11 @@
 }
 
 .historySection {
-  padding: $spacing-xl;
+  padding: $spacing-md;
+
+  @media (min-width: $breakpoint-md) {
+    padding: $spacing-xl;
+  }
 }
 
 .historyTitle {
@@ -263,17 +301,3 @@
   }
 }
 
-@media (max-width: $breakpoint-md) {
-  .actionButtons {
-    flex-direction: column;
-    gap: $spacing-md;
-
-    button {
-      width: 100%;
-    }
-  }
-
-  .formRow {
-    flex-direction: column;
-  }
-}

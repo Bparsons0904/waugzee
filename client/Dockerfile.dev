@@ -1,5 +1,5 @@
 # Development Dockerfile for SolidJS client with hot reloading
-FROM node:22-alpine
+FROM node:24-alpine
 
 # Install necessary packages
 RUN apk add --no-cache git

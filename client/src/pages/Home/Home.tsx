@@ -19,9 +19,15 @@ interface SyncResponse {
 
 const Home: Component = () => {
   const navigate = useNavigate();
-  const { user } = useUserData();
+  const { user, styluses } = useUserData();
 
   const [syncStatus, setSyncStatus] = createSignal<string>("");
+
+  const needsPrimaryStylus = () => {
+    const hasDiscogsToken = !!user()?.configuration?.discogsToken;
+    const hasPrimaryStylus = styluses().some((s) => s.isPrimary);
+    return hasDiscogsToken && !hasPrimaryStylus;
+  };
 
   const syncMutation = useApiPost<SyncResponse, void>("/sync/syncCollection", undefined, {
     successMessage: "Collection sync started successfully!",
@@ -80,9 +86,12 @@ const Home: Component = () => {
     },
     {
       title: "My Styluses",
-      description: "Manage your styluses and track needle wear.",
+      description: needsPrimaryStylus()
+        ? "Select a primary stylus to track your listening sessions."
+        : "Manage your styluses and track needle wear.",
       buttonText: "Manage Styluses",
       onClick: () => handleNavigation(ROUTES.EQUIPMENT),
+      highlight: needsPrimaryStylus(),
     },
     {
       title: "Sync Collection",

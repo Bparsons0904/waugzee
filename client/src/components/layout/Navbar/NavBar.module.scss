@@ -1,3 +1,11 @@
+@use "@styles/variables" as *;
+@use "@styles/colors" as *;
+@use "@styles/mixins" as *;
+
+// ====================
+// Navbar Base (Mobile First)
+// ====================
+
 .navbar {
   background: rgba($color-white, 0.8);
   backdrop-filter: blur(10px);
@@ -6,27 +14,46 @@
   padding: $spacing-md 0;
   box-shadow: $shadow-lg;
   border-bottom: 1px solid rgba($border-default, 0.3);
+  position: sticky;
+  top: 0;
+  z-index: $z-index-sticky;
 }
+
 .navbarContainer {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 $spacing-md;
-  @include breakpoint(md) {
-    flex-direction: row;
-    justify-content: space-between;
+
+  @include breakpoint(lg) {
+    display: flex;
     align-items: center;
+    gap: $spacing-xl;
   }
 }
+
+// ====================
+// Mobile Header (Logo + Hamburger)
+// ====================
+
+.navbarHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  @include breakpoint(lg) {
+    flex: 0 0 auto;
+  }
+}
+
 .navbarLogo {
   font-size: $font-size-2xl;
   font-weight: $font-weight-bold;
-  @include breakpoint(md) {
+
+  @include breakpoint(lg) {
     font-size: $font-size-3xl;
   }
 }
+
 .navbarTitle {
   display: flex;
   align-items: center;
@@ -56,77 +83,142 @@
   }
 }
 
-.vinylIcon {
-  color: $color-black;
-  transition: transform $transition-normal $transition-timing-smooth;
+.vinylLogo {
+  width: 54px;
+  height: 50px;
+}
 
-  .navbarTitle:hover & {
-    transform: rotate(45deg);
+// ====================
+// Mobile Menu Toggle Button
+// ====================
+
+.mobileMenuToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-sm;
+  background: transparent;
+  border: none;
+  color: $text-default;
+  cursor: pointer;
+  border-radius: $border-radius-lg;
+  transition: all $transition-fast $transition-timing-smooth;
+
+  &:hover {
+    background: rgba($color-primary-500, 0.1);
+    color: $color-primary-700;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  @include breakpoint(md) {
+    display: none;
   }
 }
+
+// ====================
+// Mobile Menu (Collapsible)
+// ====================
+
 .navbarMenu {
-  display: flex;
+  display: none;
   flex-direction: column;
-  width: 100%;
-  margin-top: $spacing-md;
   gap: $spacing-md;
+  margin-top: $spacing-md;
+  padding-top: $spacing-md;
+  border-top: 1px solid rgba($border-default, 0.2);
+
+  &.mobileMenuOpen {
+    display: flex;
+  }
+
   @include breakpoint(md) {
+    display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    width: auto;
+    margin-top: $spacing-lg;
+    padding-top: 0;
+    border-top: none;
+  }
+
+  @include breakpoint(lg) {
+    flex: 1;
     margin-top: 0;
-    gap: $spacing-lg;
   }
 }
+
+// ====================
+// Navigation Items
+// ====================
+
 .navbarItems {
   display: flex;
   flex-direction: column;
-  width: 100%;
+  gap: $spacing-xs;
   margin: 0;
   padding: 0;
+  list-style: none;
+
   @include breakpoint(md) {
     flex-direction: row;
-    width: auto;
+    gap: $spacing-sm;
+  }
+
+  @include breakpoint(lg) {
+    flex: 1;
+    justify-content: center;
   }
 }
 
 .navbarActions {
   display: flex;
   flex-direction: column;
-  width: 100%;
+  gap: $spacing-xs;
   margin: 0;
   padding: 0;
+  list-style: none;
+  padding-top: $spacing-md;
+  margin-top: $spacing-md;
+  border-top: 1px solid rgba($border-default, 0.2);
+
   @include breakpoint(md) {
     flex-direction: row;
-    width: auto;
+    gap: $spacing-sm;
+    padding-top: 0;
+    margin-top: 0;
+    border-top: none;
+  }
+
+  @include breakpoint(lg) {
+    flex: 0 0 auto;
   }
 }
+
 .navbarItem {
   margin: 0;
-  width: 100%;
-  text-align: center;
-  padding: $spacing-sm 0;
-  &:not(:last-child) {
-    border-bottom: $border-width-thin solid rgba($color-white, 0.1);
-  }
-  @include breakpoint(md) {
-    width: auto;
-    text-align: left;
-    margin-left: $spacing-md;
-    &:not(:last-child) {
-      border-bottom: none;
-    }
-  }
 }
+
+// ====================
+// Navigation Links
+// ====================
+
 .navbarLink {
+  display: block;
   color: $text-muted;
-  padding: $spacing-sm $spacing-md;
-  position: relative;
-  transition: all $transition-normal $transition-timing-smooth;
+  padding: $spacing-md;
   text-decoration: none;
   border-radius: $border-radius-xl;
   font-weight: $font-weight-medium;
+  transition: all $transition-normal $transition-timing-smooth;
+  text-align: center;
+
+  @include breakpoint(md) {
+    padding: $spacing-sm $spacing-md;
+    text-align: left;
+  }
 
   &:hover {
     color: $color-primary-700;
@@ -154,6 +246,10 @@
   }
 }
 
+// ====================
+// Auth Button (Login/Logout)
+// ====================
+
 .authButton {
   background: linear-gradient(
     135deg,
@@ -162,9 +258,13 @@
   );
   color: $button-primary-text !important;
   font-weight: $font-weight-semibold;
-  padding: $spacing-sm $spacing-lg;
+  padding: $spacing-md $spacing-lg;
   border-radius: $border-radius-full;
   box-shadow: $shadow-md;
+
+  @include breakpoint(md) {
+    padding: $spacing-sm $spacing-lg;
+  }
 
   &:hover {
     background: linear-gradient(
@@ -197,7 +297,8 @@
 // ====================
 
 @keyframes glowPulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow:
       0 0 5px rgba($color-primary-500, 0.5),
       0 0 10px rgba($color-primary-500, 0.3),

@@ -15,6 +15,7 @@ CLIENT_PORT = os.getenv('CLIENT_PORT', '3021')
 DB_CACHE_PORT= os.getenv('DB_CACHE_PORT', '6380')
 DOCKER_ENV = os.getenv('DOCKER_ENV', 'dev')
 TILT_PORT = os.getenv('TILT_PORT', '10350')
+GOEXPERIMENT = os.getenv('GOEXPERIMENT', 'greenteagc,jsonv2')
 
 # Development mode toggle
 DEV_MODE = True
@@ -311,6 +312,7 @@ print("🔧 Server API: http://localhost:%s" % SERVER_PORT)
 print("🎨 Client App: http://localhost:%s" % CLIENT_PORT)
 print("🐘 PostgreSQL: localhost:%s" % os.getenv('DB_PORT', '5432'))
 print("💾 Valkey DB: localhost:%s" % DB_CACHE_PORT)
+print("⚡ Go Experiments: %s" % GOEXPERIMENT)
 print("💡 Hot reloading enabled for all services!")
 print("🧪 Manual test/lint resources available in Tilt UI")
 

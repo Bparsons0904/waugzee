@@ -16,7 +16,7 @@ A modern SolidJS frontend for Billy Wu, a collaborative storytelling app where f
 
 ### Prerequisites
 
-- Node.js 22+ (see `.nvmrc`)
+- Node.js 24+ (see `.nvmrc`)
 - npm, pnpm, or yarn
 
 ### Installation

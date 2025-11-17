@@ -1,5 +1,6 @@
 import { Select } from "@components/common/forms/Select/Select";
 import { Button } from "@components/common/ui/Button/Button";
+import { ChevronDownIcon } from "@components/icons/ChevronDownIcon";
 import { StreakBadge } from "@components/StreakBadge/StreakBadge";
 import { useUserData } from "@context/UserDataContext";
 import type { UserRelease } from "@models/User";
@@ -20,30 +21,18 @@ export const SubNavbar: Component = () => {
   const [selectedGenre, setSelectedGenre] = createSignal<string>("");
   const [isModalOpen, setIsModalOpen] = createSignal(false);
   const [selectedRelease, setSelectedRelease] = createSignal<UserRelease | null>(null);
+  const [isExpanded, setIsExpanded] = createSignal(false);
 
   const isListened = createMemo(() => !!dailyRecommendation()?.listenedAt);
   const primaryStylus = createMemo(() => styluses().find((s) => s.isPrimary));
 
-  const logPlayMutation = useLogPlay({
-    invalidateQueries: [["user"]],
-    onSuccess: async () => {
-      await markListenedMutation.mutateAsync({});
-    },
-  });
-
-  const markListenedMutation = useMarkRecommendationListened(dailyRecommendation()?.id || "");
+  const markListenedMutation = useMarkRecommendationListened();
 
   const handleQuickPlay = () => {
     const recommendation = dailyRecommendation();
-    if (!recommendation) return;
+    if (!recommendation?.id) return;
 
-    const stylus = primaryStylus();
-    logPlayMutation.mutate({
-      userReleaseId: recommendation.userReleaseId,
-      userStylusId: stylus?.id,
-      playedAt: new Date().toISOString(),
-      notes: "Quick play from daily recommendation",
-    });
+    markListenedMutation.mutate({ recommendationId: recommendation.id });
   };
 
   const handleSuggest = () => {
@@ -109,10 +98,29 @@ export const SubNavbar: Component = () => {
     setSelectedRelease(null);
   };
 
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded());
+  };
+
   return (
     <>
       <div class={styles.subNavbar}>
-        <div class={styles.container}>
+        <button
+          type="button"
+          class={styles.mobileHeader}
+          onClick={toggleExpanded}
+          aria-expanded={isExpanded()}
+          aria-label={isExpanded() ? "Collapse recommendations" : "Expand recommendations"}
+        >
+          <span class={styles.mobileHeaderTitle}>Daily Recommendation</span>
+          <ChevronDownIcon
+            class={styles.chevron}
+            classList={{ [styles.chevronRotated]: isExpanded() }}
+            size={20}
+          />
+        </button>
+
+        <div class={styles.container} classList={{ [styles.expanded]: isExpanded() }}>
           <div class={styles.recordOfTheDay}>
             <Show when={dailyRecommendation()}>
               {(rec) => (

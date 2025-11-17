@@ -4,67 +4,98 @@
 .analyticsPage {
   max-width: 1200px;
   margin: 0 auto;
-  padding: $spacing-xl $spacing-lg;
+  padding: $spacing-md;
 
-  @media (max-width: 768px) {
-    padding: $spacing-lg $spacing-md;
+  @media (min-width: $breakpoint-sm) {
+    padding: $spacing-lg;
+  }
+
+  @media (min-width: $breakpoint-md) {
+    padding: $spacing-xl $spacing-lg;
   }
 }
 
 .pageHeader {
-  margin-bottom: $spacing-2xl;
+  margin-bottom: $spacing-lg;
   text-align: center;
+
+  @media (min-width: $breakpoint-md) {
+    margin-bottom: $spacing-2xl;
+  }
 }
 
 .pageTitle {
-  font-size: $font-size-4xl;
+  font-size: $font-size-2xl;
   font-weight: $font-weight-bold;
   color: $text-default;
   margin: 0 0 $spacing-sm 0;
 
-  @media (max-width: 768px) {
+  @media (min-width: $breakpoint-sm) {
     font-size: $font-size-3xl;
+  }
+
+  @media (min-width: $breakpoint-md) {
+    font-size: $font-size-4xl;
   }
 }
 
 .pageDescription {
-  font-size: $font-size-lg;
+  font-size: $font-size-md;
   color: $text-muted;
   margin: 0;
   max-width: 600px;
   margin-left: auto;
   margin-right: auto;
 
-  @media (max-width: 768px) {
-    font-size: $font-size-md;
+  @media (min-width: $breakpoint-md) {
+    font-size: $font-size-lg;
   }
 }
 
 .loading {
   text-align: center;
-  padding: $spacing-3xl;
-  font-size: $font-size-lg;
+  padding: $spacing-xl;
+  font-size: $font-size-md;
   color: $text-muted;
   font-style: italic;
+
+  @media (min-width: $breakpoint-md) {
+    padding: $spacing-3xl;
+    font-size: $font-size-lg;
+  }
 }
 
 .emptyState {
   text-align: center;
-  padding: $spacing-3xl;
+  padding: $spacing-xl;
   background-color: $bg-surface;
   border-radius: $border-radius-lg;
-  box-shadow: $shadow-md;
+  box-shadow: $shadow-sm;
+
+  @media (min-width: $breakpoint-md) {
+    padding: $spacing-3xl;
+    box-shadow: $shadow-md;
+  }
 
   h2 {
-    font-size: $font-size-2xl;
+    font-size: $font-size-xl;
     font-weight: $font-weight-bold;
     color: $text-default;
-    margin: 0 0 $spacing-md 0;
+    margin: 0 0 $spacing-sm 0;
+
+    @media (min-width: $breakpoint-md) {
+      font-size: $font-size-2xl;
+      margin: 0 0 $spacing-md 0;
+    }
   }
 
   p {
-    font-size: $font-size-lg;
+    font-size: $font-size-md;
     color: $text-muted;
     margin: 0;
+
+    @media (min-width: $breakpoint-md) {
+      font-size: $font-size-lg;
+    }
   }
 }

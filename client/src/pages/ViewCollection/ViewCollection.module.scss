@@ -5,6 +5,16 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: $spacing-xl;
+
+  @media (max-width: $breakpoint-md) {
+    padding: $spacing-md;
+    padding-bottom: calc(#{$spacing-md} + 80px);
+  }
+
+  @media (max-width: $breakpoint-sm) {
+    padding: $spacing-sm;
+    padding-bottom: calc(#{$spacing-sm} + 80px);
+  }
 }
 
 .title {
@@ -13,6 +23,16 @@
   color: $text-default;
   margin-bottom: $spacing-lg;
   text-align: center;
+
+  @media (max-width: $breakpoint-md) {
+    font-size: $font-size-3xl;
+    margin-bottom: $spacing-md;
+  }
+
+  @media (max-width: $breakpoint-sm) {
+    font-size: $font-size-2xl;
+    margin-bottom: $spacing-sm;
+  }
 }
 
 .controls {
@@ -20,10 +40,16 @@
   flex-direction: column;
   gap: $spacing-md;
   margin-bottom: $spacing-lg;
-}
 
-.searchBar {
-  width: 100%;
+  @media (max-width: $breakpoint-md) {
+    gap: $spacing-sm;
+    margin-bottom: $spacing-md;
+  }
+
+  @media (max-width: $breakpoint-sm) {
+    gap: $spacing-xs;
+    margin-bottom: $spacing-sm;
+  }
 }
 
 .controlButtons {

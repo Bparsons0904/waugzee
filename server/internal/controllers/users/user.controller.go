@@ -278,31 +278,31 @@ func (uc *UserController) getOrCreateRecommendation(
 		return uc.generateNewRecommendation(ctx, user)
 	}
 
-	listenedHoursAgo := now.Sub(*mostRecent.ListenedAt).Hours()
+	createdHoursAgo := now.Sub(mostRecent.CreatedAt).Hours()
 
-	if listenedHoursAgo < 18 {
+	if createdHoursAgo < 18 {
 		log.Info(
-			"user completed recommendation recently, generating new one",
+			"returning existing listened recommendation (within 18-hour window)",
 			"userID",
 			user.ID,
 			"recommendationID",
 			mostRecent.ID,
-			"listenedHoursAgo",
-			listenedHoursAgo,
+			"createdHoursAgo",
+			createdHoursAgo,
 		)
-		return uc.generateNewRecommendation(ctx, user)
+		return mostRecent, nil
 	}
 
 	log.Info(
-		"returning existing listened recommendation",
+		"recommendation is old (18+ hours), generating new one",
 		"userID",
 		user.ID,
 		"recommendationID",
 		mostRecent.ID,
-		"listenedHoursAgo",
-		listenedHoursAgo,
+		"createdHoursAgo",
+		createdHoursAgo,
 	)
-	return mostRecent, nil
+	return uc.generateNewRecommendation(ctx, user)
 }
 
 func (uc *UserController) generateNewRecommendation(

@@ -1,10 +1,9 @@
-import test from "node:test";
 import { render } from "@solidjs/testing-library";
-import { describe, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Card } from "./Card";
 
 describe("Card", () => {
-  test("renders children correctly", () => {
+  it("renders children correctly", () => {
     const { getByText } = render(() => (
       <Card>
         <div>Test content</div>
@@ -14,7 +13,7 @@ describe("Card", () => {
     expect(getByText("Test content")).toBeInTheDocument();
   });
 
-  test("applies size classes correctly", () => {
+  it("applies size classes correctly", () => {
     const { container } = render(() => (
       <Card size="large">
         <div>Content</div>
@@ -25,7 +24,7 @@ describe("Card", () => {
     expect(card.className).toContain("cardLarge");
   });
 
-  test("applies custom class name", () => {
+  it("applies custom class name", () => {
     const { container } = render(() => (
       <Card class="custom-class">
         <div>Content</div>
@@ -36,7 +35,7 @@ describe("Card", () => {
     expect(card.className).toContain("custom-class");
   });
 
-  test("handles click events", () => {
+  it("handles click events", () => {
     const handleClick = vi.fn();
     const { container } = render(() => (
       <Card onClick={handleClick}>

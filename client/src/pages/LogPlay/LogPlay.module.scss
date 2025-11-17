@@ -4,44 +4,139 @@
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: $spacing-xl;
+  padding: $spacing-sm;
+  padding-bottom: calc(#{$spacing-sm} + 80px);
+
+  @media (min-width: $breakpoint-sm) {
+    padding: $spacing-md;
+    padding-bottom: calc(#{$spacing-md} + 80px);
+  }
+
+  @media (min-width: $breakpoint-md) {
+    padding: $spacing-xl;
+    padding-bottom: $spacing-xl;
+  }
 }
 
 .title {
-  font-size: $font-size-4xl;
+  font-size: $font-size-2xl;
   font-weight: $font-weight-bold;
   color: $text-default;
-  margin-bottom: $spacing-sm;
+  margin-bottom: $spacing-xs;
   text-align: center;
+
+  @media (min-width: $breakpoint-sm) {
+    font-size: $font-size-3xl;
+    margin-bottom: $spacing-sm;
+  }
+
+  @media (min-width: $breakpoint-md) {
+    font-size: $font-size-4xl;
+  }
 }
 
 .subtitle {
-  font-size: $font-size-xl;
+  font-size: $font-size-md;
   color: $text-muted;
-  margin-bottom: $spacing-xl;
+  margin-bottom: $spacing-sm;
   text-align: center;
+
+  @media (min-width: $breakpoint-sm) {
+    font-size: $font-size-lg;
+    margin-bottom: $spacing-md;
+  }
+
+  @media (min-width: $breakpoint-md) {
+    font-size: $font-size-xl;
+    margin-bottom: $spacing-xl;
+  }
 }
 
 .logForm {
   background-color: $bg-surface;
-  border-radius: $border-radius-lg;
-  box-shadow: $shadow-md;
-  padding: $spacing-xl;
-  margin-bottom: $spacing-xl;
+  border-radius: $border-radius-md;
+  box-shadow: $shadow-sm;
+  padding: $spacing-md;
+  margin-bottom: $spacing-sm;
+
+  @media (min-width: $breakpoint-sm) {
+    padding: $spacing-md;
+    margin-bottom: $spacing-md;
+  }
+
+  @media (min-width: $breakpoint-md) {
+    padding: $spacing-xl;
+    margin-bottom: $spacing-xl;
+    border-radius: $border-radius-lg;
+    box-shadow: $shadow-md;
+  }
 }
 
 .controlsRow {
   display: flex;
-  gap: $spacing-xl;
-  margin-bottom: $spacing-xl;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-sm;
+  align-items: stretch;
+
+  @media (min-width: $breakpoint-sm) {
+    flex-direction: row;
+    gap: $spacing-md;
+    margin-bottom: $spacing-md;
+    align-items: flex-end;
+  }
+
+  @media (min-width: $breakpoint-md) {
+    gap: $spacing-xl;
+    margin-bottom: $spacing-xl;
+  }
 }
 
-.searchSection,
+.searchSection {
+  flex: 1;
+  display: none;
+  flex-direction: column;
+
+  @media (min-width: $breakpoint-sm) {
+    display: flex;
+  }
+}
+
+.searchInput {
+  width: 100%;
+  padding: $spacing-sm $spacing-md;
+  border: $border-width-thin solid $input-border;
+  border-radius: $border-radius-md;
+  font-size: $font-size-md;
+  background-color: $input-bg;
+
+  &:focus {
+    outline: none;
+    border-color: $input-border-focus;
+    box-shadow: $focus-ring;
+  }
+}
+
 .sortSection {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+.optionsSection {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+
+  @media (min-width: $breakpoint-sm) {
+    flex-direction: column;
+    justify-content: flex-end;
+    flex: 1;
+  }
+
+  @media (min-width: $breakpoint-md) {
+    flex: 1;
+  }
 }
 
 .label {
@@ -70,12 +165,6 @@
     border-color: $input-border-focus;
     box-shadow: $focus-ring;
   }
-}
-
-.optionsSection {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: $spacing-xl;
 }
 
 .toggleLabel {
@@ -140,13 +229,29 @@
 
 .releasesList {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: $spacing-md;
+  grid-template-columns: 1fr;
+  gap: $spacing-sm;
   max-height: 800px;
   overflow-y: auto;
-  padding: $spacing-sm;
-  border: $border-width-thin solid $border-default;
-  border-radius: $border-radius-md;
+  padding: 0;
+  border: none;
+  scrollbar-width: none;
+
+  @media (min-width: $breakpoint-sm) {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    padding: $spacing-xs;
+    gap: $spacing-sm;
+    scrollbar-width: thin;
+  }
+
+  @media (min-width: $breakpoint-md) {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    padding: $spacing-sm;
+    gap: $spacing-md;
+    border: $border-width-thin solid $border-default;
+    border-radius: $border-radius-md;
+    scrollbar-width: unset;
+  }
 }
 
 .releaseCard {
@@ -154,12 +259,22 @@
   flex-direction: column;
   padding: $spacing-sm;
   border: $border-width-thin solid $border-default;
-  border-radius: $border-radius-md;
+  border-radius: $border-radius-sm;
   cursor: pointer;
   transition:
     transform $transition-fast,
     box-shadow $transition-fast,
     background-color $transition-fast;
+  min-width: 0;
+  width: 100%;
+
+  @media (min-width: $breakpoint-sm) {
+    border-radius: $border-radius-md;
+  }
+
+  @media (min-width: $breakpoint-md) {
+    padding: $spacing-sm;
+  }
 
   &:hover {
     transform: translateY(-2px);
@@ -174,12 +289,13 @@
   .releaseCardContainer {
     display: flex;
     flex-direction: row;
+    min-width: 0;
   }
 }
 
 .releaseImageContainer {
-  width: 50px;
-  height: 50px;
+  width: 60px;
+  height: 60px;
   flex-shrink: 0;
   margin-right: $spacing-md;
   display: flex;
@@ -222,10 +338,11 @@
 }
 
 .releaseInfo {
-  flex-grow: 1;
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .releaseTitle {
@@ -236,6 +353,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .releaseArtist {
@@ -245,6 +363,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .statusSection {
@@ -263,38 +382,4 @@
   text-align: center;
   color: $text-muted;
   font-style: italic;
-}
-
-@media (max-width: $breakpoint-md) {
-  .controlsRow {
-    flex-direction: column;
-    gap: $spacing-md;
-  }
-
-  .searchSection,
-  .sortSection {
-    width: 100%;
-  }
-
-  .releasesList {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  }
-
-  .container {
-    padding: $spacing-lg;
-  }
-}
-
-@media (max-width: $breakpoint-sm) {
-  .releasesList {
-    grid-template-columns: 1fr;
-  }
-
-  .container {
-    padding: $spacing-md;
-  }
-
-  .logForm {
-    padding: $spacing-lg;
-  }
 }

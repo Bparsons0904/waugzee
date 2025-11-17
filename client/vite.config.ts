@@ -29,6 +29,11 @@ export default defineConfig({
         },
       },
     },
+    server: {
+      deps: {
+        inline: [/@solidjs\/router/],
+      },
+    },
   },
   resolve: {
     alias: {
@@ -44,6 +49,7 @@ export default defineConfig({
       "@utils": path.resolve(__dirname, "./src/utils/"),
     },
     conditions: ["development", "browser"],
+    extensions: [".mjs", ".js", ".mts", ".ts", ".jsx", ".tsx", ".json"],
   },
   build: {
     target: "esnext",
@@ -51,7 +57,6 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
-        includePaths: [path.resolve(__dirname, "src/styles")],
         additionalData: `
           @use "@styles/variables" as *;
           @use "@styles/mixins" as *;

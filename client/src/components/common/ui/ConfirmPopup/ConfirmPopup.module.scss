@@ -1,5 +1,6 @@
-@import "../../../../styles/variables";
-@import "../../../../styles/mixins";
+@use "../../../../styles/variables" as *;
+@use "../../../../styles/colors" as *;
+@use "../../../../styles/mixins" as *;
 
 .confirmPopup {
   text-align: center;
@@ -14,37 +15,37 @@
   height: 64px;
   border-radius: 50%;
   margin: 0 auto $spacing-lg;
-  
+
   &.primary {
     background-color: $bg-primary-subtle;
     color: $color-primary-600;
   }
-  
+
   &.secondary {
     background-color: $bg-secondary-subtle;
     color: $color-secondary-600;
   }
-  
+
   &.danger {
     background-color: $bg-error-subtle;
-    color: $color-error-600;
+    color: $text-error;
   }
-  
+
   &.warning {
     background-color: $bg-warning-subtle;
-    color: $color-warning-600;
+    color: $text-warning;
   }
-  
+
   &.tertiary {
     background-color: $bg-muted;
     color: $text-muted;
   }
-  
+
   &.gradient {
     background: $bg-primary-gradient;
     color: $color-white;
   }
-  
+
   &.ghost {
     background-color: transparent;
     border: 2px solid $border-default;
