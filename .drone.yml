@@ -25,7 +25,7 @@ steps:
       - npm run build
 
   - name: build-backend
-    image: golang:1.25.1-alpine
+    image: golang:1.25.4-alpine
     commands:
       - apk add --no-cache gcc musl-dev
       - cd server
@@ -33,7 +33,7 @@ steps:
       - CGO_ENABLED=1 GOOS=linux go build -ldflags="-w -s" -o main cmd/api/main.go
 
   - name: build-migration
-    image: golang:1.25.1-alpine
+    image: golang:1.25.4-alpine
     commands:
       - apk add --no-cache gcc musl-dev
       - cd server
