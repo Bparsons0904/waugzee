@@ -23,6 +23,12 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 $spacing-md;
+
+  @include breakpoint(lg) {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xl;
+  }
 }
 
 // ====================
@@ -33,13 +39,17 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  @include breakpoint(lg) {
+    flex: 0 0 auto;
+  }
 }
 
 .navbarLogo {
   font-size: $font-size-2xl;
   font-weight: $font-weight-bold;
 
-  @include breakpoint(md) {
+  @include breakpoint(lg) {
     font-size: $font-size-3xl;
   }
 }
@@ -133,6 +143,11 @@
     padding-top: 0;
     border-top: none;
   }
+
+  @include breakpoint(lg) {
+    flex: 1;
+    margin-top: 0;
+  }
 }
 
 // ====================
@@ -150,6 +165,11 @@
   @include breakpoint(md) {
     flex-direction: row;
     gap: $spacing-sm;
+  }
+
+  @include breakpoint(lg) {
+    flex: 1;
+    justify-content: center;
   }
 }
 
@@ -170,6 +190,10 @@
     padding-top: 0;
     margin-top: 0;
     border-top: none;
+  }
+
+  @include breakpoint(lg) {
+    flex: 0 0 auto;
   }
 }
 
