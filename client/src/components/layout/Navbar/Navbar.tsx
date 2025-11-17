@@ -1,5 +1,4 @@
 import MenuIcon from "@components/icons/MenuIcon";
-import VinylIcon from "@components/icons/VinylIcon";
 import { XIcon } from "@components/icons/XIcon";
 import { ROUTES } from "@constants/api.constants";
 import { useAuth } from "@context/AuthContext";
@@ -12,11 +11,16 @@ import { SyncStatusIndicator } from "./SyncStatusIndicator";
 
 export const NavBar: Component = () => {
   const { isAuthenticated, logout } = useAuth();
-  const { user } = useUserData();
+  const { user, styluses } = useUserData();
   const { isSyncing } = useSyncStatus();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = createSignal(false);
 
-  const needsDiscogsKey = () => !user()?.configuration?.discogsToken;
+  const needsProfileSetup = () => {
+    const needsDiscogs = !user()?.configuration?.discogsToken;
+    const needsStylus =
+      !!user()?.configuration?.discogsToken && !styluses().some((s) => s.isPrimary);
+    return needsDiscogs || needsStylus;
+  };
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen());
@@ -130,7 +134,7 @@ export const NavBar: Component = () => {
                 <li class={styles.navbarItem}>
                   <A
                     href={ROUTES.PROFILE}
-                    class={`${styles.navbarLink} ${needsDiscogsKey() ? styles.needsAttention : ""}`}
+                    class={`${styles.navbarLink} ${needsProfileSetup() ? styles.needsAttention : ""}`}
                     activeClass={styles.active}
                     onClick={closeMobileMenu}
                   >

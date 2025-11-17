@@ -170,6 +170,12 @@
   gap: $spacing-lg;
 }
 
+.stylusInfo {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
 .statusInfo {
   display: flex;
   align-items: center;
@@ -224,6 +230,32 @@
   text-align: center;
   padding: $spacing-xl;
   color: $text-error;
+}
+
+@keyframes glowPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 5px rgba($color-primary-500, 0.5),
+      0 0 10px rgba($color-primary-500, 0.3),
+      0 0 15px rgba($color-primary-500, 0.2),
+      $shadow-md;
+  }
+  50% {
+    box-shadow:
+      0 0 10px rgba($color-primary-500, 0.8),
+      0 0 20px rgba($color-primary-500, 0.5),
+      0 0 30px rgba($color-primary-500, 0.3),
+      $shadow-lg;
+  }
+}
+
+.needsAttention {
+  animation: glowPulse 2s ease-in-out infinite;
+
+  &:hover {
+    animation: none;
+  }
 }
 
 @media (max-width: $breakpoint-md) {

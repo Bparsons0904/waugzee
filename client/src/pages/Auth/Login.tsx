@@ -33,7 +33,9 @@ const Login: Component = () => {
         <div class={styles.authCard}>
           <div class={styles.authHeader}>
             <h1 class={styles.authTitle}>Welcome to Waugzee</h1>
-            <p class={styles.authSubtitle}>Sign in or create an account to start tracking your vinyl collection</p>
+            <p class={styles.authSubtitle}>
+              Sign in or create an account to start tracking your vinyl collection
+            </p>
           </div>
 
           <div class={styles.authContent}>

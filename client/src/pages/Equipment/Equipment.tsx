@@ -1,13 +1,14 @@
 import AddEquipmentModal from "@components/AddEquipmentModal/AddEquipmentModal";
 import CreateStylusModal from "@components/CreateStylusModal/CreateStylusModal";
 import { Button } from "@components/common/ui/Button/Button";
+import { ConfirmPopup } from "@components/common/ui/ConfirmPopup/ConfirmPopup";
 import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import EditEquipmentModal from "@components/EditEquipmentModal/EditEquipmentModal";
 import { useUserData } from "@context/UserDataContext";
 import type { UserStylus } from "@models/Stylus";
 import { useDeleteUserStylus } from "@services/apiHooks";
 import { formatLocalDate } from "@utils/dates";
-import { type Component, For, Show } from "solid-js";
+import { type Component, createSignal, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import styles from "./Equipment.module.scss";
 
@@ -26,6 +27,9 @@ const Equipment: Component = () => {
   }>({
     stylus: null,
   });
+
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = createSignal(false);
+  const [stylusToDelete, setStylusToDelete] = createSignal<UserStylus | null>(null);
 
   const openAddModal = () => {
     setModalMode("current", "add");
@@ -46,13 +50,29 @@ const Equipment: Component = () => {
   };
 
   const handleDelete = (stylus: UserStylus) => {
-    const displayName = stylus.stylus ? `${stylus.stylus.brand} ${stylus.stylus.model}` : "Unknown";
+    setStylusToDelete(stylus);
+    setIsDeleteConfirmOpen(true);
+  };
 
-    if (!confirm(`Are you sure you want to remove "${displayName}" from your equipment?`)) {
-      return;
-    }
+  const confirmDelete = () => {
+    const stylus = stylusToDelete();
+    if (!stylus) return;
 
     deleteUserStylusMutation.mutate(stylus.id);
+    setIsDeleteConfirmOpen(false);
+    setStylusToDelete(null);
+  };
+
+  const cancelDelete = () => {
+    setIsDeleteConfirmOpen(false);
+    setStylusToDelete(null);
+  };
+
+  const getDeleteConfirmationMessage = () => {
+    const stylus = stylusToDelete();
+    if (!stylus) return "";
+    const displayName = stylus.stylus ? `${stylus.stylus.brand} ${stylus.stylus.model}` : "Unknown";
+    return `Are you sure you want to remove "${displayName}" from your equipment? This action cannot be undone.`;
   };
 
   const styluses = () => userData.styluses();
@@ -98,6 +118,18 @@ const Equipment: Component = () => {
       >
         <EditEquipmentModal stylus={editingStylus.stylus as never} onClose={closeModal} />
       </Modal>
+
+      <ConfirmPopup
+        isOpen={isDeleteConfirmOpen()}
+        onClose={cancelDelete}
+        onConfirm={confirmDelete}
+        title="Remove Stylus"
+        description={getDeleteConfirmationMessage()}
+        confirmText="Remove"
+        cancelText="Cancel"
+        variant="danger"
+        size={ModalSize.Small}
+      />
 
       <Show when={!modalMode.current && userData.isLoading()}>
         <p class={styles.loading}>Loading equipment...</p>
