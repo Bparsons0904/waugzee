@@ -255,6 +255,10 @@ func (r *dailyRecommendationRepository) MarkAsListened(
 	}
 	r.clearRecentRecommendationCache(ctx, userID)
 
+	if err := r.ClearUserStreakCache(ctx, userID); err != nil {
+		log.Warn("failed to clear streak cache", "userID", userID, "error", err)
+	}
+
 	return nil
 }
 

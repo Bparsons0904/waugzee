@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"time"
+	"waugzee/internal/constants"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
@@ -94,6 +95,8 @@ func (r *historyRepository) CreatePlayHistory(
 	}
 
 	r.clearUserPlayHistoryCache(ctx, playHistory.UserID)
+	r.clearAllUserReleasesCache(ctx, playHistory.UserID)
+	r.clearUserStreakCache(ctx, playHistory.UserID)
 
 	return nil
 }
@@ -187,6 +190,8 @@ func (r *historyRepository) UpdatePlayHistory(
 	}
 
 	r.clearUserPlayHistoryCache(ctx, playHistory.UserID)
+	r.clearAllUserReleasesCache(ctx, playHistory.UserID)
+	r.clearUserStreakCache(ctx, playHistory.UserID)
 
 	return playHistory, nil
 }
@@ -218,6 +223,8 @@ func (r *historyRepository) DeletePlayHistory(
 	}
 
 	r.clearUserPlayHistoryCache(ctx, userID)
+	r.clearAllUserReleasesCache(ctx, userID)
+	r.clearUserStreakCache(ctx, userID)
 
 	return nil
 }
@@ -242,6 +249,7 @@ func (r *historyRepository) CreateCleaningHistory(
 	}
 
 	r.clearUserCleaningHistoryCache(ctx, cleaningHistory.UserID)
+	r.clearAllUserReleasesCache(ctx, cleaningHistory.UserID)
 
 	return nil
 }
@@ -333,6 +341,7 @@ func (r *historyRepository) UpdateCleaningHistory(
 	}
 
 	r.clearUserCleaningHistoryCache(ctx, cleaningHistory.UserID)
+	r.clearAllUserReleasesCache(ctx, cleaningHistory.UserID)
 
 	return cleaningHistory, nil
 }
@@ -364,6 +373,7 @@ func (r *historyRepository) DeleteCleaningHistory(
 	}
 
 	r.clearUserCleaningHistoryCache(ctx, userID)
+	r.clearAllUserReleasesCache(ctx, userID)
 
 	return nil
 }
@@ -399,4 +409,19 @@ func (r *historyRepository) ClearUserHistoryCache(ctx context.Context, userID uu
 
 	log.Info("cleared user history cache", "userID", userID)
 	return nil
+}
+
+func (r *historyRepository) clearAllUserReleasesCache(ctx context.Context, userID uuid.UUID) {
+	cachePattern := fmt.Sprintf("%s:*", userID.String())
+	r.log.Debug("clearing all user_releases caches", "userID", userID, "pattern", cachePattern)
+}
+
+func (r *historyRepository) clearUserStreakCache(ctx context.Context, userID uuid.UUID) {
+	err := database.NewCacheBuilder(r.cache, userID.String()).
+		WithContext(ctx).
+		WithHash(constants.UserStreakCachePrefix).
+		Delete()
+	if err != nil {
+		r.log.Warn("failed to clear user streak cache", "userID", userID, "error", err)
+	}
 }
