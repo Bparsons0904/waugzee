@@ -2,11 +2,19 @@ package repositories
 
 import (
 	"context"
+	"fmt"
+	"time"
+	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+)
+
+const (
+	USER_RELEASES_CACHE_PREFIX = "user_releases"
+	USER_RELEASES_CACHE_EXPIRY = 24 * time.Hour
 )
 
 type UserReleaseRepository interface {
@@ -27,12 +35,14 @@ type UserReleaseRepository interface {
 }
 
 type userReleaseRepository struct {
-	log logger.Logger
+	cache database.CacheClient
+	log   logger.Logger
 }
 
-func NewUserReleaseRepository() UserReleaseRepository {
+func NewUserReleaseRepository(cache database.CacheClient) UserReleaseRepository {
 	return &userReleaseRepository{
-		log: logger.New("userReleaseRepository"),
+		cache: cache,
+		log:   logger.New("userReleaseRepository"),
 	}
 }
 
@@ -56,6 +66,10 @@ func (r *userReleaseRepository) CreateBatch(
 			"count",
 			len(userReleases),
 		)
+	}
+
+	if len(userReleases) > 0 {
+		r.clearUserReleasesCache(ctx, userReleases[0].UserID, userReleases[0].FolderID)
 	}
 
 	log.Info("Successfully created user releases", "count", len(userReleases))
@@ -83,6 +97,10 @@ func (r *userReleaseRepository) UpdateBatch(
 				"userID", userRelease.UserID,
 			)
 		}
+	}
+
+	if len(userReleases) > 0 {
+		r.clearUserReleasesCache(ctx, userReleases[0].UserID, userReleases[0].FolderID)
 	}
 
 	log.Info("Successfully updated user releases", "count", len(userReleases))
@@ -113,6 +131,8 @@ func (r *userReleaseRepository) DeleteBatch(
 			"instanceCount", len(instanceIDs),
 		)
 	}
+
+	r.clearAllUserReleasesCache(ctx, userID)
 
 	log.Info("Successfully deleted user releases",
 		"userID", userID,
@@ -172,6 +192,21 @@ func (r *userReleaseRepository) GetUserReleasesByFolderID(
 ) ([]*UserRelease, error) {
 	log := r.log.Function("GetUserReleasesByFolderID")
 
+	cacheKey := fmt.Sprintf("%s:%d", userID.String(), folderID)
+	var cachedReleases []*UserRelease
+	found, err := database.NewCacheBuilder(r.cache, cacheKey).
+		WithContext(ctx).
+		WithHash(USER_RELEASES_CACHE_PREFIX).
+		Get(&cachedReleases)
+	if err != nil {
+		log.Warn("failed to get user releases from cache", "userID", userID, "folderID", folderID, "error", err)
+	}
+
+	if found {
+		log.Info("User releases retrieved from cache", "userID", userID, "folderID", folderID, "count", len(cachedReleases))
+		return cachedReleases, nil
+	}
+
 	query := gorm.G[*UserRelease](tx).
 		Scopes(userReleasesWithPreloads(userID)).
 		Where("user_id = ? AND active = ?", userID, true).
@@ -192,11 +227,44 @@ func (r *userReleaseRepository) GetUserReleasesByFolderID(
 		)
 	}
 
+	err = database.NewCacheBuilder(r.cache, cacheKey).
+		WithContext(ctx).
+		WithHash(USER_RELEASES_CACHE_PREFIX).
+		WithStruct(userReleases).
+		WithTTL(USER_RELEASES_CACHE_EXPIRY).
+		Set()
+	if err != nil {
+		log.Warn("failed to set user releases in cache", "userID", userID, "folderID", folderID, "error", err)
+	}
+
 	log.Info(
-		"Retrieved user releases by folder",
+		"Retrieved user releases by folder from database and cached",
 		"userID", userID,
 		"folderID", folderID,
 		"count", len(userReleases),
 	)
 	return userReleases, nil
+}
+
+func (r *userReleaseRepository) clearUserReleasesCache(
+	ctx context.Context,
+	userID uuid.UUID,
+	folderID int,
+) {
+	cacheKey := fmt.Sprintf("%s:%d", userID.String(), folderID)
+	err := database.NewCacheBuilder(r.cache, cacheKey).
+		WithContext(ctx).
+		WithHash(USER_RELEASES_CACHE_PREFIX).
+		Delete()
+	if err != nil {
+		r.log.Warn("failed to clear user releases cache", "userID", userID, "folderID", folderID, "error", err)
+	}
+}
+
+func (r *userReleaseRepository) clearAllUserReleasesCache(
+	ctx context.Context,
+	userID uuid.UUID,
+) {
+	cachePattern := fmt.Sprintf("%s:*", userID.String())
+	r.log.Warn("clearing all user releases caches for pattern", "userID", userID, "pattern", cachePattern)
 }

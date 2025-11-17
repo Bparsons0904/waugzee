@@ -16,6 +16,8 @@ import (
 const (
 	DAILY_RECOMMENDATIONS_CACHE_PREFIX = "daily_recommendations"
 	DAILY_RECOMMENDATIONS_CACHE_EXPIRY = 24 * time.Hour
+	RECENT_RECOMMENDATION_CACHE_PREFIX = "recent_recommendation"
+	RECENT_RECOMMENDATION_CACHE_EXPIRY = 24 * time.Hour
 )
 
 type StreakData struct {
@@ -132,6 +134,20 @@ func (r *dailyRecommendationRepository) GetMostRecentRecommendation(
 ) (*DailyRecommendation, error) {
 	log := r.log.Function("GetMostRecentRecommendation")
 
+	var cached *DailyRecommendation
+	found, err := database.NewCacheBuilder(r.cache, userID.String()).
+		WithContext(ctx).
+		WithHash(RECENT_RECOMMENDATION_CACHE_PREFIX).
+		Get(&cached)
+	if err != nil {
+		log.Warn("failed to get recent recommendation from cache", "userID", userID, "error", err)
+	}
+
+	if found {
+		log.Info("Recent recommendation retrieved from cache", "userID", userID)
+		return cached, nil
+	}
+
 	recommendation, err := gorm.G[*DailyRecommendation](tx).
 		Where(DailyRecommendation{UserID: userID}).
 		Preload("UserRelease.Release.Genres", nil).
@@ -142,6 +158,17 @@ func (r *dailyRecommendationRepository) GetMostRecentRecommendation(
 		return nil, log.Err("failed to get most recent recommendation", err, "userID", userID)
 	}
 
+	err = database.NewCacheBuilder(r.cache, userID.String()).
+		WithContext(ctx).
+		WithHash(RECENT_RECOMMENDATION_CACHE_PREFIX).
+		WithStruct(recommendation).
+		WithTTL(RECENT_RECOMMENDATION_CACHE_EXPIRY).
+		Set()
+	if err != nil {
+		log.Warn("failed to set recent recommendation in cache", "userID", userID, "error", err)
+	}
+
+	log.Info("Recent recommendation retrieved from database and cached", "userID", userID)
 	return recommendation, nil
 }
 
@@ -190,6 +217,7 @@ func (r *dailyRecommendationRepository) CreateRecommendation(
 	}
 
 	r.clearUserRecommendationCache(ctx, recommendation.UserID)
+	r.clearRecentRecommendationCache(ctx, recommendation.UserID)
 
 	return nil
 }
@@ -225,6 +253,7 @@ func (r *dailyRecommendationRepository) MarkAsListened(
 	if err != nil {
 		log.Warn("failed to clear recommendation cache", "userID", userID, "error", err)
 	}
+	r.clearRecentRecommendationCache(ctx, userID)
 
 	return nil
 }
@@ -430,4 +459,17 @@ func (r *dailyRecommendationRepository) SetUserStreakCache(
 	}
 
 	return nil
+}
+
+func (r *dailyRecommendationRepository) clearRecentRecommendationCache(
+	ctx context.Context,
+	userID uuid.UUID,
+) {
+	err := database.NewCacheBuilder(r.cache, userID.String()).
+		WithContext(ctx).
+		WithHash(RECENT_RECOMMENDATION_CACHE_PREFIX).
+		Delete()
+	if err != nil {
+		r.log.Warn("failed to clear recent recommendation cache", "userID", userID, "error", err)
+	}
 }

@@ -30,7 +30,7 @@ func New(db database.DB) Repository {
 		Genre:                 NewGenreRepository(),
 		Label:                 NewLabelRepository(),
 		Folder:                NewFolderRepository(db),
-		UserRelease:           NewUserReleaseRepository(),
+		UserRelease:           NewUserReleaseRepository(db.Cache.ClientAPI),
 		DiscogsDataProcessing: NewDiscogsDataProcessingRepository(db.SQL),
 		Stylus:                NewStylusRepository(db.Cache.ClientAPI),
 		History:               NewHistoryRepository(db.Cache.ClientAPI),
