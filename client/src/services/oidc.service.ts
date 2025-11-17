@@ -31,10 +31,23 @@ export class OIDCService {
   private eventCallbacks: OIDCEventCallbacks = {};
 
   /**
-   * Discover OIDC configuration from the provider
+   * Discover OIDC configuration from the provider with caching
    */
   private async discoverOIDCConfiguration(instanceUrl: string): Promise<Record<string, unknown>> {
     console.debug("Attempting OIDC discovery for:", instanceUrl);
+
+    // Check cache first
+    const cacheKey = `oidc_discovery_${instanceUrl}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const metadata = JSON.parse(cached);
+        console.debug("Using cached OIDC discovery metadata");
+        return metadata;
+      } catch (e) {
+        console.warn("Failed to parse cached OIDC metadata:", e);
+      }
+    }
 
     // Try multiple discovery URL patterns for Zitadel
     const discoveryUrls = [
@@ -61,6 +74,9 @@ export class OIDCService {
             },
           });
 
+          // Cache the discovery metadata for the session
+          sessionStorage.setItem(cacheKey, JSON.stringify(metadata));
+
           return metadata;
         } else {
           console.debug(
@@ -75,7 +91,7 @@ export class OIDCService {
     console.warn("All OIDC discovery URLs failed, falling back to Zitadel endpoints");
 
     // Fallback to hardcoded Zitadel endpoints
-    return {
+    const fallbackMetadata = {
       issuer: instanceUrl,
       authorization_endpoint: `${instanceUrl}/oauth/v2/authorize`,
       token_endpoint: `${instanceUrl}/oauth/v2/token`,
@@ -83,6 +99,11 @@ export class OIDCService {
       end_session_endpoint: `${instanceUrl}/oidc/v1/end_session`,
       jwks_uri: `${instanceUrl}/oauth/v2/keys`,
     };
+
+    // Cache the fallback too
+    sessionStorage.setItem(cacheKey, JSON.stringify(fallbackMetadata));
+
+    return fallbackMetadata;
   }
 
   /**

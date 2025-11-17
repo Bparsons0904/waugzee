@@ -54,11 +54,15 @@ export default defineConfig({
   build: {
     target: "esnext",
     cssCodeSplit: true,
+    modulePreload: {
+      polyfill: true,
+    },
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ["solid-js", "@solidjs/router"],
           query: ["@tanstack/solid-query"],
+          oidc: ["oidc-client-ts"],
         },
         assetFileNames: (assetInfo) => {
           const info = assetInfo.name.split(".");

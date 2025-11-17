@@ -96,7 +96,25 @@ export function AuthProvider(props: { children: JSX.Element }) {
         error: null,
       });
 
-      const config = await api.get<AuthConfig>(AUTH_ENDPOINTS.CONFIG);
+      // Try to load cached config first for faster initial render
+      const cachedConfig = localStorage.getItem("auth_config");
+      let config: AuthConfig;
+
+      if (cachedConfig) {
+        try {
+          config = JSON.parse(cachedConfig);
+          // Use cached config immediately for faster startup
+          setAuthState({ config, configLoading: false });
+        } catch (e) {
+          console.warn("Failed to parse cached auth config:", e);
+        }
+      }
+
+      // Always fetch fresh config in background to ensure it's up to date
+      config = await api.get<AuthConfig>(AUTH_ENDPOINTS.CONFIG);
+
+      // Cache the fresh config for next time
+      localStorage.setItem("auth_config", JSON.stringify(config));
 
       // Initialize OIDC service with the configuration
       if (config.configured) {

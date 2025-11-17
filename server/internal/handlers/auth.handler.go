@@ -69,6 +69,9 @@ func (h *AuthHandler) getAuthConfig(c *fiber.Ctx) error {
 		})
 	}
 
+	// Cache for 5 minutes to reduce redundant requests
+	c.Set("Cache-Control", "public, max-age=300")
+
 	return c.JSON(config)
 }
 
