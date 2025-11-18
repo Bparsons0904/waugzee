@@ -41,9 +41,7 @@ describe("validators.passwordStrength", () => {
 
 describe("ValidationChain", () => {
   it("chains multiple validators together", () => {
-    const chain = new ValidationChain()
-      .required("Password")
-      .passwordStrength();
+    const chain = new ValidationChain().required("Password").passwordStrength();
 
     expect(chain.validate("").isValid).toBe(false);
     expect(chain.validate("Password123").isValid).toBe(true);

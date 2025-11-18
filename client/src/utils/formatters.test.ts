@@ -22,9 +22,7 @@ describe("formatBytes", () => {
 
 describe("truncateHash", () => {
   it("truncates long hash with ellipsis", () => {
-    expect(truncateHash("abcdef1234567890abcdef1234567890")).toBe(
-      "abcdef...567890",
-    );
+    expect(truncateHash("abcdef1234567890abcdef1234567890")).toBe("abcdef...567890");
   });
 
   it("handles null/undefined gracefully", () => {
