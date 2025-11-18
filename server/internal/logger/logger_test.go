@@ -1,113 +1,59 @@
+// Package logger_test tests backward compatibility of re-exports from pkg/logger
 package logger
 
 import (
 	"context"
 	"errors"
-	"fmt"
-	"log/slog"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNew_Success(t *testing.T) {
+// Test that basic logger creation works via re-export
+func TestNew_BackwardCompatibility(t *testing.T) {
 	logger := New("test-package")
 
 	assert.NotNil(t, logger)
-	assert.IsType(t, &SlogLogger{}, logger)
 }
 
-func TestWith_ChainMethod(t *testing.T) {
-	logger := New("test")
+// Test that traceID context functions work via re-export
+func TestContextWithTraceID_BackwardCompatibility(t *testing.T) {
+	ctx := context.Background()
+	traceID := "test-trace-123"
 
-	newLogger := logger.With("key1", "value1")
+	ctx = ContextWithTraceID(ctx, traceID)
+	extractedTraceID := TraceIDFromContext(ctx)
 
-	assert.NotNil(t, newLogger)
-	assert.IsType(t, &SlogLogger{}, newLogger)
+	assert.Equal(t, traceID, extractedTraceID)
 }
 
-func TestFile_Method(t *testing.T) {
-	logger := New("test")
+// Test that custom key traceID functions work via re-export
+func TestContextWithTraceIDName_BackwardCompatibility(t *testing.T) {
+	ctx := context.Background()
+	traceID := "custom-trace-456"
+	customKey := "request_id"
 
-	fileLogger := logger.File("user.controller.go")
+	ctx = ContextWithTraceIDName(ctx, customKey, traceID)
+	extractedTraceID := TraceIDFromContextName(ctx, customKey)
 
-	assert.NotNil(t, fileLogger)
-	assert.IsType(t, &SlogLogger{}, fileLogger)
+	assert.Equal(t, traceID, extractedTraceID)
 }
 
-func TestFunction_Method(t *testing.T) {
+// Test basic logging methods work
+func TestLogger_BasicMethods(t *testing.T) {
 	logger := New("test")
 
-	funcLogger := logger.Function("handleLogin")
-
-	assert.NotNil(t, funcLogger)
-	assert.IsType(t, &SlogLogger{}, funcLogger)
-}
-
-func TestTimer_Functionality(t *testing.T) {
-	logger := New("test")
-
-	done := logger.Timer("test operation")
-
-	assert.NotNil(t, done)
-	assert.IsType(t, func() {}, done)
-
-	// Complete the timer (should not panic)
-	done()
-}
-
-func TestError_Methods(t *testing.T) {
-	logger := New("test")
-
-	// Test Error method
-	err := logger.Error("test error message")
-
+	// Test error methods
+	err := logger.Error("test error")
 	assert.Error(t, err)
-	assert.Equal(t, "test error message", err.Error())
-}
 
-func TestErr_Method(t *testing.T) {
-	logger := New("test")
-
-	originalErr := errors.New("original error")
-	returnedErr := logger.Err("context message", originalErr)
-
-	assert.Error(t, returnedErr)
+	// Test error with existing error
+	originalErr := errors.New("original")
+	returnedErr := logger.Err("context", originalErr)
 	assert.Equal(t, originalErr, returnedErr)
-}
 
-func TestEr_Method(t *testing.T) {
-	logger := New("test")
-
-	originalErr := errors.New("test error")
-
-	// Er method should not return anything (void)
-	logger.Er("error occurred", originalErr)
-
-	// No assertion needed as it's a void method, just verify it doesn't panic
-}
-
-func TestErrMsg_Method(t *testing.T) {
-	logger := New("test")
-
-	err := logger.ErrMsg("simple error message")
-
-	assert.Error(t, err)
-	assert.Equal(t, "simple error message", err.Error())
-}
-
-func TestLoggerInterface_Implementation(t *testing.T) {
-	// Verify SlogLogger implements Logger interface
-	logger := New("test")
-
-	assert.NotNil(t, logger)
-
-	// Test key interface methods are callable
-	err := logger.Error("error test")
-	assert.Error(t, err)
-
-	chainedLogger := logger.With("test", "value")
+	// Test method chaining
+	chainedLogger := logger.With("key", "value")
 	assert.NotNil(t, chainedLogger)
 
 	fileLogger := logger.File("test.go")
@@ -115,123 +61,34 @@ func TestLoggerInterface_Implementation(t *testing.T) {
 
 	funcLogger := logger.Function("testFunc")
 	assert.NotNil(t, funcLogger)
-
-	timer := logger.Timer("test timer")
-	assert.NotNil(t, timer)
-	timer()
 }
 
-// Negative Test Cases
-
-func TestErr_NilError(t *testing.T) {
+// Test traceID methods work via re-export
+func TestLogger_TraceIDMethods(t *testing.T) {
 	logger := New("test")
 
-	returnedErr := logger.Err("message", nil)
+	// Test explicit traceID
+	tracedLogger := logger.WithTraceID("trace-123")
+	assert.NotNil(t, tracedLogger)
 
-	assert.Nil(t, returnedErr) // Should return the nil error
+	// Test context-based traceID
+	ctx := ContextWithTraceID(context.Background(), "context-trace")
+	contextLogger := logger.TraceFromContext(ctx)
+	assert.NotNil(t, contextLogger)
+
+	// Test custom key context traceID
+	customCtx := ContextWithTraceIDName(context.Background(), "custom-key", "custom-trace")
+	customLogger := logger.TraceFromContextName(customCtx, "custom-key")
+	assert.NotNil(t, customLogger)
 }
 
-func TestEr_NilError(t *testing.T) {
+// Test that timer functionality works
+func TestLogger_Timer(t *testing.T) {
 	logger := New("test")
 
-	// Should not panic with nil error
-	logger.Er("message", nil)
-}
+	done := logger.Timer("test operation")
+	assert.NotNil(t, done)
 
-func TestStep_Method(t *testing.T) {
-	// Create a logger that we can capture output from
-	var capturedLogs []string
-	handler := &testHandler{logs: &capturedLogs}
-	logger := &SlogLogger{logger: slog.New(handler)}
-
-	logger.Step("test step message")
-
-	assert.Len(t, capturedLogs, 1)
-	assert.Contains(t, capturedLogs[0], "test step message")
-}
-
-func TestDebug_Method(t *testing.T) {
-	var capturedLogs []string
-	handler := &testHandler{logs: &capturedLogs}
-	logger := &SlogLogger{logger: slog.New(handler)}
-
-	logger.Debug("debug message", "key", "value")
-
-	assert.Len(t, capturedLogs, 1)
-	assert.Contains(t, capturedLogs[0], "debug message")
-	assert.Contains(t, capturedLogs[0], "key")
-	assert.Contains(t, capturedLogs[0], "value")
-}
-
-func TestWarn_Method(t *testing.T) {
-	var capturedLogs []string
-	handler := &testHandler{logs: &capturedLogs}
-	logger := &SlogLogger{logger: slog.New(handler)}
-
-	logger.Warn("warning message", "key", "value")
-
-	assert.Len(t, capturedLogs, 1)
-	assert.Contains(t, capturedLogs[0], "warning message")
-}
-
-func TestInfo_Method(t *testing.T) {
-	var capturedLogs []string
-	handler := &testHandler{logs: &capturedLogs}
-	logger := &SlogLogger{logger: slog.New(handler)}
-
-	logger.Info("info message", "key", "value")
-
-	assert.Len(t, capturedLogs, 1)
-	assert.Contains(t, capturedLogs[0], "info message")
-}
-
-func TestErrorf_Method(t *testing.T) {
-	logger := New("test")
-	err := logger.Errorf("test error", "detailed message")
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "detailed message")
-}
-
-func TestErMsg_VoidMethod(t *testing.T) {
-	var capturedLogs []string
-	handler := &testHandler{logs: &capturedLogs}
-	logger := &SlogLogger{logger: slog.New(handler)}
-
-	logger.ErMsg("simple error message")
-
-	assert.Len(t, capturedLogs, 1)
-	assert.Contains(t, capturedLogs[0], "simple error message")
-}
-
-// Test helper to capture log output
-type testHandler struct {
-	logs *[]string
-}
-
-func (h *testHandler) Enabled(_ context.Context, _ slog.Level) bool {
-	return true
-}
-
-func (h *testHandler) Handle(_ context.Context, record slog.Record) error {
-	// Build the full log message including attributes
-	var parts []string
-	parts = append(parts, record.Message)
-
-	record.Attrs(func(attr slog.Attr) bool {
-		parts = append(parts, fmt.Sprintf("%s=%v", attr.Key, attr.Value))
-		return true
-	})
-
-	fullMessage := strings.Join(parts, " ")
-	*h.logs = append(*h.logs, fullMessage)
-	return nil
-}
-
-func (h *testHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return h
-}
-
-func (h *testHandler) WithGroup(name string) slog.Handler {
-	return h
+	// Should not panic when called
+	done()
 }
