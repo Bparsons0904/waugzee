@@ -448,7 +448,7 @@ func (r *historyRepository) clearAllUserReleasesCache(
 
 	var userRelease UserRelease
 	err := tx.WithContext(ctx).
-		Select("user_id", "folder_id").
+		Select("user_id").
 		Where("id = ?", userReleaseID).
 		First(&userRelease).Error
 	if err != nil {
@@ -456,32 +456,18 @@ func (r *historyRepository) clearAllUserReleasesCache(
 		return
 	}
 
-	specificCacheKey := fmt.Sprintf("%s:%d", userRelease.UserID.String(), userRelease.FolderID)
-	err = database.NewCacheBuilder(r.cache, specificCacheKey).
+	err = database.NewCacheBuilder(r.cache, userRelease.UserID.String()).
 		WithContext(ctx).
 		WithHash("user_releases").
 		Delete()
 	if err != nil {
-		log.Warn("failed to clear user releases cache for specific folder",
-			"userID", userRelease.UserID,
-			"folderID", userRelease.FolderID,
-			"error", err)
-	}
-
-	allReleasesCacheKey := fmt.Sprintf("%s:0", userRelease.UserID.String())
-	err = database.NewCacheBuilder(r.cache, allReleasesCacheKey).
-		WithContext(ctx).
-		WithHash("user_releases").
-		Delete()
-	if err != nil {
-		log.Warn("failed to clear all user releases cache",
+		log.Warn("failed to clear user releases cache",
 			"userID", userRelease.UserID,
 			"error", err)
+		return
 	}
 
-	log.Info("cleared user releases caches",
-		"userID", userRelease.UserID,
-		"folderID", userRelease.FolderID)
+	log.Info("cleared user releases cache", "userID", userRelease.UserID)
 }
 
 func (r *historyRepository) clearUserStreakCache(ctx context.Context, userID uuid.UUID) {
