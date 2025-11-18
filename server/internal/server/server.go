@@ -75,7 +75,7 @@ func New(app *app.App) (*AppServer, error) {
 		return c.Next()
 	})
 
-	// Enhanced security headers
+	// Enhanced security headers (CSP removed to avoid performance impact)
 	server.Use(helmet.New(helmet.Config{
 		XSSProtection:             "1; mode=block",
 		ContentTypeNosniff:        "nosniff",
@@ -91,7 +91,7 @@ func New(app *app.App) (*AppServer, error) {
 		XDNSPrefetchControl:       "off",
 		XDownloadOptions:          "noopen",
 		XPermittedCrossDomain:     "none",
-		ContentSecurityPolicy:     "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https: wss:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
+		ContentSecurityPolicy:     "",
 	}))
 
 	fiberApp := &AppServer{
