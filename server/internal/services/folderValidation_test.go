@@ -2,13 +2,16 @@ package services
 
 import (
 	"testing"
+	"waugzee/internal/logger"
 	. "waugzee/internal/models"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFolderValidationService_ExtractFolderID(t *testing.T) {
-	fv := &FolderValidationService{}
+	fv := &FolderValidationService{
+		log: logger.New("test"),
+	}
 
 	t.Run("Extracts folderID from responseData", func(t *testing.T) {
 		responseData := map[string]any{
@@ -60,7 +63,9 @@ func TestFolderValidationService_ExtractFolderID(t *testing.T) {
 }
 
 func TestFolderValidationService_ValidateUserForFolderOperation(t *testing.T) {
-	fv := &FolderValidationService{}
+	fv := &FolderValidationService{
+		log: logger.New("test"),
+	}
 
 	t.Run("Valid user with token and username", func(t *testing.T) {
 		token := "test-token"
@@ -140,7 +145,9 @@ func TestFolderValidationService_ValidateUserForFolderOperation(t *testing.T) {
 }
 
 func TestFolderValidationService_ValidatePaginationParams(t *testing.T) {
-	fv := &FolderValidationService{}
+	fv := &FolderValidationService{
+		log: logger.New("test"),
+	}
 
 	t.Run("Valid folderID and page", func(t *testing.T) {
 		page, err := fv.ValidatePaginationParams(1, 5)
