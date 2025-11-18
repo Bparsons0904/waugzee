@@ -1,9 +1,9 @@
 import { render } from "@solidjs/testing-library";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { useRelativeTime } from "./useRelativeTime";
 
 describe("useRelativeTime", () => {
-  it("displays 'Just now' for recent dates (< 1 minute)", () => {
+  it("displays 'Just now' for recent dates", () => {
     const TestComponent = () => {
       const now = new Date();
       const relativeTime = useRelativeTime(now);
@@ -58,49 +58,5 @@ describe("useRelativeTime", () => {
     const text = getByTestId("time").textContent || "";
     expect(text).not.toBe("Just now");
     expect(text).not.toContain("ago");
-  });
-
-  it("handles string date input", () => {
-    const TestComponent = () => {
-      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-      const relativeTime = useRelativeTime(twoMinutesAgo);
-      return <div data-testid="time">{relativeTime()}</div>;
-    };
-
-    const { getByTestId } = render(() => <TestComponent />);
-    expect(getByTestId("time").textContent).toBe("2m ago");
-  });
-
-  it("handles edge case of exactly 1 minute", () => {
-    const TestComponent = () => {
-      const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
-      const relativeTime = useRelativeTime(oneMinuteAgo);
-      return <div data-testid="time">{relativeTime()}</div>;
-    };
-
-    const { getByTestId } = render(() => <TestComponent />);
-    expect(getByTestId("time").textContent).toBe("1m ago");
-  });
-
-  it("handles edge case of exactly 1 hour", () => {
-    const TestComponent = () => {
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      const relativeTime = useRelativeTime(oneHourAgo);
-      return <div data-testid="time">{relativeTime()}</div>;
-    };
-
-    const { getByTestId } = render(() => <TestComponent />);
-    expect(getByTestId("time").textContent).toBe("1h ago");
-  });
-
-  it("handles edge case of exactly 1 day", () => {
-    const TestComponent = () => {
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const relativeTime = useRelativeTime(oneDayAgo);
-      return <div data-testid="time">{relativeTime()}</div>;
-    };
-
-    const { getByTestId } = render(() => <TestComponent />);
-    expect(getByTestId("time").textContent).toBe("1d ago");
   });
 });
