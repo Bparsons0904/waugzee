@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"fmt"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
 	. "waugzee/internal/models"
@@ -13,6 +14,8 @@ import (
 
 const (
 	USER_FOLDERS_CACHE_PREFIX = "user_folders"
+	USER_FOLDER_CACHE_PREFIX  = "user_folder"
+	USER_FOLDER_CACHE_EXPIRY  = USER_CACHE_EXPIRY
 )
 
 type FolderRepository interface {
@@ -88,6 +91,11 @@ func (r *folderRepository) UpsertFolders(
 		)
 	}
 
+	if err := r.ClearUserFoldersCache(ctx, userID); err != nil {
+		log.Warn("failed to clear folders cache", "userID", userID, "error", err)
+	}
+	r.clearIndividualFolderCaches(ctx, userID, folders)
+
 	return nil
 }
 
@@ -109,6 +117,10 @@ func (r *folderRepository) DeleteOrphanFolders(
 			return log.Err("failed to delete all user folders", result.Error, "userID", userID)
 		}
 
+		if err := r.ClearUserFoldersCache(ctx, userID); err != nil {
+			log.Warn("failed to clear folders cache", "userID", userID, "error", err)
+		}
+
 		return nil
 	}
 
@@ -125,6 +137,10 @@ func (r *folderRepository) DeleteOrphanFolders(
 			"keepCount",
 			len(keepFolderIDs),
 		)
+	}
+
+	if err := r.ClearUserFoldersCache(ctx, userID); err != nil {
+		log.Warn("failed to clear folders cache", "userID", userID, "error", err)
 	}
 
 	return nil
@@ -176,6 +192,17 @@ func (r *folderRepository) GetFolderByID(
 ) (*Folder, error) {
 	log := r.log.Function("GetFolderByID")
 
+	cacheKey := fmt.Sprintf("%s:%d", userID.String(), folderID)
+	var cachedFolder Folder
+	found, err := database.NewCacheBuilder(r.cache.Cache.User, cacheKey).
+		WithContext(ctx).
+		WithHash(USER_FOLDER_CACHE_PREFIX).
+		Get(&cachedFolder)
+	if err == nil && found {
+		log.Info("folder found in cache", "userID", userID, "folderID", folderID)
+		return &cachedFolder, nil
+	}
+
 	var folder Folder
 	if err := tx.WithContext(ctx).
 		Where("user_id = ? AND id = ?", userID, folderID).
@@ -193,6 +220,16 @@ func (r *folderRepository) GetFolderByID(
 		)
 	}
 
+	if err := database.NewCacheBuilder(r.cache.Cache.User, cacheKey).
+		WithContext(ctx).
+		WithHash(USER_FOLDER_CACHE_PREFIX).
+		WithStruct(&folder).
+		WithTTL(USER_FOLDER_CACHE_EXPIRY).
+		Set(); err != nil {
+		log.Warn("failed to cache folder", "userID", userID, "folderID", folderID, "error", err)
+	}
+
+	log.Info("Retrieved folder by ID from database and cached", "userID", userID, "folderID", folderID)
 	return &folder, nil
 }
 
@@ -210,4 +247,23 @@ func (r *folderRepository) ClearUserFoldersCache(ctx context.Context, userID uui
 
 	log.Info("cleared user folders cache", "userID", userID)
 	return nil
+}
+
+func (r *folderRepository) clearIndividualFolderCaches(
+	ctx context.Context,
+	userID uuid.UUID,
+	folders []*Folder,
+) {
+	for _, folder := range folders {
+		if folder.ID != nil {
+			cacheKey := fmt.Sprintf("%s:%d", userID.String(), *folder.ID)
+			err := database.NewCacheBuilder(r.cache.Cache.User, cacheKey).
+				WithContext(ctx).
+				WithHash(USER_FOLDER_CACHE_PREFIX).
+				Delete()
+			if err != nil {
+				r.log.Warn("failed to clear individual folder cache", "userID", userID, "folderID", *folder.ID, "error", err)
+			}
+		}
+	}
 }

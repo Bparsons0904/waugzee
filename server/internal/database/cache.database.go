@@ -10,11 +10,32 @@ import (
 	"github.com/valkey-io/valkey-go"
 )
 
+// Valkey Database Index Organization
+// Each database index provides logical separation for different cache categories
 const (
+	// GENERAL_CACHE_INDEX (DB 0) - General purpose caching
+	// Used for miscellaneous cache operations that don't fit into specific categories
 	GENERAL_CACHE_INDEX = iota
-	SESSION_CACHE_INDEX // This can be repurposed to something else
+
+	// SESSION_CACHE_INDEX (DB 1) - Session management
+	// Used for user sessions and authentication-related temporary data
+	SESSION_CACHE_INDEX
+
+	// USER_CACHE_INDEX (DB 2) - All user-related data
+	// Consolidates all user-specific caches including:
+	// - User profiles and OIDC mappings
+	// - User folders and releases
+	// - Play and cleaning history
+	// - Stylus tracking
+	// - Daily recommendations and streaks
 	USER_CACHE_INDEX
+
+	// EVENTS_CACHE_INDEX (DB 3) - Event-driven data
+	// Used for event sourcing, notifications, and real-time updates
 	EVENTS_CACHE_INDEX
+
+	// CLIENT_API_CACHE_INDEX (DB 4) - External API responses
+	// Reserved for caching responses from external services (Discogs, etc.)
 	CLIENT_API_CACHE_INDEX
 )
 
