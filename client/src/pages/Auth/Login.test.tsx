@@ -33,16 +33,18 @@ describe("Login", () => {
   it("renders login page with OIDC button", () => {
     render(() => <Login />);
 
-    expect(screen.getByText("Welcome Back")).toBeInTheDocument();
-    expect(screen.getByText("Sign in to continue your vinyl journey")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /sign in with zitadel/i })).toBeInTheDocument();
+    expect(screen.getByText("Welcome to Waugzee")).toBeInTheDocument();
+    expect(
+      screen.getByText("Sign in or create an account to start tracking your vinyl collection"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continue/i })).toBeInTheDocument();
   });
 
   it("shows authentication info message", () => {
     render(() => <Login />);
 
     expect(
-      screen.getByText("You'll be redirected to our secure authentication provider to sign in."),
+      screen.getByText("You'll be securely redirected to complete sign in or create your account."),
     ).toBeInTheDocument();
   });
 
@@ -60,7 +62,7 @@ describe("Login", () => {
   it("calls loginWithOIDC when button is clicked", async () => {
     render(() => <Login />);
 
-    const loginButton = screen.getByRole("button", { name: /sign in with zitadel/i });
+    const loginButton = screen.getByRole("button", { name: /continue/i });
     fireEvent.click(loginButton);
 
     expect(mockLoginWithOIDC).toHaveBeenCalledWith(undefined);
@@ -71,7 +73,7 @@ describe("Login", () => {
 
     render(() => <Login />);
 
-    const loginButton = screen.getByRole("button", { name: /sign in with zitadel/i });
+    const loginButton = screen.getByRole("button", { name: /continue/i });
     fireEvent.click(loginButton);
 
     expect(mockLoginWithOIDC).toHaveBeenCalledWith("/dashboard");
@@ -83,7 +85,7 @@ describe("Login", () => {
 
     render(() => <Login />);
 
-    const loginButton = screen.getByRole("button", { name: /sign in with zitadel/i });
+    const loginButton = screen.getByRole("button", { name: /continue/i });
     fireEvent.click(loginButton);
 
     expect(await screen.findByText("Signing In...")).toBeInTheDocument();
@@ -98,7 +100,7 @@ describe("Login", () => {
 
     render(() => <Login />);
 
-    const loginButton = screen.getByRole("button", { name: /sign in with zitadel/i });
+    const loginButton = screen.getByRole("button", { name: /continue/i });
     fireEvent.click(loginButton);
 
     expect(await screen.findByText("Login failed")).toBeInTheDocument();
