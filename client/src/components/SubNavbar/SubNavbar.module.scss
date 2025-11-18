@@ -168,7 +168,7 @@
 .playedBadge {
   flex-shrink: 0;
   padding: $spacing-sm $spacing-xl;
-  background-color: $bg-success;
+  background-color: $color-success-700;
   color: $text-inverse;
   border-radius: $border-radius-lg;
   font-size: $font-size-sm;
@@ -195,7 +195,7 @@
 .suggestionSystem {
   display: flex;
   gap: $spacing-md;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   width: 100%;
 
@@ -208,7 +208,7 @@
 .suggestButton {
   padding: $spacing-sm $spacing-xl;
   min-width: 120px;
-  background-color: $color-social-start;
+  background-color: $color-primary-600;
   color: $text-inverse;
   border: none;
   border-radius: $border-radius-lg;
@@ -218,7 +218,7 @@
   transition: all $transition-fast;
 
   &:hover {
-    background-color: $color-hero-end;
+    background-color: $color-primary-700;
     transform: translateY(-1px);
   }
 

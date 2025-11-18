@@ -167,6 +167,7 @@ export const SubNavbar: Component = () => {
 
           <div class={styles.suggestionSystem}>
             <Select
+              label="Suggestion Mode"
               value={suggestionMode()}
               onChange={(value) => setSuggestionMode(value as SuggestionMode)}
               options={[

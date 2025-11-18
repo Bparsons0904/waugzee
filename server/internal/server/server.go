@@ -79,16 +79,19 @@ func New(app *app.App) (*AppServer, error) {
 	server.Use(helmet.New(helmet.Config{
 		XSSProtection:             "1; mode=block",
 		ContentTypeNosniff:        "nosniff",
-		XFrameOptions:             "DENY",
+		XFrameOptions:             "SAMEORIGIN",
+		HSTSMaxAge:                31536000,
+		HSTSExcludeSubdomains:     false,
+		HSTSPreloadEnabled:        true,
 		ReferrerPolicy:            "strict-origin-when-cross-origin",
 		CrossOriginEmbedderPolicy: "",
-		CrossOriginOpenerPolicy:   "",
+		CrossOriginOpenerPolicy:   "same-origin",
 		CrossOriginResourcePolicy: "cross-origin",
 		OriginAgentCluster:        "?1",
 		XDNSPrefetchControl:       "off",
 		XDownloadOptions:          "noopen",
 		XPermittedCrossDomain:     "none",
-		ContentSecurityPolicy:     "",
+		ContentSecurityPolicy:     "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https: wss:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
 	}))
 
 	fiberApp := &AppServer{
