@@ -25,7 +25,7 @@ func TestFolderValidationService_ExtractFolderID(t *testing.T) {
 	t.Run("Falls back to response.Data.Releases when folderID missing", func(t *testing.T) {
 		responseData := map[string]any{}
 		response := &DiscogsFolderReleasesResponse{
-			Data: DiscogsDataReleasesResponse{
+			Data: DiscogsFolderReleasesData{
 				Releases: []DiscogsFolderReleaseItem{
 					{FolderID: 456},
 				},
