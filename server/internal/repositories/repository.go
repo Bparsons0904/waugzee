@@ -30,10 +30,10 @@ func New(db database.DB) Repository {
 		Genre:                 NewGenreRepository(),
 		Label:                 NewLabelRepository(),
 		Folder:                NewFolderRepository(db),
-		UserRelease:           NewUserReleaseRepository(db.Cache.ClientAPI),
+		UserRelease:           NewUserReleaseRepository(db.Cache.User),
 		DiscogsDataProcessing: NewDiscogsDataProcessingRepository(db.SQL),
-		Stylus:                NewStylusRepository(db.Cache.ClientAPI),
-		History:               NewHistoryRepository(db.Cache.ClientAPI),
-		DailyRecommendation:   NewDailyRecommendationRepository(db.Cache.ClientAPI),
+		Stylus:                NewStylusRepository(db.Cache.User),
+		History:               NewHistoryRepository(db.Cache.User),
+		DailyRecommendation:   NewDailyRecommendationRepository(db.Cache.User),
 	}
 }

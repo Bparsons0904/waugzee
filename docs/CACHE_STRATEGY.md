@@ -4,6 +4,38 @@
 
 Waugzee implements a comprehensive caching strategy to minimize database queries and improve response times for the `/users/me` endpoint and related user data operations. This document outlines the caching patterns, invalidation strategies, and design decisions.
 
+## Valkey Database Index Organization
+
+Waugzee uses Valkey (Redis-compatible) with **logical database separation** to organize caches by category. All user-related data is consolidated into **DB 2 (USER_CACHE_INDEX)** for simplicity and consistency.
+
+### Database Index Assignments
+
+| DB Index | Name | Purpose | Usage |
+|----------|------|---------|-------|
+| **0** | General | General purpose caching | Miscellaneous cache operations |
+| **1** | Session | Session management | User sessions, authentication tokens |
+| **2** | **User** | **All user-related data** | User profiles, folders, releases, history, styluses, recommendations, streaks |
+| **3** | Events | Event-driven data | Event sourcing, notifications, real-time updates |
+| **4** | ClientAPI | External API responses | Cached responses from Discogs and other external services |
+
+### Why DB 2 for All User Data?
+
+**Consolidation Benefits**:
+- **Simplicity**: All user-related caches in one place
+- **Easy Flushing**: Clear all user data with single `FLUSHDB` command on DB 2
+- **Debuggability**: Inspect all user caches without switching DB indexes
+- **Consistency**: No confusion about which DB index to use for user operations
+
+**What's in DB 2**:
+- User profiles and OIDC ID mappings (`user_oidc:{oidcUserID}`)
+- User folders (`user_folders:{userID}`, `user_folder:{userID}:{folderID}`)
+- User releases (`user_releases:{userID}:{folderID}`)
+- Play history (`play_history:{userID}`)
+- Cleaning history (`cleaning_history:{userID}`)
+- Styluses (`user_styluses:{userID}`)
+- Daily recommendations (`daily_recommendations:{userID}`, `recent_recommendation:{userID}`)
+- User streaks (`user_streak:{userID}`)
+
 ## Caching Pattern
 
 All cached repository methods follow a consistent **cache-first pattern**:
