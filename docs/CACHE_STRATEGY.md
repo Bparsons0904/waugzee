@@ -29,7 +29,7 @@ Waugzee uses Valkey (Redis-compatible) with **logical database separation** to o
 **What's in DB 2**:
 - User profiles and OIDC ID mappings (`user_oidc:{oidcUserID}`)
 - User folders (`user_folders:{userID}`, `user_folder:{userID}:{folderID}`)
-- User releases (`user_releases:{userID}:{folderID}`)
+- User releases (`user_releases:{userID}`)
 - Play history (`play_history:{userID}`)
 - Cleaning history (`cleaning_history:{userID}`)
 - Styluses (`user_styluses:{userID}`)
@@ -56,7 +56,7 @@ This pattern is implemented using the `CacheBuilder` utility with `WithHash()` f
 | `user_oidc:{oidcUserID}` | `GetByOIDCUserID` | 7 days | User updates, config updates |
 | `user_folders:{userID}` | `GetUserFolders` | 7 days | Folder upsert, folder deletion |
 | `user_folder:{userID}:{folderID}` | `GetFolderByID` | 7 days | Folder upsert, folder deletion |
-| `user_releases:{userID}:{folderID}` | `GetUserReleasesByFolderID` | 24 hours | Release mutations, play/clean history mutations |
+| `user_releases:{userID}` | `GetUserReleasesByFolderID` | 24 hours | Release mutations, play/clean history mutations |
 | `user_styluses:{userID}` | `GetUserStyluses` | 7 days | Stylus create/update/delete |
 | `play_history:{userID}` | `GetUserPlayHistory` | 24 hours | Play history mutations |
 | `cleaning_history:{userID}` | `GetUserCleaningHistory` | 24 hours | Cleaning history mutations |
@@ -95,7 +95,7 @@ Some mutations affect multiple caches due to data dependencies. The following ca
 
 **Cleared:**
 - `play_history:{userID}` (direct)
-- `user_releases:{userID}:*` (cascade - UserReleases preload PlayHistory)
+- `user_releases:{userID}` (cascade - UserReleases preload PlayHistory)
 - `user_streak:{userID}` (cascade - streaks calculated from play history)
 
 **Triggers:**
@@ -109,7 +109,7 @@ Some mutations affect multiple caches due to data dependencies. The following ca
 
 **Cleared:**
 - `cleaning_history:{userID}` (direct)
-- `user_releases:{userID}:*` (cascade - UserReleases preload CleaningHistory)
+- `user_releases:{userID}` (cascade - UserReleases preload CleaningHistory)
 
 **Triggers:**
 - `CreateCleaningHistory`
@@ -156,15 +156,14 @@ Some mutations affect multiple caches due to data dependencies. The following ca
 #### UserRelease Mutations → 1 Cache
 
 **Cleared:**
-- `user_releases:{userID}:{folderID}` (specific folder)
-- OR `user_releases:{userID}:*` (all folders, on delete)
+- `user_releases:{userID}` (all user releases)
 
 **Triggers:**
-- `CreateBatch` (clears specific folder)
-- `UpdateBatch` (clears specific folder)
-- `DeleteBatch` (clears all folder caches)
+- `CreateBatch`
+- `UpdateBatch`
+- `DeleteBatch`
 
-**Rationale:** DeleteBatch doesn't specify folder, so clear all variations to ensure consistency.
+**Rationale:** Simplified caching by userID only. Users don't switch folders often, so a fresh query when they switch is acceptable.
 
 ## TTL Rationale
 
