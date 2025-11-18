@@ -452,11 +452,17 @@ func (r *historyRepository) clearAllUserReleasesCache(
 		Where("id = ?", userReleaseID).
 		First(&userRelease).Error
 	if err != nil {
-		log.Warn("failed to find user release for cache clearing", "userReleaseID", userReleaseID, "error", err)
+		log.Warn(
+			"failed to find user release for cache clearing",
+			"userReleaseID",
+			userReleaseID,
+			"error",
+			err,
+		)
 		return
 	}
 
-	err = database.NewCacheBuilder(r.cache, userRelease.UserID.String()).
+	err = database.NewCacheBuilder(r.cache, userRelease.UserID).
 		WithContext(ctx).
 		WithHash("user_releases").
 		Delete()
@@ -471,7 +477,7 @@ func (r *historyRepository) clearAllUserReleasesCache(
 }
 
 func (r *historyRepository) clearUserStreakCache(ctx context.Context, userID uuid.UUID) {
-	err := database.NewCacheBuilder(r.cache, userID.String()).
+	err := database.NewCacheBuilder(r.cache, userID).
 		WithContext(ctx).
 		WithHash(constants.UserStreakCachePrefix).
 		Delete()

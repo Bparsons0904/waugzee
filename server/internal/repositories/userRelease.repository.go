@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"context"
-	"fmt"
 	"time"
 	"waugzee/internal/database"
 	"waugzee/internal/logger"
@@ -198,11 +197,27 @@ func (r *userReleaseRepository) GetUserReleasesByFolderID(
 		WithHash(USER_RELEASES_CACHE_PREFIX).
 		Get(&cachedReleases)
 	if err != nil {
-		log.Warn("failed to get user releases from cache", "userID", userID, "folderID", folderID, "error", err)
+		log.Warn(
+			"failed to get user releases from cache",
+			"userID",
+			userID,
+			"folderID",
+			folderID,
+			"error",
+			err,
+		)
 	}
 
 	if found {
-		log.Info("User releases retrieved from cache", "userID", userID, "folderID", folderID, "count", len(cachedReleases))
+		log.Info(
+			"User releases retrieved from cache",
+			"userID",
+			userID,
+			"folderID",
+			folderID,
+			"count",
+			len(cachedReleases),
+		)
 		return cachedReleases, nil
 	}
 
@@ -233,7 +248,15 @@ func (r *userReleaseRepository) GetUserReleasesByFolderID(
 		WithTTL(USER_RELEASES_CACHE_EXPIRY).
 		Set()
 	if err != nil {
-		log.Warn("failed to set user releases in cache", "userID", userID, "folderID", folderID, "error", err)
+		log.Warn(
+			"failed to set user releases in cache",
+			"userID",
+			userID,
+			"folderID",
+			folderID,
+			"error",
+			err,
+		)
 	}
 
 	log.Info(
