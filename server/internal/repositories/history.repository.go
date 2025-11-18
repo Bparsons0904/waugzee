@@ -95,7 +95,7 @@ func (r *historyRepository) CreatePlayHistory(
 	}
 
 	r.clearUserPlayHistoryCache(ctx, playHistory.UserID)
-	r.clearAllUserReleasesCache(ctx, playHistory.UserID)
+	r.clearAllUserReleasesCache(ctx, tx, playHistory.UserReleaseID)
 	r.clearUserStreakCache(ctx, playHistory.UserID)
 
 	return nil
@@ -190,7 +190,7 @@ func (r *historyRepository) UpdatePlayHistory(
 	}
 
 	r.clearUserPlayHistoryCache(ctx, playHistory.UserID)
-	r.clearAllUserReleasesCache(ctx, playHistory.UserID)
+	r.clearAllUserReleasesCache(ctx, tx, playHistory.UserReleaseID)
 	r.clearUserStreakCache(ctx, playHistory.UserID)
 
 	return playHistory, nil
@@ -203,6 +203,20 @@ func (r *historyRepository) DeletePlayHistory(
 	playHistoryID uuid.UUID,
 ) error {
 	log := r.log.Function("DeletePlayHistory")
+
+	playHistory, err := gorm.G[*PlayHistory](tx).
+		Where("user_id = ? AND id = ?", userID, playHistoryID).
+		First(ctx)
+	if err != nil {
+		return log.Err(
+			"failed to find play history for deletion",
+			err,
+			"userID",
+			userID,
+			"playHistoryID",
+			playHistoryID,
+		)
+	}
 
 	rowsAffected, err := gorm.G[*PlayHistory](tx).
 		Where("user_id = ? AND id = ?", userID, playHistoryID).
@@ -223,7 +237,7 @@ func (r *historyRepository) DeletePlayHistory(
 	}
 
 	r.clearUserPlayHistoryCache(ctx, userID)
-	r.clearAllUserReleasesCache(ctx, userID)
+	r.clearAllUserReleasesCache(ctx, tx, playHistory.UserReleaseID)
 	r.clearUserStreakCache(ctx, userID)
 
 	return nil
@@ -249,7 +263,7 @@ func (r *historyRepository) CreateCleaningHistory(
 	}
 
 	r.clearUserCleaningHistoryCache(ctx, cleaningHistory.UserID)
-	r.clearAllUserReleasesCache(ctx, cleaningHistory.UserID)
+	r.clearAllUserReleasesCache(ctx, tx, cleaningHistory.UserReleaseID)
 
 	return nil
 }
@@ -341,7 +355,7 @@ func (r *historyRepository) UpdateCleaningHistory(
 	}
 
 	r.clearUserCleaningHistoryCache(ctx, cleaningHistory.UserID)
-	r.clearAllUserReleasesCache(ctx, cleaningHistory.UserID)
+	r.clearAllUserReleasesCache(ctx, tx, cleaningHistory.UserReleaseID)
 
 	return cleaningHistory, nil
 }
@@ -353,6 +367,20 @@ func (r *historyRepository) DeleteCleaningHistory(
 	cleaningHistoryID uuid.UUID,
 ) error {
 	log := r.log.Function("DeleteCleaningHistory")
+
+	cleaningHistory, err := gorm.G[*CleaningHistory](tx).
+		Where("user_id = ? AND id = ?", userID, cleaningHistoryID).
+		First(ctx)
+	if err != nil {
+		return log.Err(
+			"failed to find cleaning history for deletion",
+			err,
+			"userID",
+			userID,
+			"cleaningHistoryID",
+			cleaningHistoryID,
+		)
+	}
 
 	rowsAffected, err := gorm.G[*CleaningHistory](tx).
 		Where("user_id = ? AND id = ?", userID, cleaningHistoryID).
@@ -373,7 +401,7 @@ func (r *historyRepository) DeleteCleaningHistory(
 	}
 
 	r.clearUserCleaningHistoryCache(ctx, userID)
-	r.clearAllUserReleasesCache(ctx, userID)
+	r.clearAllUserReleasesCache(ctx, tx, cleaningHistory.UserReleaseID)
 
 	return nil
 }
@@ -411,9 +439,49 @@ func (r *historyRepository) ClearUserHistoryCache(ctx context.Context, userID uu
 	return nil
 }
 
-func (r *historyRepository) clearAllUserReleasesCache(ctx context.Context, userID uuid.UUID) {
-	cachePattern := fmt.Sprintf("%s:*", userID.String())
-	r.log.Debug("clearing all user_releases caches", "userID", userID, "pattern", cachePattern)
+func (r *historyRepository) clearAllUserReleasesCache(
+	ctx context.Context,
+	tx *gorm.DB,
+	userReleaseID uuid.UUID,
+) {
+	log := r.log.Function("clearAllUserReleasesCache")
+
+	var userRelease UserRelease
+	err := tx.WithContext(ctx).
+		Select("user_id", "folder_id").
+		Where("id = ?", userReleaseID).
+		First(&userRelease).Error
+	if err != nil {
+		log.Warn("failed to find user release for cache clearing", "userReleaseID", userReleaseID, "error", err)
+		return
+	}
+
+	specificCacheKey := fmt.Sprintf("%s:%d", userRelease.UserID.String(), userRelease.FolderID)
+	err = database.NewCacheBuilder(r.cache, specificCacheKey).
+		WithContext(ctx).
+		WithHash("user_releases").
+		Delete()
+	if err != nil {
+		log.Warn("failed to clear user releases cache for specific folder",
+			"userID", userRelease.UserID,
+			"folderID", userRelease.FolderID,
+			"error", err)
+	}
+
+	allReleasesCacheKey := fmt.Sprintf("%s:0", userRelease.UserID.String())
+	err = database.NewCacheBuilder(r.cache, allReleasesCacheKey).
+		WithContext(ctx).
+		WithHash("user_releases").
+		Delete()
+	if err != nil {
+		log.Warn("failed to clear all user releases cache",
+			"userID", userRelease.UserID,
+			"error", err)
+	}
+
+	log.Info("cleared user releases caches",
+		"userID", userRelease.UserID,
+		"folderID", userRelease.FolderID)
 }
 
 func (r *historyRepository) clearUserStreakCache(ctx context.Context, userID uuid.UUID) {

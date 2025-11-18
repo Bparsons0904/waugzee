@@ -120,6 +120,16 @@ func (r *userReleaseRepository) DeleteBatch(
 		return nil
 	}
 
+	var folderIDs []int
+	err := tx.WithContext(ctx).
+		Model(&UserRelease{}).
+		Where("user_id = ? AND instance_id IN ?", userID, instanceIDs).
+		Distinct("folder_id").
+		Pluck("folder_id", &folderIDs).Error
+	if err != nil {
+		log.Warn("failed to get folder IDs for cache clearing", "userID", userID, "error", err)
+	}
+
 	rowsAffected, err := gorm.G[*UserRelease](tx).
 		Where("user_id = ? AND instance_id IN ?", userID, instanceIDs).
 		Delete(ctx)
@@ -132,7 +142,7 @@ func (r *userReleaseRepository) DeleteBatch(
 		)
 	}
 
-	r.clearAllUserReleasesCache(ctx, userID)
+	r.clearAllUserReleasesCache(ctx, userID, folderIDs)
 
 	log.Info("Successfully deleted user releases",
 		"userID", userID,
@@ -264,7 +274,26 @@ func (r *userReleaseRepository) clearUserReleasesCache(
 func (r *userReleaseRepository) clearAllUserReleasesCache(
 	ctx context.Context,
 	userID uuid.UUID,
+	folderIDs []int,
 ) {
-	cachePattern := fmt.Sprintf("%s:*", userID.String())
-	r.log.Warn("clearing all user releases caches for pattern", "userID", userID, "pattern", cachePattern)
+	log := r.log.Function("clearAllUserReleasesCache")
+
+	allReleasesCacheKey := fmt.Sprintf("%s:0", userID.String())
+	err := database.NewCacheBuilder(r.cache, allReleasesCacheKey).
+		WithContext(ctx).
+		WithHash(USER_RELEASES_CACHE_PREFIX).
+		Delete()
+	if err != nil {
+		log.Warn("failed to clear all user releases cache (folderID 0)",
+			"userID", userID,
+			"error", err)
+	}
+
+	for _, folderID := range folderIDs {
+		r.clearUserReleasesCache(ctx, userID, folderID)
+	}
+
+	log.Info("cleared user releases caches",
+		"userID", userID,
+		"folderCount", len(folderIDs))
 }
