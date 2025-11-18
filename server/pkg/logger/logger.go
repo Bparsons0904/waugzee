@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"runtime"
 	"time"
 )
 
@@ -64,6 +65,11 @@ type Logger interface {
 	WithTraceID(traceID string) Logger
 	TraceFromContext(ctx context.Context) Logger
 	TraceFromContextName(ctx context.Context, key string) Logger
+
+	// Performance tracking methods
+	WithMemoryStats() Logger
+	WithGoroutineCount() Logger
+	TimerWithMetrics(msg string) func()
 }
 
 // SlogLogger implements the Logger interface using slog
@@ -258,4 +264,89 @@ func (l *SlogLogger) TraceFromContextName(ctx context.Context, key string) Logge
 		return l
 	}
 	return l.WithTraceID(traceID)
+}
+
+// Performance tracking methods
+
+// WithMemoryStats adds current memory statistics to the logger
+func (l *SlogLogger) WithMemoryStats() Logger {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	return l.With(
+		"memory_alloc_mb", bytesToMB(m.Alloc),
+		"memory_total_alloc_mb", bytesToMB(m.TotalAlloc),
+		"memory_sys_mb", bytesToMB(m.Sys),
+		"memory_num_gc", m.NumGC,
+	)
+}
+
+// WithGoroutineCount adds current goroutine count to the logger
+func (l *SlogLogger) WithGoroutineCount() Logger {
+	return l.With("goroutines", runtime.NumGoroutine())
+}
+
+// TimerWithMetrics returns a function that logs operation duration along with memory and goroutine metrics
+func (l *SlogLogger) TimerWithMetrics(msg string) func() {
+	start := time.Now()
+
+	// Capture starting metrics
+	var startMem runtime.MemStats
+	runtime.ReadMemStats(&startMem)
+	startGoroutines := runtime.NumGoroutine()
+
+	l.logger.Debug("Starting operation with metrics",
+		"operation", msg,
+		"memory_start_mb", bytesToMB(startMem.Alloc),
+		"goroutines_start", startGoroutines,
+	)
+
+	return func() {
+		// Capture ending metrics
+		var endMem runtime.MemStats
+		runtime.ReadMemStats(&endMem)
+		endGoroutines := runtime.NumGoroutine()
+
+		duration := time.Since(start)
+		memDelta := int64(endMem.Alloc) - int64(startMem.Alloc)
+		goroutineDelta := endGoroutines - startGoroutines
+
+		l.logger.Info("Operation completed with metrics",
+			"operation", msg,
+			"duration_ms", duration.Milliseconds(),
+			"duration", duration.String(),
+			"memory_start_mb", bytesToMB(startMem.Alloc),
+			"memory_end_mb", bytesToMB(endMem.Alloc),
+			"memory_delta_mb", bytesToMB(uint64(absInt64(memDelta))),
+			"memory_delta_sign", signString(memDelta),
+			"goroutines_start", startGoroutines,
+			"goroutines_end", endGoroutines,
+			"goroutines_delta", goroutineDelta,
+		)
+	}
+}
+
+// Helper functions
+
+// bytesToMB converts bytes to megabytes
+func bytesToMB(bytes uint64) float64 {
+	return float64(bytes) / 1024 / 1024
+}
+
+// absInt64 returns the absolute value of an int64
+func absInt64(n int64) int64 {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+// signString returns "+" for positive, "-" for negative, "=" for zero
+func signString(n int64) string {
+	if n > 0 {
+		return "+"
+	} else if n < 0 {
+		return "-"
+	}
+	return "="
 }

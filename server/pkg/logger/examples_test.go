@@ -175,3 +175,145 @@ func Example_contextHelpers() {
 	requestID := logger.TraceIDFromContextName(ctx, "request_id")
 	println(requestID) // "req-456"
 }
+
+// Example of memory stats tracking
+func ExampleSlogLogger_WithMemoryStats() {
+	log := logger.New("batch-processor")
+
+	// Log with current memory statistics
+	log.WithMemoryStats().Info("Starting batch processing")
+
+	// Process batch...
+
+	log.WithMemoryStats().Info("Batch processing complete")
+}
+
+// Example of goroutine count tracking
+func ExampleSlogLogger_WithGoroutineCount() {
+	log := logger.New("worker-pool")
+
+	// Log current goroutine count
+	log.WithGoroutineCount().Info("Worker pool initialized")
+
+	// Start workers...
+
+	log.WithGoroutineCount().Info("All workers started")
+}
+
+// Example of enhanced timer with performance metrics
+func ExampleSlogLogger_TimerWithMetrics() {
+	log := logger.New("database-migration")
+
+	// Start timer with full performance tracking
+	done := log.TimerWithMetrics("user table migration")
+
+	// Perform migration...
+	// This will track:
+	// - Duration
+	// - Memory allocation delta
+	// - Goroutine count delta
+
+	done() // Logs all metrics
+}
+
+// Example of combined performance tracking
+func Example_performanceTracking() {
+	log := logger.New("api-service")
+
+	// Snapshot approach - log current stats at a point in time
+	log.WithMemoryStats().WithGoroutineCount().Info("Server started")
+
+	// Timer approach - track changes over an operation
+	processRequest := func() {
+		done := log.TimerWithMetrics("request processing")
+		defer done()
+
+		// Simulate work that allocates memory and spawns goroutines
+		data := make([]byte, 1024*1024) // Allocate 1MB
+		_ = data
+
+		// Process request...
+	}
+
+	processRequest()
+}
+
+// Example of chaining performance tracking with traceID
+func Example_performanceWithTraceID() {
+	ctx := logger.ContextWithTraceID(context.Background(), "req-abc-123")
+
+	log := logger.New("order-service").
+		TraceFromContext(ctx).
+		WithMemoryStats().
+		WithGoroutineCount()
+
+	log.Info("Processing order")
+	// Output includes: traceID, memory stats, goroutine count, and message
+}
+
+// Example of real-world usage in a service
+func Example_realWorldPerformanceTracking() {
+	/*
+		package service
+
+		import "waugzee/pkg/logger"
+
+		type BatchProcessor struct {
+			log logger.Logger
+		}
+
+		func (bp *BatchProcessor) ProcessBatch(ctx context.Context, items []Item) error {
+			// Create logger with traceID and initial metrics
+			log := bp.log.
+				TraceFromContext(ctx).
+				WithGoroutineCount().
+				File("batch_processor.go").
+				Function("ProcessBatch")
+
+			log.Info("Starting batch processing",
+				"batch_size", len(items),
+			)
+
+			// Track performance for the entire operation
+			done := log.TimerWithMetrics("batch processing")
+			defer done()
+
+			// Process items...
+			for i, item := range items {
+				if i > 0 && i%1000 == 0 {
+					// Log progress with current memory stats
+					log.WithMemoryStats().Info("Batch progress",
+						"processed", i,
+						"remaining", len(items)-i,
+					)
+				}
+
+				// Process item...
+			}
+
+			log.Info("Batch processing complete")
+			return nil
+		}
+
+		// Example output:
+		// {
+		//   "time": "2025-01-18T10:30:00Z",
+		//   "level": "INFO",
+		//   "msg": "Operation completed with metrics",
+		//   "package": "batch-processor",
+		//   "traceID": "req-abc-123",
+		//   "file": "batch_processor.go",
+		//   "function": "ProcessBatch",
+		//   "operation": "batch processing",
+		//   "duration_ms": 15234,
+		//   "duration": "15.234s",
+		//   "memory_start_mb": 45.2,
+		//   "memory_end_mb": 123.8,
+		//   "memory_delta_mb": 78.6,
+		//   "memory_delta_sign": "+",
+		//   "goroutines_start": 12,
+		//   "goroutines_end": 15,
+		//   "goroutines_delta": 3
+		// }
+	*/
+}

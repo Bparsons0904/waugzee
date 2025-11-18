@@ -375,6 +375,164 @@ func TestTraceID_ChainedWithOtherMethods(t *testing.T) {
 	assert.Contains(t, capturedLogs[0], "CreateUser")
 }
 
+// Performance Tracking Tests
+
+func TestWithMemoryStats_IncludesMemoryMetrics(t *testing.T) {
+	var capturedLogs []string
+	handler := &testHandler{logs: &capturedLogs}
+	logger := &SlogLogger{logger: slog.New(handler)}
+
+	logger.WithMemoryStats().Info("operation complete")
+
+	assert.Len(t, capturedLogs, 1)
+	assert.Contains(t, capturedLogs[0], "operation complete")
+	assert.Contains(t, capturedLogs[0], "memory_alloc_mb")
+	assert.Contains(t, capturedLogs[0], "memory_total_alloc_mb")
+	assert.Contains(t, capturedLogs[0], "memory_sys_mb")
+	assert.Contains(t, capturedLogs[0], "memory_num_gc")
+}
+
+func TestWithGoroutineCount_IncludesGoroutineCount(t *testing.T) {
+	var capturedLogs []string
+	handler := &testHandler{logs: &capturedLogs}
+	logger := &SlogLogger{logger: slog.New(handler)}
+
+	logger.WithGoroutineCount().Info("server started")
+
+	assert.Len(t, capturedLogs, 1)
+	assert.Contains(t, capturedLogs[0], "server started")
+	assert.Contains(t, capturedLogs[0], "goroutines")
+}
+
+func TestTimerWithMetrics_TracksPerformanceMetrics(t *testing.T) {
+	var capturedLogs []string
+	handler := &testHandler{logs: &capturedLogs}
+	logger := &SlogLogger{logger: slog.New(handler)}
+
+	done := logger.TimerWithMetrics("test operation")
+
+	// Allocate some memory to create a measurable delta
+	data := make([]byte, 1024*1024) // 1MB
+	_ = data
+
+	done()
+
+	// Should have 2 logs: debug start + info completion
+	assert.GreaterOrEqual(t, len(capturedLogs), 1)
+
+	// Check the completion log (last one)
+	completionLog := capturedLogs[len(capturedLogs)-1]
+
+	assert.Contains(t, completionLog, "Operation completed with metrics")
+	assert.Contains(t, completionLog, "operation")
+	assert.Contains(t, completionLog, "test operation")
+	assert.Contains(t, completionLog, "duration_ms")
+	assert.Contains(t, completionLog, "duration")
+	assert.Contains(t, completionLog, "memory_start_mb")
+	assert.Contains(t, completionLog, "memory_end_mb")
+	assert.Contains(t, completionLog, "memory_delta_mb")
+	assert.Contains(t, completionLog, "memory_delta_sign")
+	assert.Contains(t, completionLog, "goroutines_start")
+	assert.Contains(t, completionLog, "goroutines_end")
+	assert.Contains(t, completionLog, "goroutines_delta")
+}
+
+func TestTimerWithMetrics_CallableMultipleTimes(t *testing.T) {
+	var capturedLogs []string
+	handler := &testHandler{logs: &capturedLogs}
+	logger := &SlogLogger{logger: slog.New(handler)}
+
+	done := logger.TimerWithMetrics("multi-call test")
+	assert.NotNil(t, done)
+
+	// Should not panic when called
+	done()
+}
+
+func TestPerformanceMetrics_ChainedWithOtherMethods(t *testing.T) {
+	var capturedLogs []string
+	handler := &testHandler{logs: &capturedLogs}
+	logger := &SlogLogger{logger: slog.New(handler)}
+
+	chainedLogger := logger.
+		WithTraceID("trace-123").
+		WithMemoryStats().
+		WithGoroutineCount().
+		File("service.go")
+
+	chainedLogger.Info("performance tracked operation")
+
+	assert.Len(t, capturedLogs, 1)
+	assert.Contains(t, capturedLogs[0], "performance tracked operation")
+	assert.Contains(t, capturedLogs[0], "traceID")
+	assert.Contains(t, capturedLogs[0], "trace-123")
+	assert.Contains(t, capturedLogs[0], "memory_alloc_mb")
+	assert.Contains(t, capturedLogs[0], "goroutines")
+	assert.Contains(t, capturedLogs[0], "file")
+	assert.Contains(t, capturedLogs[0], "service.go")
+}
+
+func TestBytesToMB_Conversion(t *testing.T) {
+	tests := []struct {
+		name     string
+		bytes    uint64
+		expected float64
+	}{
+		{"1 MB", 1024 * 1024, 1.0},
+		{"0.5 MB", 512 * 1024, 0.5},
+		{"2 MB", 2 * 1024 * 1024, 2.0},
+		{"0 bytes", 0, 0.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := bytesToMB(tt.bytes)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestAbsInt64_ReturnsAbsoluteValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    int64
+		expected int64
+	}{
+		{"positive", 42, 42},
+		{"negative", -42, 42},
+		{"zero", 0, 0},
+		{"large positive", 9223372036854775807, 9223372036854775807},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := absInt64(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSignString_ReturnsCorrectSign(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    int64
+		expected string
+	}{
+		{"positive", 42, "+"},
+		{"negative", -42, "-"},
+		{"zero", 0, "="},
+		{"large positive", 999999, "+"},
+		{"large negative", -999999, "-"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := signString(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 // Test helper to capture log output
 type testHandler struct {
 	logs *[]string

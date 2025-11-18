@@ -1,11 +1,12 @@
 # Logger Package
 
-A flexible, structured logging package built on Go's `slog` with built-in support for trace IDs and request tracking.
+A flexible, structured logging package built on Go's `slog` with built-in support for trace IDs, request tracking, and performance monitoring.
 
 ## Features
 
 - **Structured Logging**: Built on Go's standard `log/slog` package
 - **TraceID Support**: First-class support for request tracing across your application
+- **Performance Tracking**: Built-in memory and goroutine monitoring
 - **Flexible Configuration**: Configure format, level, output destination, and more
 - **Method Chaining**: Fluent API for adding context to your logs
 - **Multiple Output Formats**: JSON or text format
@@ -193,6 +194,131 @@ log.Info("Creating new user", "email", email)
 // Output includes: package=user-service, traceID=xxx, file=user.handler.go, function=CreateUser
 ```
 
+## Performance Tracking
+
+The logger includes built-in performance monitoring capabilities for tracking memory usage and goroutine counts.
+
+### Method 1: Snapshot Memory Stats
+
+Add current memory statistics to a single log entry:
+
+```go
+log := logger.New("batch-processor")
+
+// Log with current memory metrics
+log.WithMemoryStats().Info("Processing batch")
+```
+
+**Output includes:**
+- `memory_alloc_mb`: Currently allocated memory in MB
+- `memory_total_alloc_mb`: Total allocated memory (cumulative) in MB
+- `memory_sys_mb`: Memory obtained from OS in MB
+- `memory_num_gc`: Number of completed GC cycles
+
+### Method 2: Snapshot Goroutine Count
+
+Add current goroutine count to a log entry:
+
+```go
+log := logger.New("worker-pool")
+
+// Log with goroutine count
+log.WithGoroutineCount().Info("Workers started")
+```
+
+### Method 3: Timer with Full Metrics
+
+Track duration, memory delta, and goroutine delta for an operation:
+
+```go
+log := logger.New("database-migration")
+
+// Start timer with full performance tracking
+done := log.TimerWithMetrics("user table migration")
+
+// Perform migration...
+// ... your code ...
+
+done() // Logs all metrics
+```
+
+**Output includes:**
+- `duration_ms`: Operation duration in milliseconds
+- `duration`: Human-readable duration string
+- `memory_start_mb`: Memory at start
+- `memory_end_mb`: Memory at end
+- `memory_delta_mb`: Absolute memory change
+- `memory_delta_sign`: "+" (increased), "-" (decreased), or "=" (no change)
+- `goroutines_start`: Goroutine count at start
+- `goroutines_end`: Goroutine count at end
+- `goroutines_delta`: Change in goroutine count
+
+### Combined Performance Tracking
+
+Chain multiple performance methods:
+
+```go
+log := logger.New("api-service").
+    TraceFromContext(ctx).
+    WithMemoryStats().
+    WithGoroutineCount()
+
+log.Info("Request received")
+// Includes traceID + memory stats + goroutine count
+```
+
+### Real-World Example
+
+```go
+func (s *Service) ProcessBatch(ctx context.Context, items []Item) error {
+    log := s.log.
+        TraceFromContext(ctx).
+        WithGoroutineCount().
+        Function("ProcessBatch")
+
+    log.Info("Starting batch", "size", len(items))
+
+    // Track full performance metrics
+    done := log.TimerWithMetrics("batch processing")
+    defer done()
+
+    for i, item := range items {
+        // Process item...
+
+        if i > 0 && i%1000 == 0 {
+            // Log progress with current memory
+            log.WithMemoryStats().Info("Progress",
+                "processed", i,
+                "remaining", len(items)-i,
+            )
+        }
+    }
+
+    return nil
+}
+```
+
+**Example Output:**
+```json
+{
+  "time": "2025-01-18T10:30:00Z",
+  "level": "INFO",
+  "msg": "Operation completed with metrics",
+  "package": "batch-processor",
+  "traceID": "req-abc-123",
+  "operation": "batch processing",
+  "duration_ms": 15234,
+  "duration": "15.234s",
+  "memory_start_mb": 45.2,
+  "memory_end_mb": 123.8,
+  "memory_delta_mb": 78.6,
+  "memory_delta_sign": "+",
+  "goroutines_start": 12,
+  "goroutines_end": 15,
+  "goroutines_delta": 3
+}
+```
+
 ## Available Methods
 
 ### Log Levels
@@ -236,6 +362,10 @@ log.Function("ProcessPayment")
 log.WithTraceID("trace-123")
 log.TraceFromContext(ctx)
 log.TraceFromContextName(ctx, "custom-key")
+
+// Add performance metrics
+log.WithMemoryStats()
+log.WithGoroutineCount()
 ```
 
 ### Utility Methods
@@ -244,10 +374,15 @@ log.TraceFromContextName(ctx, "custom-key")
 // Step logging (info level)
 log.Step("Processing batch 1 of 10")
 
-// Timer
+// Timer (basic)
 done := log.Timer("database migration")
 // ... do work ...
-done()  // Logs duration
+done()  // Logs duration only
+
+// Timer with full performance metrics
+done := log.TimerWithMetrics("database migration")
+// ... do work ...
+done()  // Logs duration + memory delta + goroutine delta
 ```
 
 ## Configuration Options
