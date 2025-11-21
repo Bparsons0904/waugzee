@@ -95,7 +95,7 @@ export const StatsSection: Component = () => {
             <Card class={styles.statCard} onClick={stat.onClick}>
               <div class={styles.statIcon}>{stat.icon}</div>
               <div class={styles.statContent}>
-                <h3 class={styles.statNumber}>{stat.isLoading ? "--" : stat.value}</h3>
+                <div class={styles.statNumber}>{stat.isLoading ? "--" : stat.value}</div>
                 <p class={styles.statLabel}>{stat.label}</p>
               </div>
             </Card>
