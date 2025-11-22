@@ -22,6 +22,7 @@
  */
 
 import { env } from "@services/env.service";
+import { logger } from "@services/logger.service";
 import axios, { type AxiosError, type AxiosRequestConfig } from "axios";
 
 // Types
@@ -97,22 +98,59 @@ axiosClient.interceptors.response.use(
 
 // Error handling
 const handleApiError = (error: AxiosError): ApiClientError | NetworkError => {
+  const url = error.config?.url || "unknown";
+  const method = error.config?.method?.toUpperCase() || "unknown";
+
   if (error.response) {
     // Server responded with error status
     const response = error.response as { data?: { error?: ApiError } };
     const apiError = response.data?.error;
+    const status = error.response.status;
+
+    logger.error("API request failed", {
+      component: "ApiService",
+      action: "api_error",
+      method,
+      url,
+      status,
+      error: {
+        message: apiError?.message || error.message || "An error occurred",
+        code: apiError?.code,
+      },
+    });
 
     return new ApiClientError(
       apiError?.message || error.message || "An error occurred",
-      error.response.status,
+      status,
       apiError?.code,
       apiError?.details,
     );
   } else if (error.request) {
     // Request was made but no response received
+    logger.error("Network error - no response", {
+      component: "ApiService",
+      action: "network_error",
+      method,
+      url,
+      error: {
+        message: error.message || "No response received",
+        code: error.code,
+      },
+    });
+
     return new NetworkError("Network error: No response received", error);
   } else {
     // Something else happened
+    logger.error("Request setup error", {
+      component: "ApiService",
+      action: "request_error",
+      method,
+      url,
+      error: {
+        message: error.message || "An unexpected error occurred",
+      },
+    });
+
     return new NetworkError(error.message || "An unexpected error occurred", error);
   }
 };
@@ -156,10 +194,27 @@ const retryRequest = async <T>(
       lastError = error as Error;
 
       if (attempt === maxAttempts || !shouldRetry?.(lastError)) {
+        if (attempt > 1) {
+          logger.warn("All retry attempts exhausted", {
+            component: "ApiService",
+            action: "retry_exhausted",
+            attempt,
+            maxAttempts,
+            error: { message: lastError.message },
+          });
+        }
         throw lastError;
       }
 
       const delay = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
+      logger.debug("Retrying request", {
+        component: "ApiService",
+        action: "retry_attempt",
+        attempt,
+        maxAttempts,
+        delayMs: delay,
+        error: { message: lastError.message },
+      });
       await sleep(delay);
     }
   }
