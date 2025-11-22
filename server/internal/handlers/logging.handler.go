@@ -34,7 +34,7 @@ func (h *LoggingHandler) Register() {
 }
 
 func (h *LoggingHandler) handleLogBatch(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("logging_handler").Function("handleLogBatch")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("logging_handler").Function("handleLogBatch")
 
 	user := middleware.GetUser(c)
 	if user == nil {

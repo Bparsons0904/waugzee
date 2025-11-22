@@ -62,7 +62,7 @@ func (h *AuthHandler) Register() {
 }
 
 func (h *AuthHandler) getAuthConfig(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("auth_handler").Function("getAuthConfig")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("auth_handler").Function("getAuthConfig")
 
 	config, err := h.authController.GetAuthConfig()
 	if err != nil {
@@ -79,7 +79,7 @@ func (h *AuthHandler) getAuthConfig(c *fiber.Ctx) error {
 }
 
 func (h *AuthHandler) logout(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("auth_handler").Function("logout")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("auth_handler").Function("logout")
 
 	user := middleware.GetUser(c)
 
@@ -115,7 +115,7 @@ func (h *AuthHandler) logout(c *fiber.Ctx) error {
 }
 
 func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("auth_handler").Function("oidcCallback")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("auth_handler").Function("oidcCallback")
 
 	var req authController.OIDCCallbackRequest
 	if err := c.BodyParser(&req); err != nil {

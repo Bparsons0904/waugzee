@@ -36,7 +36,7 @@ func (h *SyncHandler) Register() {
 }
 
 func (h *SyncHandler) InitiateCollectionSync(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("sync_handler").Function("InitiateCollectionSync")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("sync_handler").Function("InitiateCollectionSync")
 
 	user := middleware.GetUser(c)
 	if user == nil {

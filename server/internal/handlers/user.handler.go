@@ -47,7 +47,7 @@ func (h *UserHandler) Register() {
 }
 
 func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("user_handler").Function("getCurrentUser")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("user_handler").Function("getCurrentUser")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -76,7 +76,7 @@ func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("user_handler").Function("updateDiscogsToken")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("user_handler").Function("updateDiscogsToken")
 
 	user := middleware.GetUser(c)
 
@@ -110,7 +110,7 @@ func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) updateSelectedFolder(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("user_handler").Function("updateSelectedFolder")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("user_handler").Function("updateSelectedFolder")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -145,7 +145,7 @@ func (h *UserHandler) updateSelectedFolder(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) updateUserPreferences(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("user_handler").Function("updateUserPreferences")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("user_handler").Function("updateUserPreferences")
 
 	user := middleware.GetUser(c)
 	if user == nil {

@@ -43,7 +43,7 @@ func (h *HistoryHandler) Register() {
 }
 
 func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("logPlay")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("logPlay")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -85,7 +85,7 @@ func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) updatePlayHistory(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("updatePlayHistory")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("updatePlayHistory")
 
 	user := middleware.GetUser(c)
 
@@ -135,7 +135,7 @@ func (h *HistoryHandler) updatePlayHistory(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) deletePlayHistory(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("deletePlayHistory")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("deletePlayHistory")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -175,7 +175,7 @@ func (h *HistoryHandler) deletePlayHistory(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) logCleaning(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("logCleaning")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("logCleaning")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -217,7 +217,7 @@ func (h *HistoryHandler) logCleaning(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) updateCleaningHistory(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("updateCleaningHistory")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("updateCleaningHistory")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -273,7 +273,7 @@ func (h *HistoryHandler) updateCleaningHistory(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("deleteCleaningHistory")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("deleteCleaningHistory")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -313,7 +313,7 @@ func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) logBoth(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("logBoth")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("logBoth")
 
 	user := middleware.GetUser(c)
 	if user == nil {
