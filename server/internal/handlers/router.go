@@ -19,6 +19,10 @@ func Router(router fiber.Router, app *app.App) (err error) {
 	setupWebSocketRoute(router, app)
 
 	api := router.Group("/api")
+
+	// Apply TraceID middleware to all API routes
+	api.Use(app.Middleware.TraceID())
+
 	HealthHandler(api, app.Config)
 	NewAuthHandler(*app, api).Register()
 	api.Use(app.Middleware.RequireAuth(app.Services.Zitadel))
