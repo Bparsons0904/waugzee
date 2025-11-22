@@ -24,10 +24,6 @@ class LoggerService {
     this.sessionId = this.generateSessionId();
   }
 
-  /**
-   * Initialize the logger - call this after auth is ready
-   * Sets up flush interval and page unload handler
-   */
   initialize(): void {
     if (this.isInitialized) return;
 
@@ -82,9 +78,6 @@ class LoggerService {
     this.isInitialized = true;
   }
 
-  /**
-   * Cleanup logger resources
-   */
   destroy(): void {
     if (this.flushTimer) {
       clearInterval(this.flushTimer);
@@ -94,41 +87,25 @@ class LoggerService {
     this.isInitialized = false;
   }
 
-  /**
-   * Log a debug message (development only, not sent to server)
-   */
   debug(message: string, context?: LogContext): void {
     if (!env.isProduction) {
       this.logToConsole("debug", message, context);
     }
   }
 
-  /**
-   * Log an info message
-   */
   info(message: string, context?: LogContext): void {
     this.log("info", message, context);
   }
 
-  /**
-   * Log a warning message
-   */
   warn(message: string, context?: LogContext): void {
     this.log("warn", message, context);
   }
 
-  /**
-   * Log an error message
-   */
   error(message: string, context?: LogContext): void {
     this.log("error", message, context);
   }
 
-  /**
-   * Core logging method
-   */
   private log(level: LogLevel, message: string, context?: LogContext): void {
-    // Always output to console in development
     if (!env.isProduction) {
       this.logToConsole(level, message, context);
     }
@@ -179,9 +156,6 @@ class LoggerService {
     }
   }
 
-  /**
-   * Flush buffered logs to the server
-   */
   private flush(sync = false): void {
     if (this.buffer.length === 0) return;
 
@@ -217,9 +191,6 @@ class LoggerService {
     }
   }
 
-  /**
-   * Get current page metadata
-   */
   private getMetadata(): LogMetadata {
     if (typeof window === "undefined") {
       return {
@@ -241,33 +212,21 @@ class LoggerService {
     };
   }
 
-  /**
-   * Generate a unique session ID
-   */
   private generateSessionId(): string {
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).substring(2, 9);
     return `${timestamp}-${random}`;
   }
 
-  /**
-   * Get the API base URL for sendBeacon
-   */
   private getApiBaseUrl(): string {
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8288";
     return `${apiUrl}/api`;
   }
 
-  /**
-   * Get current buffer size (for debugging)
-   */
   getBufferSize(): number {
     return this.buffer.length;
   }
 
-  /**
-   * Force flush (for testing/debugging)
-   */
   forceFlush(): void {
     this.flush();
   }
