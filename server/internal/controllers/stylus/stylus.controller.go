@@ -123,6 +123,18 @@ func (c *StylusController) GetUserStyluses(
 		return nil, log.Err("failed to get user styluses", err, "userID", user.ID)
 	}
 
+	usageHours, err := c.stylusRepo.GetStylusUsageHours(ctx, c.db.SQL, user.ID)
+	if err != nil {
+		log.Warn("failed to get stylus usage hours, using stored values", "userID", user.ID, "error", err)
+	} else {
+		for _, stylus := range styluses {
+			if hours, ok := usageHours[stylus.ID]; ok {
+				hoursDecimal := decimal.NewFromFloat(hours)
+				stylus.HoursUsed = &hoursDecimal
+			}
+		}
+	}
+
 	return styluses, nil
 }
 

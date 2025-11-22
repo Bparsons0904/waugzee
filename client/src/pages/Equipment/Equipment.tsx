@@ -4,18 +4,25 @@ import { Button } from "@components/common/ui/Button/Button";
 import { ConfirmPopup } from "@components/common/ui/ConfirmPopup/ConfirmPopup";
 import { Modal, ModalSize } from "@components/common/ui/Modal/Modal";
 import EditEquipmentModal from "@components/EditEquipmentModal/EditEquipmentModal";
-import { useUserData } from "@context/UserDataContext";
+import { STYLUS_ENDPOINTS } from "@constants/api.constants";
 import type { UserStylus } from "@models/Stylus";
-import { useDeleteUserStylus } from "@services/apiHooks";
+import { useApiQuery, useDeleteUserStylus } from "@services/apiHooks";
 import { formatLocalDate } from "@utils/dates";
 import { type Component, createSignal, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import styles from "./Equipment.module.scss";
 
+interface UserStylusesResponse {
+  styluses: UserStylus[];
+}
+
 type ModalMode = "add" | "custom" | "edit" | null;
 
 const Equipment: Component = () => {
-  const userData = useUserData();
+  const stylusQuery = useApiQuery<UserStylusesResponse>(
+    ["userStyluses"],
+    STYLUS_ENDPOINTS.USER_STYLUSES,
+  );
   const deleteUserStylusMutation = useDeleteUserStylus();
 
   const [modalMode, setModalMode] = createStore<{ current: ModalMode }>({
@@ -75,7 +82,8 @@ const Equipment: Component = () => {
     return `Are you sure you want to remove "${displayName}" from your equipment? This action cannot be undone.`;
   };
 
-  const styluses = () => userData.styluses();
+  const styluses = () => stylusQuery.data?.styluses || [];
+  const isLoading = () => stylusQuery.isPending;
   const activeStyluses = () => styluses().filter((s) => s.isActive);
   const inactiveStyluses = () => styluses().filter((s) => !s.isActive);
 
@@ -85,7 +93,7 @@ const Equipment: Component = () => {
         <h2 class={styles.title}>Equipment Manager</h2>
         <div class={styles.headerButtons}>
           <Show when={!modalMode.current}>
-            <Button variant="primary" onClick={openAddModal} disabled={userData.isLoading()}>
+            <Button variant="primary" onClick={openAddModal} disabled={isLoading()}>
               Add Stylus
             </Button>
           </Show>
@@ -131,11 +139,11 @@ const Equipment: Component = () => {
         size={ModalSize.Small}
       />
 
-      <Show when={!modalMode.current && userData.isLoading()}>
+      <Show when={!modalMode.current && isLoading()}>
         <p class={styles.loading}>Loading equipment...</p>
       </Show>
 
-      <Show when={!modalMode.current && !userData.isLoading() && styluses().length === 0}>
+      <Show when={!modalMode.current && !isLoading() && styluses().length === 0}>
         <p class={styles.noStyluses}>No styluses found. Click "Add Stylus" to get started.</p>
       </Show>
 

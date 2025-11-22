@@ -1,0 +1,101 @@
+// TODO: REMOVE_AFTER_MIGRATION - This entire file is for one-time Kleio data import
+@import "../../styles/variables";
+@import "../../styles/colors";
+
+.section {
+  background: $bg-surface;
+  border-radius: $border-radius-lg;
+  padding: $spacing-xl;
+  box-shadow: $shadow-sm;
+}
+
+.header {
+  margin-bottom: $spacing-lg;
+}
+
+.sectionTitle {
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  color: $text-default;
+  margin: 0 0 $spacing-xs 0;
+}
+
+.sectionDescription {
+  font-size: $font-size-sm;
+  color: $text-muted;
+  margin: 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.uploadArea {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.fileInput {
+  display: none;
+}
+
+.fileLabel {
+  flex: 1;
+  padding: $spacing-md $spacing-lg;
+  background: $bg-subtle;
+  border: 1px solid $border-default;
+  border-radius: $border-radius-md;
+  font-size: $font-size-sm;
+  color: $text-muted;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    background: $bg-muted;
+    border-color: $border-strong;
+  }
+}
+
+.successMessage {
+  padding: $spacing-md;
+  background: $bg-success;
+  border: 1px solid $border-success;
+  border-radius: $border-radius-md;
+  color: $text-success;
+  font-size: $font-size-sm;
+
+  strong {
+    display: block;
+    margin-bottom: $spacing-sm;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: $spacing-lg;
+  }
+
+  li {
+    margin-bottom: $spacing-xs;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+.errorMessage {
+  padding: $spacing-md;
+  background: $bg-error;
+  border: 1px solid $border-error;
+  border-radius: $border-radius-md;
+  color: $text-error;
+  font-size: $font-size-sm;
+}

@@ -89,8 +89,12 @@ func (s *KleioImportService) validateKleioExport(export *KleioExport) error {
 		return fmt.Errorf("missing export date")
 	}
 
-	if _, err := time.Parse("2006-01-02", export.ExportDate); err != nil {
-		return fmt.Errorf("invalid export date format: %w", err)
+	if _, err := time.Parse(time.RFC3339Nano, export.ExportDate); err != nil {
+		if _, err := time.Parse(time.RFC3339, export.ExportDate); err != nil {
+			if _, err := time.Parse("2006-01-02", export.ExportDate); err != nil {
+				return fmt.Errorf("invalid export date format: %w", err)
+			}
+		}
 	}
 
 	const maxNoteLength = 1000
