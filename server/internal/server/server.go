@@ -5,7 +5,7 @@ import (
 	"time"
 	"waugzee/internal/app"
 	"waugzee/internal/handlers"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"

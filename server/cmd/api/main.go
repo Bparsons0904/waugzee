@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"waugzee/internal/app"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	"waugzee/internal/server"
 	"syscall"
 	"time"

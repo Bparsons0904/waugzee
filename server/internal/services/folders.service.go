@@ -8,7 +8,7 @@ import (
 	"time"
 	"waugzee/internal/database"
 	"waugzee/internal/events"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 

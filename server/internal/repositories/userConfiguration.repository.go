@@ -2,7 +2,7 @@ package repositories
 
 import (
 	"context"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"github.com/google/uuid"
@@ -25,14 +25,10 @@ type UserConfigurationRepository interface {
 	) error
 }
 
-type userConfigurationRepository struct {
-	log logger.Logger
-}
+type userConfigurationRepository struct{}
 
 func NewUserConfigurationRepository() UserConfigurationRepository {
-	return &userConfigurationRepository{
-		log: logger.New("userConfigurationRepository"),
-	}
+	return &userConfigurationRepository{}
 }
 
 func (r *userConfigurationRepository) GetByUserID(
@@ -40,7 +36,7 @@ func (r *userConfigurationRepository) GetByUserID(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) (*UserConfiguration, error) {
-	log := r.log.Function("GetByUserID")
+	log := logger.New("userConfigurationRepository").TraceFromContext(ctx).Function("GetByUserID")
 
 	var config UserConfiguration
 	err := tx.WithContext(ctx).Where("user_id = ?", userID).First(&config).Error
@@ -57,7 +53,7 @@ func (r *userConfigurationRepository) Update(
 	config *UserConfiguration,
 	userRepo UserRepository,
 ) error {
-	log := r.log.Function("Update")
+	log := logger.New("userConfigurationRepository").TraceFromContext(ctx).Function("Update")
 
 	if err := tx.WithContext(ctx).Save(config).Error; err != nil {
 		return log.Err("failed to update user configuration", err)
@@ -82,7 +78,7 @@ func (r *userConfigurationRepository) CreateOrUpdate(
 	config *UserConfiguration,
 	userRepo UserRepository,
 ) error {
-	log := r.log.Function("CreateOrUpdate")
+	log := logger.New("userConfigurationRepository").TraceFromContext(ctx).Function("CreateOrUpdate")
 
 	if err := tx.WithContext(ctx).Save(config).Error; err != nil {
 		return log.Err("failed to create or update user configuration", err)
@@ -100,4 +96,3 @@ func (r *userConfigurationRepository) CreateOrUpdate(
 
 	return nil
 }
-

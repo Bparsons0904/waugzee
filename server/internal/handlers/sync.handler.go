@@ -4,7 +4,7 @@ import (
 	"waugzee/internal/app"
 	syncController "waugzee/internal/controllers/sync"
 	"waugzee/internal/handlers/middleware"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	"waugzee/internal/services"
 
 	"github.com/gofiber/fiber/v2"
@@ -36,10 +36,11 @@ func (h *SyncHandler) Register() {
 }
 
 func (h *SyncHandler) InitiateCollectionSync(c *fiber.Ctx) error {
-	log := h.log.Function("InitiateCollectionSync")
+	log := logger.New("handlers").TraceFromContext(c.Context()).File("sync_handler").Function("InitiateCollectionSync")
 
 	user := middleware.GetUser(c)
 	if user == nil {
+		log.Warn("Unauthorized access attempt")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication required",
 		})
@@ -47,7 +48,7 @@ func (h *SyncHandler) InitiateCollectionSync(c *fiber.Ctx) error {
 
 	err := h.syncController.HandleSyncRequest(c.Context(), user)
 	if err != nil {
-		_ = log.Error("Failed to handle sync request", "error", err, "userID", user.ID)
+		_ = log.Err("Failed to handle sync request", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to initiate sync",
 		})
