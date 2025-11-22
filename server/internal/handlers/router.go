@@ -28,6 +28,7 @@ func Router(router fiber.Router, app *app.App) (err error) {
 	NewHistoryHandler(*app, api).Register()
 	NewRecommendationHandler(*app, api).Register()
 	NewAdminHandler(*app, api).Register()
+	NewLoggingHandler(*app, api).Register()
 
 	return nil
 }

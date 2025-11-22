@@ -21,6 +21,7 @@ type Service struct {
 	FileCleanup          *FileCleanupService
 	KleioImport          *KleioImportService       // TODO: REMOVE_AFTER_MIGRATION
 	CacheInvalidation    *CacheInvalidationService
+	Logging              *LoggingService
 }
 
 func New(db database.DB, config config.Config, eventBus *events.EventBus) (Service, error) {
@@ -48,6 +49,7 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 	releaseSyncService := NewReleaseSyncService(eventBus, repos, db, discogsRateLimiterService)
 	fileCleanupService := NewFileCleanupService(config)
 	cacheInvalidationService := NewCacheInvalidationService(eventBus)
+	loggingService := NewLoggingService(config.VictoriaLogsURL)
 	// TODO: REMOVE_AFTER_MIGRATION - One-time Kleio data import service
 	kleioImportService := NewKleioImportService(
 		db,
@@ -70,6 +72,7 @@ func New(db database.DB, config config.Config, eventBus *events.EventBus) (Servi
 		ReleaseSync:          releaseSyncService,
 		FileCleanup:          fileCleanupService,
 		CacheInvalidation:    cacheInvalidationService,
+		Logging:              loggingService,
 		KleioImport:          kleioImportService, // TODO: REMOVE_AFTER_MIGRATION
 	}, nil
 }

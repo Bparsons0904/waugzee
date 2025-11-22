@@ -24,6 +24,7 @@ type Config struct {
 	ZitadelPrivateKey    string `mapstructure:"ZITADEL_PRIVATE_KEY"`
 	ZitadelKeyID         string `mapstructure:"ZITADEL_KEY_ID"`
 	ZitadelClientIDM2M   string `mapstructure:"ZITADEL_CLIENT_ID_M2M"`
+	VictoriaLogsURL      string `mapstructure:"VICTORIA_LOGS_URL"`
 }
 
 var ConfigInstance Config
@@ -41,6 +42,7 @@ func New() (Config, error) {
 		"DB_CACHE_ADDRESS", "DB_CACHE_PORT", "DB_CACHE_RESET",
 		"CORS_ALLOW_ORIGINS",
 		"ZITADEL_CLIENT_ID", "ZITADEL_INSTANCE_URL", "ZITADEL_PRIVATE_KEY", "ZITADEL_KEY_ID", "ZITADEL_CLIENT_ID_M2M",
+		"VICTORIA_LOGS_URL",
 	}
 
 	for _, env := range envVars {

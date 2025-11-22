@@ -1,5 +1,6 @@
 import { AUTH_ENDPOINTS, ROUTES } from "@constants/api.constants";
 import { api, setTokenGetter } from "@services/api";
+import { logger } from "@services/logger.service";
 import { oidcService } from "@services/oidc.service";
 import { useNavigate } from "@solidjs/router";
 import { createContext, createEffect, type JSX, onCleanup, Show, useContext } from "solid-js";
@@ -230,6 +231,19 @@ export function AuthProvider(props: { children: JSX.Element }) {
       cancelled = true;
       controller.abort();
     });
+  });
+
+  // Initialize logger when user becomes authenticated
+  createEffect(() => {
+    if (authState.status === "authenticated") {
+      logger.initialize();
+      logger.info("User authenticated", { action: "auth_success" });
+    }
+  });
+
+  // Cleanup logger on component unmount
+  onCleanup(() => {
+    logger.destroy();
   });
 
   const loginWithOIDC = async (returnTo?: string) => {

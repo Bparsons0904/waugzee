@@ -105,3 +105,15 @@ export const ADMIN_ENDPOINTS = {
 export const RECOMMENDATION_ENDPOINTS = {
   MARK_LISTENED: (id: string) => `/recommendations/${id}/listen`,
 } as const;
+
+// Logging endpoints
+export const LOGGING_ENDPOINTS = {
+  BATCH: "/logs",
+} as const;
+
+// Logger configuration
+export const LOGGER_CONFIG = {
+  BATCH_SIZE: 10,
+  FLUSH_INTERVAL_MS: 5000,
+  MAX_BUFFER_SIZE: 100,
+} as const;
