@@ -44,6 +44,35 @@ func TestNewWithConfig_TextFormat(t *testing.T) {
 	assert.IsType(t, &SlogLogger{}, logger)
 }
 
+func TestNewWithContext_ExtractsTraceID(t *testing.T) {
+	var capturedLogs []string
+	handler := &testHandler{logs: &capturedLogs}
+
+	// Create context with traceID
+	ctx := ContextWithTraceID(context.Background(), "test-trace-from-context")
+
+	// Create logger using NewWithContext
+	logger := &SlogLogger{logger: slog.New(handler)}
+	tracedLogger := logger.TraceFromContext(ctx)
+
+	tracedLogger.Info("test message")
+
+	assert.Len(t, capturedLogs, 1)
+	assert.Contains(t, capturedLogs[0], "test message")
+	assert.Contains(t, capturedLogs[0], "traceID")
+	assert.Contains(t, capturedLogs[0], "test-trace-from-context")
+}
+
+func TestNewWithContext_NoTraceID(t *testing.T) {
+	// NewWithContext should work even without traceID in context
+	ctx := context.Background()
+
+	logger := NewWithContext(ctx, "test-service")
+
+	assert.NotNil(t, logger)
+	assert.IsType(t, &SlogLogger{}, logger)
+}
+
 func TestWith_ChainMethod(t *testing.T) {
 	logger := New("test")
 

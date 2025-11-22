@@ -128,6 +128,11 @@ func NewWithConfig(config Config) Logger {
 	}
 }
 
+// NewWithContext creates a new logger with traceID automatically extracted from context
+func NewWithContext(ctx context.Context, name string) Logger {
+	return New(name).TraceFromContext(ctx)
+}
+
 func isTestMode() bool {
 	for _, arg := range os.Args {
 		if arg == "-test.v" || arg == "-test.run" || arg == "-test.bench" {

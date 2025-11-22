@@ -26,6 +26,7 @@ const (
 var (
 	New                    = pkglogger.New
 	NewWithConfig          = pkglogger.NewWithConfig
+	NewWithContext         = pkglogger.NewWithContext
 	ContextWithTraceID     = pkglogger.ContextWithTraceID
 	ContextWithTraceIDName = pkglogger.ContextWithTraceIDName
 	TraceIDFromContext     = pkglogger.TraceIDFromContext
