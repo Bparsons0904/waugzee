@@ -31,6 +31,14 @@ class LoggerService {
   initialize(): void {
     if (this.isInitialized) return;
 
+    if (!env.isProduction) {
+      console.debug("[Logger] Initializing logger service", {
+        sessionId: this.sessionId,
+        flushInterval: LOGGER_CONFIG.FLUSH_INTERVAL_MS,
+        batchSize: LOGGER_CONFIG.BATCH_SIZE,
+      });
+    }
+
     this.flushTimer = setInterval(() => {
       this.flush();
     }, LOGGER_CONFIG.FLUSH_INTERVAL_MS);
@@ -185,16 +193,27 @@ class LoggerService {
       sessionId: this.sessionId,
     };
 
+    if (!env.isProduction) {
+      console.debug(`[Logger] Flushing ${logs.length} logs (sync: ${sync})`);
+    }
+
     if (sync && typeof navigator !== "undefined" && navigator.sendBeacon) {
       const blob = new Blob([JSON.stringify(payload)], {
         type: "application/json",
       });
       navigator.sendBeacon(`${this.getApiBaseUrl()}${LOGGING_ENDPOINTS.BATCH}`, blob);
     } else {
-      api.post(LOGGING_ENDPOINTS.BATCH, payload).catch((err) => {
-        console.error("Failed to send logs:", err);
-        this.buffer = [...logs, ...this.buffer].slice(-LOGGER_CONFIG.MAX_BUFFER_SIZE);
-      });
+      api
+        .post(LOGGING_ENDPOINTS.BATCH, payload)
+        .then((response) => {
+          if (!env.isProduction) {
+            console.debug("[Logger] Logs sent successfully", response);
+          }
+        })
+        .catch((err) => {
+          console.error("[Logger] Failed to send logs:", err);
+          this.buffer = [...logs, ...this.buffer].slice(-LOGGER_CONFIG.MAX_BUFFER_SIZE);
+        });
     }
   }
 
