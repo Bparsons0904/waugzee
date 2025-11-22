@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"waugzee/internal/database"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"github.com/google/uuid"
@@ -52,7 +52,7 @@ func (r *folderRepository) UpsertFolders(
 	userID uuid.UUID,
 	folders []*Folder,
 ) error {
-	log := logger.NewWithContext(ctx, "folderRepository").Function("UpsertFolders")
+	log := logger.New("folderRepository").TraceFromContext(ctx).Function("UpsertFolders")
 
 	log.Info("Upserting folders", "userID", userID, "folderCount", len(folders))
 	if len(folders) == 0 {
@@ -103,7 +103,7 @@ func (r *folderRepository) DeleteOrphanFolders(
 	userID uuid.UUID,
 	keepFolderIDs []int,
 ) error {
-	log := logger.NewWithContext(ctx, "folderRepository").Function("DeleteOrphanFolders")
+	log := logger.New("folderRepository").TraceFromContext(ctx).Function("DeleteOrphanFolders")
 
 	if len(keepFolderIDs) == 0 {
 		// Delete all user folders if no IDs to keep
@@ -149,7 +149,7 @@ func (r *folderRepository) GetUserFolders(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) ([]*Folder, error) {
-	log := logger.NewWithContext(ctx, "folderRepository").Function("GetUserFolders")
+	log := logger.New("folderRepository").TraceFromContext(ctx).Function("GetUserFolders")
 
 	var cachedFolders []*Folder
 	found, err := database.NewCacheBuilder(r.cache.Cache.User, userID).
@@ -188,7 +188,7 @@ func (r *folderRepository) GetFolderByID(
 	userID uuid.UUID,
 	folderID int,
 ) (*Folder, error) {
-	log := logger.NewWithContext(ctx, "folderRepository").Function("GetFolderByID")
+	log := logger.New("folderRepository").TraceFromContext(ctx).Function("GetFolderByID")
 
 	cacheKey := fmt.Sprintf("%s:%d", userID.String(), folderID)
 	var cachedFolder Folder
@@ -232,7 +232,7 @@ func (r *folderRepository) GetFolderByID(
 }
 
 func (r *folderRepository) ClearUserFoldersCache(ctx context.Context, userID uuid.UUID) error {
-	log := logger.NewWithContext(ctx, "folderRepository").Function("ClearUserFoldersCache")
+	log := logger.New("folderRepository").TraceFromContext(ctx).Function("ClearUserFoldersCache")
 
 	if err := database.NewCacheBuilder(r.cache.Cache.User, userID.String()).
 		WithContext(ctx).
@@ -251,7 +251,7 @@ func (r *folderRepository) clearIndividualFolderCaches(
 	userID uuid.UUID,
 	folders []*Folder,
 ) {
-	log := logger.NewWithContext(ctx, "folderRepository").Function("clearIndividualFolderCaches")
+	log := logger.New("folderRepository").TraceFromContext(ctx).Function("clearIndividualFolderCaches")
 
 	for _, folder := range folders {
 		if folder.ID != nil {

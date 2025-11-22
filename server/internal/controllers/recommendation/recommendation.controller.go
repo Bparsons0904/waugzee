@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 	"waugzee/internal/database"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
@@ -56,7 +56,7 @@ func (c *RecommendationController) MarkAsListened(
 	user *User,
 	recommendationID uuid.UUID,
 ) error {
-	log := logger.NewWithContext(ctx, "recommendationController").Function("MarkAsListened")
+	log := logger.New("recommendationController").TraceFromContext(ctx).Function("MarkAsListened")
 
 	recommendation, err := c.recommendationRepo.GetByID(ctx, c.db, recommendationID, user.ID)
 	if err != nil {

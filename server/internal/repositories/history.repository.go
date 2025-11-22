@@ -6,7 +6,7 @@ import (
 	"time"
 	"waugzee/internal/constants"
 	"waugzee/internal/database"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"github.com/google/uuid"
@@ -78,7 +78,7 @@ func (r *historyRepository) CreatePlayHistory(
 	tx *gorm.DB,
 	playHistory *PlayHistory,
 ) error {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("CreatePlayHistory")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("CreatePlayHistory")
 
 	err := gorm.G[PlayHistory](tx).Create(ctx, playHistory)
 	if err != nil {
@@ -105,7 +105,7 @@ func (r *historyRepository) GetUserPlayHistory(
 	userID uuid.UUID,
 	limit int,
 ) ([]*PlayHistory, error) {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("GetUserPlayHistory")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("GetUserPlayHistory")
 
 	var cached []*PlayHistory
 	found, err := database.NewCacheBuilder(r.cache, userID.String()).
@@ -160,7 +160,7 @@ func (r *historyRepository) UpdatePlayHistory(
 	playHistoryID uuid.UUID,
 	updates map[string]any,
 ) (*PlayHistory, error) {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("UpdatePlayHistory")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("UpdatePlayHistory")
 
 	result := tx.Model(&PlayHistory{}).Where("id = ?", playHistoryID).Updates(updates)
 	if result.Error != nil {
@@ -200,7 +200,7 @@ func (r *historyRepository) DeletePlayHistory(
 	userID uuid.UUID,
 	playHistoryID uuid.UUID,
 ) error {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("DeletePlayHistory")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("DeletePlayHistory")
 
 	playHistory, err := gorm.G[*PlayHistory](tx).
 		Where("user_id = ? AND id = ?", userID, playHistoryID).
@@ -246,7 +246,7 @@ func (r *historyRepository) CreateCleaningHistory(
 	tx *gorm.DB,
 	cleaningHistory *CleaningHistory,
 ) error {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("CreateCleaningHistory")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("CreateCleaningHistory")
 
 	err := gorm.G[CleaningHistory](tx).Create(ctx, cleaningHistory)
 	if err != nil {
@@ -272,7 +272,7 @@ func (r *historyRepository) GetUserCleaningHistory(
 	userID uuid.UUID,
 	limit int,
 ) ([]*CleaningHistory, error) {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("GetUserCleaningHistory")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("GetUserCleaningHistory")
 
 	var cached []*CleaningHistory
 	found, err := database.NewCacheBuilder(r.cache, userID.String()).
@@ -326,7 +326,7 @@ func (r *historyRepository) UpdateCleaningHistory(
 	cleaningHistoryID uuid.UUID,
 	updates map[string]any,
 ) (*CleaningHistory, error) {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("UpdateCleaningHistory")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("UpdateCleaningHistory")
 
 	result := tx.Model(&CleaningHistory{}).Where("id = ?", cleaningHistoryID).Updates(updates)
 	if result.Error != nil {
@@ -364,7 +364,7 @@ func (r *historyRepository) DeleteCleaningHistory(
 	userID uuid.UUID,
 	cleaningHistoryID uuid.UUID,
 ) error {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("DeleteCleaningHistory")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("DeleteCleaningHistory")
 
 	cleaningHistory, err := gorm.G[*CleaningHistory](tx).
 		Where("user_id = ? AND id = ?", userID, cleaningHistoryID).
@@ -405,7 +405,7 @@ func (r *historyRepository) DeleteCleaningHistory(
 }
 
 func (r *historyRepository) clearUserPlayHistoryCache(ctx context.Context, userID uuid.UUID) {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("clearUserPlayHistoryCache")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("clearUserPlayHistoryCache")
 
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).
@@ -420,7 +420,7 @@ func (r *historyRepository) clearUserCleaningHistoryCache(
 	ctx context.Context,
 	userID uuid.UUID,
 ) {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("clearUserCleaningHistoryCache")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("clearUserCleaningHistoryCache")
 
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).
@@ -432,7 +432,7 @@ func (r *historyRepository) clearUserCleaningHistoryCache(
 }
 
 func (r *historyRepository) ClearUserHistoryCache(ctx context.Context, userID uuid.UUID) error {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("ClearUserHistoryCache")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("ClearUserHistoryCache")
 
 	r.clearUserPlayHistoryCache(ctx, userID)
 	r.clearUserCleaningHistoryCache(ctx, userID)
@@ -446,7 +446,7 @@ func (r *historyRepository) clearAllUserReleasesCache(
 	tx *gorm.DB,
 	userReleaseID uuid.UUID,
 ) {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("clearAllUserReleasesCache")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("clearAllUserReleasesCache")
 
 	var userRelease UserRelease
 	err := tx.WithContext(ctx).
@@ -479,7 +479,7 @@ func (r *historyRepository) clearAllUserReleasesCache(
 }
 
 func (r *historyRepository) clearUserStreakCache(ctx context.Context, userID uuid.UUID) {
-	log := logger.NewWithContext(ctx, "historyRepository").Function("clearUserStreakCache")
+	log := logger.New("historyRepository").TraceFromContext(ctx).Function("clearUserStreakCache")
 
 	err := database.NewCacheBuilder(r.cache, userID).
 		WithContext(ctx).

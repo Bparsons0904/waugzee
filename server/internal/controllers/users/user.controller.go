@@ -6,7 +6,7 @@ import (
 	"time"
 	"waugzee/config"
 	"waugzee/internal/database"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
@@ -87,7 +87,7 @@ func (uc *UserController) UpdateDiscogsToken(
 	user *User,
 	token string,
 ) (*User, error) {
-	log := logger.NewWithContext(ctx, "userController").Function("UpdateDiscogsToken")
+	log := logger.New("userController").TraceFromContext(ctx).Function("UpdateDiscogsToken")
 
 	if token == "" {
 		return nil, log.ErrMsg("token is required")
@@ -126,7 +126,7 @@ func (uc *UserController) GetUser(
 	ctx context.Context,
 	user *User,
 ) (*GetUserResponse, error) {
-	log := logger.NewWithContext(ctx, "userController").Function("GetUser")
+	log := logger.New("userController").TraceFromContext(ctx).Function("GetUser")
 
 	// Get user folders
 	folders, err := uc.folderRepo.GetUserFolders(ctx, uc.db.SQL, user.ID)
@@ -234,7 +234,7 @@ func (uc *UserController) getOrCreateRecommendation(
 	ctx context.Context,
 	user *User,
 ) (*DailyRecommendation, error) {
-	log := logger.NewWithContext(ctx, "userController").Function("getOrCreateRecommendation")
+	log := logger.New("userController").TraceFromContext(ctx).Function("getOrCreateRecommendation")
 
 	mostRecent, err := uc.recommendationRepo.GetMostRecentRecommendation(ctx, uc.db.SQL, user.ID)
 
@@ -307,7 +307,7 @@ func (uc *UserController) generateNewRecommendation(
 	ctx context.Context,
 	user *User,
 ) (*DailyRecommendation, error) {
-	log := logger.NewWithContext(ctx, "userController").Function("generateNewRecommendation")
+	log := logger.New("userController").TraceFromContext(ctx).Function("generateNewRecommendation")
 
 	folderID := 0
 	if user.Configuration != nil && user.Configuration.SelectedFolderID != nil {
@@ -444,7 +444,7 @@ func (uc *UserController) generateRandomRecommendation(
 	userID uuid.UUID,
 	releases []*UserRelease,
 ) (*DailyRecommendation, error) {
-	log := logger.NewWithContext(ctx, "userController").Function("generateRandomRecommendation")
+	log := logger.New("userController").TraceFromContext(ctx).Function("generateRandomRecommendation")
 
 	selectedRelease := releases[rand.Intn(len(releases))]
 
@@ -486,7 +486,7 @@ func (uc *UserController) UpdateSelectedFolder(
 	user *User,
 	folderID int,
 ) (*User, error) {
-	log := logger.NewWithContext(ctx, "userController").Function("UpdateSelectedFolder")
+	log := logger.New("userController").TraceFromContext(ctx).Function("UpdateSelectedFolder")
 
 	if user.Configuration == nil {
 		return nil, log.ErrMsg(
@@ -524,7 +524,7 @@ func (uc *UserController) UpdateUserPreferences(
 	user *User,
 	preferences *UpdateUserPreferencesRequest,
 ) (*User, error) {
-	log := logger.NewWithContext(ctx, "userController").Function("UpdateUserPreferences")
+	log := logger.New("userController").TraceFromContext(ctx).Function("UpdateUserPreferences")
 
 	if user.Configuration == nil {
 		return nil, log.ErrMsg(
@@ -578,7 +578,7 @@ func (uc *UserController) calculateUserStreak(
 	ctx context.Context,
 	userID uuid.UUID,
 ) (*repositories.StreakData, error) {
-	log := logger.NewWithContext(ctx, "userController").Function("calculateUserStreak")
+	log := logger.New("userController").TraceFromContext(ctx).Function("calculateUserStreak")
 
 	cachedStreak, found, err := uc.recommendationRepo.GetUserStreakFromCache(ctx, userID)
 	if err != nil {

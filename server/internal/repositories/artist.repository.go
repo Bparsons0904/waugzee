@@ -3,7 +3,7 @@ package repositories
 import (
 	"context"
 	"strconv"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"gorm.io/gorm"
@@ -33,7 +33,7 @@ func NewArtistRepository() ArtistRepository {
 }
 
 func (r *artistRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (*Artist, error) {
-	log := logger.NewWithContext(ctx, "artistRepository").Function("GetByID")
+	log := logger.New("artistRepository").TraceFromContext(ctx).Function("GetByID")
 
 	artistID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -53,7 +53,7 @@ func (r *artistRepository) GetByDiscogsID(
 	tx *gorm.DB,
 	discogsID int64,
 ) (*Artist, error) {
-	log := logger.NewWithContext(ctx, "artistRepository").Function("GetByDiscogsID")
+	log := logger.New("artistRepository").TraceFromContext(ctx).Function("GetByDiscogsID")
 
 	artist, err := gorm.G[*Artist](tx).Where(BaseDiscogModel{ID: discogsID}).First(ctx)
 	if err != nil {
@@ -71,7 +71,7 @@ func (r *artistRepository) Create(
 	tx *gorm.DB,
 	artist *Artist,
 ) (*Artist, error) {
-	log := logger.NewWithContext(ctx, "artistRepository").Function("Create")
+	log := logger.New("artistRepository").TraceFromContext(ctx).Function("Create")
 
 	if err := tx.WithContext(ctx).Create(artist).Error; err != nil {
 		return nil, log.Err("failed to create artist", err, "artist", artist)
@@ -81,7 +81,7 @@ func (r *artistRepository) Create(
 }
 
 func (r *artistRepository) Update(ctx context.Context, tx *gorm.DB, artist *Artist) error {
-	log := logger.NewWithContext(ctx, "artistRepository").Function("Update")
+	log := logger.New("artistRepository").TraceFromContext(ctx).Function("Update")
 
 	if err := tx.WithContext(ctx).Save(artist).Error; err != nil {
 		return log.Err("failed to update artist", err, "artist", artist)
@@ -91,7 +91,7 @@ func (r *artistRepository) Update(ctx context.Context, tx *gorm.DB, artist *Arti
 }
 
 func (r *artistRepository) Delete(ctx context.Context, tx *gorm.DB, id string) error {
-	log := logger.NewWithContext(ctx, "artistRepository").Function("Delete")
+	log := logger.New("artistRepository").TraceFromContext(ctx).Function("Delete")
 
 	artistID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -111,7 +111,7 @@ func (r *artistRepository) Delete(ctx context.Context, tx *gorm.DB, id string) e
 }
 
 func (r *artistRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error {
-	log := logger.NewWithContext(ctx, "artistRepository").Function("UpsertBatch")
+	log := logger.New("artistRepository").TraceFromContext(ctx).Function("UpsertBatch")
 
 	if len(artists) == 0 {
 		return nil
@@ -135,7 +135,7 @@ func (r *artistRepository) GetBatchByDiscogsIDs(
 	tx *gorm.DB,
 	discogsIDs []int64,
 ) (map[int64]*Artist, error) {
-	log := logger.NewWithContext(ctx, "artistRepository").Function("GetBatchByDiscogsIDs")
+	log := logger.New("artistRepository").TraceFromContext(ctx).Function("GetBatchByDiscogsIDs")
 
 	if len(discogsIDs) == 0 {
 		return make(map[int64]*Artist), nil
@@ -156,7 +156,7 @@ func (r *artistRepository) GetBatchByDiscogsIDs(
 }
 
 func (r *artistRepository) InsertBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error {
-	log := logger.NewWithContext(ctx, "artistRepository").Function("InsertBatch")
+	log := logger.New("artistRepository").TraceFromContext(ctx).Function("InsertBatch")
 
 	if len(artists) == 0 {
 		return nil
@@ -170,7 +170,7 @@ func (r *artistRepository) InsertBatch(ctx context.Context, tx *gorm.DB, artists
 }
 
 func (r *artistRepository) UpdateBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error {
-	log := logger.NewWithContext(ctx, "artistRepository").Function("UpdateBatch")
+	log := logger.New("artistRepository").TraceFromContext(ctx).Function("UpdateBatch")
 
 	if len(artists) == 0 {
 		return nil

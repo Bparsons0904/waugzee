@@ -6,7 +6,7 @@ import (
 	"time"
 	"waugzee/config"
 	"waugzee/internal/database"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
@@ -128,7 +128,7 @@ func (c *HistoryController) LogPlay(
 	user *User,
 	request *LogPlayRequest,
 ) (*PlayHistory, error) {
-	log := logger.NewWithContext(ctx, "historyController").Function("LogPlay")
+	log := logger.New("historyController").TraceFromContext(ctx).Function("LogPlay")
 
 	if request.UserReleaseID == uuid.Nil {
 		return nil, log.ErrorWithType(ErrValidation, "userReleaseId is required")
@@ -205,7 +205,7 @@ func (c *HistoryController) UpdatePlayHistory(
 	playHistoryID uuid.UUID,
 	request *UpdatePlayHistoryRequest,
 ) (*PlayHistory, error) {
-	log := logger.NewWithContext(ctx, "historyController").Function("UpdatePlayHistory")
+	log := logger.New("historyController").TraceFromContext(ctx).Function("UpdatePlayHistory")
 
 	if playHistoryID == uuid.Nil {
 		return nil, log.ErrorWithType(ErrValidation, "playHistoryId is required")
@@ -298,7 +298,7 @@ func (c *HistoryController) DeletePlayHistory(
 	user *User,
 	playHistoryID uuid.UUID,
 ) error {
-	log := logger.NewWithContext(ctx, "historyController").Function("DeletePlayHistory")
+	log := logger.New("historyController").TraceFromContext(ctx).Function("DeletePlayHistory")
 
 	if playHistoryID == uuid.Nil {
 		return log.ErrorWithType(ErrValidation, "playHistoryId is required")
@@ -318,7 +318,7 @@ func (c *HistoryController) LogCleaning(
 	user *User,
 	request *LogCleaningRequest,
 ) (*CleaningHistory, error) {
-	log := logger.NewWithContext(ctx, "historyController").Function("LogCleaning")
+	log := logger.New("historyController").TraceFromContext(ctx).Function("LogCleaning")
 
 	if request.UserReleaseID == uuid.Nil {
 		return nil, log.ErrorWithType(ErrValidation, "userReleaseId is required")
@@ -383,7 +383,7 @@ func (c *HistoryController) UpdateCleaningHistory(
 	cleaningHistoryID uuid.UUID,
 	request *UpdateCleaningHistoryRequest,
 ) (*CleaningHistory, error) {
-	log := logger.NewWithContext(ctx, "historyController").Function("UpdateCleaningHistory")
+	log := logger.New("historyController").TraceFromContext(ctx).Function("UpdateCleaningHistory")
 
 	if cleaningHistoryID == uuid.Nil {
 		return nil, log.ErrorWithType(ErrValidation, "cleaningHistoryId is required")
@@ -472,7 +472,7 @@ func (c *HistoryController) DeleteCleaningHistory(
 	user *User,
 	cleaningHistoryID uuid.UUID,
 ) error {
-	log := logger.NewWithContext(ctx, "historyController").Function("DeleteCleaningHistory")
+	log := logger.New("historyController").TraceFromContext(ctx).Function("DeleteCleaningHistory")
 
 	if cleaningHistoryID == uuid.Nil {
 		return log.ErrorWithType(ErrValidation, "cleaningHistoryId is required")
@@ -498,7 +498,7 @@ func (c *HistoryController) LogBoth(
 	user *User,
 	request *LogBothRequest,
 ) (*LogBothResponse, error) {
-	log := logger.NewWithContext(ctx, "historyController").Function("LogBoth")
+	log := logger.New("historyController").TraceFromContext(ctx).Function("LogBoth")
 
 	if request.UserReleaseID == uuid.Nil {
 		return nil, log.ErrorWithType(ErrValidation, "userReleaseId is required")

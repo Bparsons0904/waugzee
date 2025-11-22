@@ -6,7 +6,7 @@ import (
 	"time"
 	"waugzee/internal/constants"
 	"waugzee/internal/database"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"github.com/google/uuid"
@@ -80,7 +80,7 @@ func (r *dailyRecommendationRepository) GetTodayRecommendation(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) (*DailyRecommendation, error) {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("GetTodayRecommendation")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("GetTodayRecommendation")
 
 	var cached *DailyRecommendation
 	found, err := database.NewCacheBuilder(r.cache, userID.String()).
@@ -130,7 +130,7 @@ func (r *dailyRecommendationRepository) GetMostRecentRecommendation(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) (*DailyRecommendation, error) {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("GetMostRecentRecommendation")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("GetMostRecentRecommendation")
 
 	var cached *DailyRecommendation
 	found, err := database.NewCacheBuilder(r.cache, userID.String()).
@@ -176,7 +176,7 @@ func (r *dailyRecommendationRepository) GetByID(
 	recommendationID uuid.UUID,
 	userID uuid.UUID,
 ) (*DailyRecommendation, error) {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("GetByID")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("GetByID")
 
 	recommendation, err := gorm.G[*DailyRecommendation](tx).
 		Where(DailyRecommendation{BaseUUIDModel: BaseUUIDModel{ID: recommendationID}, UserID: userID}).
@@ -200,7 +200,7 @@ func (r *dailyRecommendationRepository) CreateRecommendation(
 	tx *gorm.DB,
 	recommendation *DailyRecommendation,
 ) error {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("CreateRecommendation")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("CreateRecommendation")
 
 	err := gorm.G[DailyRecommendation](tx).Create(ctx, recommendation)
 	if err != nil {
@@ -226,7 +226,7 @@ func (r *dailyRecommendationRepository) MarkAsListened(
 	recommendationID uuid.UUID,
 	userID uuid.UUID,
 ) error {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("MarkAsListened")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("MarkAsListened")
 
 	now := time.Now()
 	rows, err := gorm.G[DailyRecommendation](tx).
@@ -264,7 +264,7 @@ func (r *dailyRecommendationRepository) clearUserRecommendationCache(
 	ctx context.Context,
 	userID uuid.UUID,
 ) {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("clearUserRecommendationCache")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("clearUserRecommendationCache")
 
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).
@@ -294,7 +294,7 @@ func (r *dailyRecommendationRepository) GetAllUserRecommendations(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) ([]*DailyRecommendation, error) {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("GetAllUserRecommendations")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("GetAllUserRecommendations")
 
 	recommendations, err := gorm.G[*DailyRecommendation](tx).
 		Where(DailyRecommendation{UserID: userID}).
@@ -312,7 +312,7 @@ func (r *dailyRecommendationRepository) ClearUserRecommendationCache(
 	ctx context.Context,
 	userID uuid.UUID,
 ) error {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("ClearUserRecommendationCache")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("ClearUserRecommendationCache")
 
 	r.clearUserRecommendationCache(ctx, userID)
 
@@ -324,7 +324,7 @@ func (r *dailyRecommendationRepository) ClearUserStreakCache(
 	ctx context.Context,
 	userID uuid.UUID,
 ) error {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("ClearUserStreakCache")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("ClearUserStreakCache")
 
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).
@@ -343,7 +343,7 @@ func (r *dailyRecommendationRepository) CalculateUserStreaks(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) (*StreakData, error) {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("CalculateUserStreaks")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("CalculateUserStreaks")
 
 	// Calculate streaks using CTEs:
 	// 1. ordered_recs: Order recommendations by date DESC with row numbers
@@ -427,7 +427,7 @@ func (r *dailyRecommendationRepository) GetUserStreakFromCache(
 	ctx context.Context,
 	userID uuid.UUID,
 ) (*StreakData, bool, error) {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("GetUserStreakFromCache")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("GetUserStreakFromCache")
 
 	var cachedStreak *StreakData
 	found, err := database.NewCacheBuilder(r.cache, userID.String()).
@@ -451,7 +451,7 @@ func (r *dailyRecommendationRepository) SetUserStreakCache(
 	userID uuid.UUID,
 	streakData *StreakData,
 ) error {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("SetUserStreakCache")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("SetUserStreakCache")
 
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).
@@ -471,7 +471,7 @@ func (r *dailyRecommendationRepository) clearRecentRecommendationCache(
 	ctx context.Context,
 	userID uuid.UUID,
 ) {
-	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("clearRecentRecommendationCache")
+	log := logger.New("dailyRecommendationRepository").TraceFromContext(ctx).Function("clearRecentRecommendationCache")
 
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).

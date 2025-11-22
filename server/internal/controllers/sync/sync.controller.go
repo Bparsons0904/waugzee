@@ -4,7 +4,7 @@ import (
 	"context"
 	"waugzee/config"
 	"waugzee/internal/events"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
@@ -41,7 +41,7 @@ func (sc *SyncController) HandleSyncRequest(
 	ctx context.Context,
 	user *User,
 ) error {
-	log := logger.NewWithContext(ctx, "syncController").Function("HandleSyncRequest")
+	log := logger.New("syncController").TraceFromContext(ctx).Function("HandleSyncRequest")
 
 	if user.Configuration == nil || user.Configuration.DiscogsToken == nil ||
 		*user.Configuration.DiscogsToken == "" {

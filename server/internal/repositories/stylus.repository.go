@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 	"waugzee/internal/database"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"github.com/google/uuid"
@@ -57,7 +57,7 @@ func (r *stylusRepository) GetAllStyluses(
 	tx *gorm.DB,
 	userID *uuid.UUID,
 ) ([]*Stylus, error) {
-	log := logger.NewWithContext(ctx, "stylusRepository").Function("GetAllStyluses")
+	log := logger.New("stylusRepository").TraceFromContext(ctx).Function("GetAllStyluses")
 
 	var styluses []*Stylus
 	query := tx.WithContext(ctx)
@@ -82,7 +82,7 @@ func (r *stylusRepository) GetUserStyluses(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) ([]*UserStylus, error) {
-	log := logger.NewWithContext(ctx, "stylusRepository").Function("GetUserStyluses")
+	log := logger.New("stylusRepository").TraceFromContext(ctx).Function("GetUserStyluses")
 
 	var cached []*UserStylus
 	found, err := database.NewCacheBuilder(r.cache, userID.String()).
@@ -133,7 +133,7 @@ func (r *stylusRepository) GetPrimaryUserStylus(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) (*UserStylus, error) {
-	log := logger.NewWithContext(ctx, "stylusRepository").Function("GetPrimaryUserStylus")
+	log := logger.New("stylusRepository").TraceFromContext(ctx).Function("GetPrimaryUserStylus")
 
 	userStylus, err := gorm.G[*UserStylus](tx).
 		Preload("Stylus", nil).
@@ -155,7 +155,7 @@ func (r *stylusRepository) GetStylusUsageHours(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) (map[uuid.UUID]float64, error) {
-	log := logger.NewWithContext(ctx, "stylusRepository").Function("GetStylusUsageHours")
+	log := logger.New("stylusRepository").TraceFromContext(ctx).Function("GetStylusUsageHours")
 
 	type usageResult struct {
 		UserStylusID uuid.UUID `gorm:"column:user_stylus_id"`
@@ -190,7 +190,7 @@ func (r *stylusRepository) CreateCustomStylus(
 	tx *gorm.DB,
 	stylus *Stylus,
 ) error {
-	log := logger.NewWithContext(ctx, "stylusRepository").Function("CreateCustomStylus")
+	log := logger.New("stylusRepository").TraceFromContext(ctx).Function("CreateCustomStylus")
 
 	if err := tx.WithContext(ctx).Create(stylus).Error; err != nil {
 		return log.Err(
@@ -219,7 +219,7 @@ func (r *stylusRepository) Create(
 	tx *gorm.DB,
 	userStylus *UserStylus,
 ) error {
-	log := logger.NewWithContext(ctx, "stylusRepository").Function("Create")
+	log := logger.New("stylusRepository").TraceFromContext(ctx).Function("Create")
 
 	if err := tx.WithContext(ctx).Create(userStylus).Error; err != nil {
 		return log.Err(
@@ -244,7 +244,7 @@ func (r *stylusRepository) Update(
 	stylusID uuid.UUID,
 	updatedStylus *UserStylus,
 ) error {
-	log := logger.NewWithContext(ctx, "stylusRepository").Function("Update")
+	log := logger.New("stylusRepository").TraceFromContext(ctx).Function("Update")
 
 	rows, err := gorm.G[*UserStylus](tx).
 		Where(BaseUUIDModel{ID: stylusID}).
@@ -283,7 +283,7 @@ func (r *stylusRepository) Delete(
 	userID uuid.UUID,
 	stylusID uuid.UUID,
 ) error {
-	log := logger.NewWithContext(ctx, "stylusRepository").Function("Delete")
+	log := logger.New("stylusRepository").TraceFromContext(ctx).Function("Delete")
 
 	result := tx.WithContext(ctx).
 		Where("user_id = ? AND id = ?", userID, stylusID).
@@ -320,7 +320,7 @@ func (r *stylusRepository) UnsetAllPrimary(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) error {
-	log := logger.NewWithContext(ctx, "stylusRepository").Function("UnsetAllPrimary")
+	log := logger.New("stylusRepository").TraceFromContext(ctx).Function("UnsetAllPrimary")
 
 	if _, err := gorm.G[UserStylus](tx).
 		Where(UserStylus{UserID: userID}).
@@ -339,7 +339,7 @@ func (r *stylusRepository) VerifyUserOwnership(
 	stylusID uuid.UUID,
 	userID uuid.UUID,
 ) error {
-	log := logger.NewWithContext(ctx, "stylusRepository").Function("VerifyUserOwnership")
+	log := logger.New("stylusRepository").TraceFromContext(ctx).Function("VerifyUserOwnership")
 
 	var userStylus UserStylus
 	if err := tx.WithContext(ctx).
@@ -362,7 +362,7 @@ func (r *stylusRepository) VerifyUserOwnership(
 }
 
 func (r *stylusRepository) clearUserStylusCache(ctx context.Context, userID uuid.UUID) {
-	log := logger.NewWithContext(ctx, "stylusRepository").Function("clearUserStylusCache")
+	log := logger.New("stylusRepository").TraceFromContext(ctx).Function("clearUserStylusCache")
 
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).
@@ -374,7 +374,7 @@ func (r *stylusRepository) clearUserStylusCache(ctx context.Context, userID uuid
 }
 
 func (r *stylusRepository) ClearUserStylusCache(ctx context.Context, userID uuid.UUID) error {
-	log := logger.NewWithContext(ctx, "stylusRepository").Function("ClearUserStylusCache")
+	log := logger.New("stylusRepository").TraceFromContext(ctx).Function("ClearUserStylusCache")
 
 	r.clearUserStylusCache(ctx, userID)
 

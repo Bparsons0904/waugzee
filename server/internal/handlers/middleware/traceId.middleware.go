@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"waugzee/pkg/logger"
+	logger "github.com/Bparsons0904/goLogger"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"

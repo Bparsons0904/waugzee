@@ -4,7 +4,7 @@ import (
 	"waugzee/internal/app"
 	stylusController "waugzee/internal/controllers/stylus"
 	"waugzee/internal/handlers/middleware"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -39,7 +39,7 @@ func (h *StylusHandler) Register() {
 }
 
 func (h *StylusHandler) getAvailableStyluses(c *fiber.Ctx) error {
-	log := logger.NewWithContext(c.Context(), "handlers").File("stylus_handler").Function("getAvailableStyluses")
+	log := logger.New("handlers").TraceFromContext(c.Context()).File("stylus_handler").Function("getAvailableStyluses")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -63,7 +63,7 @@ func (h *StylusHandler) getAvailableStyluses(c *fiber.Ctx) error {
 }
 
 func (h *StylusHandler) createCustomStylus(c *fiber.Ctx) error {
-	log := logger.NewWithContext(c.Context(), "handlers").File("stylus_handler").Function("createCustomStylus")
+	log := logger.New("handlers").TraceFromContext(c.Context()).File("stylus_handler").Function("createCustomStylus")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -100,7 +100,7 @@ func (h *StylusHandler) createCustomStylus(c *fiber.Ctx) error {
 }
 
 func (h *StylusHandler) getUserStyluses(c *fiber.Ctx) error {
-	log := logger.NewWithContext(c.Context(), "handlers").File("stylus_handler").Function("getUserStyluses")
+	log := logger.New("handlers").TraceFromContext(c.Context()).File("stylus_handler").Function("getUserStyluses")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -124,7 +124,7 @@ func (h *StylusHandler) getUserStyluses(c *fiber.Ctx) error {
 }
 
 func (h *StylusHandler) createUserStylus(c *fiber.Ctx) error {
-	log := logger.NewWithContext(c.Context(), "handlers").File("stylus_handler").Function("createUserStylus")
+	log := logger.New("handlers").TraceFromContext(c.Context()).File("stylus_handler").Function("createUserStylus")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -160,7 +160,7 @@ func (h *StylusHandler) createUserStylus(c *fiber.Ctx) error {
 }
 
 func (h *StylusHandler) updateUserStylus(c *fiber.Ctx) error {
-	log := logger.NewWithContext(c.Context(), "handlers").File("stylus_handler").Function("updateUserStylus")
+	log := logger.New("handlers").TraceFromContext(c.Context()).File("stylus_handler").Function("updateUserStylus")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -207,7 +207,7 @@ func (h *StylusHandler) updateUserStylus(c *fiber.Ctx) error {
 }
 
 func (h *StylusHandler) deleteUserStylus(c *fiber.Ctx) error {
-	log := logger.NewWithContext(c.Context(), "handlers").File("stylus_handler").Function("deleteUserStylus")
+	log := logger.New("handlers").TraceFromContext(c.Context()).File("stylus_handler").Function("deleteUserStylus")
 
 	user := middleware.GetUser(c)
 	if user == nil {

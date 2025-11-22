@@ -1,7 +1,7 @@
 package database
 
 import (
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

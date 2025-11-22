@@ -5,7 +5,7 @@ import (
 	"waugzee/internal/app"
 	recommendationController "waugzee/internal/controllers/recommendation"
 	"waugzee/internal/handlers/middleware"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -34,7 +34,7 @@ func (h *RecommendationHandler) Register() {
 }
 
 func (h *RecommendationHandler) markAsListened(c *fiber.Ctx) error {
-	log := logger.NewWithContext(c.Context(), "handlers").File("recommendation_handler").Function("markAsListened")
+	log := logger.New("handlers").TraceFromContext(c.Context()).File("recommendation_handler").Function("markAsListened")
 
 	user := middleware.GetUser(c)
 

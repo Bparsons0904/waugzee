@@ -3,7 +3,7 @@ package repositories
 import (
 	"context"
 	"strconv"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"github.com/google/uuid"
@@ -35,7 +35,7 @@ func NewLabelRepository() LabelRepository {
 }
 
 func (r *labelRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (*Label, error) {
-	log := logger.NewWithContext(ctx, "labelRepository").Function("GetByID")
+	log := logger.New("labelRepository").TraceFromContext(ctx).Function("GetByID")
 
 	labelID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -55,7 +55,7 @@ func (r *labelRepository) GetByDiscogsID(
 	tx *gorm.DB,
 	discogsID int64,
 ) (*Label, error) {
-	log := logger.NewWithContext(ctx, "labelRepository").Function("GetByDiscogsID")
+	log := logger.New("labelRepository").TraceFromContext(ctx).Function("GetByDiscogsID")
 
 	label, err := gorm.G[*Label](tx).Where(BaseDiscogModel{ID: discogsID}).First(ctx)
 	if err != nil {
@@ -69,7 +69,7 @@ func (r *labelRepository) GetByDiscogsID(
 }
 
 func (r *labelRepository) Create(ctx context.Context, tx *gorm.DB, label *Label) (*Label, error) {
-	log := logger.NewWithContext(ctx, "labelRepository").Function("Create")
+	log := logger.New("labelRepository").TraceFromContext(ctx).Function("Create")
 
 	if err := tx.WithContext(ctx).Create(label).Error; err != nil {
 		return nil, log.Err("failed to create label", err, "label", label)
@@ -79,7 +79,7 @@ func (r *labelRepository) Create(ctx context.Context, tx *gorm.DB, label *Label)
 }
 
 func (r *labelRepository) Update(ctx context.Context, tx *gorm.DB, label *Label) error {
-	log := logger.NewWithContext(ctx, "labelRepository").Function("Update")
+	log := logger.New("labelRepository").TraceFromContext(ctx).Function("Update")
 
 	if err := tx.WithContext(ctx).Save(label).Error; err != nil {
 		return log.Err("failed to update label", err, "label", label)
@@ -89,7 +89,7 @@ func (r *labelRepository) Update(ctx context.Context, tx *gorm.DB, label *Label)
 }
 
 func (r *labelRepository) Delete(ctx context.Context, tx *gorm.DB, id string) error {
-	log := logger.NewWithContext(ctx, "labelRepository").Function("Delete")
+	log := logger.New("labelRepository").TraceFromContext(ctx).Function("Delete")
 
 	labelID, err := uuid.Parse(id)
 	if err != nil {
@@ -109,7 +109,7 @@ func (r *labelRepository) Delete(ctx context.Context, tx *gorm.DB, id string) er
 }
 
 func (r *labelRepository) UpsertFileBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
-	log := logger.NewWithContext(ctx, "labelRepository").Function("UpsertFileBatch")
+	log := logger.New("labelRepository").TraceFromContext(ctx).Function("UpsertFileBatch")
 
 	if len(labels) == 0 {
 		return nil
@@ -127,7 +127,7 @@ func (r *labelRepository) UpsertFileBatch(ctx context.Context, tx *gorm.DB, labe
 
 // TODO: This should handle updates from folder sync
 func (r *labelRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
-	log := logger.NewWithContext(ctx, "labelRepository").Function("UpsertBatch")
+	log := logger.New("labelRepository").TraceFromContext(ctx).Function("UpsertBatch")
 
 	if len(labels) == 0 {
 		return nil
@@ -151,7 +151,7 @@ func (r *labelRepository) GetBatchByDiscogsIDs(
 	tx *gorm.DB,
 	discogsIDs []int64,
 ) (map[int64]*Label, error) {
-	log := logger.NewWithContext(ctx, "labelRepository").Function("GetBatchByDiscogsIDs")
+	log := logger.New("labelRepository").TraceFromContext(ctx).Function("GetBatchByDiscogsIDs")
 
 	if len(discogsIDs) == 0 {
 		return make(map[int64]*Label), nil
@@ -173,7 +173,7 @@ func (r *labelRepository) GetBatchByDiscogsIDs(
 }
 
 func (r *labelRepository) InsertBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
-	log := logger.NewWithContext(ctx, "labelRepository").Function("InsertBatch")
+	log := logger.New("labelRepository").TraceFromContext(ctx).Function("InsertBatch")
 
 	if len(labels) == 0 {
 		return nil
@@ -187,7 +187,7 @@ func (r *labelRepository) InsertBatch(ctx context.Context, tx *gorm.DB, labels [
 }
 
 func (r *labelRepository) UpdateBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
-	log := logger.NewWithContext(ctx, "labelRepository").Function("UpdateBatch")
+	log := logger.New("labelRepository").TraceFromContext(ctx).Function("UpdateBatch")
 
 	if len(labels) == 0 {
 		return nil

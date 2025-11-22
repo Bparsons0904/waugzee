@@ -2,7 +2,7 @@ package repositories
 
 import (
 	"context"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"github.com/google/uuid"
@@ -36,7 +36,7 @@ func (r *userConfigurationRepository) GetByUserID(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) (*UserConfiguration, error) {
-	log := logger.NewWithContext(ctx, "userConfigurationRepository").Function("GetByUserID")
+	log := logger.New("userConfigurationRepository").TraceFromContext(ctx).Function("GetByUserID")
 
 	var config UserConfiguration
 	err := tx.WithContext(ctx).Where("user_id = ?", userID).First(&config).Error
@@ -53,7 +53,7 @@ func (r *userConfigurationRepository) Update(
 	config *UserConfiguration,
 	userRepo UserRepository,
 ) error {
-	log := logger.NewWithContext(ctx, "userConfigurationRepository").Function("Update")
+	log := logger.New("userConfigurationRepository").TraceFromContext(ctx).Function("Update")
 
 	if err := tx.WithContext(ctx).Save(config).Error; err != nil {
 		return log.Err("failed to update user configuration", err)
@@ -78,7 +78,7 @@ func (r *userConfigurationRepository) CreateOrUpdate(
 	config *UserConfiguration,
 	userRepo UserRepository,
 ) error {
-	log := logger.NewWithContext(ctx, "userConfigurationRepository").Function("CreateOrUpdate")
+	log := logger.New("userConfigurationRepository").TraceFromContext(ctx).Function("CreateOrUpdate")
 
 	if err := tx.WithContext(ctx).Save(config).Error; err != nil {
 		return log.Err("failed to create or update user configuration", err)

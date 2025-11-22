@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 	"waugzee/internal/database"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"github.com/google/uuid"
@@ -48,7 +48,7 @@ func (r *userReleaseRepository) CreateBatch(
 	tx *gorm.DB,
 	userReleases []*UserRelease,
 ) error {
-	log := logger.NewWithContext(ctx, "userReleaseRepository").Function("CreateBatch")
+	log := logger.New("userReleaseRepository").TraceFromContext(ctx).Function("CreateBatch")
 
 	if len(userReleases) == 0 {
 		log.Info("No user releases to create")
@@ -78,7 +78,7 @@ func (r *userReleaseRepository) UpdateBatch(
 	tx *gorm.DB,
 	userReleases []*UserRelease,
 ) error {
-	log := logger.NewWithContext(ctx, "userReleaseRepository").Function("UpdateBatch")
+	log := logger.New("userReleaseRepository").TraceFromContext(ctx).Function("UpdateBatch")
 
 	if len(userReleases) == 0 {
 		log.Info("No user releases to update")
@@ -110,7 +110,7 @@ func (r *userReleaseRepository) DeleteBatch(
 	userID uuid.UUID,
 	instanceIDs []int,
 ) error {
-	log := logger.NewWithContext(ctx, "userReleaseRepository").Function("DeleteBatch")
+	log := logger.New("userReleaseRepository").TraceFromContext(ctx).Function("DeleteBatch")
 
 	if len(instanceIDs) == 0 {
 		log.Info("No user releases to delete")
@@ -144,7 +144,7 @@ func (r *userReleaseRepository) GetExistingByUser(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) (map[int]*UserRelease, error) {
-	log := logger.NewWithContext(ctx, "userReleaseRepository").Function("GetExistingByUser")
+	log := logger.New("userReleaseRepository").TraceFromContext(ctx).Function("GetExistingByUser")
 
 	userReleases, err := gorm.G[*UserRelease](tx).
 		Where("user_id = ? AND active = ?", userID, true).
@@ -187,7 +187,7 @@ func (r *userReleaseRepository) GetUserReleasesByFolderID(
 	userID uuid.UUID,
 	folderID int,
 ) ([]*UserRelease, error) {
-	log := logger.NewWithContext(ctx, "userReleaseRepository").Function("GetUserReleasesByFolderID")
+	log := logger.New("userReleaseRepository").TraceFromContext(ctx).Function("GetUserReleasesByFolderID")
 
 	var cachedReleases []*UserRelease
 	found, err := database.NewCacheBuilder(r.cache, userID.String()).
@@ -270,7 +270,7 @@ func (r *userReleaseRepository) clearUserReleasesCache(
 	ctx context.Context,
 	userID uuid.UUID,
 ) {
-	log := logger.NewWithContext(ctx, "userReleaseRepository").Function("clearUserReleasesCache")
+	log := logger.New("userReleaseRepository").TraceFromContext(ctx).Function("clearUserReleasesCache")
 
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).

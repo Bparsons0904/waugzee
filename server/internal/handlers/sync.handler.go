@@ -4,7 +4,7 @@ import (
 	"waugzee/internal/app"
 	syncController "waugzee/internal/controllers/sync"
 	"waugzee/internal/handlers/middleware"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	"waugzee/internal/services"
 
 	"github.com/gofiber/fiber/v2"
@@ -36,7 +36,7 @@ func (h *SyncHandler) Register() {
 }
 
 func (h *SyncHandler) InitiateCollectionSync(c *fiber.Ctx) error {
-	log := logger.NewWithContext(c.Context(), "handlers").File("sync_handler").Function("InitiateCollectionSync")
+	log := logger.New("handlers").TraceFromContext(c.Context()).File("sync_handler").Function("InitiateCollectionSync")
 
 	user := middleware.GetUser(c)
 	if user == nil {

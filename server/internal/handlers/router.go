@@ -3,7 +3,7 @@ package handlers
 import (
 	"waugzee/internal/app"
 	"waugzee/internal/handlers/middleware"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"

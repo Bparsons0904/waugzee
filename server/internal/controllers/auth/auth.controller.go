@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 	"waugzee/internal/database"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
@@ -92,7 +92,7 @@ func (ac *AuthController) getOrCreateOIDCUser(
 	ctx context.Context,
 	tokenInfo *types.TokenInfo,
 ) (*User, error) {
-	log := logger.NewWithContext(ctx, "authController").Function("getOrCreateOIDCUser")
+	log := logger.New("authController").TraceFromContext(ctx).Function("getOrCreateOIDCUser")
 
 	// Determine first and last names from various sources
 	firstName := tokenInfo.GivenName
@@ -164,7 +164,7 @@ func (ac *AuthController) HandleOIDCCallback(
 	ctx context.Context,
 	req OIDCCallbackRequest,
 ) (*TokenExchangeResult, error) {
-	log := logger.NewWithContext(ctx, "authController").Function("HandleOIDCCallback")
+	log := logger.New("authController").TraceFromContext(ctx).Function("HandleOIDCCallback")
 
 	tokenInfo, err := ac.zitadelService.ValidateIDToken(ctx, req.IDToken)
 	if err != nil {
@@ -205,7 +205,7 @@ func (ac *AuthController) LogoutUser(
 	req LogoutRequest,
 	user *User,
 ) (*LogoutResponse, error) {
-	log := logger.NewWithContext(ctx, "authController").Function("LogoutUser")
+	log := logger.New("authController").TraceFromContext(ctx).Function("LogoutUser")
 
 	var oidcUserID string
 	if user != nil {

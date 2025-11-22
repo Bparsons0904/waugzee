@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 	"waugzee/config"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	"waugzee/internal/types"
 
 	"github.com/golang-jwt/jwt/v5"

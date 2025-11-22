@@ -2,7 +2,7 @@ package repositories
 
 import (
 	"context"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"gorm.io/gorm"
@@ -61,7 +61,7 @@ func (r *masterRepository) GetByDiscogsID(
 	tx *gorm.DB,
 	discogsID int64,
 ) (*Master, error) {
-	log := logger.NewWithContext(ctx, "masterRepository").Function("GetByDiscogsID")
+	log := logger.New("masterRepository").TraceFromContext(ctx).Function("GetByDiscogsID")
 
 	master, err := gorm.G[*Master](tx).Where(BaseDiscogModel{ID: discogsID}).First(ctx)
 	if err != nil {
@@ -75,7 +75,7 @@ func (r *masterRepository) GetByDiscogsID(
 }
 
 func (r *masterRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, masters []*Master) error {
-	log := logger.NewWithContext(ctx, "masterRepository").Function("UpsertBatch")
+	log := logger.New("masterRepository").TraceFromContext(ctx).Function("UpsertBatch")
 
 	if len(masters) == 0 {
 		return nil
@@ -97,7 +97,7 @@ func (r *masterRepository) CreateMasterArtistAssociations(
 	tx *gorm.DB,
 	associations []MasterArtistAssociation,
 ) error {
-	log := logger.NewWithContext(ctx, "masterRepository").Function("CreateMasterArtistAssociations")
+	log := logger.New("masterRepository").TraceFromContext(ctx).Function("CreateMasterArtistAssociations")
 
 	if len(associations) == 0 {
 		return nil
@@ -139,7 +139,7 @@ func (r *masterRepository) UpsertMasterArtistAssociationsBatch(
 	tx *gorm.DB,
 	associationBatches []*[]MasterArtistAssociation,
 ) error {
-	log := logger.NewWithContext(ctx, "masterRepository").Function("UpsertMasterArtistAssociationsBatch")
+	log := logger.New("masterRepository").TraceFromContext(ctx).Function("UpsertMasterArtistAssociationsBatch")
 
 	if len(associationBatches) == 0 {
 		return nil
@@ -176,7 +176,7 @@ func (r *masterRepository) AssociateArtists(
 	master *Master,
 	artists []*Artist,
 ) error {
-	log := logger.NewWithContext(ctx, "masterRepository").Function("AssociateArtists")
+	log := logger.New("masterRepository").TraceFromContext(ctx).Function("AssociateArtists")
 
 	if len(artists) == 0 {
 		return nil
@@ -197,7 +197,7 @@ func (r *masterRepository) AssociateGenres(
 	master *Master,
 	genres []*Genre,
 ) error {
-	log := logger.NewWithContext(ctx, "masterRepository").Function("AssociateGenres")
+	log := logger.New("masterRepository").TraceFromContext(ctx).Function("AssociateGenres")
 
 	if len(genres) == 0 {
 		return nil
@@ -218,7 +218,7 @@ func (r *masterRepository) CreateMasterGenreAssociations(
 	tx *gorm.DB,
 	associations []MasterGenreAssociation,
 ) error {
-	log := logger.NewWithContext(ctx, "masterRepository").Function("CreateMasterGenreAssociations")
+	log := logger.New("masterRepository").TraceFromContext(ctx).Function("CreateMasterGenreAssociations")
 
 	if len(associations) == 0 {
 		return nil
@@ -264,7 +264,7 @@ func (r *masterRepository) UpsertMasterGenreAssociationsBatch(
 	tx *gorm.DB,
 	associationBatches []*[]MasterGenreAssociation,
 ) error {
-	log := logger.NewWithContext(ctx, "masterRepository").Function("UpsertMasterGenreAssociationsBatch")
+	log := logger.New("masterRepository").TraceFromContext(ctx).Function("UpsertMasterGenreAssociationsBatch")
 
 	if len(associationBatches) == 0 {
 		return nil
