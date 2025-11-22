@@ -57,7 +57,7 @@ func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
 		})
 	}
 
-	userData, err := h.userController.GetUser(c.Context(), user)
+	userData, err := h.userController.GetUser(c.UserContext(), user)
 	if err != nil {
 		_ = log.Err("Failed to retrieve user data", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -88,7 +88,7 @@ func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
 		})
 	}
 
-	user, err := h.userController.UpdateDiscogsToken(c.Context(), user, req.Token)
+	user, err := h.userController.UpdateDiscogsToken(c.UserContext(), user, req.Token)
 	if err != nil {
 		if err.Error() == "token is required" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -128,7 +128,7 @@ func (h *UserHandler) updateSelectedFolder(c *fiber.Ctx) error {
 		})
 	}
 
-	updatedUser, err := h.userController.UpdateSelectedFolder(c.Context(), user, req.FolderID)
+	updatedUser, err := h.userController.UpdateSelectedFolder(c.UserContext(), user, req.FolderID)
 	if err != nil {
 		if err.Error() == "folder not found or not owned by user" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -163,7 +163,7 @@ func (h *UserHandler) updateUserPreferences(c *fiber.Ctx) error {
 		})
 	}
 
-	updatedUser, err := h.userController.UpdateUserPreferences(c.Context(), user, &req)
+	updatedUser, err := h.userController.UpdateUserPreferences(c.UserContext(), user, &req)
 	if err != nil {
 		errMsg := err.Error()
 		if errMsg == "user configuration not found, please set up Discogs integration first" ||

@@ -61,7 +61,7 @@ func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
 		})
 	}
 
-	playHistory, err := h.historyController.LogPlay(c.Context(), user, &req)
+	playHistory, err := h.historyController.LogPlay(c.UserContext(), user, &req)
 	if err != nil {
 		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -107,7 +107,7 @@ func (h *HistoryHandler) updatePlayHistory(c *fiber.Ctx) error {
 	}
 
 	playHistory, err := h.historyController.UpdatePlayHistory(
-		c.Context(),
+		c.UserContext(),
 		user,
 		playHistoryID,
 		&req,
@@ -154,7 +154,7 @@ func (h *HistoryHandler) deletePlayHistory(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.historyController.DeletePlayHistory(c.Context(), user, playHistoryID); err != nil {
+	if err := h.historyController.DeletePlayHistory(c.UserContext(), user, playHistoryID); err != nil {
 		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": err.Error(),
@@ -193,7 +193,7 @@ func (h *HistoryHandler) logCleaning(c *fiber.Ctx) error {
 		})
 	}
 
-	cleaningHistory, err := h.historyController.LogCleaning(c.Context(), user, &req)
+	cleaningHistory, err := h.historyController.LogCleaning(c.UserContext(), user, &req)
 	if err != nil {
 		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -245,7 +245,7 @@ func (h *HistoryHandler) updateCleaningHistory(c *fiber.Ctx) error {
 	}
 
 	cleaningHistory, err := h.historyController.UpdateCleaningHistory(
-		c.Context(),
+		c.UserContext(),
 		user,
 		cleaningHistoryID,
 		&req,
@@ -292,7 +292,7 @@ func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.historyController.DeleteCleaningHistory(c.Context(), user, cleaningHistoryID); err != nil {
+	if err := h.historyController.DeleteCleaningHistory(c.UserContext(), user, cleaningHistoryID); err != nil {
 		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": err.Error(),
@@ -331,7 +331,7 @@ func (h *HistoryHandler) logBoth(c *fiber.Ctx) error {
 		})
 	}
 
-	response, err := h.historyController.LogBoth(c.Context(), user, &req)
+	response, err := h.historyController.LogBoth(c.UserContext(), user, &req)
 	if err != nil {
 		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{

@@ -47,7 +47,7 @@ func (h *LoggingHandler) handleLogBatch(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	response, err := h.loggingController.ProcessLogBatch(c.Context(), req, user.ID.String())
+	response, err := h.loggingController.ProcessLogBatch(c.UserContext(), req, user.ID.String())
 	if err != nil {
 		log.Er("Failed to process log batch", err,
 			"userID", user.ID,

@@ -49,7 +49,7 @@ func (h *StylusHandler) getAvailableStyluses(c *fiber.Ctx) error {
 		})
 	}
 
-	styluses, err := h.stylusController.GetAvailableStyluses(c.Context(), user)
+	styluses, err := h.stylusController.GetAvailableStyluses(c.UserContext(), user)
 	if err != nil {
 		_ = log.Err("Failed to retrieve available styluses", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -81,7 +81,7 @@ func (h *StylusHandler) createCustomStylus(c *fiber.Ctx) error {
 		})
 	}
 
-	stylus, err := h.stylusController.CreateCustomStylus(c.Context(), user, &req)
+	stylus, err := h.stylusController.CreateCustomStylus(c.UserContext(), user, &req)
 	if err != nil {
 		if err.Error() == "brand is required" || err.Error() == "model is required" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -110,7 +110,7 @@ func (h *StylusHandler) getUserStyluses(c *fiber.Ctx) error {
 		})
 	}
 
-	styluses, err := h.stylusController.GetUserStyluses(c.Context(), user)
+	styluses, err := h.stylusController.GetUserStyluses(c.UserContext(), user)
 	if err != nil {
 		_ = log.Err("Failed to retrieve user styluses", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -142,7 +142,7 @@ func (h *StylusHandler) createUserStylus(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.stylusController.CreateUserStylus(c.Context(), user, &req); err != nil {
+	if err := h.stylusController.CreateUserStylus(c.UserContext(), user, &req); err != nil {
 		if err.Error() == "stylusId is required" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "stylusId is required",
@@ -189,7 +189,7 @@ func (h *StylusHandler) updateUserStylus(c *fiber.Ctx) error {
 
 	log.Info("Updating user stylus", "stylusID", stylusID, "request", req)
 
-	if err := h.stylusController.UpdateUserStylus(c.Context(), user, stylusID, &req); err != nil {
+	if err := h.stylusController.UpdateUserStylus(c.UserContext(), user, stylusID, &req); err != nil {
 		if err.Error() == "user stylus not found or not owned by user" {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "User stylus not found or not owned by user",
@@ -226,7 +226,7 @@ func (h *StylusHandler) deleteUserStylus(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.stylusController.DeleteUserStylus(c.Context(), user, stylusID); err != nil {
+	if err := h.stylusController.DeleteUserStylus(c.UserContext(), user, stylusID); err != nil {
 		if err.Error() == "user stylus not found or not owned by user" {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "User stylus not found or not owned by user",

@@ -48,7 +48,7 @@ func (h *RecommendationHandler) markAsListened(c *fiber.Ctx) error {
 	}
 
 	err = h.recommendationController.MarkAsListened(
-		c.Context(),
+		c.UserContext(),
 		user,
 		recommendationID,
 	)

@@ -105,7 +105,7 @@ func (h *AuthHandler) logout(c *fiber.Ctx) error {
 		}
 	}
 
-	response, err := h.authController.LogoutUser(c.Context(), reqBody, user)
+	response, err := h.authController.LogoutUser(c.UserContext(), reqBody, user)
 	if err != nil {
 		_ = log.Err("Failed to logout user", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -144,7 +144,7 @@ func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
 		req.State,
 	)
 
-	response, err := h.authController.HandleOIDCCallback(c.Context(), req)
+	response, err := h.authController.HandleOIDCCallback(c.UserContext(), req)
 	if err != nil {
 		_ = log.Err("Authentication failed", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
