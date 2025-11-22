@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"waugzee/internal/app"
+	loggingController "waugzee/internal/controllers/logging"
 	"waugzee/internal/handlers/middleware"
 	"waugzee/internal/logger"
-	"waugzee/internal/services"
 	"waugzee/internal/types"
 
 	"github.com/gofiber/fiber/v2"
@@ -12,13 +12,13 @@ import (
 
 type LoggingHandler struct {
 	Handler
-	loggingService *services.LoggingService
+	loggingController loggingController.LoggingControllerInterface
 }
 
 func NewLoggingHandler(app app.App, router fiber.Router) *LoggingHandler {
 	log := logger.New("handlers").File("logging_handler")
 	return &LoggingHandler{
-		loggingService: app.Services.Logging,
+		loggingController: app.Controllers.Logging,
 		Handler: Handler{
 			log:        log,
 			router:     router,
@@ -45,19 +45,7 @@ func (h *LoggingHandler) handleLogBatch(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	if len(req.Logs) == 0 {
-		return c.Status(fiber.StatusOK).JSON(types.LogBatchResponse{
-			Success:   true,
-			Processed: 0,
-		})
-	}
-
-	if req.SessionID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Session ID is required"})
-	}
-
-	// Process the log batch
-	response, err := h.loggingService.ProcessLogBatch(c.Context(), req, user.ID.String())
+	response, err := h.loggingController.ProcessLogBatch(c.Context(), req, user.ID.String())
 	if err != nil {
 		log.Er("Failed to process log batch", err,
 			"userID", user.ID,
