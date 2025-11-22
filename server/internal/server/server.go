@@ -53,7 +53,7 @@ func New(app *app.App) (*AppServer, error) {
 	server.Use(cors.New(cors.Config{
 		AllowOrigins:     app.Config.CorsAllowOrigins,
 		AllowMethods:     "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, withCredentials, X-Response-Type, Upgrade, Connection, X-Client-Type",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, withCredentials, X-Response-Type, Upgrade, Connection, X-Client-Type, X-Trace-ID",
 		AllowCredentials: true,
 		MaxAge:           300,
 		ExposeHeaders:    "Upgrade, X-Auth-Token",
