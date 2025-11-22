@@ -1,4 +1,5 @@
 import { env } from "@services/env.service";
+import { logger } from "@services/logger.service";
 import { createReconnectingWS, createWSState } from "@solid-primitives/websocket";
 import {
   createContext,
@@ -86,11 +87,10 @@ export function WebSocketProvider(props: WebSocketProviderProps) {
   const [wsAuthenticated, setWsAuthenticated] = createSignal<boolean>(false);
 
   const log = (..._args: unknown[]) => {
-    // Debug logging disabled for production
-    // if (debug) {
-    // biome-ignore lint/suspicious/noConsole: Debug logging for WebSocket connection
-    console.log(`[WebSocket] ${_args[0]}`, ..._args.slice(1));
-    // }
+    logger.debug(_args[0] as string, {
+      component: "WebSocket",
+      ...((_args.length > 1) ? { details: _args.slice(1) } : {}),
+    });
   };
 
   const getWebSocketUrl = () => {

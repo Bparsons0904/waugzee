@@ -1,4 +1,5 @@
 import { useAuth } from "@context/AuthContext";
+import { logger } from "@services/logger.service";
 import { type Component, createEffect, createSignal } from "solid-js";
 import styles from "./Auth.module.scss";
 
@@ -15,7 +16,10 @@ const OidcCallback: Component = () => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Authentication failed";
       setError(errorMessage);
-      console.error("OIDC callback error:", err);
+      logger.error("OIDC callback error", {
+        component: "OidcCallback",
+        error: { message: err instanceof Error ? err.message : String(err) },
+      });
     } finally {
       setLoading(false);
     }

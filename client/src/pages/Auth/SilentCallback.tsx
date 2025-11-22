@@ -1,3 +1,4 @@
+import { logger } from "@services/logger.service";
 import { oidcService } from "@services/oidc.service";
 import { type Component, createEffect } from "solid-js";
 
@@ -14,9 +15,12 @@ const SilentCallback: Component = () => {
     try {
       // Handle the silent renewal callback
       await oidcService.signInSilentCallback();
-      console.debug("Silent token renewal successful");
+      logger.debug("Silent token renewal successful", { component: "SilentCallback" });
     } catch (error) {
-      console.error("Silent token renewal failed:", error);
+      logger.error("Silent token renewal failed", {
+        component: "SilentCallback",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
       // The parent window will handle the error through the UserManager events
     }
   });

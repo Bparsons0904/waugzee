@@ -12,6 +12,7 @@
 import { LOGGER_CONFIG, LOGGING_ENDPOINTS } from "@constants/api.constants";
 import type { LogBatchRequest, LogContext, LogEntry, LogLevel, LogMetadata } from "../types/Logger";
 import { api } from "./api";
+import { env } from "./env.service";
 
 class LoggerService {
   private buffer: LogEntry[] = [];
@@ -86,6 +87,15 @@ class LoggerService {
   }
 
   /**
+   * Log a debug message (development only, not sent to server)
+   */
+  debug(message: string, context?: LogContext): void {
+    if (!env.isProduction) {
+      this.logToConsole("debug", message, context);
+    }
+  }
+
+  /**
    * Log an info message
    */
   info(message: string, context?: LogContext): void {
@@ -110,6 +120,11 @@ class LoggerService {
    * Core logging method
    */
   private log(level: LogLevel, message: string, context?: LogContext): void {
+    // Always output to console in development
+    if (!env.isProduction) {
+      this.logToConsole(level, message, context);
+    }
+
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level,
@@ -126,6 +141,33 @@ class LoggerService {
 
     if (this.buffer.length > LOGGER_CONFIG.MAX_BUFFER_SIZE) {
       this.buffer = this.buffer.slice(-LOGGER_CONFIG.MAX_BUFFER_SIZE);
+    }
+  }
+
+  /**
+   * Output log to browser console
+   */
+  private logToConsole(level: LogLevel | "debug", message: string, context?: LogContext): void {
+    const prefix = `[${level.toUpperCase()}]`;
+    const args: unknown[] = [prefix, message];
+
+    if (context) {
+      args.push(context);
+    }
+
+    switch (level) {
+      case "debug":
+        console.debug(...args);
+        break;
+      case "info":
+        console.info(...args);
+        break;
+      case "warn":
+        console.warn(...args);
+        break;
+      case "error":
+        console.error(...args);
+        break;
     }
   }
 
