@@ -16,6 +16,7 @@ type LogContext struct {
 	StylusID    string                 `json:"stylusId,omitempty"`
 	Component   string                 `json:"component,omitempty"`
 	Duration    *int64                 `json:"duration,omitempty"`
+	TraceID     string                 `json:"traceId,omitempty"`
 	Error       *LogErrorContext       `json:"error,omitempty"`
 	Extra       map[string]interface{} `json:"-"`
 }
@@ -72,6 +73,7 @@ type VictoriaLogsEntry struct {
 	Level         string `json:"level"`
 	UserID        string `json:"userId,omitempty"`
 	SessionID     string `json:"sessionId,omitempty"`
+	TraceID       string `json:"traceId,omitempty"`
 	Action        string `json:"action,omitempty"`
 	Component     string `json:"component,omitempty"`
 	URL           string `json:"url,omitempty"`

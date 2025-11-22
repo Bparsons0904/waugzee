@@ -10,6 +10,7 @@ export interface LogContext {
   stylusId?: string;
   component?: string;
   duration?: number;
+  traceId?: string;
   error?: {
     message: string;
     stack?: string;

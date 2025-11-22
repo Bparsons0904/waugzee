@@ -230,6 +230,28 @@ class LoggerService {
   forceFlush(): void {
     this.flush();
   }
+
+  /**
+   * Generate a trace ID (UUID v4) for request tracing
+   * This can be used to correlate client requests with server logs
+   */
+  generateTraceId(): string {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback for environments without crypto.randomUUID
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
 }
 
 export const logger = new LoggerService();
+
+/**
+ * Generate a trace ID for request tracing
+ * Use this to create trace IDs for API requests
+ */
+export const generateTraceId = (): string => logger.generateTraceId();

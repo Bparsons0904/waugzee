@@ -114,6 +114,7 @@ func (s *LoggingService) convertToVictoriaLogsEntry(
 	if entry.Context != nil {
 		vlEntry.Action = entry.Context.Action
 		vlEntry.Component = entry.Context.Component
+		vlEntry.TraceID = entry.Context.TraceID
 
 		if entry.Context.Error != nil {
 			vlEntry.ErrorMessage = entry.Context.Error.Message

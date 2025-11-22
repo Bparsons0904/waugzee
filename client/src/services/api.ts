@@ -22,7 +22,7 @@
  */
 
 import { env } from "@services/env.service";
-import { logger } from "@services/logger.service";
+import { generateTraceId, logger } from "@services/logger.service";
 import axios, { type AxiosError, type AxiosRequestConfig } from "axios";
 
 // Types
@@ -78,13 +78,18 @@ export const setTokenGetter = (getter: () => string | null) => {
   getAuthToken = getter;
 };
 
-// Request interceptor to add Authorization header
+// Request interceptor to add Authorization header and trace ID
 axiosClient.interceptors.request.use(
   (config) => {
     const token = getAuthToken?.();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Add trace ID for request correlation
+    const traceId = generateTraceId();
+    config.headers["X-Trace-ID"] = traceId;
+    // Store trace ID in config for use in error handling
+    config.metadata = { traceId };
     return config;
   },
   (error) => Promise.reject(error),
@@ -100,6 +105,7 @@ axiosClient.interceptors.response.use(
 const handleApiError = (error: AxiosError): ApiClientError | NetworkError => {
   const url = error.config?.url || "unknown";
   const method = error.config?.method?.toUpperCase() || "unknown";
+  const traceId = (error.config as { metadata?: { traceId?: string } })?.metadata?.traceId;
 
   if (error.response) {
     // Server responded with error status
@@ -113,6 +119,7 @@ const handleApiError = (error: AxiosError): ApiClientError | NetworkError => {
       method,
       url,
       status,
+      traceId,
       error: {
         message: apiError?.message || error.message || "An error occurred",
         code: apiError?.code,
@@ -132,6 +139,7 @@ const handleApiError = (error: AxiosError): ApiClientError | NetworkError => {
       action: "network_error",
       method,
       url,
+      traceId,
       error: {
         message: error.message || "No response received",
         code: error.code,
@@ -146,6 +154,7 @@ const handleApiError = (error: AxiosError): ApiClientError | NetworkError => {
       action: "request_error",
       method,
       url,
+      traceId,
       error: {
         message: error.message || "An unexpected error occurred",
       },
