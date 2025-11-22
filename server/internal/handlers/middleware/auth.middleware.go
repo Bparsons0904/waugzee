@@ -76,8 +76,8 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 		// Store user in Fiber context
 		c.Locals(UserKeyFiber, user)
 
-		// Add to Go context for services
-		ctx := context.WithValue(c.Context(), UserKey, user)
+		// Add to Go context for services (preserve trace ID from TraceID middleware)
+		ctx := context.WithValue(c.UserContext(), UserKey, user)
 		c.SetUserContext(ctx)
 
 		log.Info(
