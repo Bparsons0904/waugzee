@@ -29,7 +29,6 @@ services:
     working_dir: /app
     networks:
       - dev-network-dev
-      - monitoring
     restart: unless-stopped
     depends_on:
       postgres:
@@ -148,6 +147,3 @@ volumes:
 networks:
   dev-network-dev:
     driver: bridge
-  monitoring:
-    external: true
-    name: monitoring_monitoring
