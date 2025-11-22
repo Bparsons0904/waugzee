@@ -6,6 +6,8 @@ import (
 	"waugzee/internal/models"
 	"waugzee/internal/services"
 
+	logger "github.com/Bparsons0904/goLogger"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -19,9 +21,9 @@ const (
 
 // RequireAuth middleware validates OIDC tokens and requires authentication
 func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.Handler {
-	log := m.log.Function("RequireAuth")
-
 	return func(c *fiber.Ctx) error {
+		log := logger.New("middleware").TraceFromContext(c.Context()).Function("RequireAuth")
+
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
 			log.Info("missing authorization header")
