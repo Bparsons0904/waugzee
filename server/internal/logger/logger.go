@@ -3,7 +3,6 @@
 package logger
 
 import (
-	"context"
 	"log/slog"
 
 	pkglogger "waugzee/pkg/logger"
@@ -25,12 +24,12 @@ const (
 
 // Re-export functions from pkg/logger
 var (
-	New                     = pkglogger.New
-	NewWithConfig           = pkglogger.NewWithConfig
-	ContextWithTraceID      = pkglogger.ContextWithTraceID
-	ContextWithTraceIDName  = pkglogger.ContextWithTraceIDName
-	TraceIDFromContext      = pkglogger.TraceIDFromContext
-	TraceIDFromContextName  = pkglogger.TraceIDFromContextName
+	New                    = pkglogger.New
+	NewWithConfig          = pkglogger.NewWithConfig
+	ContextWithTraceID     = pkglogger.ContextWithTraceID
+	ContextWithTraceIDName = pkglogger.ContextWithTraceIDName
+	TraceIDFromContext     = pkglogger.TraceIDFromContext
+	TraceIDFromContextName = pkglogger.TraceIDFromContextName
 )
 
 // Deprecated: Use pkg/logger.Config instead
