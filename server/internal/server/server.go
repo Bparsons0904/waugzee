@@ -75,14 +75,17 @@ func New(app *app.App) (*AppServer, error) {
 		return c.Next()
 	})
 
-	// Enhanced security headers
+	// Enhanced security headers (CSP removed to avoid performance impact)
 	server.Use(helmet.New(helmet.Config{
 		XSSProtection:             "1; mode=block",
 		ContentTypeNosniff:        "nosniff",
-		XFrameOptions:             "DENY",
+		XFrameOptions:             "SAMEORIGIN",
+		HSTSMaxAge:                31536000,
+		HSTSExcludeSubdomains:     false,
+		HSTSPreloadEnabled:        true,
 		ReferrerPolicy:            "strict-origin-when-cross-origin",
 		CrossOriginEmbedderPolicy: "",
-		CrossOriginOpenerPolicy:   "",
+		CrossOriginOpenerPolicy:   "same-origin",
 		CrossOriginResourcePolicy: "cross-origin",
 		OriginAgentCluster:        "?1",
 		XDNSPrefetchControl:       "off",
