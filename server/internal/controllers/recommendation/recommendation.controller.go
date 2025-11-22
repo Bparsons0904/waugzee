@@ -24,7 +24,6 @@ type RecommendationController struct {
 	transactionService *services.TransactionService
 	cache              database.CacheClient
 	db                 *gorm.DB
-	log                logger.Logger
 }
 
 type RecommendationControllerInterface interface {
@@ -49,7 +48,6 @@ func New(
 		transactionService: services.Transaction,
 		cache:              cache,
 		db:                 db,
-		log:                logger.New("recommendationController"),
 	}
 }
 
@@ -58,7 +56,7 @@ func (c *RecommendationController) MarkAsListened(
 	user *User,
 	recommendationID uuid.UUID,
 ) error {
-	log := c.log.Function("MarkAsListened")
+	log := logger.NewWithContext(ctx, "recommendationController").Function("MarkAsListened")
 
 	recommendation, err := c.recommendationRepo.GetByID(ctx, c.db, recommendationID, user.ID)
 	if err != nil {

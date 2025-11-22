@@ -67,13 +67,11 @@ type DailyRecommendationRepository interface {
 
 type dailyRecommendationRepository struct {
 	cache database.CacheClient
-	log   logger.Logger
 }
 
 func NewDailyRecommendationRepository(cache database.CacheClient) DailyRecommendationRepository {
 	return &dailyRecommendationRepository{
 		cache: cache,
-		log:   logger.New("dailyRecommendationRepository"),
 	}
 }
 
@@ -82,7 +80,7 @@ func (r *dailyRecommendationRepository) GetTodayRecommendation(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) (*DailyRecommendation, error) {
-	log := r.log.Function("GetTodayRecommendation")
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("GetTodayRecommendation")
 
 	var cached *DailyRecommendation
 	found, err := database.NewCacheBuilder(r.cache, userID.String()).
@@ -132,7 +130,7 @@ func (r *dailyRecommendationRepository) GetMostRecentRecommendation(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) (*DailyRecommendation, error) {
-	log := r.log.Function("GetMostRecentRecommendation")
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("GetMostRecentRecommendation")
 
 	var cached *DailyRecommendation
 	found, err := database.NewCacheBuilder(r.cache, userID.String()).
@@ -178,7 +176,7 @@ func (r *dailyRecommendationRepository) GetByID(
 	recommendationID uuid.UUID,
 	userID uuid.UUID,
 ) (*DailyRecommendation, error) {
-	log := r.log.Function("GetByID")
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("GetByID")
 
 	recommendation, err := gorm.G[*DailyRecommendation](tx).
 		Where(DailyRecommendation{BaseUUIDModel: BaseUUIDModel{ID: recommendationID}, UserID: userID}).
@@ -202,7 +200,7 @@ func (r *dailyRecommendationRepository) CreateRecommendation(
 	tx *gorm.DB,
 	recommendation *DailyRecommendation,
 ) error {
-	log := r.log.Function("CreateRecommendation")
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("CreateRecommendation")
 
 	err := gorm.G[DailyRecommendation](tx).Create(ctx, recommendation)
 	if err != nil {
@@ -228,7 +226,7 @@ func (r *dailyRecommendationRepository) MarkAsListened(
 	recommendationID uuid.UUID,
 	userID uuid.UUID,
 ) error {
-	log := r.log.Function("MarkAsListened")
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("MarkAsListened")
 
 	now := time.Now()
 	rows, err := gorm.G[DailyRecommendation](tx).
@@ -266,12 +264,14 @@ func (r *dailyRecommendationRepository) clearUserRecommendationCache(
 	ctx context.Context,
 	userID uuid.UUID,
 ) {
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("clearUserRecommendationCache")
+
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).
 		WithHash(DAILY_RECOMMENDATIONS_CACHE_PREFIX).
 		Delete()
 	if err != nil {
-		r.log.Warn("failed to clear user recommendation cache", "userID", userID, "error", err)
+		log.Warn("failed to clear user recommendation cache", "userID", userID, "error", err)
 	}
 }
 
@@ -294,7 +294,7 @@ func (r *dailyRecommendationRepository) GetAllUserRecommendations(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) ([]*DailyRecommendation, error) {
-	log := r.log.Function("GetAllUserRecommendations")
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("GetAllUserRecommendations")
 
 	recommendations, err := gorm.G[*DailyRecommendation](tx).
 		Where(DailyRecommendation{UserID: userID}).
@@ -312,7 +312,7 @@ func (r *dailyRecommendationRepository) ClearUserRecommendationCache(
 	ctx context.Context,
 	userID uuid.UUID,
 ) error {
-	log := r.log.Function("ClearUserRecommendationCache")
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("ClearUserRecommendationCache")
 
 	r.clearUserRecommendationCache(ctx, userID)
 
@@ -324,15 +324,17 @@ func (r *dailyRecommendationRepository) ClearUserStreakCache(
 	ctx context.Context,
 	userID uuid.UUID,
 ) error {
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("ClearUserStreakCache")
+
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).
 		WithHash(constants.UserStreakCachePrefix).
 		Delete()
 	if err != nil {
-		return r.log.Err("failed to clear user streak cache", err, "userID", userID)
+		return log.Err("failed to clear user streak cache", err, "userID", userID)
 	}
 
-	r.log.Info("cleared user streak cache", "userID", userID)
+	log.Info("cleared user streak cache", "userID", userID)
 	return nil
 }
 
@@ -341,7 +343,7 @@ func (r *dailyRecommendationRepository) CalculateUserStreaks(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) (*StreakData, error) {
-	log := r.log.Function("CalculateUserStreaks")
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("CalculateUserStreaks")
 
 	// Calculate streaks using CTEs:
 	// 1. ordered_recs: Order recommendations by date DESC with row numbers
@@ -425,7 +427,7 @@ func (r *dailyRecommendationRepository) GetUserStreakFromCache(
 	ctx context.Context,
 	userID uuid.UUID,
 ) (*StreakData, bool, error) {
-	log := r.log.Function("GetUserStreakFromCache")
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("GetUserStreakFromCache")
 
 	var cachedStreak *StreakData
 	found, err := database.NewCacheBuilder(r.cache, userID.String()).
@@ -449,7 +451,7 @@ func (r *dailyRecommendationRepository) SetUserStreakCache(
 	userID uuid.UUID,
 	streakData *StreakData,
 ) error {
-	log := r.log.Function("SetUserStreakCache")
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("SetUserStreakCache")
 
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).
@@ -469,11 +471,13 @@ func (r *dailyRecommendationRepository) clearRecentRecommendationCache(
 	ctx context.Context,
 	userID uuid.UUID,
 ) {
+	log := logger.NewWithContext(ctx, "dailyRecommendationRepository").Function("clearRecentRecommendationCache")
+
 	err := database.NewCacheBuilder(r.cache, userID.String()).
 		WithContext(ctx).
 		WithHash(RECENT_RECOMMENDATION_CACHE_PREFIX).
 		Delete()
 	if err != nil {
-		r.log.Warn("failed to clear recent recommendation cache", "userID", userID, "error", err)
+		log.Warn("failed to clear recent recommendation cache", "userID", userID, "error", err)
 	}
 }

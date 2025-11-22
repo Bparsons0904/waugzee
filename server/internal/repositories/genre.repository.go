@@ -25,18 +25,14 @@ type GenreRepository interface {
 	UpdateBatch(ctx context.Context, tx *gorm.DB, genres []*Genre) error
 }
 
-type genreRepository struct {
-	log logger.Logger
-}
+type genreRepository struct{}
 
 func NewGenreRepository() GenreRepository {
-	return &genreRepository{
-		log: logger.New("genreRepository"),
-	}
+	return &genreRepository{}
 }
 
 func (r *genreRepository) GetAll(ctx context.Context, tx *gorm.DB) ([]*Genre, error) {
-	log := r.log.Function("GetAll")
+	log := logger.NewWithContext(ctx, "genreRepository").Function("GetAll")
 
 	genres, err := gorm.G[*Genre](tx).Find(ctx)
 	if err != nil {
@@ -47,7 +43,7 @@ func (r *genreRepository) GetAll(ctx context.Context, tx *gorm.DB) ([]*Genre, er
 }
 
 func (r *genreRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (*Genre, error) {
-	log := r.log.Function("GetByID")
+	log := logger.NewWithContext(ctx, "genreRepository").Function("GetByID")
 
 	genreID, err := uuid.Parse(id)
 	if err != nil {
@@ -63,7 +59,7 @@ func (r *genreRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (
 }
 
 func (r *genreRepository) GetByName(ctx context.Context, tx *gorm.DB, name string) (*Genre, error) {
-	log := r.log.Function("GetByName")
+	log := logger.NewWithContext(ctx, "genreRepository").Function("GetByName")
 
 	genre, err := gorm.G[*Genre](tx).Where("name = ?", name).First(ctx)
 	if err != nil {
@@ -74,7 +70,7 @@ func (r *genreRepository) GetByName(ctx context.Context, tx *gorm.DB, name strin
 }
 
 func (r *genreRepository) Create(ctx context.Context, tx *gorm.DB, genre *Genre) (*Genre, error) {
-	log := r.log.Function("Create")
+	log := logger.NewWithContext(ctx, "genreRepository").Function("Create")
 
 	if err := tx.WithContext(ctx).Create(genre).Error; err != nil {
 		return nil, log.Err("failed to create genre", err, "name", genre.Name)
@@ -84,7 +80,7 @@ func (r *genreRepository) Create(ctx context.Context, tx *gorm.DB, genre *Genre)
 }
 
 func (r *genreRepository) Update(ctx context.Context, tx *gorm.DB, genre *Genre) error {
-	log := r.log.Function("Update")
+	log := logger.NewWithContext(ctx, "genreRepository").Function("Update")
 
 	if err := tx.WithContext(ctx).Save(genre).Error; err != nil {
 		return log.Err("failed to update genre", err, "id", genre.ID, "name", genre.Name)
@@ -94,7 +90,7 @@ func (r *genreRepository) Update(ctx context.Context, tx *gorm.DB, genre *Genre)
 }
 
 func (r *genreRepository) Delete(ctx context.Context, tx *gorm.DB, id string) error {
-	log := r.log.Function("Delete")
+	log := logger.NewWithContext(ctx, "genreRepository").Function("Delete")
 
 	genreID, err := uuid.Parse(id)
 	if err != nil {
@@ -118,7 +114,7 @@ func (r *genreRepository) FindOrCreate(
 	tx *gorm.DB,
 	name string,
 ) (*Genre, error) {
-	log := r.log.Function("FindOrCreate")
+	log := logger.NewWithContext(ctx, "genreRepository").Function("FindOrCreate")
 
 	if name == "" {
 		return nil, log.Err("genre name cannot be empty", nil)
@@ -145,7 +141,7 @@ func (r *genreRepository) FindOrCreate(
 }
 
 func (r *genreRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, genres []*Genre) error {
-	log := r.log.Function("UpsertBatch")
+	log := logger.NewWithContext(ctx, "genreRepository").Function("UpsertBatch")
 
 	if len(genres) == 0 {
 		return nil
@@ -201,7 +197,7 @@ func (r *genreRepository) GetBatchByNames(
 	tx *gorm.DB,
 	names []string,
 ) (map[string]*Genre, error) {
-	log := r.log.Function("GetBatchByNames")
+	log := logger.NewWithContext(ctx, "genreRepository").Function("GetBatchByNames")
 
 	if len(names) == 0 {
 		return make(map[string]*Genre), nil
@@ -222,7 +218,7 @@ func (r *genreRepository) GetBatchByNames(
 }
 
 func (r *genreRepository) InsertBatch(ctx context.Context, tx *gorm.DB, genres []*Genre) error {
-	log := r.log.Function("InsertBatch")
+	log := logger.NewWithContext(ctx, "genreRepository").Function("InsertBatch")
 
 	if len(genres) == 0 {
 		return nil
@@ -240,7 +236,7 @@ func (r *genreRepository) InsertBatch(ctx context.Context, tx *gorm.DB, genres [
 }
 
 func (r *genreRepository) UpdateBatch(ctx context.Context, tx *gorm.DB, genres []*Genre) error {
-	log := r.log.Function("UpdateBatch")
+	log := logger.NewWithContext(ctx, "genreRepository").Function("UpdateBatch")
 
 	if len(genres) == 0 {
 		return nil

@@ -47,8 +47,11 @@ func (h *UserHandler) Register() {
 }
 
 func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("user_handler").Function("getCurrentUser")
+
 	user := middleware.GetUser(c)
 	if user == nil {
+		log.Warn("Unauthorized access attempt")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication required",
 		})
@@ -56,6 +59,7 @@ func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
 
 	userData, err := h.userController.GetUser(c.Context(), user)
 	if err != nil {
+		_ = log.Err("Failed to retrieve user data", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to retrieve user data",
 		})
@@ -72,10 +76,13 @@ func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("user_handler").Function("updateDiscogsToken")
+
 	user := middleware.GetUser(c)
 
 	var req UpdateDiscogsTokenRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Warn("Invalid request body", "error", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
@@ -93,6 +100,7 @@ func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
 				"error": "Invalid Discogs token",
 			})
 		}
+		_ = log.Err("Failed to save token", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to save token",
 		})
@@ -102,8 +110,11 @@ func (h *UserHandler) updateDiscogsToken(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) updateSelectedFolder(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("user_handler").Function("updateSelectedFolder")
+
 	user := middleware.GetUser(c)
 	if user == nil {
+		log.Warn("Unauthorized access attempt")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication required",
 		})
@@ -111,6 +122,7 @@ func (h *UserHandler) updateSelectedFolder(c *fiber.Ctx) error {
 
 	var req UpdateSelectedFolderRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Warn("Invalid request body", "error", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
@@ -123,6 +135,7 @@ func (h *UserHandler) updateSelectedFolder(c *fiber.Ctx) error {
 				"error": "Folder not found or not owned by user",
 			})
 		}
+		_ = log.Err("Failed to update selected folder", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to update selected folder",
 		})
@@ -132,8 +145,11 @@ func (h *UserHandler) updateSelectedFolder(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) updateUserPreferences(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("user_handler").Function("updateUserPreferences")
+
 	user := middleware.GetUser(c)
 	if user == nil {
+		log.Warn("Unauthorized access attempt")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication required",
 		})
@@ -141,6 +157,7 @@ func (h *UserHandler) updateUserPreferences(c *fiber.Ctx) error {
 
 	var req userController.UpdateUserPreferencesRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Warn("Invalid request body", "error", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
@@ -157,6 +174,7 @@ func (h *UserHandler) updateUserPreferences(c *fiber.Ctx) error {
 				"error": errMsg,
 			})
 		}
+		_ = log.Err("Failed to update user preferences", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to update user preferences",
 		})

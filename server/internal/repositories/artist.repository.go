@@ -26,18 +26,14 @@ type ArtistRepository interface {
 	UpdateBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error
 }
 
-type artistRepository struct {
-	log logger.Logger
-}
+type artistRepository struct{}
 
 func NewArtistRepository() ArtistRepository {
-	return &artistRepository{
-		log: logger.New("artistRepository"),
-	}
+	return &artistRepository{}
 }
 
 func (r *artistRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (*Artist, error) {
-	log := r.log.Function("GetByID")
+	log := logger.NewWithContext(ctx, "artistRepository").Function("GetByID")
 
 	artistID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -57,7 +53,7 @@ func (r *artistRepository) GetByDiscogsID(
 	tx *gorm.DB,
 	discogsID int64,
 ) (*Artist, error) {
-	log := r.log.Function("GetByDiscogsID")
+	log := logger.NewWithContext(ctx, "artistRepository").Function("GetByDiscogsID")
 
 	artist, err := gorm.G[*Artist](tx).Where(BaseDiscogModel{ID: discogsID}).First(ctx)
 	if err != nil {
@@ -75,7 +71,7 @@ func (r *artistRepository) Create(
 	tx *gorm.DB,
 	artist *Artist,
 ) (*Artist, error) {
-	log := r.log.Function("Create")
+	log := logger.NewWithContext(ctx, "artistRepository").Function("Create")
 
 	if err := tx.WithContext(ctx).Create(artist).Error; err != nil {
 		return nil, log.Err("failed to create artist", err, "artist", artist)
@@ -85,7 +81,7 @@ func (r *artistRepository) Create(
 }
 
 func (r *artistRepository) Update(ctx context.Context, tx *gorm.DB, artist *Artist) error {
-	log := r.log.Function("Update")
+	log := logger.NewWithContext(ctx, "artistRepository").Function("Update")
 
 	if err := tx.WithContext(ctx).Save(artist).Error; err != nil {
 		return log.Err("failed to update artist", err, "artist", artist)
@@ -95,7 +91,7 @@ func (r *artistRepository) Update(ctx context.Context, tx *gorm.DB, artist *Arti
 }
 
 func (r *artistRepository) Delete(ctx context.Context, tx *gorm.DB, id string) error {
-	log := r.log.Function("Delete")
+	log := logger.NewWithContext(ctx, "artistRepository").Function("Delete")
 
 	artistID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -115,7 +111,7 @@ func (r *artistRepository) Delete(ctx context.Context, tx *gorm.DB, id string) e
 }
 
 func (r *artistRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error {
-	log := r.log.Function("UpsertBatch")
+	log := logger.NewWithContext(ctx, "artistRepository").Function("UpsertBatch")
 
 	if len(artists) == 0 {
 		return nil
@@ -139,7 +135,7 @@ func (r *artistRepository) GetBatchByDiscogsIDs(
 	tx *gorm.DB,
 	discogsIDs []int64,
 ) (map[int64]*Artist, error) {
-	log := r.log.Function("GetBatchByDiscogsIDs")
+	log := logger.NewWithContext(ctx, "artistRepository").Function("GetBatchByDiscogsIDs")
 
 	if len(discogsIDs) == 0 {
 		return make(map[int64]*Artist), nil
@@ -160,7 +156,7 @@ func (r *artistRepository) GetBatchByDiscogsIDs(
 }
 
 func (r *artistRepository) InsertBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error {
-	log := r.log.Function("InsertBatch")
+	log := logger.NewWithContext(ctx, "artistRepository").Function("InsertBatch")
 
 	if len(artists) == 0 {
 		return nil
@@ -174,7 +170,7 @@ func (r *artistRepository) InsertBatch(ctx context.Context, tx *gorm.DB, artists
 }
 
 func (r *artistRepository) UpdateBatch(ctx context.Context, tx *gorm.DB, artists []*Artist) error {
-	log := r.log.Function("UpdateBatch")
+	log := logger.NewWithContext(ctx, "artistRepository").Function("UpdateBatch")
 
 	if len(artists) == 0 {
 		return nil

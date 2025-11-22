@@ -43,8 +43,11 @@ func (h *HistoryHandler) Register() {
 }
 
 func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("history_handler").Function("logPlay")
+
 	user := middleware.GetUser(c)
 	if user == nil {
+		log.Warn("Unauthorized access attempt")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication required",
 		})
@@ -52,6 +55,7 @@ func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
 
 	var req historyController.LogPlayRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Warn("Invalid request body", "error", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
@@ -69,6 +73,7 @@ func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
 				"error": err.Error(),
 			})
 		}
+		_ = log.Err("Failed to log play", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to log play",
 		})
@@ -80,11 +85,14 @@ func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) updatePlayHistory(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("history_handler").Function("updatePlayHistory")
+
 	user := middleware.GetUser(c)
 
 	playHistoryIDParam := c.Params("id")
 	playHistoryID, err := uuid.Parse(playHistoryIDParam)
 	if err != nil {
+		log.Warn("Invalid play history ID", "id", playHistoryIDParam)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid play history ID",
 		})
@@ -92,6 +100,7 @@ func (h *HistoryHandler) updatePlayHistory(c *fiber.Ctx) error {
 
 	var req historyController.UpdatePlayHistoryRequest
 	if err = c.BodyParser(&req); err != nil {
+		log.Warn("Invalid request body", "error", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
@@ -114,6 +123,7 @@ func (h *HistoryHandler) updatePlayHistory(c *fiber.Ctx) error {
 				"error": err.Error(),
 			})
 		}
+		_ = log.Err("Failed to update play history", err, "playHistoryID", playHistoryID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to update play history",
 		})
@@ -125,8 +135,11 @@ func (h *HistoryHandler) updatePlayHistory(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) deletePlayHistory(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("history_handler").Function("deletePlayHistory")
+
 	user := middleware.GetUser(c)
 	if user == nil {
+		log.Warn("Unauthorized access attempt")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication required",
 		})
@@ -135,6 +148,7 @@ func (h *HistoryHandler) deletePlayHistory(c *fiber.Ctx) error {
 	playHistoryIDParam := c.Params("id")
 	playHistoryID, err := uuid.Parse(playHistoryIDParam)
 	if err != nil {
+		log.Warn("Invalid play history ID", "id", playHistoryIDParam)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid play history ID",
 		})
@@ -151,6 +165,7 @@ func (h *HistoryHandler) deletePlayHistory(c *fiber.Ctx) error {
 				"error": err.Error(),
 			})
 		}
+		_ = log.Err("Failed to delete play history", err, "playHistoryID", playHistoryID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to delete play history",
 		})
@@ -160,8 +175,11 @@ func (h *HistoryHandler) deletePlayHistory(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) logCleaning(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("history_handler").Function("logCleaning")
+
 	user := middleware.GetUser(c)
 	if user == nil {
+		log.Warn("Unauthorized access attempt")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication required",
 		})
@@ -169,6 +187,7 @@ func (h *HistoryHandler) logCleaning(c *fiber.Ctx) error {
 
 	var req historyController.LogCleaningRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Warn("Invalid request body", "error", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
@@ -186,6 +205,7 @@ func (h *HistoryHandler) logCleaning(c *fiber.Ctx) error {
 				"error": err.Error(),
 			})
 		}
+		_ = log.Err("Failed to log cleaning", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to log cleaning",
 		})
@@ -197,8 +217,11 @@ func (h *HistoryHandler) logCleaning(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) updateCleaningHistory(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("history_handler").Function("updateCleaningHistory")
+
 	user := middleware.GetUser(c)
 	if user == nil {
+		log.Warn("Unauthorized access attempt")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication required",
 		})
@@ -207,6 +230,7 @@ func (h *HistoryHandler) updateCleaningHistory(c *fiber.Ctx) error {
 	cleaningHistoryIDParam := c.Params("id")
 	cleaningHistoryID, err := uuid.Parse(cleaningHistoryIDParam)
 	if err != nil {
+		log.Warn("Invalid cleaning history ID", "id", cleaningHistoryIDParam)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid cleaning history ID",
 		})
@@ -214,6 +238,7 @@ func (h *HistoryHandler) updateCleaningHistory(c *fiber.Ctx) error {
 
 	var req historyController.UpdateCleaningHistoryRequest
 	if err = c.BodyParser(&req); err != nil {
+		log.Warn("Invalid request body", "error", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
@@ -236,6 +261,7 @@ func (h *HistoryHandler) updateCleaningHistory(c *fiber.Ctx) error {
 				"error": err.Error(),
 			})
 		}
+		_ = log.Err("Failed to update cleaning history", err, "cleaningHistoryID", cleaningHistoryID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to update cleaning history",
 		})
@@ -247,8 +273,11 @@ func (h *HistoryHandler) updateCleaningHistory(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("history_handler").Function("deleteCleaningHistory")
+
 	user := middleware.GetUser(c)
 	if user == nil {
+		log.Warn("Unauthorized access attempt")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication required",
 		})
@@ -257,6 +286,7 @@ func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
 	cleaningHistoryIDParam := c.Params("id")
 	cleaningHistoryID, err := uuid.Parse(cleaningHistoryIDParam)
 	if err != nil {
+		log.Warn("Invalid cleaning history ID", "id", cleaningHistoryIDParam)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid cleaning history ID",
 		})
@@ -273,6 +303,7 @@ func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
 				"error": err.Error(),
 			})
 		}
+		_ = log.Err("Failed to delete cleaning history", err, "cleaningHistoryID", cleaningHistoryID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to delete cleaning history",
 		})
@@ -282,8 +313,11 @@ func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) logBoth(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("history_handler").Function("logBoth")
+
 	user := middleware.GetUser(c)
 	if user == nil {
+		log.Warn("Unauthorized access attempt")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authentication required",
 		})
@@ -291,6 +325,7 @@ func (h *HistoryHandler) logBoth(c *fiber.Ctx) error {
 
 	var req historyController.LogBothRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Warn("Invalid request body", "error", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
@@ -308,6 +343,7 @@ func (h *HistoryHandler) logBoth(c *fiber.Ctx) error {
 				"error": err.Error(),
 			})
 		}
+		_ = log.Err("Failed to log play and cleaning", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to log play and cleaning",
 		})

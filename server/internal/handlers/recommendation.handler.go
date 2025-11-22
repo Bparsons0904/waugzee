@@ -34,11 +34,14 @@ func (h *RecommendationHandler) Register() {
 }
 
 func (h *RecommendationHandler) markAsListened(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("recommendation_handler").Function("markAsListened")
+
 	user := middleware.GetUser(c)
 
 	recommendationIDParam := c.Params("id")
 	recommendationID, err := uuid.Parse(recommendationIDParam)
 	if err != nil {
+		log.Warn("Invalid recommendation ID", "id", recommendationIDParam)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid recommendation ID",
 		})
@@ -55,6 +58,7 @@ func (h *RecommendationHandler) markAsListened(c *fiber.Ctx) error {
 				"error": "Recommendation not found",
 			})
 		}
+		_ = log.Err("Failed to mark recommendation as listened", err, "recommendationID", recommendationID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to mark recommendation as listened",
 		})

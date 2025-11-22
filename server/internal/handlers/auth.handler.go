@@ -62,8 +62,11 @@ func (h *AuthHandler) Register() {
 }
 
 func (h *AuthHandler) getAuthConfig(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("auth_handler").Function("getAuthConfig")
+
 	config, err := h.authController.GetAuthConfig()
 	if err != nil {
+		_ = log.Err("Failed to get auth config", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
@@ -76,7 +79,8 @@ func (h *AuthHandler) getAuthConfig(c *fiber.Ctx) error {
 }
 
 func (h *AuthHandler) logout(c *fiber.Ctx) error {
-	log := h.log.Function("logout")
+	log := logger.NewWithContext(c.Context(), "handlers").File("auth_handler").Function("logout")
+
 	user := middleware.GetUser(c)
 
 	var reqBody authController.LogoutRequest
@@ -103,6 +107,7 @@ func (h *AuthHandler) logout(c *fiber.Ctx) error {
 
 	response, err := h.authController.LogoutUser(c.Context(), reqBody, user)
 	if err != nil {
+		_ = log.Err("Failed to logout user", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -110,9 +115,11 @@ func (h *AuthHandler) logout(c *fiber.Ctx) error {
 }
 
 func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
+	log := logger.NewWithContext(c.Context(), "handlers").File("auth_handler").Function("oidcCallback")
+
 	var req authController.OIDCCallbackRequest
 	if err := c.BodyParser(&req); err != nil {
-		h.log.Info(
+		log.Info(
 			"Failed to parse callback request body",
 			"error",
 			err.Error(),
@@ -127,7 +134,7 @@ func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
 		})
 	}
 
-	h.log.Info(
+	log.Info(
 		"Received OIDC callback request",
 		"hasIDToken",
 		req.IDToken != "",
@@ -139,6 +146,7 @@ func (h *AuthHandler) oidcCallback(c *fiber.Ctx) error {
 
 	response, err := h.authController.HandleOIDCCallback(c.Context(), req)
 	if err != nil {
+		_ = log.Err("Authentication failed", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Authentication failed",
 		})

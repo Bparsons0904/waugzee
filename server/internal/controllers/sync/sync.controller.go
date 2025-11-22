@@ -16,7 +16,6 @@ type SyncController struct {
 	orchestrationService *services.OrchestrationService
 	eventBus             *events.EventBus
 	config               config.Config
-	log                  logger.Logger
 }
 
 type SyncControllerInterface interface {
@@ -35,7 +34,6 @@ func New(
 		orchestrationService: services.Orchestration,
 		eventBus:             eventBus,
 		config:               config,
-		log:                  logger.New("syncController"),
 	}
 }
 
@@ -43,7 +41,7 @@ func (sc *SyncController) HandleSyncRequest(
 	ctx context.Context,
 	user *User,
 ) error {
-	log := sc.log.Function("HandleSyncRequest")
+	log := logger.NewWithContext(ctx, "syncController").Function("HandleSyncRequest")
 
 	if user.Configuration == nil || user.Configuration.DiscogsToken == nil ||
 		*user.Configuration.DiscogsToken == "" {

@@ -28,18 +28,14 @@ type LabelRepository interface {
 	UpdateBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error
 }
 
-type labelRepository struct {
-	log logger.Logger
-}
+type labelRepository struct{}
 
 func NewLabelRepository() LabelRepository {
-	return &labelRepository{
-		log: logger.New("labelRepository"),
-	}
+	return &labelRepository{}
 }
 
 func (r *labelRepository) GetByID(ctx context.Context, tx *gorm.DB, id string) (*Label, error) {
-	log := r.log.Function("GetByID")
+	log := logger.NewWithContext(ctx, "labelRepository").Function("GetByID")
 
 	labelID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -59,7 +55,7 @@ func (r *labelRepository) GetByDiscogsID(
 	tx *gorm.DB,
 	discogsID int64,
 ) (*Label, error) {
-	log := r.log.Function("GetByDiscogsID")
+	log := logger.NewWithContext(ctx, "labelRepository").Function("GetByDiscogsID")
 
 	label, err := gorm.G[*Label](tx).Where(BaseDiscogModel{ID: discogsID}).First(ctx)
 	if err != nil {
@@ -73,7 +69,7 @@ func (r *labelRepository) GetByDiscogsID(
 }
 
 func (r *labelRepository) Create(ctx context.Context, tx *gorm.DB, label *Label) (*Label, error) {
-	log := r.log.Function("Create")
+	log := logger.NewWithContext(ctx, "labelRepository").Function("Create")
 
 	if err := tx.WithContext(ctx).Create(label).Error; err != nil {
 		return nil, log.Err("failed to create label", err, "label", label)
@@ -83,7 +79,7 @@ func (r *labelRepository) Create(ctx context.Context, tx *gorm.DB, label *Label)
 }
 
 func (r *labelRepository) Update(ctx context.Context, tx *gorm.DB, label *Label) error {
-	log := r.log.Function("Update")
+	log := logger.NewWithContext(ctx, "labelRepository").Function("Update")
 
 	if err := tx.WithContext(ctx).Save(label).Error; err != nil {
 		return log.Err("failed to update label", err, "label", label)
@@ -93,7 +89,7 @@ func (r *labelRepository) Update(ctx context.Context, tx *gorm.DB, label *Label)
 }
 
 func (r *labelRepository) Delete(ctx context.Context, tx *gorm.DB, id string) error {
-	log := r.log.Function("Delete")
+	log := logger.NewWithContext(ctx, "labelRepository").Function("Delete")
 
 	labelID, err := uuid.Parse(id)
 	if err != nil {
@@ -113,7 +109,7 @@ func (r *labelRepository) Delete(ctx context.Context, tx *gorm.DB, id string) er
 }
 
 func (r *labelRepository) UpsertFileBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
-	log := r.log.Function("UpsertBatch")
+	log := logger.NewWithContext(ctx, "labelRepository").Function("UpsertFileBatch")
 
 	if len(labels) == 0 {
 		return nil
@@ -131,7 +127,7 @@ func (r *labelRepository) UpsertFileBatch(ctx context.Context, tx *gorm.DB, labe
 
 // TODO: This should handle updates from folder sync
 func (r *labelRepository) UpsertBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
-	log := r.log.Function("UpsertBatch")
+	log := logger.NewWithContext(ctx, "labelRepository").Function("UpsertBatch")
 
 	if len(labels) == 0 {
 		return nil
@@ -155,7 +151,7 @@ func (r *labelRepository) GetBatchByDiscogsIDs(
 	tx *gorm.DB,
 	discogsIDs []int64,
 ) (map[int64]*Label, error) {
-	log := r.log.Function("GetBatchByDiscogsIDs")
+	log := logger.NewWithContext(ctx, "labelRepository").Function("GetBatchByDiscogsIDs")
 
 	if len(discogsIDs) == 0 {
 		return make(map[int64]*Label), nil
@@ -177,7 +173,7 @@ func (r *labelRepository) GetBatchByDiscogsIDs(
 }
 
 func (r *labelRepository) InsertBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
-	log := r.log.Function("InsertBatch")
+	log := logger.NewWithContext(ctx, "labelRepository").Function("InsertBatch")
 
 	if len(labels) == 0 {
 		return nil
@@ -191,7 +187,7 @@ func (r *labelRepository) InsertBatch(ctx context.Context, tx *gorm.DB, labels [
 }
 
 func (r *labelRepository) UpdateBatch(ctx context.Context, tx *gorm.DB, labels []*Label) error {
-	log := r.log.Function("UpdateBatch")
+	log := logger.NewWithContext(ctx, "labelRepository").Function("UpdateBatch")
 
 	if len(labels) == 0 {
 		return nil

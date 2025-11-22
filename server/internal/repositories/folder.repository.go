@@ -38,13 +38,11 @@ type FolderRepository interface {
 
 type folderRepository struct {
 	cache database.DB
-	log   logger.Logger
 }
 
 func NewFolderRepository(cache database.DB) FolderRepository {
 	return &folderRepository{
 		cache: cache,
-		log:   logger.New("folderRepository"),
 	}
 }
 
@@ -54,7 +52,7 @@ func (r *folderRepository) UpsertFolders(
 	userID uuid.UUID,
 	folders []*Folder,
 ) error {
-	log := r.log.Function("UpsertFolders")
+	log := logger.NewWithContext(ctx, "folderRepository").Function("UpsertFolders")
 
 	log.Info("Upserting folders", "userID", userID, "folderCount", len(folders))
 	if len(folders) == 0 {
@@ -105,7 +103,7 @@ func (r *folderRepository) DeleteOrphanFolders(
 	userID uuid.UUID,
 	keepFolderIDs []int,
 ) error {
-	log := r.log.Function("DeleteOrphanFolders")
+	log := logger.NewWithContext(ctx, "folderRepository").Function("DeleteOrphanFolders")
 
 	if len(keepFolderIDs) == 0 {
 		// Delete all user folders if no IDs to keep
@@ -151,7 +149,7 @@ func (r *folderRepository) GetUserFolders(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) ([]*Folder, error) {
-	log := r.log.Function("GetUserFolders")
+	log := logger.NewWithContext(ctx, "folderRepository").Function("GetUserFolders")
 
 	var cachedFolders []*Folder
 	found, err := database.NewCacheBuilder(r.cache.Cache.User, userID).
@@ -190,7 +188,7 @@ func (r *folderRepository) GetFolderByID(
 	userID uuid.UUID,
 	folderID int,
 ) (*Folder, error) {
-	log := r.log.Function("GetFolderByID")
+	log := logger.NewWithContext(ctx, "folderRepository").Function("GetFolderByID")
 
 	cacheKey := fmt.Sprintf("%s:%d", userID.String(), folderID)
 	var cachedFolder Folder
@@ -233,9 +231,8 @@ func (r *folderRepository) GetFolderByID(
 	return &folder, nil
 }
 
-
 func (r *folderRepository) ClearUserFoldersCache(ctx context.Context, userID uuid.UUID) error {
-	log := r.log.Function("ClearUserFoldersCache")
+	log := logger.NewWithContext(ctx, "folderRepository").Function("ClearUserFoldersCache")
 
 	if err := database.NewCacheBuilder(r.cache.Cache.User, userID.String()).
 		WithContext(ctx).
@@ -254,6 +251,8 @@ func (r *folderRepository) clearIndividualFolderCaches(
 	userID uuid.UUID,
 	folders []*Folder,
 ) {
+	log := logger.NewWithContext(ctx, "folderRepository").Function("clearIndividualFolderCaches")
+
 	for _, folder := range folders {
 		if folder.ID != nil {
 			cacheKey := fmt.Sprintf("%s:%d", userID.String(), *folder.ID)
@@ -262,7 +261,7 @@ func (r *folderRepository) clearIndividualFolderCaches(
 				WithHash(USER_FOLDER_CACHE_PREFIX).
 				Delete()
 			if err != nil {
-				r.log.Warn("failed to clear individual folder cache", "userID", userID, "folderID", *folder.ID, "error", err)
+				log.Warn("failed to clear individual folder cache", "userID", userID, "folderID", *folder.ID, "error", err)
 			}
 		}
 	}

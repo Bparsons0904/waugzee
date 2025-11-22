@@ -45,7 +45,7 @@ func (h *AdminHandler) Register() {
 }
 
 func (h *AdminHandler) getDownloadStatus(c *fiber.Ctx) error {
-	log := h.log.Function("getDownloadStatus")
+	log := logger.NewWithContext(c.Context(), "handlers").File("admin_handler").Function("getDownloadStatus")
 
 	status, err := h.adminController.GetDownloadStatus(c.Context())
 	if err != nil {
@@ -58,7 +58,7 @@ func (h *AdminHandler) getDownloadStatus(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) triggerDownload(c *fiber.Ctx) error {
-	log := h.log.Function("triggerDownload")
+	log := logger.NewWithContext(c.Context(), "handlers").File("admin_handler").Function("triggerDownload")
 
 	user := middleware.GetUser(c)
 
@@ -78,7 +78,7 @@ func (h *AdminHandler) triggerDownload(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) triggerReprocess(c *fiber.Ctx) error {
-	log := h.log.Function("triggerReprocess")
+	log := logger.NewWithContext(c.Context(), "handlers").File("admin_handler").Function("triggerReprocess")
 
 	user := middleware.GetUser(c)
 
@@ -100,7 +100,7 @@ func (h *AdminHandler) triggerReprocess(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) resetStuckDownload(c *fiber.Ctx) error {
-	log := h.log.Function("resetStuckDownload")
+	log := logger.NewWithContext(c.Context(), "handlers").File("admin_handler").Function("resetStuckDownload")
 
 	user := middleware.GetUser(c)
 
@@ -123,7 +123,7 @@ func (h *AdminHandler) resetStuckDownload(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) listStoredFiles(c *fiber.Ctx) error {
-	log := h.log.Function("listStoredFiles")
+	log := logger.NewWithContext(c.Context(), "handlers").File("admin_handler").Function("listStoredFiles")
 
 	response, err := h.adminController.ListStoredFiles(c.Context())
 	if err != nil {
@@ -136,7 +136,7 @@ func (h *AdminHandler) listStoredFiles(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) cleanupAllFiles(c *fiber.Ctx) error {
-	log := h.log.Function("cleanupAllFiles")
+	log := logger.NewWithContext(c.Context(), "handlers").File("admin_handler").Function("cleanupAllFiles")
 
 	user := middleware.GetUser(c)
 
@@ -155,7 +155,7 @@ func (h *AdminHandler) cleanupAllFiles(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) cleanupYearMonth(c *fiber.Ctx) error {
-	log := h.log.Function("cleanupYearMonth")
+	log := logger.NewWithContext(c.Context(), "handlers").File("admin_handler").Function("cleanupYearMonth")
 
 	yearMonth := c.Params("yearMonth")
 	if yearMonth == "" {
@@ -178,7 +178,7 @@ func (h *AdminHandler) cleanupYearMonth(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Year-month files cleaned up successfully",
+		"message":   "Year-month files cleaned up successfully",
 		"yearMonth": yearMonth,
 	})
 }
@@ -186,10 +186,11 @@ func (h *AdminHandler) cleanupYearMonth(c *fiber.Ctx) error {
 // TODO: REMOVE_AFTER_MIGRATION
 // This handler is for one-time Kleio data migration and should be deleted after import is complete.
 func (h *AdminHandler) importKleioData(c *fiber.Ctx) error {
-	log := h.log.Function("importKleioData")
+	log := logger.NewWithContext(c.Context(), "handlers").File("admin_handler").Function("importKleioData")
 
 	user := middleware.GetUser(c)
 	if user == nil {
+		log.Warn("Unauthorized access attempt")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authentication required"})
 	}
 
