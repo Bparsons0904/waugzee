@@ -20,6 +20,7 @@ type StylusRepository interface {
 	GetAllStyluses(ctx context.Context, tx *gorm.DB, userID *uuid.UUID) ([]*Stylus, error)
 	GetUserStyluses(ctx context.Context, tx *gorm.DB, userID uuid.UUID) ([]*UserStylus, error)
 	GetPrimaryUserStylus(ctx context.Context, tx *gorm.DB, userID uuid.UUID) (*UserStylus, error)
+	GetStylusUsageHours(ctx context.Context, tx *gorm.DB, userID uuid.UUID) (map[uuid.UUID]float64, error)
 	CreateCustomStylus(ctx context.Context, tx *gorm.DB, stylus *Stylus) error
 	Create(ctx context.Context, tx *gorm.DB, userStylus *UserStylus) error
 	Update(
@@ -157,6 +158,41 @@ func (r *stylusRepository) GetPrimaryUserStylus(
 
 	log.Info("Primary user stylus retrieved", "userID", userID, "stylusID", userStylus.StylusID)
 	return userStylus, nil
+}
+
+func (r *stylusRepository) GetStylusUsageHours(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+) (map[uuid.UUID]float64, error) {
+	log := r.log.Function("GetStylusUsageHours")
+
+	type usageResult struct {
+		UserStylusID uuid.UUID `gorm:"column:user_stylus_id"`
+		TotalSeconds int64     `gorm:"column:total_seconds"`
+	}
+
+	var results []usageResult
+	err := tx.WithContext(ctx).
+		Table("play_histories ph").
+		Select("ph.user_stylus_id, COALESCE(SUM(r.total_duration), 0) as total_seconds").
+		Joins("JOIN user_releases ur ON ph.user_release_id = ur.id").
+		Joins("JOIN releases r ON ur.release_id = r.id").
+		Where("ph.user_id = ? AND ph.user_stylus_id IS NOT NULL", userID).
+		Group("ph.user_stylus_id").
+		Scan(&results).Error
+	if err != nil {
+		return nil, log.Err("failed to get stylus usage hours", err, "userID", userID)
+	}
+
+	usageMap := make(map[uuid.UUID]float64)
+	for _, r := range results {
+		hours := float64(r.TotalSeconds) / 3600.0
+		usageMap[r.UserStylusID] = hours
+	}
+
+	log.Info("Stylus usage hours calculated", "userID", userID, "stylusCount", len(usageMap))
+	return usageMap, nil
 }
 
 func (r *stylusRepository) CreateCustomStylus(
