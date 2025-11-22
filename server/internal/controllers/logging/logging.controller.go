@@ -2,14 +2,15 @@ package loggingController
 
 import (
 	"context"
-	"waugzee/internal/logger"
+
+	logger "github.com/Bparsons0904/goLogger"
+
 	"waugzee/internal/services"
 	"waugzee/internal/types"
 )
 
 type LoggingController struct {
 	loggingService *services.LoggingService
-	log            logger.Logger
 }
 
 type LoggingControllerInterface interface {
@@ -19,7 +20,6 @@ type LoggingControllerInterface interface {
 func New(services services.Service) LoggingControllerInterface {
 	return &LoggingController{
 		loggingService: services.Logging,
-		log:            logger.New("loggingController"),
 	}
 }
 
@@ -29,7 +29,7 @@ func (c *LoggingController) ProcessLogBatch(
 	req types.LogBatchRequest,
 	userID string,
 ) (*types.LogBatchResponse, error) {
-	log := c.log.Function("ProcessLogBatch")
+	log := logger.New("loggingController").TraceFromContext(ctx).Function("ProcessLogBatch")
 
 	// Handle empty batch
 	if len(req.Logs) == 0 {

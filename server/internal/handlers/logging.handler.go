@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"waugzee/internal/app"
-	loggingController "waugzee/internal/controllers/logging"
 	"waugzee/internal/handlers/middleware"
-	"waugzee/internal/logger"
 	"waugzee/internal/types"
+
+	loggingController "waugzee/internal/controllers/logging"
+
+	logger "github.com/Bparsons0904/goLogger"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -32,7 +34,7 @@ func (h *LoggingHandler) Register() {
 }
 
 func (h *LoggingHandler) handleLogBatch(c *fiber.Ctx) error {
-	log := h.log.Function("handleLogBatch")
+	log := logger.New("handlers").TraceFromContext(c.Context()).File("logging_handler").Function("handleLogBatch")
 
 	user := middleware.GetUser(c)
 	if user == nil {

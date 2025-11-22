@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"waugzee/internal/logger"
+
+	logger "github.com/Bparsons0904/goLogger"
+
 	"waugzee/internal/types"
 )
 
