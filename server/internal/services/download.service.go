@@ -15,7 +15,7 @@ import (
 	"time"
 	"waugzee/config"
 	"waugzee/internal/events"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	"waugzee/internal/models"
 
 	"github.com/google/uuid"

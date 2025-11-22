@@ -7,7 +7,7 @@ import (
 	"waugzee/config"
 	"waugzee/internal/database"
 	"waugzee/internal/events"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
 	"waugzee/internal/types"

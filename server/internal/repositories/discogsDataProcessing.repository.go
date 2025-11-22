@@ -2,7 +2,7 @@ package repositories
 
 import (
 	"context"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"gorm.io/gorm"
@@ -18,14 +18,12 @@ type DiscogsDataProcessingRepository interface {
 }
 
 type discogsDataProcessingRepository struct {
-	db  *gorm.DB
-	log logger.Logger
+	db *gorm.DB
 }
 
 func NewDiscogsDataProcessingRepository(db *gorm.DB) DiscogsDataProcessingRepository {
 	return &discogsDataProcessingRepository{
-		db:  db,
-		log: logger.New("discogsDataProcessingRepository"),
+		db: db,
 	}
 }
 
@@ -33,7 +31,7 @@ func (r *discogsDataProcessingRepository) Create(
 	ctx context.Context,
 	processing *DiscogsDataProcessing,
 ) (*DiscogsDataProcessing, error) {
-	log := r.log.Function("Create")
+	log := logger.New("discogsDataProcessingRepository").TraceFromContext(ctx).Function("Create")
 
 	err := gorm.G[DiscogsDataProcessing](r.db).Create(ctx, processing)
 	if err != nil {
@@ -47,7 +45,7 @@ func (r *discogsDataProcessingRepository) GetByYearMonth(
 	ctx context.Context,
 	yearMonth string,
 ) (*DiscogsDataProcessing, error) {
-	log := r.log.Function("GetByYearMonth")
+	log := logger.New("discogsDataProcessingRepository").TraceFromContext(ctx).Function("GetByYearMonth")
 
 	processing, err := gorm.G[*DiscogsDataProcessing](
 		r.db,
@@ -64,7 +62,7 @@ func (r *discogsDataProcessingRepository) Update(
 	ctx context.Context,
 	processing *DiscogsDataProcessing,
 ) error {
-	log := r.log.Function("Update")
+	log := logger.New("discogsDataProcessingRepository").TraceFromContext(ctx).Function("Update")
 
 	if err := r.db.WithContext(ctx).Save(processing).Error; err != nil {
 		return log.Err("failed to update discogs data processing record", err)
@@ -74,7 +72,7 @@ func (r *discogsDataProcessingRepository) Update(
 }
 
 func (r *discogsDataProcessingRepository) Delete(ctx context.Context, id int64) error {
-	log := r.log.Function("Delete")
+	log := logger.New("discogsDataProcessingRepository").TraceFromContext(ctx).Function("Delete")
 
 	rowsAffected, err := gorm.G[DiscogsDataProcessing](r.db).Where("id = ?", id).Delete(ctx)
 	if err != nil || rowsAffected == 0 {
@@ -92,7 +90,7 @@ func (r *discogsDataProcessingRepository) Delete(ctx context.Context, id int64) 
 func (r *discogsDataProcessingRepository) GetAll(
 	ctx context.Context,
 ) ([]*DiscogsDataProcessing, error) {
-	log := r.log.Function("GetAll")
+	log := logger.New("discogsDataProcessingRepository").TraceFromContext(ctx).Function("GetAll")
 
 	results, err := gorm.G[*DiscogsDataProcessing](r.db).Find(ctx)
 	if err != nil {
@@ -105,7 +103,7 @@ func (r *discogsDataProcessingRepository) GetAll(
 func (r *discogsDataProcessingRepository) GetLatestProcessing(
 	ctx context.Context,
 ) (*DiscogsDataProcessing, error) {
-	log := r.log.Function("GetLatestProcessing")
+	log := logger.New("discogsDataProcessingRepository").TraceFromContext(ctx).Function("GetLatestProcessing")
 
 	processing, err := gorm.G[DiscogsDataProcessing](r.db).
 		Order("created_at DESC").

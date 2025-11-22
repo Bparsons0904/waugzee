@@ -2,7 +2,7 @@ package initialize
 
 import (
 	"waugzee/config"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"gorm.io/gorm"

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 	"waugzee/internal/constants"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	"waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
@@ -34,7 +34,6 @@ type AdminController struct {
 	schedulerService     *services.SchedulerService
 	fileCleanupService   *services.FileCleanupService
 	kleioImportService   *services.KleioImportService // TODO: REMOVE_AFTER_MIGRATION
-	log                  logger.Logger
 }
 
 func NewAdminController(
@@ -54,7 +53,6 @@ func NewAdminController(
 		schedulerService:     schedulerService,
 		fileCleanupService:   fileCleanupService,
 		kleioImportService:   kleioImportService, // TODO: REMOVE_AFTER_MIGRATION
-		log:                  logger.New("adminController"),
 	}
 }
 
@@ -85,7 +83,7 @@ type StoredFilesResponse struct {
 }
 
 func (c *AdminController) GetDownloadStatus(ctx context.Context) (*DownloadStatusResponse, error) {
-	log := c.log.Function("GetDownloadStatus")
+	log := logger.New("adminController").TraceFromContext(ctx).Function("GetDownloadStatus")
 
 	record, err := c.processingRepo.GetLatestProcessing(ctx)
 	if err != nil {
@@ -127,7 +125,7 @@ func (c *AdminController) modelToResponse(
 }
 
 func (c *AdminController) TriggerDownload(ctx context.Context) error {
-	log := c.log.Function("TriggerDownload")
+	log := logger.New("adminController").TraceFromContext(ctx).Function("TriggerDownload")
 
 	yearMonth := time.Now().Format("2006-01")
 
@@ -164,7 +162,7 @@ func (c *AdminController) TriggerDownload(ctx context.Context) error {
 }
 
 func (c *AdminController) TriggerReprocess(ctx context.Context) error {
-	log := c.log.Function("TriggerReprocess")
+	log := logger.New("adminController").TraceFromContext(ctx).Function("TriggerReprocess")
 
 	record, err := c.processingRepo.GetLatestProcessing(ctx)
 	if err != nil {
@@ -205,7 +203,7 @@ func (c *AdminController) TriggerReprocess(ctx context.Context) error {
 }
 
 func (c *AdminController) ResetStuckDownload(ctx context.Context) error {
-	log := c.log.Function("ResetStuckDownload")
+	log := logger.New("adminController").TraceFromContext(ctx).Function("ResetStuckDownload")
 
 	yearMonth := time.Now().Format("2006-01")
 
@@ -249,7 +247,7 @@ func (c *AdminController) ResetStuckDownload(ctx context.Context) error {
 }
 
 func (c *AdminController) ListStoredFiles(ctx context.Context) (*StoredFilesResponse, error) {
-	log := c.log.Function("ListStoredFiles")
+	log := logger.New("adminController").TraceFromContext(ctx).Function("ListStoredFiles")
 
 	files, err := c.fileCleanupService.ListStoredFiles(ctx)
 	if err != nil {
@@ -269,7 +267,7 @@ func (c *AdminController) ListStoredFiles(ctx context.Context) (*StoredFilesResp
 }
 
 func (c *AdminController) CleanupAllFiles(ctx context.Context) error {
-	log := c.log.Function("CleanupAllFiles")
+	log := logger.New("adminController").TraceFromContext(ctx).Function("CleanupAllFiles")
 
 	if err := c.fileCleanupService.CleanupAllFiles(ctx); err != nil {
 		return log.Err("failed to cleanup all files", err)
@@ -280,7 +278,7 @@ func (c *AdminController) CleanupAllFiles(ctx context.Context) error {
 }
 
 func (c *AdminController) CleanupYearMonth(ctx context.Context, yearMonth string) error {
-	log := c.log.Function("CleanupYearMonth")
+	log := logger.New("adminController").TraceFromContext(ctx).Function("CleanupYearMonth")
 
 	if err := c.fileCleanupService.CleanupYearMonth(ctx, yearMonth); err != nil {
 		return log.Err("failed to cleanup year-month files", err, "yearMonth", yearMonth)
@@ -297,7 +295,7 @@ func (c *AdminController) ImportKleioData(
 	userID uuid.UUID,
 	jsonData []byte,
 ) (*services.ImportSummary, error) {
-	log := c.log.Function("ImportKleioData")
+	log := logger.New("adminController").TraceFromContext(ctx).Function("ImportKleioData")
 
 	summary, err := c.kleioImportService.ImportKleioData(ctx, userID, jsonData)
 	if err != nil {

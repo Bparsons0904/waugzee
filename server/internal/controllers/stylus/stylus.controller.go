@@ -5,7 +5,7 @@ import (
 	"time"
 	"waugzee/config"
 	"waugzee/internal/database"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
@@ -20,7 +20,6 @@ type StylusController struct {
 	transactionService *services.TransactionService
 	db                 database.DB
 	Config             config.Config
-	log                logger.Logger
 }
 
 type CreateCustomStylusRequest struct {
@@ -87,7 +86,6 @@ func New(
 		transactionService: services.Transaction,
 		db:                 db,
 		Config:             config,
-		log:                logger.New("stylusController"),
 	}
 }
 
@@ -103,10 +101,11 @@ func (c *StylusController) GetAvailableStyluses(
 	ctx context.Context,
 	user *User,
 ) ([]*Stylus, error) {
+	log := logger.New("stylusController").TraceFromContext(ctx).Function("GetAvailableStyluses")
+
 	styluses, err := c.stylusRepo.GetAllStyluses(ctx, c.db.SQL, &user.ID)
 	if err != nil {
-		return nil, c.log.Function("GetAvailableStyluses").
-			Err("failed to get available styluses", err, "userID", user.ID)
+		return nil, log.Err("failed to get available styluses", err, "userID", user.ID)
 	}
 
 	return styluses, nil
@@ -116,7 +115,7 @@ func (c *StylusController) GetUserStyluses(
 	ctx context.Context,
 	user *User,
 ) ([]*UserStylus, error) {
-	log := c.log.Function("GetUserStyluses")
+	log := logger.New("stylusController").TraceFromContext(ctx).Function("GetUserStyluses")
 
 	styluses, err := c.stylusRepo.GetUserStyluses(ctx, c.db.SQL, user.ID)
 	if err != nil {
@@ -143,7 +142,7 @@ func (c *StylusController) CreateCustomStylus(
 	user *User,
 	request *CreateCustomStylusRequest,
 ) (*Stylus, error) {
-	log := c.log.Function("CreateCustomStylus")
+	log := logger.New("stylusController").TraceFromContext(ctx).Function("CreateCustomStylus")
 
 	if request.Brand == "" {
 		return nil, log.ErrMsg("brand is required")
@@ -186,7 +185,7 @@ func (c *StylusController) CreateUserStylus(
 	user *User,
 	request *CreateUserStylusRequest,
 ) error {
-	log := c.log.Function("CreateUserStylus")
+	log := logger.New("stylusController").TraceFromContext(ctx).Function("CreateUserStylus")
 
 	if request.StylusID == uuid.Nil {
 		return log.ErrMsg("stylusId is required")
@@ -251,7 +250,7 @@ func (c *StylusController) UpdateUserStylus(
 	stylusID uuid.UUID,
 	request *UpdateUserStylusRequest,
 ) error {
-	log := c.log.Function("UpdateUserStylus")
+	log := logger.New("stylusController").TraceFromContext(ctx).Function("UpdateUserStylus")
 
 	var purchaseDate, installDate *time.Time
 	var err error
@@ -302,7 +301,7 @@ func (c *StylusController) DeleteUserStylus(
 	user *User,
 	stylusID uuid.UUID,
 ) error {
-	log := c.log.Function("DeleteUserStylus")
+	log := logger.New("stylusController").TraceFromContext(ctx).Function("DeleteUserStylus")
 
 	if err := c.stylusRepo.Delete(ctx, c.db.SQL, user.ID, stylusID); err != nil {
 		return log.Err("failed to delete user stylus", err, "userID", user.ID, "stylusID", stylusID)

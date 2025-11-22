@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 )
 
 type DiscogsService struct {

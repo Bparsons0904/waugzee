@@ -1,7 +1,7 @@
 package config
 
 import (
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 
 	"github.com/spf13/viper"
 )

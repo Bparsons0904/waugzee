@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 	"time"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 
 	"github.com/go-co-op/gocron"
 )

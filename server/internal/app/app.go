@@ -8,7 +8,7 @@ import (
 	"waugzee/internal/events"
 	"waugzee/internal/handlers/middleware"
 	"waugzee/internal/jobs"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
 	"waugzee/internal/websockets"

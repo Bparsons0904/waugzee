@@ -2,7 +2,7 @@ package services
 
 import (
 	"waugzee/internal/events"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	// . "waugzee/internal/models"
 )
 

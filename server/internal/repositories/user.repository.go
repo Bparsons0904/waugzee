@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 	"waugzee/internal/database"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"github.com/google/uuid"
@@ -27,14 +27,12 @@ type UserRepository interface {
 }
 
 type userRepository struct {
-	cache database.DB // Keep cache for cache operations
-	log   logger.Logger
+	cache database.DB
 }
 
 func NewUserRepository(cache database.DB) UserRepository {
 	return &userRepository{
 		cache: cache,
-		log:   logger.New("userRepository"),
 	}
 }
 
@@ -43,7 +41,7 @@ func (r *userRepository) GetByID(
 	tx *gorm.DB,
 	userID uuid.UUID,
 ) (*User, error) {
-	log := r.log.Function("GetByID")
+	log := logger.New("userRepository").TraceFromContext(ctx).Function("GetByID")
 
 	var user User
 	if err := tx.WithContext(ctx).Preload("Configuration").First(&user, "id = ?", userID).Error; err != nil {
@@ -57,7 +55,7 @@ func (r *userRepository) GetByID(
 }
 
 func (r *userRepository) Update(ctx context.Context, tx *gorm.DB, user *User) error {
-	log := r.log.Function("Update")
+	log := logger.New("userRepository").TraceFromContext(ctx).Function("Update")
 
 	if err := tx.WithContext(ctx).Save(user).Error; err != nil {
 		return log.Err("failed to update user", err, "user", user)
@@ -71,32 +69,33 @@ func (r *userRepository) Update(ctx context.Context, tx *gorm.DB, user *User) er
 }
 
 func (r *userRepository) getCacheByOIDC(ctx context.Context, oidcUserID string, user *User) error {
+	log := logger.New("userRepository").TraceFromContext(ctx).Function("getCacheByOIDC")
+
 	found, err := database.NewCacheBuilder(r.cache.Cache.User, oidcUserID).
 		WithContext(ctx).
 		WithHash(USER_CACHE_PREFIX).
 		Get(user)
 	if err != nil {
-		return r.log.Function("getCacheByOIDC").
-			Err("failed to get user from cache", err, "oidcUserID", oidcUserID)
+		return log.Err("failed to get user from cache", err, "oidcUserID", oidcUserID)
 	}
 
 	if !found {
-		return r.log.Function("getCacheByOIDC").
-			Error("user not found in cache", "oidcUserID", oidcUserID)
+		return log.Error("user not found in cache", "oidcUserID", oidcUserID)
 	}
 
 	return nil
 }
 
 func (r *userRepository) addUserToCache(ctx context.Context, user *User) error {
+	log := logger.New("userRepository").TraceFromContext(ctx).Function("addUserToCache")
+
 	if err := database.NewCacheBuilder(r.cache.Cache.User, user.OIDCUserID).
 		WithContext(ctx).
 		WithHash(USER_CACHE_PREFIX).
 		WithStruct(user).
 		WithTTL(USER_CACHE_EXPIRY).
 		Set(); err != nil {
-		return r.log.Function("addUserToCache").
-			Err("failed to add user to cache", err, "oidcUserID", user.OIDCUserID)
+		return log.Err("failed to add user to cache", err, "oidcUserID", user.OIDCUserID)
 	}
 	return nil
 }
@@ -106,7 +105,7 @@ func (r *userRepository) GetByOIDCUserID(
 	tx *gorm.DB,
 	oidcUserID string,
 ) (*User, error) {
-	log := r.log.Function("GetByOIDCUserID")
+	log := logger.New("userRepository").TraceFromContext(ctx).Function("GetByOIDCUserID")
 
 	var cachedUser User
 	if err := r.getCacheByOIDC(ctx, oidcUserID, &cachedUser); err == nil {
@@ -131,7 +130,7 @@ func (r *userRepository) createFromOIDC(
 	tx *gorm.DB,
 	user *User,
 ) (*User, error) {
-	log := r.log.Function("createFromOIDC")
+	log := logger.New("userRepository").TraceFromContext(ctx).Function("createFromOIDC")
 
 	// Ensure defaults are set
 	if !user.IsActive {
@@ -158,7 +157,7 @@ func (r *userRepository) FindOrCreateOIDCUser(
 	tx *gorm.DB,
 	user *User,
 ) (*User, error) {
-	log := r.log.Function("FindOrCreateOIDCUser")
+	log := logger.New("userRepository").TraceFromContext(ctx).Function("FindOrCreateOIDCUser")
 
 	// First try to find by OIDC user ID
 	existingUser, err := r.GetByOIDCUserID(ctx, tx, user.OIDCUserID)
@@ -189,7 +188,7 @@ func (r *userRepository) FindOrCreateOIDCUser(
 }
 
 func (r *userRepository) ClearUserCacheByOIDC(ctx context.Context, oidcUserID string) error {
-	log := r.log.Function("ClearUserCacheByOIDC")
+	log := logger.New("userRepository").TraceFromContext(ctx).Function("ClearUserCacheByOIDC")
 
 	if err := database.NewCacheBuilder(r.cache.Cache.User, oidcUserID).
 		WithContext(ctx).
@@ -208,7 +207,7 @@ func (r *userRepository) ClearUserCacheByUserID(
 	tx *gorm.DB,
 	userID string,
 ) error {
-	log := r.log.Function("ClearUserCacheByUserID")
+	log := logger.New("userRepository").TraceFromContext(ctx).Function("ClearUserCacheByUserID")
 
 	var user User
 	if err := tx.WithContext(ctx).First(&user, "id = ?", userID).Error; err != nil {
@@ -223,7 +222,7 @@ func (r *userRepository) ClearUserCacheByUserID(
 }
 
 func (r *userRepository) GetAllUsers(ctx context.Context, tx *gorm.DB) ([]*User, error) {
-	log := r.log.Function("GetAllUsers")
+	log := logger.New("userRepository").TraceFromContext(ctx).Function("GetAllUsers")
 
 	users, err := gorm.G[*User](tx).
 		Where(User{IsActive: true}).

@@ -3,7 +3,7 @@ package repositories
 import (
 	"context"
 	"time"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 
 	"gorm.io/gorm"
@@ -75,14 +75,10 @@ type ReleaseRepository interface {
 	AssociateGenres(ctx context.Context, tx *gorm.DB, release *Release, genres []*Genre) error
 }
 
-type releaseRepository struct {
-	log logger.Logger
-}
+type releaseRepository struct{}
 
 func NewReleaseRepository() ReleaseRepository {
-	return &releaseRepository{
-		log: logger.New("releaseRepository"),
-	}
+	return &releaseRepository{}
 }
 
 func (r *releaseRepository) GetByDiscogsID(
@@ -90,6 +86,8 @@ func (r *releaseRepository) GetByDiscogsID(
 	tx *gorm.DB,
 	discogsID int64,
 ) (*Release, error) {
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("GetByDiscogsID")
+
 	var release Release
 	if err := tx.WithContext(ctx).
 		Preload("Labels").
@@ -103,8 +101,7 @@ func (r *releaseRepository) GetByDiscogsID(
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
-		return nil, r.log.Function("GetByDiscogsID").
-			Err("failed to get release by Discogs ID", err, "discogsID", discogsID)
+		return nil, log.Err("failed to get release by Discogs ID", err, "discogsID", discogsID)
 	}
 
 	return &release, nil
@@ -115,7 +112,7 @@ func (r *releaseRepository) UpsertBatch(
 	tx *gorm.DB,
 	releases []*Release,
 ) error {
-	log := r.log.Function("UpsertBatch")
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("UpsertBatch")
 
 	if len(releases) == 0 {
 		return nil
@@ -148,7 +145,7 @@ func (r *releaseRepository) AssociateArtists(
 	release *Release,
 	artists []*Artist,
 ) error {
-	log := r.log.Function("AssociateArtists")
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("AssociateArtists")
 
 	if len(artists) == 0 {
 		return nil
@@ -169,7 +166,7 @@ func (r *releaseRepository) AssociateLabels(
 	release *Release,
 	labels []*Label,
 ) error {
-	log := r.log.Function("AssociateLabels")
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("AssociateLabels")
 
 	if len(labels) == 0 {
 		return nil
@@ -190,7 +187,7 @@ func (r *releaseRepository) AssociateGenres(
 	release *Release,
 	genres []*Genre,
 ) error {
-	log := r.log.Function("AssociateGenres")
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("AssociateGenres")
 
 	if len(genres) == 0 {
 		return nil
@@ -210,7 +207,7 @@ func (r *releaseRepository) CreateReleaseArtistAssociations(
 	tx *gorm.DB,
 	associations []ReleaseArtistAssociation,
 ) error {
-	log := r.log.Function("CreateReleaseArtistAssociations")
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("CreateReleaseArtistAssociations")
 
 	if len(associations) == 0 {
 		return nil
@@ -254,7 +251,7 @@ func (r *releaseRepository) CreateReleaseLabelAssociations(
 	tx *gorm.DB,
 	associations []ReleaseLabelAssociation,
 ) error {
-	log := r.log.Function("CreateReleaseLabelAssociations")
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("CreateReleaseLabelAssociations")
 
 	if len(associations) == 0 {
 		return nil
@@ -298,7 +295,7 @@ func (r *releaseRepository) UpsertReleaseArtistAssociationsBatch(
 	tx *gorm.DB,
 	associationBatches []*[]ReleaseArtistAssociation,
 ) error {
-	log := r.log.Function("UpsertReleaseArtistAssociationsBatch")
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("UpsertReleaseArtistAssociationsBatch")
 
 	if len(associationBatches) == 0 {
 		return nil
@@ -333,7 +330,7 @@ func (r *releaseRepository) UpsertReleaseLabelAssociationsBatch(
 	tx *gorm.DB,
 	associationBatches []*[]ReleaseLabelAssociation,
 ) error {
-	log := r.log.Function("UpsertReleaseLabelAssociationsBatch")
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("UpsertReleaseLabelAssociationsBatch")
 
 	if len(associationBatches) == 0 {
 		return nil
@@ -367,7 +364,7 @@ func (r *releaseRepository) CreateReleaseGenreAssociations(
 	tx *gorm.DB,
 	associations []ReleaseGenreAssociation,
 ) error {
-	log := r.log.Function("CreateReleaseGenreAssociations")
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("CreateReleaseGenreAssociations")
 
 	if len(associations) == 0 {
 		return nil
@@ -411,7 +408,7 @@ func (r *releaseRepository) UpsertReleaseGenreAssociationsBatch(
 	tx *gorm.DB,
 	associationBatches []*[]ReleaseGenreAssociation,
 ) error {
-	log := r.log.Function("UpsertReleaseGenreAssociationsBatch")
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("UpsertReleaseGenreAssociationsBatch")
 
 	if len(associationBatches) == 0 {
 		return nil
@@ -445,7 +442,7 @@ func (r *releaseRepository) CheckReleaseExistence(
 	tx *gorm.DB,
 	releaseIDs []int64,
 ) (existing []int64, missing []int64, err error) {
-	log := r.log.Function("CheckReleaseExistence")
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("CheckReleaseExistence")
 
 	if len(releaseIDs) == 0 {
 		return []int64{}, []int64{}, nil
@@ -492,7 +489,7 @@ func (r *releaseRepository) UpdateReleaseImages(
 	tx *gorm.DB,
 	updates []ReleaseImageUpdate,
 ) error {
-	log := r.log.Function("UpdateReleaseImages")
+	log := logger.New("releaseRepository").TraceFromContext(ctx).Function("UpdateReleaseImages")
 
 	if len(updates) == 0 {
 		return nil

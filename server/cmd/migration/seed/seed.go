@@ -2,7 +2,7 @@ package seed
 
 import (
 	"waugzee/config"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 
 	"gorm.io/gorm"
 )

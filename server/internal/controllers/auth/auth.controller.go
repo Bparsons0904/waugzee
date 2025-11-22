@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 	"waugzee/internal/database"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	. "waugzee/internal/models"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
@@ -17,7 +17,6 @@ type AuthController struct {
 	historyRepo    repositories.HistoryRepository
 	stylusRepo     repositories.StylusRepository
 	db             database.DB
-	log            logger.Logger
 }
 
 type AuthControllerInterface interface {
@@ -75,7 +74,6 @@ func New(
 		historyRepo:    repos.History,
 		stylusRepo:     repos.Stylus,
 		db:             db,
-		log:            logger.New("authController"),
 	}
 }
 
@@ -94,7 +92,7 @@ func (ac *AuthController) getOrCreateOIDCUser(
 	ctx context.Context,
 	tokenInfo *types.TokenInfo,
 ) (*User, error) {
-	log := ac.log.Function("getOrCreateOIDCUser")
+	log := logger.New("authController").TraceFromContext(ctx).Function("getOrCreateOIDCUser")
 
 	// Determine first and last names from various sources
 	firstName := tokenInfo.GivenName
@@ -166,7 +164,7 @@ func (ac *AuthController) HandleOIDCCallback(
 	ctx context.Context,
 	req OIDCCallbackRequest,
 ) (*TokenExchangeResult, error) {
-	log := ac.log.Function("HandleOIDCCallback")
+	log := logger.New("authController").TraceFromContext(ctx).Function("HandleOIDCCallback")
 
 	tokenInfo, err := ac.zitadelService.ValidateIDToken(ctx, req.IDToken)
 	if err != nil {
@@ -207,7 +205,7 @@ func (ac *AuthController) LogoutUser(
 	req LogoutRequest,
 	user *User,
 ) (*LogoutResponse, error) {
-	log := ac.log.Function("LogoutUser")
+	log := logger.New("authController").TraceFromContext(ctx).Function("LogoutUser")
 
 	var oidcUserID string
 	if user != nil {

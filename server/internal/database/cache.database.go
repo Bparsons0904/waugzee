@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 	"waugzee/config"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 
 	"github.com/valkey-io/valkey-go"
 )

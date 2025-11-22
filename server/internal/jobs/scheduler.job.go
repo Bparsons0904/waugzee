@@ -2,7 +2,7 @@ package jobs
 
 import (
 	"waugzee/config"
-	"waugzee/internal/logger"
+	logger "github.com/Bparsons0904/goLogger"
 	"waugzee/internal/repositories"
 	"waugzee/internal/services"
 )
