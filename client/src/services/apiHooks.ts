@@ -4,6 +4,7 @@ import {
   HISTORY_ENDPOINTS,
   PLAY_HISTORY_ENDPOINTS,
   RECOMMENDATION_ENDPOINTS,
+  RELEASE_ENDPOINTS,
   STYLUS_ENDPOINTS,
 } from "@constants/api.constants";
 import type { DownloadStatusResponse, StoredFilesResponse } from "@models/Admin";
@@ -463,6 +464,49 @@ export function useMarkRecommendationListened(
       invalidateQueries: [["user"]],
       successMessage: "Play logged and recommendation marked as listened!",
       errorMessage: "Failed to mark recommendation as listened",
+      ...options,
+    },
+  );
+}
+
+// Release Management API Hooks
+export function useArchiveRelease(options?: ApiMutationOptions<{ message: string }, string>) {
+  return useApiMutation<{ message: string }, string>(
+    "PATCH",
+    (id) => RELEASE_ENDPOINTS.ARCHIVE(id),
+    undefined,
+    {
+      invalidateQueries: [["user"]],
+      successMessage: "Release archived successfully!",
+      errorMessage: "Failed to archive release. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useUnarchiveRelease(options?: ApiMutationOptions<{ message: string }, string>) {
+  return useApiMutation<{ message: string }, string>(
+    "PATCH",
+    (id) => RELEASE_ENDPOINTS.UNARCHIVE(id),
+    undefined,
+    {
+      invalidateQueries: [["user"]],
+      successMessage: "Release unarchived successfully!",
+      errorMessage: "Failed to unarchive release. Please try again.",
+      ...options,
+    },
+  );
+}
+
+export function useDeleteRelease(options?: ApiMutationOptions<{ message: string }, string>) {
+  return useApiMutation<{ message: string }, string>(
+    "DELETE",
+    (id) => RELEASE_ENDPOINTS.DELETE(id),
+    undefined,
+    {
+      invalidateQueries: [["user"]],
+      successMessage: "Release deleted successfully!",
+      errorMessage: "Failed to delete release. Please try again.",
       ...options,
     },
   );

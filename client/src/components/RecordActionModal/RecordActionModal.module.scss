@@ -301,3 +301,91 @@
   }
 }
 
+.archivedBadge {
+  display: inline-block;
+  margin-left: $spacing-sm;
+  padding: $spacing-xs $spacing-sm;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  color: $text-warning;
+  background-color: $bg-warning;
+  border-radius: $border-radius-md;
+  vertical-align: middle;
+}
+
+.archivedNotice {
+  padding: $spacing-md;
+  margin: $spacing-md;
+  background-color: $bg-warning;
+  border: $border-width-thin solid $border-warning;
+  border-radius: $border-radius-md;
+  color: $text-warning;
+  font-size: $font-size-sm;
+  text-align: center;
+
+  @media (min-width: $breakpoint-md) {
+    margin: $spacing-md $spacing-xl;
+  }
+}
+
+.managementButtons {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: $spacing-sm;
+  padding: $spacing-md;
+  border-bottom: $border-width-thin solid $border-default;
+  background-color: $bg-subtle;
+
+  button {
+    width: 100%;
+  }
+
+  @media (min-width: $breakpoint-md) {
+    flex-direction: row;
+    gap: $spacing-xl;
+    padding: $spacing-md $spacing-xl;
+
+    button {
+      width: auto;
+    }
+  }
+}
+
+.archiveButton,
+.unarchiveButton {
+  padding: $spacing-sm $spacing-lg;
+  font-weight: $font-weight-medium;
+  font-size: $font-size-sm;
+}
+
+.deleteButton {
+  padding: $spacing-sm $spacing-lg;
+  font-weight: $font-weight-medium;
+  font-size: $font-size-sm;
+}
+
+.deleteConfirm {
+  padding: $spacing-md;
+  margin: $spacing-md;
+  background-color: $bg-error;
+  border: $border-width-thin solid $border-error;
+  border-radius: $border-radius-md;
+
+  @media (min-width: $breakpoint-md) {
+    margin: $spacing-md $spacing-xl;
+  }
+
+  p {
+    margin: 0 0 $spacing-md 0;
+    color: $text-error;
+    font-size: $font-size-sm;
+  }
+}
+
+.confirmButtons {
+  display: flex;
+  gap: $spacing-sm;
+  justify-content: flex-end;
+}
+

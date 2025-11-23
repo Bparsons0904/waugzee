@@ -13,7 +13,14 @@ import { RecordHistoryItem } from "@components/RecordHistoryItem/RecordHistoryIt
 import { useUserData } from "@context/UserDataContext";
 import type { CleaningHistory, PlayHistory } from "@models/Release";
 import type { UserRelease } from "@models/User";
-import { useLogBoth, useLogCleaning, useLogPlay } from "@services/apiHooks";
+import {
+  useArchiveRelease,
+  useDeleteRelease,
+  useLogBoth,
+  useLogCleaning,
+  useLogPlay,
+  useUnarchiveRelease,
+} from "@services/apiHooks";
 import { formatDateTimeForInput } from "@utils/dates";
 import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
@@ -44,6 +51,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
   const [editItem, setEditItem] = createSignal<
     ((PlayHistory | CleaningHistory) & { type: "play" | "cleaning" }) | null
   >(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
 
   const logPlayMutation = useLogPlay({
     invalidateQueries: [["user"]],
@@ -68,6 +76,37 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
       props.onClose();
     },
   });
+
+  const archiveMutation = useArchiveRelease({
+    onSuccess: () => {
+      props.onClose();
+    },
+  });
+
+  const unarchiveMutation = useUnarchiveRelease({
+    onSuccess: () => {
+      props.onClose();
+    },
+  });
+
+  const deleteMutation = useDeleteRelease({
+    onSuccess: () => {
+      setShowDeleteConfirm(false);
+      props.onClose();
+    },
+  });
+
+  const handleArchive = () => {
+    archiveMutation.mutate(props.release.id);
+  };
+
+  const handleUnarchive = () => {
+    unarchiveMutation.mutate(props.release.id);
+  };
+
+  const handleDelete = () => {
+    deleteMutation.mutate(props.release.id);
+  };
 
   const resetForm = () => {
     setFormState({
@@ -167,7 +206,12 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
               />
             </div>
             <div class={styles.recordInfo}>
-              <h3 class={styles.recordTitle}>{props.release.release.title}</h3>
+              <h3 class={styles.recordTitle}>
+                {props.release.release.title}
+                <Show when={props.release.archived}>
+                  <span class={styles.archivedBadge}>Archived</span>
+                </Show>
+              </h3>
               <p class={styles.recordArtist}>{props.release.release.format || "Unknown Format"}</p>
               {props.release.release.year && (
                 <p class={styles.recordYear}>{props.release.release.year}</p>
@@ -221,11 +265,17 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
             </div>
           </div>
 
+          <Show when={props.release.archived}>
+            <div class={styles.archivedNotice}>
+              This record is archived. Unarchive it to log new plays or cleanings.
+            </div>
+          </Show>
+
           <div class={styles.actionButtons}>
             <Button
               variant="primary"
               onClick={handleLogPlay}
-              disabled={logPlayMutation.isPending}
+              disabled={logPlayMutation.isPending || props.release.archived}
               class={styles.playButton}
             >
               {logPlayMutation.isPending ? "Logging..." : "Log Play"}
@@ -233,7 +283,7 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
             <Button
               variant="secondary"
               onClick={handleLogBoth}
-              disabled={logBothMutation.isPending}
+              disabled={logBothMutation.isPending || props.release.archived}
               class={styles.bothButton}
             >
               {logBothMutation.isPending ? "Logging..." : "Log Both"}
@@ -241,12 +291,62 @@ const RecordActionModal: Component<RecordActionModalProps> = (props) => {
             <Button
               variant="tertiary"
               onClick={handleLogCleaning}
-              disabled={logCleaningMutation.isPending}
+              disabled={logCleaningMutation.isPending || props.release.archived}
               class={styles.cleaningButton}
             >
               {logCleaningMutation.isPending ? "Logging..." : "Log Cleaning"}
             </Button>
           </div>
+
+          <div class={styles.managementButtons}>
+            <Show
+              when={props.release.archived}
+              fallback={
+                <Button
+                  variant="secondary"
+                  onClick={handleArchive}
+                  disabled={archiveMutation.isPending}
+                  class={styles.archiveButton}
+                >
+                  {archiveMutation.isPending ? "Archiving..." : "Archive Record"}
+                </Button>
+              }
+            >
+              <Button
+                variant="secondary"
+                onClick={handleUnarchive}
+                disabled={unarchiveMutation.isPending}
+                class={styles.unarchiveButton}
+              >
+                {unarchiveMutation.isPending ? "Unarchiving..." : "Unarchive Record"}
+              </Button>
+            </Show>
+            <Button
+              variant="danger"
+              onClick={() => setShowDeleteConfirm(true)}
+              class={styles.deleteButton}
+            >
+              Delete Record
+            </Button>
+          </div>
+
+          <Show when={showDeleteConfirm()}>
+            <div class={styles.deleteConfirm}>
+              <p>Are you sure you want to delete this record? This action cannot be undone.</p>
+              <div class={styles.confirmButtons}>
+                <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? "Deleting..." : "Confirm Delete"}
+                </Button>
+              </div>
+            </div>
+          </Show>
 
           <div class={styles.historySection}>
             <h3 class={styles.historyTitle}>Record History</h3>

@@ -27,6 +27,14 @@ export const USER_ENDPOINTS = {
   PROFILE: (id: string) => `${API_PATHS.USERS}/${id}`,
 } as const;
 
+// Release management endpoints
+export const RELEASE_ENDPOINTS = {
+  ARCHIVED: `${API_PATHS.USERS}/me/releases/archived`,
+  ARCHIVE: (id: string) => `${API_PATHS.USERS}/me/releases/${id}/archive`,
+  UNARCHIVE: (id: string) => `${API_PATHS.USERS}/me/releases/${id}/unarchive`,
+  DELETE: (id: string) => `${API_PATHS.USERS}/me/releases/${id}`,
+} as const;
+
 // Stylus endpoints
 export const STYLUS_ENDPOINTS = {
   AVAILABLE: "/styluses/available",

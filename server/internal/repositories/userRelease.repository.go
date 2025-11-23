@@ -31,6 +31,35 @@ type UserReleaseRepository interface {
 		userID uuid.UUID,
 		folderID int,
 	) ([]*UserRelease, error)
+	GetUserReleaseByID(
+		ctx context.Context,
+		tx *gorm.DB,
+		userID uuid.UUID,
+		releaseID uuid.UUID,
+	) (*UserRelease, error)
+	ArchiveUserRelease(
+		ctx context.Context,
+		tx *gorm.DB,
+		userID uuid.UUID,
+		releaseID uuid.UUID,
+	) error
+	UnarchiveUserRelease(
+		ctx context.Context,
+		tx *gorm.DB,
+		userID uuid.UUID,
+		releaseID uuid.UUID,
+	) error
+	DeleteUserRelease(
+		ctx context.Context,
+		tx *gorm.DB,
+		userID uuid.UUID,
+		releaseID uuid.UUID,
+	) error
+	GetArchivedUserReleases(
+		ctx context.Context,
+		tx *gorm.DB,
+		userID uuid.UUID,
+	) ([]*UserRelease, error)
 }
 
 type userReleaseRepository struct {
@@ -221,7 +250,7 @@ func (r *userReleaseRepository) GetUserReleasesByFolderID(
 
 	query := gorm.G[*UserRelease](tx).
 		Scopes(userReleasesWithPreloads(userID)).
-		Where("user_id = ? AND active = ?", userID, true).
+		Where("user_id = ? AND active = ? AND archived = ?", userID, true, false).
 		Order("date_added DESC")
 
 	if folderID != 0 {
@@ -261,6 +290,172 @@ func (r *userReleaseRepository) GetUserReleasesByFolderID(
 		"Retrieved user releases by folder from database and cached",
 		"userID", userID,
 		"folderID", folderID,
+		"count", len(userReleases),
+	)
+	return userReleases, nil
+}
+
+func (r *userReleaseRepository) GetUserReleaseByID(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+	releaseID uuid.UUID,
+) (*UserRelease, error) {
+	log := logger.New("userReleaseRepository").TraceFromContext(ctx).Function("GetUserReleaseByID")
+
+	userRelease, err := gorm.G[*UserRelease](tx).
+		Scopes(userReleasesWithPreloads(userID)).
+		Where("user_id = ? AND id = ?", userID, releaseID).
+		First(ctx)
+	if err != nil {
+		return nil, log.Err(
+			"failed to get user release by ID",
+			err,
+			"userID", userID,
+			"releaseID", releaseID,
+		)
+	}
+
+	return userRelease, nil
+}
+
+func (r *userReleaseRepository) ArchiveUserRelease(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+	releaseID uuid.UUID,
+) error {
+	log := logger.New("userReleaseRepository").TraceFromContext(ctx).Function("ArchiveUserRelease")
+
+	rowsAffected, err := gorm.G[*UserRelease](tx).
+		Where("user_id = ? AND id = ?", userID, releaseID).
+		Update(ctx, "archived", true)
+	if err != nil {
+		return log.Err(
+			"failed to archive user release",
+			err,
+			"userID", userID,
+			"releaseID", releaseID,
+		)
+	}
+
+	if rowsAffected == 0 {
+		return log.Err(
+			"user release not found",
+			gorm.ErrRecordNotFound,
+			"userID", userID,
+			"releaseID", releaseID,
+		)
+	}
+
+	r.clearUserReleasesCache(ctx, userID)
+
+	log.Info("Successfully archived user release",
+		"userID", userID,
+		"releaseID", releaseID)
+
+	return nil
+}
+
+func (r *userReleaseRepository) UnarchiveUserRelease(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+	releaseID uuid.UUID,
+) error {
+	log := logger.New("userReleaseRepository").TraceFromContext(ctx).Function("UnarchiveUserRelease")
+
+	rowsAffected, err := gorm.G[*UserRelease](tx).
+		Where("user_id = ? AND id = ?", userID, releaseID).
+		Update(ctx, "archived", false)
+	if err != nil {
+		return log.Err(
+			"failed to unarchive user release",
+			err,
+			"userID", userID,
+			"releaseID", releaseID,
+		)
+	}
+
+	if rowsAffected == 0 {
+		return log.Err(
+			"user release not found",
+			gorm.ErrRecordNotFound,
+			"userID", userID,
+			"releaseID", releaseID,
+		)
+	}
+
+	r.clearUserReleasesCache(ctx, userID)
+
+	log.Info("Successfully unarchived user release",
+		"userID", userID,
+		"releaseID", releaseID)
+
+	return nil
+}
+
+func (r *userReleaseRepository) DeleteUserRelease(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+	releaseID uuid.UUID,
+) error {
+	log := logger.New("userReleaseRepository").TraceFromContext(ctx).Function("DeleteUserRelease")
+
+	rowsAffected, err := gorm.G[*UserRelease](tx).
+		Where("user_id = ? AND id = ?", userID, releaseID).
+		Delete(ctx)
+	if err != nil {
+		return log.Err(
+			"failed to delete user release",
+			err,
+			"userID", userID,
+			"releaseID", releaseID,
+		)
+	}
+
+	if rowsAffected == 0 {
+		return log.Err(
+			"user release not found",
+			gorm.ErrRecordNotFound,
+			"userID", userID,
+			"releaseID", releaseID,
+		)
+	}
+
+	r.clearUserReleasesCache(ctx, userID)
+
+	log.Info("Successfully deleted user release",
+		"userID", userID,
+		"releaseID", releaseID)
+
+	return nil
+}
+
+func (r *userReleaseRepository) GetArchivedUserReleases(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID uuid.UUID,
+) ([]*UserRelease, error) {
+	log := logger.New("userReleaseRepository").TraceFromContext(ctx).Function("GetArchivedUserReleases")
+
+	userReleases, err := gorm.G[*UserRelease](tx).
+		Scopes(userReleasesWithPreloads(userID)).
+		Where("user_id = ? AND archived = ?", userID, true).
+		Order("date_added DESC").
+		Find(ctx)
+	if err != nil {
+		return nil, log.Err(
+			"failed to get archived user releases",
+			err,
+			"userID", userID,
+		)
+	}
+
+	log.Info(
+		"Retrieved archived user releases",
+		"userID", userID,
 		"count", len(userReleases),
 	)
 	return userReleases, nil

@@ -122,6 +122,7 @@ func (r *historyRepository) GetUserPlayHistory(
 	}
 
 	playHistory, err := gorm.G[*PlayHistory](tx).
+		Joins("INNER JOIN user_releases ON user_releases.id = play_histories.user_release_id AND user_releases.deleted_at IS NULL").
 		Preload("UserRelease.Release.Genres", nil).
 		Preload("UserRelease.Release.Artists", nil).
 		Preload("UserStylus.Stylus", nil).
@@ -289,6 +290,7 @@ func (r *historyRepository) GetUserCleaningHistory(
 	}
 
 	cleaningHistory, err := gorm.G[*CleaningHistory](tx).
+		Joins("INNER JOIN user_releases ON user_releases.id = cleaning_histories.user_release_id AND user_releases.deleted_at IS NULL").
 		Preload("UserRelease.Release.Genres", nil).
 		Preload("UserRelease.Release.Artists", nil).
 		Where(CleaningHistory{UserID: userID}).

@@ -163,6 +163,7 @@ export interface UserRelease {
   notes?: Record<string, unknown>; // JSON data
   dateAdded: string;
   active: boolean;
+  archived: boolean;
   playHistory: PlayHistory[];
   cleaningHistory: CleaningHistory[];
 }

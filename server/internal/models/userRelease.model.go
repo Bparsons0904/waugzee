@@ -20,6 +20,7 @@ type UserRelease struct {
 	Notes      datatypes.JSON `gorm:"type:jsonb"                                       json:"notes"`
 	DateAdded  time.Time      `gorm:"type:timestamptz;not null"                        json:"dateAdded"`
 	Active     bool           `gorm:"type:bool;default:true"                           json:"active"`
+	Archived   bool           `gorm:"type:bool;default:false;not null"                 json:"archived"`
 	DeletedAt  gorm.DeletedAt `gorm:"index"                                            json:"-"`
 
 	PlayHistory     []PlayHistory     `gorm:"foreignKey:UserReleaseID" json:"playHistory"`

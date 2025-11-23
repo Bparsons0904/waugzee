@@ -8,6 +8,7 @@ import (
 	"waugzee/internal/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 type UpdateDiscogsTokenRequest struct {
@@ -44,6 +45,11 @@ func (h *UserHandler) Register() {
 	users.Put("/me/discogs", h.updateDiscogsToken)
 	users.Put("/me/folder", h.updateSelectedFolder)
 	users.Put("/me/preferences", h.updateUserPreferences)
+
+	users.Get("/me/releases/archived", h.getArchivedReleases)
+	users.Patch("/me/releases/:id/archive", h.archiveRelease)
+	users.Patch("/me/releases/:id/unarchive", h.unarchiveRelease)
+	users.Delete("/me/releases/:id", h.deleteRelease)
 }
 
 func (h *UserHandler) getCurrentUser(c *fiber.Ctx) error {
@@ -181,4 +187,119 @@ func (h *UserHandler) updateUserPreferences(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"user": updatedUser})
+}
+
+func (h *UserHandler) archiveRelease(c *fiber.Ctx) error {
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("user_handler").Function("archiveRelease")
+
+	user := middleware.GetUser(c)
+	if user == nil {
+		log.Warn("Unauthorized access attempt")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authentication required",
+		})
+	}
+
+	releaseIDStr := c.Params("id")
+	releaseID, err := uuid.Parse(releaseIDStr)
+	if err != nil {
+		log.Warn("Invalid release ID", "releaseID", releaseIDStr, "error", err)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid release ID",
+		})
+	}
+
+	err = h.userController.ArchiveRelease(c.UserContext(), user.ID, releaseID)
+	if err != nil {
+		_ = log.Err("Failed to archive release", err, "userID", user.ID, "releaseID", releaseID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to archive release",
+		})
+	}
+
+	return c.JSON(fiber.Map{"message": "Release archived successfully"})
+}
+
+func (h *UserHandler) unarchiveRelease(c *fiber.Ctx) error {
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("user_handler").Function("unarchiveRelease")
+
+	user := middleware.GetUser(c)
+	if user == nil {
+		log.Warn("Unauthorized access attempt")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authentication required",
+		})
+	}
+
+	releaseIDStr := c.Params("id")
+	releaseID, err := uuid.Parse(releaseIDStr)
+	if err != nil {
+		log.Warn("Invalid release ID", "releaseID", releaseIDStr, "error", err)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid release ID",
+		})
+	}
+
+	err = h.userController.UnarchiveRelease(c.UserContext(), user.ID, releaseID)
+	if err != nil {
+		_ = log.Err("Failed to unarchive release", err, "userID", user.ID, "releaseID", releaseID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to unarchive release",
+		})
+	}
+
+	return c.JSON(fiber.Map{"message": "Release unarchived successfully"})
+}
+
+func (h *UserHandler) deleteRelease(c *fiber.Ctx) error {
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("user_handler").Function("deleteRelease")
+
+	user := middleware.GetUser(c)
+	if user == nil {
+		log.Warn("Unauthorized access attempt")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authentication required",
+		})
+	}
+
+	releaseIDStr := c.Params("id")
+	releaseID, err := uuid.Parse(releaseIDStr)
+	if err != nil {
+		log.Warn("Invalid release ID", "releaseID", releaseIDStr, "error", err)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid release ID",
+		})
+	}
+
+	err = h.userController.DeleteRelease(c.UserContext(), user.ID, releaseID)
+	if err != nil {
+		_ = log.Err("Failed to delete release", err, "userID", user.ID, "releaseID", releaseID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to delete release",
+		})
+	}
+
+	return c.JSON(fiber.Map{"message": "Release deleted successfully"})
+}
+
+func (h *UserHandler) getArchivedReleases(c *fiber.Ctx) error {
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("user_handler").Function("getArchivedReleases")
+
+	user := middleware.GetUser(c)
+	if user == nil {
+		log.Warn("Unauthorized access attempt")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authentication required",
+		})
+	}
+
+	releases, err := h.userController.GetArchivedReleases(c.UserContext(), user.ID)
+	if err != nil {
+		_ = log.Err("Failed to get archived releases", err, "userID", user.ID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get archived releases",
+		})
+	}
+
+	return c.JSON(fiber.Map{"releases": releases})
 }

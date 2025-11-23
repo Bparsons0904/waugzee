@@ -60,6 +60,25 @@ type UserControllerInterface interface {
 		user *User,
 		preferences *UpdateUserPreferencesRequest,
 	) (*User, error)
+	ArchiveRelease(
+		ctx context.Context,
+		userID uuid.UUID,
+		releaseID uuid.UUID,
+	) error
+	UnarchiveRelease(
+		ctx context.Context,
+		userID uuid.UUID,
+		releaseID uuid.UUID,
+	) error
+	DeleteRelease(
+		ctx context.Context,
+		userID uuid.UUID,
+		releaseID uuid.UUID,
+	) error
+	GetArchivedReleases(
+		ctx context.Context,
+		userID uuid.UUID,
+	) ([]*UserRelease, error)
 }
 
 func New(
@@ -609,4 +628,67 @@ func (uc *UserController) calculateUserStreak(
 	)
 
 	return streakData, nil
+}
+
+func (uc *UserController) ArchiveRelease(
+	ctx context.Context,
+	userID uuid.UUID,
+	releaseID uuid.UUID,
+) error {
+	log := logger.New("userController").TraceFromContext(ctx).Function("ArchiveRelease")
+
+	err := uc.userReleaseRepo.ArchiveUserRelease(ctx, uc.db.SQL, userID, releaseID)
+	if err != nil {
+		return log.Err("failed to archive release", err, "userID", userID, "releaseID", releaseID)
+	}
+
+	log.Info("Successfully archived release", "userID", userID, "releaseID", releaseID)
+	return nil
+}
+
+func (uc *UserController) UnarchiveRelease(
+	ctx context.Context,
+	userID uuid.UUID,
+	releaseID uuid.UUID,
+) error {
+	log := logger.New("userController").TraceFromContext(ctx).Function("UnarchiveRelease")
+
+	err := uc.userReleaseRepo.UnarchiveUserRelease(ctx, uc.db.SQL, userID, releaseID)
+	if err != nil {
+		return log.Err("failed to unarchive release", err, "userID", userID, "releaseID", releaseID)
+	}
+
+	log.Info("Successfully unarchived release", "userID", userID, "releaseID", releaseID)
+	return nil
+}
+
+func (uc *UserController) DeleteRelease(
+	ctx context.Context,
+	userID uuid.UUID,
+	releaseID uuid.UUID,
+) error {
+	log := logger.New("userController").TraceFromContext(ctx).Function("DeleteRelease")
+
+	err := uc.userReleaseRepo.DeleteUserRelease(ctx, uc.db.SQL, userID, releaseID)
+	if err != nil {
+		return log.Err("failed to delete release", err, "userID", userID, "releaseID", releaseID)
+	}
+
+	log.Info("Successfully deleted release", "userID", userID, "releaseID", releaseID)
+	return nil
+}
+
+func (uc *UserController) GetArchivedReleases(
+	ctx context.Context,
+	userID uuid.UUID,
+) ([]*UserRelease, error) {
+	log := logger.New("userController").TraceFromContext(ctx).Function("GetArchivedReleases")
+
+	releases, err := uc.userReleaseRepo.GetArchivedUserReleases(ctx, uc.db.SQL, userID)
+	if err != nil {
+		return nil, log.Err("failed to get archived releases", err, "userID", userID)
+	}
+
+	log.Info("Retrieved archived releases", "userID", userID, "count", len(releases))
+	return releases, nil
 }
