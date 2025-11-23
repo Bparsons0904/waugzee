@@ -1,5 +1,6 @@
 import { Button } from "@components/common/ui/Button/Button";
 import { useAuth } from "@context/AuthContext";
+import { logger } from "@services/logger.service";
 import { type Component, createSignal, Show } from "solid-js";
 import styles from "./Auth.module.scss";
 
@@ -21,7 +22,10 @@ const Login: Component = () => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Login failed";
       setError(errorMessage);
-      console.error("Login error:", err);
+      logger.error("Login error", {
+        component: "Login",
+        error: { message: err instanceof Error ? err.message : String(err) },
+      });
     } finally {
       setLoading(false);
     }

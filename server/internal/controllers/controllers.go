@@ -10,6 +10,7 @@ import (
 	adminController "waugzee/internal/controllers/admin"
 	authController "waugzee/internal/controllers/auth"
 	historyController "waugzee/internal/controllers/history"
+	loggingController "waugzee/internal/controllers/logging"
 	recommendationController "waugzee/internal/controllers/recommendation"
 	stylusController "waugzee/internal/controllers/stylus"
 	syncController "waugzee/internal/controllers/sync"
@@ -24,6 +25,7 @@ type Controllers struct {
 	History        historyController.HistoryControllerInterface
 	Admin          adminController.AdminControllerInterface
 	Recommendation recommendationController.RecommendationControllerInterface
+	Logging        loggingController.LoggingControllerInterface
 }
 
 func New(
@@ -49,5 +51,6 @@ func New(
 			services.KleioImport, // TODO: REMOVE_AFTER_MIGRATION
 		),
 		Recommendation: recommendationController.New(repos, &services, db.SQL, db.Cache.ClientAPI),
+		Logging:        loggingController.New(services),
 	}
 }

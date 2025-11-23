@@ -41,6 +41,7 @@ import type { AxiosRequestConfig } from "axios";
 import type { Accessor } from "solid-js";
 import { useToast } from "../context/ToastContext";
 import { api } from "./api";
+import { logger } from "./logger.service";
 
 // Enhanced query options
 export interface ApiQueryOptions<T>
@@ -145,6 +146,16 @@ export function useApiMutation<T, V = unknown>(
       userOnSuccess?.(data, variables, context);
     },
     onError: (error, variables, context) => {
+      // Log the mutation error
+      const requestUrl = typeof url === "function" ? url(variables) : url;
+      logger.error("Mutation failed", {
+        component: "ApiHooks",
+        action: "mutation_error",
+        method,
+        url: requestUrl,
+        error: { message: error.message },
+      });
+
       // Handle error toast
       if (errorMessage) {
         const message = typeof errorMessage === "function" ? errorMessage(error) : errorMessage;

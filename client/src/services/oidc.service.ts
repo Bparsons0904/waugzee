@@ -1,4 +1,5 @@
 import { ROUTES } from "@constants/api.constants";
+import { logger } from "@services/logger.service";
 import {
   type User as OidcUser,
   UserManager,
@@ -34,7 +35,7 @@ export class OIDCService {
    * Discover OIDC configuration from the provider with caching
    */
   private async discoverOIDCConfiguration(instanceUrl: string): Promise<Record<string, unknown>> {
-    console.debug("Attempting OIDC discovery for:", instanceUrl);
+    logger.debug("Attempting OIDC discovery", { component: "OIDC", instanceUrl });
 
     // Check cache first
     const cacheKey = `oidc_discovery_${instanceUrl}`;
@@ -42,10 +43,13 @@ export class OIDCService {
     if (cached) {
       try {
         const metadata = JSON.parse(cached);
-        console.debug("Using cached OIDC discovery metadata");
+        logger.debug("Using cached OIDC discovery metadata", { component: "OIDC" });
         return metadata;
       } catch (e) {
-        console.warn("Failed to parse cached OIDC metadata:", e);
+        logger.warn("Failed to parse cached OIDC metadata", {
+          component: "OIDC",
+          error: { message: e instanceof Error ? e.message : String(e) },
+        });
       }
     }
 
@@ -58,12 +62,13 @@ export class OIDCService {
 
     for (const discoveryUrl of discoveryUrls) {
       try {
-        console.debug(`Trying discovery URL: ${discoveryUrl}`);
+        logger.debug("Trying discovery URL", { component: "OIDC", discoveryUrl });
         const response = await fetch(discoveryUrl);
 
         if (response.ok) {
           const metadata = await response.json();
-          console.debug("OIDC discovery successful:", {
+          logger.debug("OIDC discovery successful", {
+            component: "OIDC",
             discoveryUrl,
             issuer: metadata.issuer,
             endpoints: {
@@ -79,16 +84,25 @@ export class OIDCService {
 
           return metadata;
         } else {
-          console.debug(
-            `Discovery URL failed: ${discoveryUrl} - ${response.status} ${response.statusText}`,
-          );
+          logger.debug("Discovery URL failed", {
+            component: "OIDC",
+            discoveryUrl,
+            status: response.status,
+            statusText: response.statusText,
+          });
         }
       } catch (error) {
-        console.debug(`Discovery URL error: ${discoveryUrl} -`, error);
+        logger.debug("Discovery URL error", {
+          component: "OIDC",
+          discoveryUrl,
+          error: { message: error instanceof Error ? error.message : String(error) },
+        });
       }
     }
 
-    console.warn("All OIDC discovery URLs failed, falling back to Zitadel endpoints");
+    logger.warn("All OIDC discovery URLs failed, falling back to Zitadel endpoints", {
+      component: "OIDC",
+    });
 
     // Fallback to hardcoded Zitadel endpoints
     const fallbackMetadata = {
@@ -162,7 +176,8 @@ export class OIDCService {
     };
 
     try {
-      console.debug("Creating UserManager with settings:", {
+      logger.debug("Creating UserManager with settings", {
+        component: "OIDC",
         authority: settings.authority,
         client_id: settings.client_id,
         redirect_uri: settings.redirect_uri,
@@ -174,7 +189,7 @@ export class OIDCService {
       // Set up event handlers
       this.setupEventHandlers();
 
-      console.debug("OIDC UserManager created successfully");
+      logger.debug("OIDC UserManager created successfully", { component: "OIDC" });
     } catch (error) {
       this.userManager = null;
       throw new Error(
@@ -191,12 +206,12 @@ export class OIDCService {
 
     // Token renewed successfully
     this.userManager.events.addAccessTokenExpiring(() => {
-      console.debug("Access token expiring, attempting renewal...");
+      logger.debug("Access token expiring, attempting renewal", { component: "OIDC" });
     });
 
     // Token expired - trigger logout if automatic renewal fails
     this.userManager.events.addAccessTokenExpired(() => {
-      console.warn("Access token expired - triggering logout");
+      logger.warn("Access token expired", { component: "OIDC", action: "token_expired" });
       if (this.eventCallbacks.onTokenExpired) {
         this.eventCallbacks.onTokenExpired();
       }
@@ -204,7 +219,11 @@ export class OIDCService {
 
     // Silent renewal failed - trigger logout
     this.userManager.events.addSilentRenewError((error) => {
-      console.error("Silent token renewal failed - triggering logout:", error);
+      logger.error("Silent token renewal failed", {
+        component: "OIDC",
+        action: "silent_renew_error",
+        error: { message: error.message || "Silent renewal failed" },
+      });
       if (this.eventCallbacks.onSilentRenewError) {
         this.eventCallbacks.onSilentRenewError(new Error(error.message || "Silent renewal failed"));
       }
@@ -212,7 +231,8 @@ export class OIDCService {
 
     // User loaded successfully
     this.userManager.events.addUserLoaded((user) => {
-      console.debug("User loaded from OIDC:", {
+      logger.debug("User loaded from OIDC", {
+        component: "OIDC",
         sub: user.profile.sub,
         exp: user.expires_at,
         scopes: user.scopes,
@@ -221,12 +241,12 @@ export class OIDCService {
 
     // User session terminated
     this.userManager.events.addUserUnloaded(() => {
-      console.debug("User session terminated");
+      logger.debug("User session terminated", { component: "OIDC" });
     });
 
     // User signed out
     this.userManager.events.addUserSignedOut(() => {
-      console.debug("User signed out - triggering logout callback");
+      logger.debug("User signed out", { component: "OIDC", action: "user_signed_out" });
       if (this.eventCallbacks.onUserSignedOut) {
         this.eventCallbacks.onUserSignedOut();
       }
@@ -238,7 +258,9 @@ export class OIDCService {
    */
   async getUser(): Promise<OidcUser | null> {
     if (!this.userManager) {
-      console.warn("OIDC service not initialized - getUser() called too early");
+      logger.warn("OIDC service not initialized - getUser() called too early", {
+        component: "OIDC",
+      });
       return null;
     }
 
@@ -246,7 +268,10 @@ export class OIDCService {
       const user = await this.userManager.getUser();
       return user;
     } catch (error) {
-      console.error("Failed to get user from OIDC:", error);
+      logger.error("Failed to get user from OIDC", {
+        component: "OIDC",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
       return null;
     }
   }
@@ -272,7 +297,9 @@ export class OIDCService {
    */
   async isAuthenticated(): Promise<boolean> {
     if (!this.userManager) {
-      console.warn("OIDC service not initialized - isAuthenticated() called too early");
+      logger.warn("OIDC service not initialized - isAuthenticated() called too early", {
+        component: "OIDC",
+      });
       return false;
     }
 
@@ -294,7 +321,10 @@ export class OIDCService {
         state: { timestamp: Date.now(), ...additionalState },
       });
     } catch (error) {
-      console.error("Failed to start sign-in redirect:", error);
+      logger.error("Failed to start sign-in redirect", {
+        component: "OIDC",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
       throw new Error("Failed to initiate authentication");
     }
   }
@@ -319,7 +349,8 @@ export class OIDCService {
         throw new Error("No access token received");
       }
 
-      console.debug("Authentication callback successful", {
+      logger.debug("Authentication callback successful", {
+        component: "OIDC",
         sub: user.profile.sub,
         exp: user.expires_at,
         scopes: user.scopes,
@@ -327,7 +358,10 @@ export class OIDCService {
 
       return user;
     } catch (error) {
-      console.error("OIDC callback failed:", error);
+      logger.error("OIDC callback failed", {
+        component: "OIDC",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
       throw new Error("Authentication callback failed");
     }
   }
@@ -346,7 +380,10 @@ export class OIDCService {
         state: { timestamp: Date.now() },
       });
     } catch (error) {
-      console.error("Failed to sign out:", error);
+      logger.error("Failed to sign out", {
+        component: "OIDC",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
       // Fallback: clear local session even if remote logout fails
       await this.userManager.removeUser();
       throw error;
@@ -364,7 +401,10 @@ export class OIDCService {
     try {
       await this.userManager.removeUser();
     } catch (error) {
-      console.error("Failed to clear user session:", error);
+      logger.error("Failed to clear user session", {
+        component: "OIDC",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
       throw error;
     }
   }
@@ -380,7 +420,10 @@ export class OIDCService {
     try {
       await this.userManager.signinSilentCallback();
     } catch (error) {
-      console.error("Silent renewal callback failed:", error);
+      logger.error("Silent renewal callback failed", {
+        component: "OIDC",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
       throw error;
     }
   }
@@ -397,7 +440,10 @@ export class OIDCService {
       const user = await this.userManager.signinSilent();
       return user;
     } catch (error) {
-      console.error("Manual token renewal failed:", error);
+      logger.error("Manual token renewal failed", {
+        component: "OIDC",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
       return null;
     }
   }

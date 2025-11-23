@@ -129,7 +129,7 @@ func (zs *ZitadelService) ValidateIDToken(
 	ctx context.Context,
 	idToken string,
 ) (*types.TokenInfo, error) {
-	log := zs.log.Function("ValidateIDToken")
+	log := logger.New("ZitadelService").TraceFromContext(ctx).Function("ValidateIDToken")
 
 	// Parse JWT token with signature verification
 	token, err := jwt.ParseWithClaims(
@@ -262,7 +262,7 @@ func (zs *ZitadelService) ValidateIDToken(
 
 // getOIDCDiscovery fetches and caches the OIDC discovery document
 func (zs *ZitadelService) getOIDCDiscovery(ctx context.Context) (*OIDCDiscovery, error) {
-	log := zs.log.Function("getOIDCDiscovery")
+	log := logger.New("ZitadelService").TraceFromContext(ctx).Function("getOIDCDiscovery")
 
 	// Check cache first
 	zs.discoveryMux.RLock()
@@ -324,7 +324,7 @@ func (zs *ZitadelService) getOIDCDiscovery(ctx context.Context) (*OIDCDiscovery,
 
 // getJWKS fetches and caches the JSON Web Key Set
 func (zs *ZitadelService) getJWKS(ctx context.Context) (*JWKSet, error) {
-	log := zs.log.Function("getJWKS")
+	log := logger.New("ZitadelService").TraceFromContext(ctx).Function("getJWKS")
 
 	// Check cache first
 	zs.jwksMux.RLock()
@@ -386,7 +386,7 @@ func (zs *ZitadelService) getPublicKeyForToken(
 	ctx context.Context,
 	kidHeader string,
 ) (*rsa.PublicKey, error) {
-	log := zs.log.Function("getPublicKeyForToken")
+	log := logger.New("ZitadelService").TraceFromContext(ctx).Function("getPublicKeyForToken")
 
 	// Get JWKS
 	jwks, err := zs.getJWKS(ctx)
@@ -444,7 +444,7 @@ func (zs *ZitadelService) getPublicKeyForToken(
 
 // RevokeToken revokes an access or refresh token with Zitadel
 func (zs *ZitadelService) RevokeToken(ctx context.Context, token string, tokenType string) error {
-	log := zs.log.Function("RevokeToken")
+	log := logger.New("ZitadelService").TraceFromContext(ctx).Function("RevokeToken")
 
 	// Get OIDC discovery to find revocation endpoint
 	discovery, err := zs.getOIDCDiscovery(ctx)
@@ -527,7 +527,7 @@ func (zs *ZitadelService) GetLogoutURL(
 	ctx context.Context,
 	idTokenHint, postLogoutRedirectURI, state string,
 ) (string, error) {
-	log := zs.log.Function("GetLogoutURL")
+	log := logger.New("ZitadelService").TraceFromContext(ctx).Function("GetLogoutURL")
 
 	// Get OIDC discovery to find end session endpoint
 	discovery, err := zs.getOIDCDiscovery(ctx)

@@ -36,7 +36,7 @@ func (h *SyncHandler) Register() {
 }
 
 func (h *SyncHandler) InitiateCollectionSync(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("sync_handler").Function("InitiateCollectionSync")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("sync_handler").Function("InitiateCollectionSync")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -46,7 +46,7 @@ func (h *SyncHandler) InitiateCollectionSync(c *fiber.Ctx) error {
 		})
 	}
 
-	err := h.syncController.HandleSyncRequest(c.Context(), user)
+	err := h.syncController.HandleSyncRequest(c.UserContext(), user)
 	if err != nil {
 		_ = log.Err("Failed to handle sync request", err, "userID", user.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

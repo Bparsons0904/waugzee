@@ -25,6 +25,7 @@ services:
       - GOEXPERIMENT=${GOEXPERIMENT:-greenteagc,jsonv2}
       - SERVER_PORT=8288 # Internal port should always be 8288
       - LOG_FORMAT=${LOG_FORMAT:-json} # Set to "text" for human-readable logs in development
+      - VICTORIA_LOGS_URL=${VICTORIA_LOGS_URL:-}
     working_dir: /app
     networks:
       - dev-network-dev

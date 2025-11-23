@@ -3,7 +3,7 @@ module waugzee
 go 1.25.4
 
 require (
-	github.com/Bparsons0904/goLogger v1.0.0
+	github.com/Bparsons0904/goLogger v1.1.0
 	github.com/go-co-op/gocron v1.37.0
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/gofiber/helmet/v2 v2.2.26

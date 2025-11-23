@@ -45,9 +45,9 @@ func (h *AdminHandler) Register() {
 }
 
 func (h *AdminHandler) getDownloadStatus(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("admin_handler").Function("getDownloadStatus")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("admin_handler").Function("getDownloadStatus")
 
-	status, err := h.adminController.GetDownloadStatus(c.Context())
+	status, err := h.adminController.GetDownloadStatus(c.UserContext())
 	if err != nil {
 		_ = log.Err("Failed to get download status", err)
 		return c.Status(fiber.StatusInternalServerError).
@@ -58,13 +58,13 @@ func (h *AdminHandler) getDownloadStatus(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) triggerDownload(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("admin_handler").Function("triggerDownload")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("admin_handler").Function("triggerDownload")
 
 	user := middleware.GetUser(c)
 
 	log.Info("Admin triggering download", "userID", user.ID, "email", user.Email)
 
-	err := h.adminController.TriggerDownload(c.Context())
+	err := h.adminController.TriggerDownload(c.UserContext())
 	if err != nil {
 		if err.Error() == "download or processing already in progress" {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
@@ -78,13 +78,13 @@ func (h *AdminHandler) triggerDownload(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) triggerReprocess(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("admin_handler").Function("triggerReprocess")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("admin_handler").Function("triggerReprocess")
 
 	user := middleware.GetUser(c)
 
 	log.Info("Admin triggering reprocess", "userID", user.ID, "email", user.Email)
 
-	err := h.adminController.TriggerReprocess(c.Context())
+	err := h.adminController.TriggerReprocess(c.UserContext())
 	if err != nil {
 		if err.Error() == "no processing record found" ||
 			err.Error() == "files must be downloaded before reprocessing" {
@@ -100,13 +100,13 @@ func (h *AdminHandler) triggerReprocess(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) resetStuckDownload(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("admin_handler").Function("resetStuckDownload")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("admin_handler").Function("resetStuckDownload")
 
 	user := middleware.GetUser(c)
 
 	log.Info("Admin resetting stuck download", "userID", user.ID, "email", user.Email)
 
-	err := h.adminController.ResetStuckDownload(c.Context())
+	err := h.adminController.ResetStuckDownload(c.UserContext())
 	if err != nil {
 		if err.Error() == "no processing record found" ||
 			err.Error() == "cannot reset record in this state" {
@@ -123,9 +123,9 @@ func (h *AdminHandler) resetStuckDownload(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) listStoredFiles(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("admin_handler").Function("listStoredFiles")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("admin_handler").Function("listStoredFiles")
 
-	response, err := h.adminController.ListStoredFiles(c.Context())
+	response, err := h.adminController.ListStoredFiles(c.UserContext())
 	if err != nil {
 		_ = log.Err("Failed to list stored files", err)
 		return c.Status(fiber.StatusInternalServerError).
@@ -136,13 +136,13 @@ func (h *AdminHandler) listStoredFiles(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) cleanupAllFiles(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("admin_handler").Function("cleanupAllFiles")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("admin_handler").Function("cleanupAllFiles")
 
 	user := middleware.GetUser(c)
 
 	log.Info("Admin cleaning up all files", "userID", user.ID, "email", user.Email)
 
-	err := h.adminController.CleanupAllFiles(c.Context())
+	err := h.adminController.CleanupAllFiles(c.UserContext())
 	if err != nil {
 		_ = log.Err("Failed to cleanup all files", err)
 		return c.Status(fiber.StatusInternalServerError).
@@ -155,7 +155,7 @@ func (h *AdminHandler) cleanupAllFiles(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) cleanupYearMonth(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("admin_handler").Function("cleanupYearMonth")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("admin_handler").Function("cleanupYearMonth")
 
 	yearMonth := c.Params("yearMonth")
 	if yearMonth == "" {
@@ -170,7 +170,7 @@ func (h *AdminHandler) cleanupYearMonth(c *fiber.Ctx) error {
 		"email", user.Email,
 		"yearMonth", yearMonth)
 
-	err := h.adminController.CleanupYearMonth(c.Context(), yearMonth)
+	err := h.adminController.CleanupYearMonth(c.UserContext(), yearMonth)
 	if err != nil {
 		_ = log.Err("Failed to cleanup year-month files", err, "yearMonth", yearMonth)
 		return c.Status(fiber.StatusInternalServerError).
@@ -186,7 +186,7 @@ func (h *AdminHandler) cleanupYearMonth(c *fiber.Ctx) error {
 // TODO: REMOVE_AFTER_MIGRATION
 // This handler is for one-time Kleio data migration and should be deleted after import is complete.
 func (h *AdminHandler) importKleioData(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("admin_handler").Function("importKleioData")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("admin_handler").Function("importKleioData")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -233,7 +233,7 @@ func (h *AdminHandler) importKleioData(c *fiber.Ctx) error {
 		"email", user.Email,
 		"fileSize", fileHeader.Size)
 
-	summary, err := h.adminController.ImportKleioData(c.Context(), user.ID, jsonData)
+	summary, err := h.adminController.ImportKleioData(c.UserContext(), user.ID, jsonData)
 	if err != nil {
 		_ = log.Err("Failed to import Kleio data", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to import Kleio data"})

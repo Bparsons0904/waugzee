@@ -34,7 +34,7 @@ func (h *RecommendationHandler) Register() {
 }
 
 func (h *RecommendationHandler) markAsListened(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("recommendation_handler").Function("markAsListened")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("recommendation_handler").Function("markAsListened")
 
 	user := middleware.GetUser(c)
 
@@ -48,7 +48,7 @@ func (h *RecommendationHandler) markAsListened(c *fiber.Ctx) error {
 	}
 
 	err = h.recommendationController.MarkAsListened(
-		c.Context(),
+		c.UserContext(),
 		user,
 		recommendationID,
 	)

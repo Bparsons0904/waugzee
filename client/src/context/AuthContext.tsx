@@ -1,5 +1,6 @@
 import { AUTH_ENDPOINTS, ROUTES } from "@constants/api.constants";
 import { api, setTokenGetter } from "@services/api";
+import { logger } from "@services/logger.service";
 import { oidcService } from "@services/oidc.service";
 import { useNavigate } from "@solidjs/router";
 import { createContext, createEffect, type JSX, onCleanup, Show, useContext } from "solid-js";
@@ -64,7 +65,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
   // Define performLocalLogout early so it can be used in callbacks
   const performLocalLogout = () => {
-    console.info("Performing local logout - clearing all auth state");
+    logger.info("Performing local logout", { component: "AuthContext", action: "local_logout" });
 
     // Clear all local state
     setAuthState({
@@ -83,7 +84,10 @@ export function AuthProvider(props: { children: JSX.Element }) {
       const token = await oidcService.getIDToken();
       setAuthState("token", token);
     } catch (error) {
-      console.warn("Failed to get ID token:", error);
+      logger.warn("Failed to get ID token", {
+        component: "AuthContext",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
       setAuthState("token", null);
     }
   });
@@ -106,7 +110,10 @@ export function AuthProvider(props: { children: JSX.Element }) {
           // Use cached config immediately for faster startup
           setAuthState({ config, configLoading: false });
         } catch (e) {
-          console.warn("Failed to parse cached auth config:", e);
+          logger.warn("Failed to parse cached auth config", {
+            component: "AuthContext",
+            error: { message: e instanceof Error ? e.message : String(e) },
+          });
         }
       }
 
@@ -123,15 +130,19 @@ export function AuthProvider(props: { children: JSX.Element }) {
         // Set up OIDC event callbacks for token expiry and renewal failures
         oidcService.setEventCallbacks({
           onTokenExpired: () => {
-            console.warn("OIDC token expired - performing logout");
+            logger.warn("OIDC token expired", { component: "AuthContext", action: "token_expired" });
             performLocalLogout();
           },
           onSilentRenewError: (error) => {
-            console.error("OIDC silent renewal failed - performing logout:", error);
+            logger.error("OIDC silent renewal failed", {
+              component: "AuthContext",
+              action: "silent_renew_error",
+              error: { message: error.message },
+            });
             performLocalLogout();
           },
           onUserSignedOut: () => {
-            console.info("OIDC user signed out - performing logout");
+            logger.info("OIDC user signed out", { component: "AuthContext", action: "user_signed_out" });
             performLocalLogout();
           },
         });
@@ -151,7 +162,11 @@ export function AuthProvider(props: { children: JSX.Element }) {
         });
       }
     } catch (error) {
-      console.error("Auth config load failed:", error);
+      logger.error("Auth config load failed", {
+        component: "AuthContext",
+        action: "config_load_error",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
       setAuthState({
         config: { configured: false },
         configLoading: false,
@@ -174,14 +189,14 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
     const checkAuthStatus = async () => {
       try {
-        console.debug("Checking authentication status...");
+        logger.debug("Checking authentication status", { component: "AuthContext" });
         setAuthState("error", null);
 
         const isAuthenticated = await oidcService.isAuthenticated();
         const oidcUser = await oidcService.getUser();
 
         if (!isAuthenticated || !oidcUser || cancelled) {
-          console.debug("No valid OIDC session found");
+          logger.debug("No valid OIDC session found", { component: "AuthContext" });
           setAuthState({
             status: "unauthenticated",
             token: null,
@@ -192,7 +207,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
 
         // Set authenticated status with ID token (JWT) for backend validation
         if (!cancelled) {
-          console.info("Authentication successful");
+          logger.info("Authentication successful", { component: "AuthContext", action: "auth_check_success" });
 
           setAuthState({
             status: "authenticated",
@@ -211,7 +226,10 @@ export function AuthProvider(props: { children: JSX.Element }) {
         }
       } catch (error) {
         if (!cancelled) {
-          console.warn("Authentication check failed:", error);
+          logger.warn("Authentication check failed", {
+            component: "AuthContext",
+            error: { message: error instanceof Error ? error.message : String(error) },
+          });
           setAuthState({
             status: "unauthenticated",
             token: null,
@@ -230,6 +248,19 @@ export function AuthProvider(props: { children: JSX.Element }) {
       cancelled = true;
       controller.abort();
     });
+  });
+
+  // Initialize logger when user becomes authenticated
+  createEffect(() => {
+    if (authState.status === "authenticated") {
+      logger.initialize();
+      logger.info("User authenticated", { component: "AuthContext", action: "auth_success" });
+    }
+  });
+
+  // Cleanup logger on component unmount
+  onCleanup(() => {
+    logger.destroy();
   });
 
   const loginWithOIDC = async (returnTo?: string) => {
@@ -252,7 +283,11 @@ export function AuthProvider(props: { children: JSX.Element }) {
         returnTo: returnPath,
       });
     } catch (error) {
-      console.error("OIDC login failed:", error);
+      logger.error("OIDC login failed", {
+        component: "AuthContext",
+        action: "oidc_login_error",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
       setAuthState("error", {
         type: "auth_failed",
         message: error instanceof Error ? error.message : "Login failed",
@@ -286,12 +321,18 @@ export function AuthProvider(props: { children: JSX.Element }) {
             typeof oidcUser.state === "string" ? oidcUser.state : JSON.stringify(oidcUser.state),
         });
 
-        console.info("Backend callback successful:", {
+        logger.info("Backend callback successful", {
+          component: "AuthContext",
+          action: "backend_callback_success",
           userId: callbackResponse?.user?.id,
           email: callbackResponse?.user?.email,
         });
       } catch (backendError) {
-        console.error("Backend callback failed:", backendError);
+        logger.error("Backend callback failed", {
+          component: "AuthContext",
+          action: "backend_callback_error",
+          error: { message: backendError instanceof Error ? backendError.message : String(backendError) },
+        });
         throw new Error("Failed to register user with backend");
       }
 
@@ -310,7 +351,10 @@ export function AuthProvider(props: { children: JSX.Element }) {
             ? oidcUser.state
             : JSON.parse(typeof oidcUser.state === "string" ? oidcUser.state : "{}");
       } catch (error) {
-        console.warn("Failed to parse OIDC state, using default:", error);
+        logger.warn("Failed to parse OIDC state, using default", {
+          component: "AuthContext",
+          error: { message: error instanceof Error ? error.message : String(error) },
+        });
       }
 
       const returnTo = typeof state.returnTo === "string" ? state.returnTo : ROUTES.HOME;
@@ -318,7 +362,11 @@ export function AuthProvider(props: { children: JSX.Element }) {
       // Navigate to original destination
       navigate(returnTo);
     } catch (error) {
-      console.error("OIDC callback failed:", error);
+      logger.error("OIDC callback failed", {
+        component: "AuthContext",
+        action: "oidc_callback_error",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
 
       setAuthState({
         status: "unauthenticated",
@@ -334,7 +382,7 @@ export function AuthProvider(props: { children: JSX.Element }) {
   };
 
   const logout = async () => {
-    console.info("Logout initiated");
+    logger.info("Logout initiated", { component: "AuthContext", action: "logout_start" });
 
     try {
       try {
@@ -342,36 +390,49 @@ export function AuthProvider(props: { children: JSX.Element }) {
           await api.post(AUTH_ENDPOINTS.LOGOUT, {
             access_token: authState.token,
           });
-          console.debug("Backend logout completed successfully");
+          logger.debug("Backend logout completed successfully", { component: "AuthContext" });
         }
       } catch (backendError) {
-        console.warn("Backend logout failed, continuing with OIDC logout:", backendError);
+        logger.warn("Backend logout failed, continuing with OIDC logout", {
+          component: "AuthContext",
+          error: { message: backendError instanceof Error ? backendError.message : String(backendError) },
+        });
       }
 
       if (!authState.oidcInitialized) {
-        console.warn("OIDC service not initialized, performing local logout only");
+        logger.warn("OIDC service not initialized, performing local logout only", { component: "AuthContext" });
         performLocalLogout();
         return;
       }
 
       try {
         await oidcService.signOut();
-        console.debug("OIDC signOut completed successfully");
+        logger.debug("OIDC signOut completed successfully", { component: "AuthContext" });
       } catch (oidcError) {
-        console.warn("OIDC signOut failed, forcing local cleanup:", oidcError);
+        logger.warn("OIDC signOut failed, forcing local cleanup", {
+          component: "AuthContext",
+          error: { message: oidcError instanceof Error ? oidcError.message : String(oidcError) },
+        });
 
         // Force clear OIDC session even if signOut fails
         try {
           await oidcService.clearUserSession();
-          console.debug("OIDC session cleared forcibly");
+          logger.debug("OIDC session cleared forcibly", { component: "AuthContext" });
         } catch (clearError) {
-          console.error("Failed to clear OIDC session:", clearError);
+          logger.error("Failed to clear OIDC session", {
+            component: "AuthContext",
+            error: { message: clearError instanceof Error ? clearError.message : String(clearError) },
+          });
         }
       }
 
       performLocalLogout();
     } catch (error) {
-      console.error("Logout process failed, performing emergency cleanup:", error);
+      logger.error("Logout process failed, performing emergency cleanup", {
+        component: "AuthContext",
+        action: "logout_error",
+        error: { message: error instanceof Error ? error.message : String(error) },
+      });
 
       // Emergency cleanup - ensure we always clear local state
       performLocalLogout();

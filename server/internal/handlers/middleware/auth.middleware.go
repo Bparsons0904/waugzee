@@ -6,6 +6,8 @@ import (
 	"waugzee/internal/models"
 	"waugzee/internal/services"
 
+	logger "github.com/Bparsons0904/goLogger"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -19,9 +21,9 @@ const (
 
 // RequireAuth middleware validates OIDC tokens and requires authentication
 func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.Handler {
-	log := m.log.Function("RequireAuth")
-
 	return func(c *fiber.Ctx) error {
+		log := logger.New("middleware").TraceFromContext(c.UserContext()).Function("RequireAuth")
+
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
 			log.Info("missing authorization header")
@@ -48,7 +50,7 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 		}
 
 		// Validate ID token (JWT) with Zitadel
-		tokenInfo, err := zitadelService.ValidateIDToken(c.Context(), token)
+		tokenInfo, err := zitadelService.ValidateIDToken(c.UserContext(), token)
 		if err != nil {
 			log.Info("token validation failed", "error", err.Error())
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -57,7 +59,7 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 		}
 
 		// Fetch user from database using OIDC User ID
-		user, err := m.userRepo.GetByOIDCUserID(c.Context(), m.DB.SQL, tokenInfo.UserID)
+		user, err := m.userRepo.GetByOIDCUserID(c.UserContext(), m.DB.SQL, tokenInfo.UserID)
 		if err != nil {
 			log.Info(
 				"user not found in database",
@@ -74,8 +76,8 @@ func (m *Middleware) RequireAuth(zitadelService *services.ZitadelService) fiber.
 		// Store user in Fiber context
 		c.Locals(UserKeyFiber, user)
 
-		// Add to Go context for services
-		ctx := context.WithValue(c.Context(), UserKey, user)
+		// Add to Go context for services (preserve trace ID from TraceID middleware)
+		ctx := context.WithValue(c.UserContext(), UserKey, user)
 		c.SetUserContext(ctx)
 
 		log.Info(

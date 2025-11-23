@@ -43,7 +43,7 @@ func (h *HistoryHandler) Register() {
 }
 
 func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("logPlay")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("logPlay")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -61,7 +61,7 @@ func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
 		})
 	}
 
-	playHistory, err := h.historyController.LogPlay(c.Context(), user, &req)
+	playHistory, err := h.historyController.LogPlay(c.UserContext(), user, &req)
 	if err != nil {
 		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -85,7 +85,7 @@ func (h *HistoryHandler) logPlay(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) updatePlayHistory(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("updatePlayHistory")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("updatePlayHistory")
 
 	user := middleware.GetUser(c)
 
@@ -107,7 +107,7 @@ func (h *HistoryHandler) updatePlayHistory(c *fiber.Ctx) error {
 	}
 
 	playHistory, err := h.historyController.UpdatePlayHistory(
-		c.Context(),
+		c.UserContext(),
 		user,
 		playHistoryID,
 		&req,
@@ -135,7 +135,7 @@ func (h *HistoryHandler) updatePlayHistory(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) deletePlayHistory(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("deletePlayHistory")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("deletePlayHistory")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -154,7 +154,7 @@ func (h *HistoryHandler) deletePlayHistory(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.historyController.DeletePlayHistory(c.Context(), user, playHistoryID); err != nil {
+	if err := h.historyController.DeletePlayHistory(c.UserContext(), user, playHistoryID); err != nil {
 		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": err.Error(),
@@ -175,7 +175,7 @@ func (h *HistoryHandler) deletePlayHistory(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) logCleaning(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("logCleaning")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("logCleaning")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -193,7 +193,7 @@ func (h *HistoryHandler) logCleaning(c *fiber.Ctx) error {
 		})
 	}
 
-	cleaningHistory, err := h.historyController.LogCleaning(c.Context(), user, &req)
+	cleaningHistory, err := h.historyController.LogCleaning(c.UserContext(), user, &req)
 	if err != nil {
 		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -217,7 +217,7 @@ func (h *HistoryHandler) logCleaning(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) updateCleaningHistory(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("updateCleaningHistory")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("updateCleaningHistory")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -245,7 +245,7 @@ func (h *HistoryHandler) updateCleaningHistory(c *fiber.Ctx) error {
 	}
 
 	cleaningHistory, err := h.historyController.UpdateCleaningHistory(
-		c.Context(),
+		c.UserContext(),
 		user,
 		cleaningHistoryID,
 		&req,
@@ -273,7 +273,7 @@ func (h *HistoryHandler) updateCleaningHistory(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("deleteCleaningHistory")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("deleteCleaningHistory")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -292,7 +292,7 @@ func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.historyController.DeleteCleaningHistory(c.Context(), user, cleaningHistoryID); err != nil {
+	if err := h.historyController.DeleteCleaningHistory(c.UserContext(), user, cleaningHistoryID); err != nil {
 		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": err.Error(),
@@ -313,7 +313,7 @@ func (h *HistoryHandler) deleteCleaningHistory(c *fiber.Ctx) error {
 }
 
 func (h *HistoryHandler) logBoth(c *fiber.Ctx) error {
-	log := logger.New("handlers").TraceFromContext(c.Context()).File("history_handler").Function("logBoth")
+	log := logger.New("handlers").TraceFromContext(c.UserContext()).File("history_handler").Function("logBoth")
 
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -331,7 +331,7 @@ func (h *HistoryHandler) logBoth(c *fiber.Ctx) error {
 		})
 	}
 
-	response, err := h.historyController.LogBoth(c.Context(), user, &req)
+	response, err := h.historyController.LogBoth(c.UserContext(), user, &req)
 	if err != nil {
 		if errors.Is(err, historyController.ErrValidation) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{

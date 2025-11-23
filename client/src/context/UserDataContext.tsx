@@ -29,7 +29,20 @@ type UserDataContextValue = {
   refreshUser: () => Promise<void>;
 };
 
-const UserDataContext = createContext<UserDataContextValue>({} as UserDataContextValue);
+const UserDataContext = createContext<UserDataContextValue>({
+  user: () => null,
+  folders: () => [],
+  releases: () => [],
+  styluses: () => [],
+  playHistory: () => [],
+  cleaningHistory: () => [],
+  dailyRecommendation: () => null,
+  streak: () => null,
+  isLoading: () => true,
+  error: () => null,
+  updateUser: () => {},
+  refreshUser: async () => {},
+});
 
 export function UserDataProvider(props: { children: JSX.Element }) {
   const auth = useAuth();
