@@ -11,7 +11,7 @@ trigger:
 
 steps:
   - name: build-frontend
-    image: node:22-alpine
+    image: node:24-alpine
     environment:
       VITE_API_URL:
         from_secret: VITE_API_URL
