@@ -22,7 +22,7 @@ RUN CGO_ENABLED=1 GOOS=linux GOEXPERIMENT=${GOEXPERIMENT} go build -ldflags="-w 
 RUN CGO_ENABLED=1 GOOS=linux GOEXPERIMENT=${GOEXPERIMENT} go build -ldflags="-w -s" -o migration cmd/migration/main.go
 
 # Production stage
-FROM alpine:latest
+FROM alpine:3.23.0
 
 # Install necessary runtime packages
 RUN apk add --no-cache ca-certificates curl
