@@ -1,4 +1,5 @@
 import { BottomSearchBar } from "@components/BottomSearchBar/BottomSearchBar";
+import { SearchInput } from "@components/common/forms/SearchInput/SearchInput";
 import { Select } from "@components/common/forms/Select/Select";
 import { Button } from "@components/common/ui/Button/Button";
 import FilterIcon from "@components/icons/FilterIcon";
@@ -13,6 +14,8 @@ import type { UserRelease } from "src/types/User";
 import styles from "./ViewCollection.module.scss";
 
 interface CollectionControlsProps {
+  searchTerm: string;
+  onSearchChange: (value: string) => void;
   sortBy: string;
   onSortChange: (value: string) => void;
   gridSize: "small" | "medium" | "large";
@@ -29,17 +32,14 @@ const CollectionControls: Component<CollectionControlsProps> = (props) => {
   return (
     <>
       <div class={styles.controls}>
-        <div class={styles.controlButtons}>
-          <button
-            class={styles.filterButton}
-            onClick={props.onToggleFilters}
-            classList={{ [styles.active]: props.showFilters }}
-            type="button"
-          >
-            <FilterIcon size={20} />
-            <span>Filter</span>
-          </button>
+        <SearchInput
+          value={props.searchTerm}
+          onInput={props.onSearchChange}
+          placeholder="Search by album or artist..."
+          class={styles.searchBar}
+        />
 
+        <div class={styles.controlButtons}>
           <Select
             name="sortBy"
             options={[
@@ -52,6 +52,16 @@ const CollectionControls: Component<CollectionControlsProps> = (props) => {
             onChange={props.onSortChange}
             class={styles.sortSelect}
           />
+
+          <button
+            class={styles.filterButton}
+            onClick={props.onToggleFilters}
+            classList={{ [styles.active]: props.showFilters }}
+            type="button"
+          >
+            <FilterIcon size={20} />
+            <span>Filter</span>
+          </button>
 
           <div class={styles.gridSizeToggle}>
             <button
@@ -288,6 +298,8 @@ const ViewCollection: Component = () => {
       <h1 class={styles.title}>Your Collection</h1>
 
       <CollectionControls
+        searchTerm={viewState.searchTerm}
+        onSearchChange={(value) => setViewState("searchTerm", value)}
         sortBy={viewState.sortBy}
         onSortChange={(value) => setViewState("sortBy", value)}
         gridSize={viewState.gridSize}

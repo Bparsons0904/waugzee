@@ -37,11 +37,13 @@
 
 .controls {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   gap: $spacing-md;
   margin-bottom: $spacing-lg;
 
   @media (max-width: $breakpoint-md) {
+    flex-direction: column;
     gap: $spacing-sm;
     margin-bottom: $spacing-md;
   }
@@ -52,12 +54,26 @@
   }
 }
 
+.searchBar {
+  flex: 1;
+  min-width: 200px;
+
+  @media (max-width: $breakpoint-md) {
+    display: none;
+  }
+}
+
 .controlButtons {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  flex-wrap: nowrap;
   align-items: center;
   gap: $spacing-md;
+
+  @media (max-width: $breakpoint-md) {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    width: 100%;
+  }
 }
 
 .filterButton {
@@ -80,6 +96,15 @@
     background-color: $bg-primary-subtle;
     border-color: $border-primary;
     color: $color-primary-600;
+  }
+}
+
+.sortSelect {
+  min-width: 250px;
+
+  @media (max-width: $breakpoint-md) {
+    min-width: auto;
+    width: 100%;
   }
 }
 
