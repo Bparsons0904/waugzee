@@ -27,7 +27,7 @@ ENV VITE_ENV=$VITE_ENV
 RUN npm run build
 
 # Production stage with nginx
-FROM nginx:1.27-alpine3.23
+FROM nginx:1.27-alpine
 
 # Copy custom nginx config if needed
 # COPY nginx.conf /etc/nginx/nginx.conf
